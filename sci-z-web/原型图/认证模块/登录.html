@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>登录 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .login-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .login-card {
+        width: 100%;
+        max-width: 400px;
+        background: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        padding: 32px;
+      }
+
+      .logo-section {
+        text-align: center;
+        margin-bottom: 32px;
+      }
+
+      .logo-section img {
+        width: 48px;
+        height: 48px;
+        margin-bottom: 16px;
+      }
+
+      .logo-section h1 {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0 0 8px 0;
+      }
+
+      .logo-section p {
+        font-size: 14px;
+        color: #6b7280;
+        margin: 0;
+      }
+
+      .form-section {
+        margin-bottom: 24px;
+      }
+
+      .form-item {
+        margin-bottom: 20px;
+      }
+
+      .form-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .remember-section {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 20px 0;
+      }
+
+      .forgot-link {
+        color: #1e3a8a;
+        text-decoration: none;
+        font-size: 14px;
+      }
+
+      .forgot-link:hover {
+        text-decoration: underline;
+      }
+
+      .login-button {
+        width: 100%;
+        height: 40px;
+        font-size: 16px;
+        margin-bottom: 24px;
+      }
+
+      .register-section {
+        text-align: center;
+        padding-top: 24px;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      .register-link {
+        color: #1e3a8a;
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      .register-link:hover {
+        text-decoration: underline;
+      }
+
+      .captcha-container {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+
+      .captcha-input {
+        flex: 2;
+      }
+
+      .captcha-image {
+        flex: 1;
+        height: 40px;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f9fafb;
+        color: #6b7280;
+        font-size: 12px;
+      }
+
+      .captcha-image:hover {
+        border-color: #1e3a8a;
+      }
+
+      .error-message {
+        color: #dc2626;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+
+      .success-icon {
+        color: #16a34a;
+        font-size: 16px;
+      }
+
+      @media (max-width: 480px) {
+        .login-card {
+          margin: 0 20px;
+          padding: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="login-container">
+        <div class="login-card">
+          <!-- Logo 区域 -->
+          <div class="logo-section">
+            <img src="../images/logo.svg" alt="Logo" />
+            <h1>高校科研管理平台</h1>
+            <p>欢迎回来，请登录您的账户</p>
+          </div>
+
+          <!-- 表单区域 -->
+          <div class="form-section">
+            <el-form
+              :model="loginForm"
+              :rules="rules"
+              ref="formRef"
+              @submit.prevent="handleLogin"
+            >
+              <!-- 用户名输入框 -->
+              <div class="form-item">
+                <el-form-item prop="username">
+                  <el-input
+                    v-model="loginForm.username"
+                    placeholder="请输入用户名/邮箱 (默认: admin)"
+                    size="large"
+                    :prefix-icon="User"
+                    clearable
+                    @blur="validateUsername"
+                  />
+                  <div v-if="usernameError" class="error-message">
+                    {{ usernameError }}
+                  </div>
+                  <div v-if="usernameSuccess" class="success-icon">✓</div>
+                </el-form-item>
+              </div>
+
+              <!-- 密码输入框 -->
+              <div class="form-item">
+                <el-form-item prop="password">
+                  <el-input
+                    v-model="loginForm.password"
+                    type="password"
+                    placeholder="请输入密码 (默认: admin)"
+                    size="large"
+                    :prefix-icon="Lock"
+                    show-password
+                    clearable
+                    @blur="validatePassword"
+                  />
+                  <div v-if="passwordError" class="error-message">
+                    {{ passwordError }}
+                  </div>
+                  <div v-if="passwordSuccess" class="success-icon">✓</div>
+                </el-form-item>
+              </div>
+
+              <!-- 验证码输入框 -->
+              <div class="form-item" v-if="showCaptcha">
+                <el-form-item prop="captcha">
+                  <div class="captcha-container">
+                    <el-input
+                      v-model="loginForm.captcha"
+                      placeholder="请输入验证码"
+                      size="large"
+                      class="captcha-input"
+                      maxlength="4"
+                      clearable
+                    />
+                    <div class="captcha-image" @click="refreshCaptcha">
+                      <span v-if="!captchaUrl">点击获取</span>
+                      <img
+                        v-else
+                        :src="captchaUrl"
+                        alt="验证码"
+                        style="width: 100%; height: 100%; object-fit: cover"
+                      />
+                    </div>
+                  </div>
+                  <div v-if="captchaError" class="error-message">
+                    {{ captchaError }}
+                  </div>
+                </el-form-item>
+              </div>
+
+              <!-- 记住我和忘记密码 -->
+              <div class="remember-section">
+                <el-checkbox v-model="loginForm.remember">
+                  7天免登录
+                </el-checkbox>
+                <a href="#" class="forgot-link" @click="handleForgotPassword">
+                  忘记密码？
+                </a>
+              </div>
+
+              <!-- 登录按钮 -->
+              <el-button
+                type="primary"
+                class="login-button"
+                size="large"
+                :loading="loading"
+                @click="handleLogin"
+              >
+                {{ loading ? '登录中...' : '登录' }}
+              </el-button>
+            </el-form>
+          </div>
+
+          <!-- 底部区域 -->
+          <div class="register-section">
+            <span style="color: #6b7280">还没有账户？</span>
+            <a href="#" class="register-link" @click="handleRegister">
+              立即注册
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive } = Vue;
+      const { ElMessage, ElLoading } = ElementPlus;
+
+      createApp({
+        setup() {
+          // 表单数据
+          const loginForm = reactive({
+            username: "",
+            password: "",
+            captcha: "",
+            remember: false,
+          });
+
+          // 状态管理
+          const loading = ref(false);
+          const showCaptcha = ref(false);
+          const captchaUrl = ref("");
+          const failedAttempts = ref(0);
+
+          // 验证状态
+          const usernameError = ref("");
+          const usernameSuccess = ref(false);
+          const passwordError = ref("");
+          const passwordSuccess = ref(false);
+          const captchaError = ref("");
+
+          // 表单引用
+          const formRef = ref();
+
+          // 验证规则
+          const rules = {
+            username: [
+              { required: true, message: "请输入用户名", trigger: "blur" },
+              {
+                min: 3,
+                max: 50,
+                message: "用户名长度为3-50个字符",
+                trigger: "blur",
+              },
+            ],
+            password: [
+              { required: true, message: "请输入密码", trigger: "blur" },
+              {
+                min: 5,
+                max: 20,
+                message: "密码长度为5-20个字符",
+                trigger: "blur",
+              },
+            ],
+            captcha: [
+              { required: true, message: "请输入验证码", trigger: "blur" },
+              { len: 4, message: "验证码为4位字符", trigger: "blur" },
+            ],
+          };
+
+          // 用户名验证
+          const validateUsername = () => {
+            usernameError.value = "";
+            usernameSuccess.value = false;
+
+            if (!loginForm.username) {
+              usernameError.value = "请输入用户名";
+              return false;
+            }
+
+            if (
+              loginForm.username.length < 3 ||
+              loginForm.username.length > 50
+            ) {
+              usernameError.value = "用户名长度为3-50个字符";
+              return false;
+            }
+
+            // 模拟异步验证
+            setTimeout(() => {
+              usernameSuccess.value = true;
+            }, 300);
+
+            return true;
+          };
+
+          // 密码验证
+          const validatePassword = () => {
+            passwordError.value = "";
+            passwordSuccess.value = false;
+
+            if (!loginForm.password) {
+              passwordError.value = "请输入密码";
+              return false;
+            }
+
+            if (
+              loginForm.password.length < 5 ||
+              loginForm.password.length > 20
+            ) {
+              passwordError.value = "密码长度为5-20个字符";
+              return false;
+            }
+
+            // 模拟密码强度检查
+            setTimeout(() => {
+              passwordSuccess.value = true;
+            }, 300);
+
+            return true;
+          };
+
+          // 刷新验证码
+          const refreshCaptcha = () => {
+            // 模拟生成验证码
+            captchaUrl.value = `data:image/svg+xml;base64,${btoa(`
+            <svg width="100" height="40" xmlns="http://www.w3.org/2000/svg">
+              <rect width="100" height="40" fill="#F3F4F6"/>
+              <text x="50" y="25" text-anchor="middle" font-family="monospace" font-size="18" fill="#374151">${Math.random()
+                .toString()
+                .substring(2, 6)}</text>
+            </svg>
+          `)}`;
+            captchaError.value = "";
+          };
+
+          // 登录处理
+          const handleLogin = async () => {
+            if (!formRef.value) return;
+
+            try {
+              const valid = await formRef.value.validate();
+              if (!valid) return;
+
+              loading.value = true;
+
+              // 模拟登录API调用
+              await new Promise((resolve) => setTimeout(resolve, 1500));
+
+              // 检查默认用户 admin/admin
+              if (
+                loginForm.username === "admin" &&
+                loginForm.password === "admin"
+              ) {
+                ElMessage.success("登录成功！欢迎使用高校科研管理平台");
+
+                // 模拟缓存Token
+                if (loginForm.remember) {
+                  localStorage.setItem("remember_token", "mock_remember_token");
+                }
+                localStorage.setItem("auth_token", "mock_auth_token");
+
+                // 跳转到系统主界面
+                setTimeout(() => {
+                  // 检查是否在iframe中
+                  if (window.parent !== window) {
+                    window.parent.postMessage(
+                      {
+                        type: "navigate",
+                        path: "dashboard",
+                      },
+                      "*"
+                    );
+                  } else {
+                    // 直接跳转到系统主界面（包含左侧菜单和右上角用户信息）
+                    window.location.href = "../通用规范/原型壳-布局.html";
+                  }
+                }, 1000);
+              } else {
+                // 登录失败
+                failedAttempts.value++;
+                if (failedAttempts.value >= 3) {
+                  showCaptcha.value = true;
+                  refreshCaptcha();
+                }
+
+                ElMessage.error("用户名或密码错误，请重试");
+                ElMessage.info("提示：默认用户名和密码为 admin/admin");
+              }
+            } catch (error) {
+              ElMessage.error("登录失败，请重试");
+            } finally {
+              loading.value = false;
+            }
+          };
+
+          // 忘记密码
+          const handleForgotPassword = () => {
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "auth/reset-password",
+                },
+                "*"
+              );
+            } else {
+              // 直接跳转（用于独立访问）
+              window.location.href = "重置密码.html";
+            }
+          };
+
+          // 注册
+          const handleRegister = () => {
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "auth/register",
+                },
+                "*"
+              );
+            } else {
+              // 直接跳转（用于独立访问）
+              window.location.href = "注册.html";
+            }
+          };
+
+          return {
+            loginForm,
+            loading,
+            showCaptcha,
+            captchaUrl,
+            usernameError,
+            usernameSuccess,
+            passwordError,
+            passwordSuccess,
+            captchaError,
+            formRef,
+            rules,
+            validateUsername,
+            validatePassword,
+            refreshCaptcha,
+            handleLogin,
+            handleForgotPassword,
+            handleRegister,
+          };
+        },
+      })
+        .use(ElementPlus)
+        .mount("#app");
+    </script>
+  </body>
+</html>

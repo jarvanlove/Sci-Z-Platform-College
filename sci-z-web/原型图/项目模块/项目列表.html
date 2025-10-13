@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>项目列表 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.3.14/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3.2.47/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.3.14"></script>
+    <script src="https://unpkg.com/dayjs@1.11.10/locale/zh-cn.js"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .project-list-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+      }
+
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0;
+      }
+
+      .search-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+      }
+
+      .search-form {
+        display: flex;
+        gap: 16px;
+        align-items: end;
+      }
+
+      .search-form .el-form-item {
+        margin-bottom: 0;
+      }
+
+      .table-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+      }
+
+      .status-tag {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .status-planned {
+        background-color: #dbeafe;
+        color: #1e40af;
+      }
+
+      .status-progress {
+        background-color: #fef3c7;
+        color: #f59e0b;
+      }
+
+      .status-completed {
+        background-color: #dcfce7;
+        color: #16a34a;
+      }
+
+      .status-delayed {
+        background-color: #fee2e2;
+        color: #dc2626;
+      }
+
+      .operation-buttons {
+        display: flex;
+        gap: 8px;
+      }
+
+      .operation-buttons .el-button {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #6b7280;
+      }
+
+      .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+      }
+
+      .empty-state-text {
+        font-size: 16px;
+        margin-bottom: 8px;
+      }
+
+      .empty-state-hint {
+        font-size: 14px;
+        color: #9ca3af;
+      }
+
+      /* 加载状态样式 */
+      .loading-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        color: #6b7280;
+        font-size: 14px;
+      }
+
+      .loading-container .el-icon {
+        margin-right: 8px;
+        font-size: 16px;
+      }
+
+      /* 原生HTML表格样式 */
+      .table-wrapper {
+        overflow-x: auto;
+      }
+
+      .native-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+        color: #374151;
+        background-color: #ffffff;
+        border: 1px solid #e5e7eb;
+      }
+
+      /* 表头样式 */
+      .native-table thead th {
+        background-color: #f5f5f5;
+        color: #374151;
+        font-weight: 600;
+        padding: 12px 8px;
+        border-right: 1px solid #e5e7eb;
+        border-bottom: 1px solid #e5e7eb;
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      /* 表格内容样式 */
+      .native-table tbody td {
+        padding: 12px 8px;
+        border-right: 1px solid #e5e7eb;
+        border-bottom: 1px solid #e5e7eb;
+        vertical-align: top;
+      }
+
+      /* 斑马纹效果 */
+      .native-table tbody tr:nth-child(even) {
+        background-color: #f9fafb;
+      }
+
+      /* 悬停效果 */
+      .native-table tbody tr:hover {
+        background-color: #f3f4f6;
+      }
+
+      /* 列宽度设置 */
+      .native-table .col-number {
+        width: 150px;
+        min-width: 120px;
+      }
+
+      .native-table .col-name {
+        width: 250px;
+        min-width: 200px;
+      }
+
+      .native-table .col-manager {
+        width: 120px;
+        min-width: 100px;
+        text-align: center;
+      }
+
+      .native-table .col-status {
+        width: 100px;
+        text-align: center;
+      }
+
+      .native-table .col-progress {
+        width: 120px;
+      }
+
+      .native-table .col-start-time {
+        width: 140px;
+        min-width: 120px;
+        text-align: center;
+      }
+
+      .native-table .col-end-time {
+        width: 140px;
+        min-width: 120px;
+        text-align: center;
+      }
+
+      .native-table .col-actions {
+        width: 120px;
+        text-align: center;
+      }
+
+      /* 最后一列不显示右边框 */
+      .native-table thead th:last-child,
+      .native-table tbody td:last-child {
+        border-right: none;
+      }
+
+      /* 进度条样式 */
+      .progress-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .progress-bar {
+        flex: 1;
+        height: 6px;
+        background-color: #e5e7eb;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
+
+      .progress-fill.low {
+        background-color: #dc2626;
+      }
+
+      .progress-fill.medium {
+        background-color: #f59e0b;
+      }
+
+      .progress-fill.high {
+        background-color: #16a34a;
+      }
+
+      .progress-text {
+        font-size: 12px;
+        color: #6b7280;
+        min-width: 35px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="project-list-container">
+        <!-- 页面标题和操作 -->
+        <div class="page-header">
+          <h1 class="page-title">项目管理</h1>
+          <el-button type="primary" size="large" @click="handleNewProject">
+            <el-icon><Plus /></el-icon>
+            新建项目
+          </el-button>
+        </div>
+
+        <!-- 搜索筛选区域 -->
+        <div class="search-card">
+          <el-form :model="searchForm" class="search-form" label-width="100px">
+            <el-form-item label="关键词搜索">
+              <el-input
+                v-model="searchForm.keyword"
+                placeholder="请输入项目名称或编号"
+                clearable
+                style="width: 300px"
+                @keyup.enter="handleSearch"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item label="状态筛选">
+              <el-select
+                v-model="searchForm.status"
+                placeholder="请选择状态"
+                clearable
+                style="width: 150px"
+                @change="handleStatusChange"
+              >
+                <el-option
+                  v-for="option in statusOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="时间筛选">
+              <el-date-picker
+                v-model="searchForm.dateRange"
+                type="daterange"
+                range-separator="至"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
+                style="width: 240px"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                @change="handleDateChange"
+              />
+            </el-form-item>
+          </el-form>
+
+          <!-- 按钮行 -->
+          <div
+            style="display: flex; justify-content: flex-end; margin-top: 16px"
+          >
+            <el-button
+              type="primary"
+              @click="handleSearch"
+              style="margin-right: 8px"
+            >
+              <el-icon><Search /></el-icon>
+              搜索
+            </el-button>
+            <el-button @click="handleReset">
+              <el-icon><Refresh /></el-icon>
+              重置
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 项目列表表格 -->
+        <div class="table-card">
+          <!-- 加载状态 -->
+          <div v-if="loading" class="loading-container">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>加载中...</span>
+          </div>
+
+          <!-- 原生HTML表格 -->
+          <div v-else class="table-wrapper">
+            <table class="native-table">
+              <thead>
+                <tr>
+                  <th class="col-number">项目编号</th>
+                  <th class="col-name">项目名称</th>
+                  <th class="col-manager">项目负责人</th>
+                  <th class="col-status">项目状态</th>
+                  <th class="col-progress">进度</th>
+                  <th class="col-start-time">开始时间</th>
+                  <th class="col-end-time">预计完成时间</th>
+                  <th class="col-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="project in projects" :key="project.id">
+                  <td class="col-number">{{ project.number }}</td>
+                  <td class="col-name" :title="project.name">
+                    {{ project.name }}
+                  </td>
+                  <td class="col-manager">{{ project.manager }}</td>
+                  <td class="col-status">
+                    <span
+                      class="status-tag"
+                      :class="`status-${project.status}`"
+                    >
+                      {{ getStatusText(project.status) }}
+                    </span>
+                  </td>
+                  <td class="col-progress">
+                    <div class="progress-container">
+                      <div class="progress-bar">
+                        <div
+                          class="progress-fill"
+                          :class="getProgressClass(project.progress)"
+                          :style="{ width: project.progress + '%' }"
+                        ></div>
+                      </div>
+                      <span class="progress-text">{{ project.progress }}%</span>
+                    </div>
+                  </td>
+                  <td class="col-start-time">{{ project.startTime }}</td>
+                  <td class="col-end-time">{{ project.endTime }}</td>
+                  <td class="col-actions">
+                    <div class="operation-buttons">
+                      <el-button
+                        type="primary"
+                        size="small"
+                        link
+                        @click="handleView(project.id)"
+                      >
+                        查看详情
+                      </el-button>
+                      <el-button
+                        type="default"
+                        size="small"
+                        link
+                        @click="handleEdit(project.id)"
+                      >
+                        编辑
+                      </el-button>
+                      <el-button
+                        v-if="project.canDelete"
+                        type="danger"
+                        size="small"
+                        link
+                        @click="handleDelete(project.id)"
+                      >
+                        删除
+                      </el-button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-if="!loading && projects.length === 0" class="empty-state">
+            <div class="empty-state-icon">📁</div>
+            <div class="empty-state-text">暂无项目记录</div>
+            <div class="empty-state-hint">
+              点击"新建项目"按钮开始您的第一个项目
+            </div>
+          </div>
+
+          <!-- 分页 -->
+          <div v-if="projects.length > 0" class="pagination-container">
+            <!-- 通用分页组件 -->
+            <div id="pagination-component"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, onMounted } = Vue;
+      const { ElMessage, ElMessageBox } = ElementPlus;
+
+      // 注册Loading图标
+      const Loading = {
+        template:
+          '<svg class="el-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M512 64a32 32 0 0 1 32 32v192a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32zm0 896a32 32 0 0 1-32-32V736a32 32 0 0 1 64 0v192a32 32 0 0 1-32 32zm448-480a32 32 0 0 1-32 32H736a32 32 0 0 1 0-64h192a32 32 0 0 1 32 32zM96 512a32 32 0 0 1 32-32h192a32 32 0 0 1 0 64H128a32 32 0 0 1-32-32zm778.24-200.96a32 32 0 0 1 45.248 45.248l-135.68 135.68a32 32 0 1 1-45.248-45.248l135.68-135.68zm-636.48 636.48a32 32 0 0 1 45.248 45.248l-135.68 135.68a32 32 0 1 1-45.248-45.248l135.68-135.68zM778.24 712.96a32 32 0 0 1-45.248 45.248l-135.68-135.68a32 32 0 1 1 45.248-45.248l135.68 135.68zM141.76 311.04a32 32 0 0 1-45.248-45.248l135.68-135.68a32 32 0 1 1 45.248 45.248l-135.68 135.68z"/></svg>',
+      };
+
+      createApp({
+        components: {
+          Loading,
+        },
+        setup() {
+          // 数据状态
+          const loading = ref(false);
+
+          // 搜索表单
+          const searchForm = reactive({
+            keyword: "",
+            status: "",
+            dateRange: [],
+          });
+
+          // 项目列表数据
+          const projects = ref([]);
+
+          // 分页信息
+          const pagination = reactive({
+            current: 1,
+            size: 10,
+            total: 0,
+          });
+
+          // 状态选项
+          const statusOptions = ref([
+            { label: "全部", value: "" },
+            { label: "计划中", value: "planned" },
+            { label: "进行中", value: "progress" },
+            { label: "已完成", value: "completed" },
+            { label: "已延期", value: "delayed" },
+          ]);
+
+          // 模拟项目数据
+          const mockProjects = [
+            {
+              id: 1,
+              number: "PRJ-2024-001",
+              name: "基于人工智能的智能诊断系统研究",
+              manager: "张教授",
+              status: "progress",
+              progress: 65,
+              startTime: "2024-01-15",
+              endTime: "2024-06-30",
+              canDelete: true,
+            },
+            {
+              id: 2,
+              number: "PRJ-2024-002",
+              name: "区块链技术在供应链管理中的应用",
+              manager: "李博士",
+              status: "planned",
+              progress: 0,
+              startTime: "2024-02-01",
+              endTime: "2024-08-31",
+              canDelete: true,
+            },
+            {
+              id: 3,
+              number: "PRJ-2024-003",
+              name: "大数据分析在医疗健康领域的应用研究",
+              manager: "王教授",
+              status: "completed",
+              progress: 100,
+              startTime: "2023-09-01",
+              endTime: "2024-01-31",
+              canDelete: false,
+            },
+            {
+              id: 4,
+              number: "PRJ-2024-004",
+              name: "物联网技术在智慧城市建设中的应用",
+              manager: "赵博士",
+              status: "delayed",
+              progress: 45,
+              startTime: "2023-12-01",
+              endTime: "2024-03-31",
+              canDelete: true,
+            },
+            {
+              id: 5,
+              number: "PRJ-2024-005",
+              name: "机器学习算法优化研究",
+              manager: "陈教授",
+              status: "progress",
+              progress: 80,
+              startTime: "2024-01-01",
+              endTime: "2024-05-31",
+              canDelete: true,
+            },
+          ];
+
+          // 获取状态文本
+          const getStatusText = (status) => {
+            const statusMap = {
+              planned: "计划中",
+              progress: "进行中",
+              completed: "已完成",
+              delayed: "已延期",
+            };
+            return statusMap[status] || "未知";
+          };
+
+          // 获取进度条颜色类
+          const getProgressClass = (progress) => {
+            if (progress <= 30) return "low";
+            if (progress <= 70) return "medium";
+            return "high";
+          };
+
+          // 加载项目列表
+          const loadProjects = async () => {
+            try {
+              loading.value = true;
+
+              // 模拟API调用延迟
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
+              // 应用筛选条件
+              let filteredProjects = [...mockProjects];
+
+              if (searchForm.keyword) {
+                filteredProjects = filteredProjects.filter(
+                  (project) =>
+                    project.name.includes(searchForm.keyword) ||
+                    project.number.includes(searchForm.keyword)
+                );
+              }
+
+              if (searchForm.status) {
+                filteredProjects = filteredProjects.filter(
+                  (project) => project.status === searchForm.status
+                );
+              }
+
+              // 应用分页
+              const start = (pagination.current - 1) * pagination.size;
+              const end = start + pagination.size;
+
+              projects.value = filteredProjects.slice(start, end);
+              pagination.total = filteredProjects.length;
+            } catch (error) {
+              ElMessage.error("加载项目列表失败，请重试");
+            } finally {
+              loading.value = false;
+              // 数据加载完成后重新初始化分页组件
+              setTimeout(() => {
+                initPagination();
+              }, 100);
+            }
+          };
+
+          // 搜索处理
+          const handleSearch = () => {
+            pagination.current = 1;
+            loadProjects();
+            ElMessage.info("搜索完成");
+          };
+
+          // 状态筛选处理
+          const handleStatusChange = () => {
+            pagination.current = 1;
+            loadProjects();
+          };
+
+          // 时间筛选处理
+          const handleDateChange = () => {
+            pagination.current = 1;
+            loadProjects();
+          };
+
+          // 重置搜索
+          const handleReset = () => {
+            searchForm.keyword = "";
+            searchForm.status = "";
+            searchForm.dateRange = [];
+            pagination.current = 1;
+            loadProjects();
+            ElMessage.info("已重置搜索条件");
+          };
+
+          // 新建项目
+          const handleNewProject = () => {
+            ElMessage.info("跳转到新建项目页面");
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "project/create",
+                },
+                "*"
+              );
+            } else {
+              window.location.href = "新建项目.html";
+            }
+          };
+
+          // 查看详情
+          const handleView = (id) => {
+            ElMessage.info(`查看项目详情：ID ${id}`);
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "project/detail",
+                  params: { id },
+                },
+                "*"
+              );
+            } else {
+              window.location.href = "项目详情.html";
+            }
+          };
+
+          // 编辑项目
+          const handleEdit = (id) => {
+            ElMessage.info(`编辑项目：ID ${id}`);
+            // 这里应该跳转到项目编辑页面
+          };
+
+          // 删除项目
+          const handleDelete = async (id) => {
+            try {
+              await ElMessageBox.confirm(
+                "确定要删除此项目吗？删除后将无法恢复。",
+                "确认删除",
+                {
+                  confirmButtonText: "确定删除",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+              ElMessage.success("项目已删除");
+              loadProjects();
+            } catch {
+              ElMessage.info("已取消删除");
+            }
+          };
+
+          // 初始化分页组件
+          const initPagination = () => {
+            const paginationContainer = document.getElementById(
+              "pagination-component"
+            );
+            if (paginationContainer) {
+              // 创建分页组件HTML
+              const paginationHTML = `
+                <div class="pagination-container">
+                  <!-- 分页信息 -->
+                  <div class="pagination-info">
+                    共 ${pagination.total} 条记录
+                  </div>
+
+                  <!-- 每页显示数量选择器 -->
+                  <div class="page-size-selector">
+                    每页显示
+                    <select id="page-size-select">
+                      <option value="10" ${
+                        pagination.size === 10 ? "selected" : ""
+                      }>10 条</option>
+                      <option value="20" ${
+                        pagination.size === 20 ? "selected" : ""
+                      }>20 条</option>
+                      <option value="50" ${
+                        pagination.size === 50 ? "selected" : ""
+                      }>50 条</option>
+                    </select>
+                  </div>
+
+                  <!-- 分页控制器 -->
+                  <div class="pagination-controls">
+                    <!-- 上一页按钮 -->
+                    <a href="javascript:void(0)" class="page-btn ${
+                      pagination.current === 1 ? "disabled" : ""
+                    }" id="prev-btn">
+                      上一页
+                    </a>
+
+                    <!-- 页码按钮 -->
+                    <div class="page-nav" id="page-nav">
+                      ${generatePageButtons()}
+                    </div>
+
+                    <!-- 下一页按钮 -->
+                    <a href="javascript:void(0)" class="page-btn ${
+                      pagination.current ===
+                      Math.ceil(pagination.total / pagination.size)
+                        ? "disabled"
+                        : ""
+                    }" id="next-btn">
+                      下一页
+                    </a>
+                  </div>
+
+                  <!-- 快速跳转 -->
+                  <div class="page-jumper">
+                    跳至
+                    <input type="number" id="jump-input" value="${
+                      pagination.current
+                    }" min="1" max="${Math.ceil(
+                pagination.total / pagination.size
+              )}">
+                    页
+                    <button class="jump-btn" id="jump-btn">确定</button>
+                  </div>
+                </div>
+              `;
+
+              paginationContainer.innerHTML = paginationHTML;
+
+              // 绑定事件
+              bindPaginationEvents();
+            }
+          };
+
+          // 生成页码按钮
+          const generatePageButtons = () => {
+            const totalPages = Math.ceil(pagination.total / pagination.size);
+            const current = pagination.current;
+            const pagerCount = 7; // 显示的页码数量
+
+            let buttons = "";
+
+            if (totalPages <= pagerCount) {
+              // 总页数小于等于显示数量，显示所有页码
+              for (let i = 1; i <= totalPages; i++) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  i === current ? "active" : ""
+                }" data-page="${i}">${i}</a>`;
+              }
+            } else {
+              // 计算中间页码范围
+              const half = Math.floor(pagerCount / 2);
+              let start = Math.max(1, current - half);
+              let end = Math.min(totalPages, start + pagerCount - 1);
+
+              // 调整起始位置
+              if (end - start + 1 < pagerCount) {
+                start = Math.max(1, end - pagerCount + 1);
+              }
+
+              // 第一页
+              if (start > 1) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  1 === current ? "active" : ""
+                }" data-page="1">1</a>`;
+                if (start > 2) {
+                  buttons += '<span class="page-ellipsis">...</span>';
+                }
+              }
+
+              // 中间页码
+              for (let i = start; i <= end; i++) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  i === current ? "active" : ""
+                }" data-page="${i}">${i}</a>`;
+              }
+
+              // 最后一页
+              if (end < totalPages) {
+                if (end < totalPages - 1) {
+                  buttons += '<span class="page-ellipsis">...</span>';
+                }
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  totalPages === current ? "active" : ""
+                }" data-page="${totalPages}">${totalPages}</a>`;
+              }
+            }
+
+            return buttons;
+          };
+
+          // 绑定分页事件
+          const bindPaginationEvents = () => {
+            // 每页显示数量变化
+            const pageSizeSelect = document.getElementById("page-size-select");
+            if (pageSizeSelect) {
+              pageSizeSelect.addEventListener("change", (e) => {
+                pagination.size = parseInt(e.target.value);
+                pagination.current = 1;
+                loadProjects();
+                initPagination(); // 重新初始化分页组件
+              });
+            }
+
+            // 上一页
+            const prevBtn = document.getElementById("prev-btn");
+            if (prevBtn) {
+              prevBtn.addEventListener("click", () => {
+                if (pagination.current > 1) {
+                  pagination.current--;
+                  loadProjects();
+                  initPagination();
+                }
+              });
+            }
+
+            // 下一页
+            const nextBtn = document.getElementById("next-btn");
+            if (nextBtn) {
+              nextBtn.addEventListener("click", () => {
+                const totalPages = Math.ceil(
+                  pagination.total / pagination.size
+                );
+                if (pagination.current < totalPages) {
+                  pagination.current++;
+                  loadProjects();
+                  initPagination();
+                }
+              });
+            }
+
+            // 页码点击
+            const pageNav = document.getElementById("page-nav");
+            if (pageNav) {
+              pageNav.addEventListener("click", (e) => {
+                if (
+                  e.target.classList.contains("page-btn") &&
+                  !e.target.classList.contains("active")
+                ) {
+                  const page = parseInt(e.target.getAttribute("data-page"));
+                  if (page && page !== pagination.current) {
+                    pagination.current = page;
+                    loadProjects();
+                    initPagination();
+                  }
+                }
+              });
+            }
+
+            // 快速跳转
+            const jumpBtn = document.getElementById("jump-btn");
+            const jumpInput = document.getElementById("jump-input");
+            if (jumpBtn && jumpInput) {
+              const handleJump = () => {
+                const page = parseInt(jumpInput.value);
+                const totalPages = Math.ceil(
+                  pagination.total / pagination.size
+                );
+                if (
+                  page &&
+                  page >= 1 &&
+                  page <= totalPages &&
+                  page !== pagination.current
+                ) {
+                  pagination.current = page;
+                  loadProjects();
+                  initPagination();
+                } else {
+                  jumpInput.value = pagination.current;
+                }
+              };
+
+              jumpBtn.addEventListener("click", handleJump);
+              jumpInput.addEventListener("keyup", (e) => {
+                if (e.key === "Enter") {
+                  handleJump();
+                }
+              });
+            }
+          };
+
+          // 组件挂载时加载数据
+          onMounted(() => {
+            console.log("项目列表页面加载中...");
+            loadProjects();
+          });
+
+          return {
+            loading,
+            searchForm,
+            projects,
+            pagination,
+            statusOptions,
+            getStatusText,
+            getProgressClass,
+            handleSearch,
+            handleStatusChange,
+            handleDateChange,
+            handleReset,
+            handleNewProject,
+            handleView,
+            handleEdit,
+            handleDelete,
+          };
+        },
+      })
+        .use(ElementPlus, {
+          locale: {
+            name: "zh-cn",
+            el: {
+              datepicker: {
+                now: "此刻",
+                today: "今天",
+                cancel: "取消",
+                clear: "清空",
+                confirm: "确认",
+                selectDate: "选择日期",
+                selectTime: "选择时间",
+                startDate: "开始日期",
+                startTime: "开始时间",
+                endDate: "结束日期",
+                endTime: "结束时间",
+                prevYear: "前一年",
+                nextYear: "后一年",
+                prevMonth: "上个月",
+                nextMonth: "下个月",
+                year: "年",
+                month1: "1月",
+                month2: "2月",
+                month3: "3月",
+                month4: "4月",
+                month5: "5月",
+                month6: "6月",
+                month7: "7月",
+                month8: "8月",
+                month9: "9月",
+                month10: "10月",
+                month11: "11月",
+                month12: "12月",
+                weeks: {
+                  sun: "日",
+                  mon: "一",
+                  tue: "二",
+                  wed: "三",
+                  thu: "四",
+                  fri: "五",
+                  sat: "六",
+                },
+                months: {
+                  jan: "一月",
+                  feb: "二月",
+                  mar: "三月",
+                  apr: "四月",
+                  may: "五月",
+                  jun: "六月",
+                  jul: "七月",
+                  aug: "八月",
+                  sep: "九月",
+                  oct: "十月",
+                  nov: "十一月",
+                  dec: "十二月",
+                },
+              },
+            },
+          },
+        })
+        .mount("#app");
+    </script>
+  </body>
+</html>

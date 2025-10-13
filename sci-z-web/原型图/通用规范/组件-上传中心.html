@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>组件-上传中心</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <link rel="stylesheet" href="样式.css" />
+  </head>
+  <body>
+    <div id="app" class="content">
+      <div class="card">
+        <h3 class="title">统一上传组件（示例）</h3>
+        <el-upload
+          drag
+          multiple
+          :auto-upload="false"
+          :limit="5"
+          :on-exceed="()=>ElMessage.warning('最多5个')"
+        >
+          <i class="el-icon-upload"></i>
+          <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+          <template #tip>
+            <div class="el-upload__tip">
+              支持 doc/docx/xlsx/pdf/jpg/png；单文件 ≤ 50MB
+            </div>
+          </template>
+        </el-upload>
+      </div>
+    </div>
+    <script>
+      Vue.createApp({}).mount("#app");
+    </script>
+  </body>
+</html>

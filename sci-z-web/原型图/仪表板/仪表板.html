@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>仪表板 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.4.4/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.4.4"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .dashboard-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+      }
+
+      .stats-cards {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .stat-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+      }
+
+      .stat-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+      }
+
+      .stat-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+
+      .stat-value {
+        font-size: 28px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .stat-label {
+        font-size: 14px;
+        color: #6b7280;
+      }
+
+      .stat-total {
+        color: #1e3a8a;
+      }
+
+      .stat-progress {
+        color: #f59e0b;
+      }
+
+      .stat-pending {
+        color: #2563eb;
+      }
+
+      .stat-completed {
+        color: #16a34a;
+      }
+
+      .main-content {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 24px;
+      }
+
+      .content-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .card-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #374151;
+        margin: 0;
+      }
+
+      .card-action {
+        color: #1e3a8a;
+        font-size: 14px;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .card-action:hover {
+        text-decoration: underline;
+      }
+
+      .declaration-table {
+        width: 100%;
+      }
+
+      .declaration-table .el-table__row {
+        cursor: pointer;
+      }
+
+      .declaration-table .el-table__row:hover {
+        background-color: #f0f9ff !important;
+      }
+
+      .progress-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 16px;
+        padding: 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .progress-item:hover {
+        background-color: #f8fafc;
+      }
+
+      .progress-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .progress-info {
+        flex: 1;
+        margin-right: 12px;
+      }
+
+      .progress-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: #374151;
+        margin-bottom: 4px;
+      }
+
+      .progress-time {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      .progress-bar-container {
+        width: 120px;
+        margin-right: 8px;
+      }
+
+      .progress-bar {
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+        background-color: #e5e7eb;
+      }
+
+      .progress-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+
+      .progress-fill.low {
+        background-color: #dc2626;
+      }
+
+      .progress-fill.medium {
+        background-color: #f59e0b;
+      }
+
+      .progress-fill.high {
+        background-color: #16a34a;
+      }
+
+      .progress-percentage {
+        font-size: 12px;
+        font-weight: 600;
+        color: #374151;
+        min-width: 40px;
+        text-align: right;
+      }
+
+      .todo-item {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 12px;
+        padding: 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .todo-item:hover {
+        background-color: #f8fafc;
+      }
+
+      .todo-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .todo-type {
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        margin-right: 8px;
+        flex-shrink: 0;
+      }
+
+      .todo-type.declaration {
+        background-color: #dbeafe;
+        color: #2563eb;
+      }
+
+      .todo-type.acceptance {
+        background-color: #fef3c7;
+        color: #f59e0b;
+      }
+
+      .todo-type.report {
+        background-color: #e0e7ff;
+        color: #1e3a8a;
+      }
+
+      .todo-type.notification {
+        background-color: #f3f4f6;
+        color: #6b7280;
+      }
+
+      .todo-content {
+        flex: 1;
+        margin-right: 8px;
+      }
+
+      .todo-description {
+        font-size: 14px;
+        color: #374151;
+        margin-bottom: 4px;
+        line-height: 1.4;
+      }
+
+      .todo-time {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      .todo-priority {
+        padding: 2px 6px;
+        border-radius: 8px;
+        font-size: 10px;
+        font-weight: 600;
+        flex-shrink: 0;
+      }
+
+      .priority-urgent {
+        background-color: #fee2e2;
+        color: #dc2626;
+      }
+
+      .priority-important {
+        background-color: #fef3c7;
+        color: #f59e0b;
+      }
+
+      .priority-normal {
+        background-color: #dbeafe;
+        color: #2563eb;
+      }
+
+      .quick-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .action-button {
+        display: flex;
+        align-items: center;
+        padding: 12px 16px;
+        border-radius: 6px;
+        text-decoration: none;
+        color: #374151;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+        cursor: pointer;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+      }
+
+      .action-button.primary {
+        background-color: #1e3a8a;
+        color: #ffffff;
+      }
+
+      .action-button.primary:hover {
+        background-color: #1e40af;
+      }
+
+      .action-button.secondary {
+        background-color: #ffffff;
+        border: 1px solid #1e3a8a;
+        color: #1e3a8a;
+      }
+
+      .action-button.secondary:hover {
+        background-color: #f8fafc;
+      }
+
+      .action-button.text {
+        background-color: transparent;
+        color: #1e3a8a;
+        border: none;
+      }
+
+      .action-button.text:hover {
+        background-color: #f8fafc;
+      }
+
+      .action-icon {
+        margin-right: 8px;
+        font-size: 16px;
+      }
+
+      .status-tag {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .status-submitting {
+        background-color: #fef3c7;
+        color: #f59e0b;
+      }
+
+      .status-success {
+        background-color: #dcfce7;
+        color: #16a34a;
+      }
+
+      .status-failed {
+        background-color: #fee2e2;
+        color: #dc2626;
+      }
+
+      .status-withdrawn {
+        background-color: #e0e7ff;
+        color: #2563eb;
+      }
+
+      .loading-skeleton {
+        background: linear-gradient(
+          90deg,
+          #f0f0f0 25%,
+          #e0e0e0 50%,
+          #f0f0f0 75%
+        );
+        background-size: 200% 100%;
+        animation: loading 1.5s infinite;
+      }
+
+      @keyframes loading {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+
+      .skeleton-card {
+        height: 120px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+      }
+
+      .skeleton-content {
+        height: 200px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+      }
+
+      @media (max-width: 1024px) {
+        .stats-cards {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .main-content {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .stats-cards {
+          grid-template-columns: 1fr;
+        }
+
+        .dashboard-container {
+          padding: 16px;
+        }
+
+        .progress-item {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .progress-info {
+          margin-right: 0;
+          margin-bottom: 8px;
+        }
+
+        .progress-bar-container {
+          width: 100%;
+          margin-right: 0;
+          margin-bottom: 4px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="dashboard-container">
+        <!-- 顶部统计卡片区域 -->
+        <div class="stats-cards">
+          <div
+            v-if="loading"
+            v-for="i in 4"
+            :key="`skeleton-${i}`"
+            class="stat-card loading-skeleton"
+          ></div>
+
+          <div
+            v-else
+            v-for="stat in stats"
+            :key="stat.type"
+            class="stat-card"
+            :class="`stat-${stat.type}`"
+            @click="handleStatClick(stat.type)"
+          >
+            <div class="stat-icon">{{ stat.icon }}</div>
+            <div class="stat-value">{{ formatNumber(stat.value) }}</div>
+            <div class="stat-label">{{ stat.label }}</div>
+          </div>
+        </div>
+
+        <!-- 主要内容区域 -->
+        <div class="main-content">
+          <!-- 左侧内容 -->
+          <div>
+            <!-- 最近申报列表 -->
+            <div class="content-card">
+              <div class="card-header">
+                <h3 class="card-title">最近申报</h3>
+                <a
+                  href="#"
+                  class="card-action"
+                  @click="handleViewAllDeclarations"
+                >
+                  查看全部
+                </a>
+              </div>
+
+              <div
+                v-if="loading"
+                class="skeleton-content loading-skeleton"
+              ></div>
+
+              <!-- 调试信息 -->
+              <!-- <div
+                v-if="!loading"
+                style="margin-bottom: 10px; font-size: 12px; color: #666"
+              >
+                数据条数: {{ recentDeclarations.length }} | 加载状态: {{ loading
+                }}
+                Element Plus测试按钮已隐藏 
+              </div> -->
+
+              <!-- 申报数据表格 -->
+              <div
+                v-if="!loading && recentDeclarations.length > 0"
+                style="margin-bottom: 20px"
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    border: 1px solid #e5e7eb;
+                  "
+                >
+                  <thead style="background-color: #f5f5f5">
+                    <tr>
+                      <th
+                        style="
+                          border: 1px solid #e5e7eb;
+                          padding: 8px;
+                          font-size: 13px;
+                          color: #6b7280;
+                        "
+                      >
+                        申报编号
+                      </th>
+                      <th
+                        style="
+                          border: 1px solid #e5e7eb;
+                          padding: 8px;
+                          font-size: 13px;
+                          color: #6b7280;
+                        "
+                      >
+                        研究方向
+                      </th>
+                      <th
+                        style="
+                          border: 1px solid #e5e7eb;
+                          padding: 8px;
+                          font-size: 13px;
+                          color: #6b7280;
+                        "
+                      >
+                        申报时间
+                      </th>
+                      <th style="border: 1px solid #e5e7eb; padding: 8px">
+                        状态
+                      </th>
+                      <th style="border: 1px solid #e5e7eb; padding: 8px">
+                        操作
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="(item, index) in recentDeclarations"
+                      :key="item.id"
+                      :style="{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb' }"
+                    >
+                      <td
+                        style="
+                          border: 1px solid #e5e7eb;
+                          padding: 8px;
+                          text-align: center;
+                          font-size: 13px;
+                          color: #9ca3af;
+                        "
+                      >
+                        {{ item.number }}
+                      </td>
+                      <td
+                        style="
+                          border: 1px solid #e5e7eb;
+                          padding: 8px;
+                          font-size: 13px;
+                          color: #9ca3af;
+                        "
+                      >
+                        {{ item.direction }}
+                      </td>
+                      <td
+                        style="
+                          border: 1px solid #e5e7eb;
+                          padding: 8px;
+                          text-align: center;
+                          font-size: 13px;
+                          color: #9ca3af;
+                        "
+                      >
+                        {{ item.submitTime }}
+                      </td>
+                      <td
+                        style="
+                          border: 1px solid #e5e7eb;
+                          padding: 8px;
+                          text-align: center;
+                        "
+                      >
+                        <span :style="getStatusStyle(item.statusType)"
+                          >{{ item.status }}</span
+                        >
+                      </td>
+                      <td
+                        style="
+                          border: 1px solid #e5e7eb;
+                          padding: 8px;
+                          text-align: center;
+                        "
+                      >
+                        <button
+                          @click="handleDeclarationClick(item)"
+                          style="
+                            background: #e5e7eb;
+                            color: #6b7280;
+                            border: 1px solid #d1d5db;
+                            padding: 2px 6px;
+                            border-radius: 3px;
+                            cursor: pointer;
+                            font-size: 12px;
+                            font-weight: 400;
+                          "
+                        >
+                          查看
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Element Plus表格已隐藏，使用原生HTML表格 -->
+              <!-- <el-table
+                v-if="!loading && recentDeclarations.length > 0"
+                :data="recentDeclarations"
+                class="declaration-table"
+                @row-click="handleDeclarationClick"
+                border
+                stripe
+              >
+                <el-table-column
+                  prop="number"
+                  label="申报编号"
+                  width="120"
+                  show-overflow-tooltip
+                  align="center"
+                />
+                <el-table-column
+                  prop="direction"
+                  label="研究方向"
+                  min-width="200"
+                  show-overflow-tooltip
+                />
+                <el-table-column
+                  prop="submitTime"
+                  label="申报时间"
+                  width="120"
+                  align="center"
+                />
+                <el-table-column
+                  prop="status"
+                  label="状态"
+                  width="100"
+                  align="center"
+                >
+                  <template #default="{ row }">
+                    <span
+                      class="status-tag"
+                      :class="`status-${row.statusType}`"
+                    >
+                      {{ row.status }}
+                    </span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="80" align="center">
+                  <template #default="{ row }">
+                    <el-button
+                      type="primary"
+                      size="small"
+                      link
+                      @click.stop="handleDeclarationClick(row)"
+                    >
+                      查看
+                    </el-button>
+                  </template>
+                </el-table-column>
+              </el-table> -->
+            </div>
+
+            <!-- 项目进度概览 -->
+            <div class="content-card">
+              <div class="card-header">
+                <h3 class="card-title">项目进度概览</h3>
+                <a href="#" class="card-action" @click="handleViewAllProjects">
+                  查看全部
+                </a>
+              </div>
+
+              <div
+                v-if="loading"
+                class="skeleton-content loading-skeleton"
+              ></div>
+
+              <div v-else>
+                <div
+                  v-for="project in projectProgress"
+                  :key="project.id"
+                  class="progress-item"
+                  @click="handleProjectClick(project.id)"
+                >
+                  <div class="progress-info">
+                    <div class="progress-name">{{ project.name }}</div>
+                    <div class="progress-time">
+                      预计完成：{{ project.expectedDate }}
+                    </div>
+                  </div>
+                  <div class="progress-bar-container">
+                    <div class="progress-bar">
+                      <div
+                        class="progress-fill"
+                        :class="getProgressClass(project.progress)"
+                        :style="{ width: project.progress + '%' }"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="progress-percentage">{{ project.progress }}%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右侧内容 -->
+          <div>
+            <!-- 待办事项 -->
+            <div class="content-card">
+              <div class="card-header">
+                <h3 class="card-title">待办事项</h3>
+                <a href="#" class="card-action" @click="handleViewAllTodos">
+                  查看全部
+                </a>
+              </div>
+
+              <div
+                v-if="loading"
+                class="skeleton-content loading-skeleton"
+              ></div>
+
+              <div v-else>
+                <div
+                  v-for="todo in todos"
+                  :key="todo.id"
+                  class="todo-item"
+                  @click="handleTodoClick(todo.id)"
+                >
+                  <span class="todo-type" :class="todo.type">
+                    {{ getTodoTypeText(todo.type) }}
+                  </span>
+                  <div class="todo-content">
+                    <div class="todo-description">{{ todo.description }}</div>
+                    <div class="todo-time">{{ todo.deadline }}</div>
+                  </div>
+                  <span
+                    class="todo-priority"
+                    :class="`priority-${todo.priority}`"
+                  >
+                    {{ getPriorityText(todo.priority) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 快捷入口 -->
+            <div class="content-card">
+              <div class="card-header">
+                <h3 class="card-title">快捷入口</h3>
+              </div>
+
+              <div class="quick-actions">
+                <button
+                  class="action-button primary"
+                  @click="handleQuickAction('newDeclaration')"
+                >
+                  <span class="action-icon">📝</span>
+                  新建申报
+                </button>
+                <button
+                  class="action-button secondary"
+                  @click="handleQuickAction('createProject')"
+                >
+                  <span class="action-icon">📁</span>
+                  创建项目
+                </button>
+                <button
+                  class="action-button secondary"
+                  @click="handleQuickAction('applyAcceptance')"
+                >
+                  <span class="action-icon">✅</span>
+                  申请验收
+                </button>
+                <button
+                  class="action-button text"
+                  @click="handleQuickAction('knowledgeSearch')"
+                >
+                  <span class="action-icon">🔍</span>
+                  知识库搜索
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, computed, onMounted } = Vue;
+      const { ElMessage } = ElementPlus;
+
+      createApp({
+        setup() {
+          // 数据状态
+          const loading = ref(true);
+
+          // 统计数据
+          const stats = reactive([
+            {
+              type: "total",
+              icon: "📁",
+              value: 0,
+              label: "总项目数",
+            },
+            {
+              type: "progress",
+              icon: "⏰",
+              value: 0,
+              label: "进行中的项目",
+            },
+            {
+              type: "pending",
+              icon: "⏳",
+              value: 0,
+              label: "待验收项目",
+            },
+            {
+              type: "completed",
+              icon: "✅",
+              value: 0,
+              label: "已完成项目",
+            },
+          ]);
+
+          // 最近申报列表
+          const recentDeclarations = ref([]);
+
+          // 项目进度
+          const projectProgress = ref([]);
+
+          // 待办事项
+          const todos = ref([]);
+
+          // 格式化数字
+          const formatNumber = (num) => {
+            return num.toLocaleString();
+          };
+
+          // 获取进度条样式类
+          const getProgressClass = (progress) => {
+            if (progress <= 30) return "low";
+            if (progress <= 70) return "medium";
+            return "high";
+          };
+
+          // 获取待办事项类型文本
+          const getTodoTypeText = (type) => {
+            const typeMap = {
+              declaration: "申报审核",
+              acceptance: "项目验收",
+              report: "报告审核",
+              notification: "系统通知",
+            };
+            return typeMap[type] || type;
+          };
+
+          // 获取优先级文本
+          const getPriorityText = (priority) => {
+            const priorityMap = {
+              urgent: "紧急",
+              important: "重要",
+              normal: "普通",
+            };
+            return priorityMap[priority] || priority;
+          };
+
+          // 获取状态样式
+          const getStatusStyle = (statusType) => {
+            const styleMap = {
+              submitting:
+                "background-color: #fef3c7; color: #f59e0b; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;",
+              success:
+                "background-color: #dcfce7; color: #16a34a; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;",
+              failed:
+                "background-color: #fee2e2; color: #dc2626; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;",
+              withdrawn:
+                "background-color: #e0e7ff; color: #2563eb; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;",
+            };
+            return (
+              styleMap[statusType] ||
+              "background-color: #f3f4f6; color: #6b7280; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;"
+            );
+          };
+
+          // 加载仪表板数据
+          const loadDashboardData = async () => {
+            try {
+              loading.value = true;
+
+              // 模拟API调用延迟
+              await new Promise((resolve) => setTimeout(resolve, 1500));
+
+              // 模拟统计数据
+              stats[0].value = 156;
+              stats[1].value = 23;
+              stats[2].value = 8;
+              stats[3].value = 125;
+
+              // 模拟最近申报数据
+              recentDeclarations.value = [
+                {
+                  id: 1,
+                  number: "SB2024001",
+                  direction: "人工智能在教育领域的应用研究",
+                  submitTime: "2024-01-15",
+                  status: "申报中",
+                  statusType: "submitting",
+                },
+                {
+                  id: 2,
+                  number: "SB2024002",
+                  direction: "区块链技术在供应链管理中的应用",
+                  submitTime: "2024-01-14",
+                  status: "申报成功",
+                  statusType: "success",
+                },
+                {
+                  id: 3,
+                  number: "SB2024003",
+                  direction: "量子计算算法优化研究",
+                  submitTime: "2024-01-13",
+                  status: "申报失败",
+                  statusType: "failed",
+                },
+                {
+                  id: 4,
+                  number: "SB2024004",
+                  direction: "生物信息学数据分析方法研究",
+                  submitTime: "2024-01-12",
+                  status: "已撤回",
+                  statusType: "withdrawn",
+                },
+                {
+                  id: 5,
+                  number: "SB2024005",
+                  direction: "物联网安全防护技术研究",
+                  submitTime: "2024-01-11",
+                  status: "申报中",
+                  statusType: "submitting",
+                },
+              ];
+
+              // 模拟项目进度数据
+              projectProgress.value = [
+                {
+                  id: 1,
+                  name: "智能教学系统开发",
+                  progress: 75,
+                  expectedDate: "2024-03-15",
+                },
+                {
+                  id: 2,
+                  name: "区块链供应链平台",
+                  progress: 45,
+                  expectedDate: "2024-04-20",
+                },
+                {
+                  id: 3,
+                  name: "量子算法优化研究",
+                  progress: 20,
+                  expectedDate: "2024-05-10",
+                },
+                {
+                  id: 4,
+                  name: "生物信息学分析工具",
+                  progress: 90,
+                  expectedDate: "2024-02-28",
+                },
+                {
+                  id: 5,
+                  name: "物联网安全框架",
+                  progress: 60,
+                  expectedDate: "2024-03-30",
+                },
+              ];
+
+              // 模拟待办事项数据
+              todos.value = [
+                {
+                  id: 1,
+                  type: "declaration",
+                  description: '审核张教授的"机器学习算法优化"申报材料',
+                  deadline: "2024-01-20",
+                  priority: "urgent",
+                },
+                {
+                  id: 2,
+                  type: "acceptance",
+                  description: '验收李博士的"智能医疗诊断系统"项目',
+                  deadline: "2024-01-25",
+                  priority: "important",
+                },
+                {
+                  id: 3,
+                  type: "report",
+                  description: "审核王研究员的季度研究报告",
+                  deadline: "2024-01-22",
+                  priority: "normal",
+                },
+                {
+                  id: 4,
+                  type: "notification",
+                  description: "系统维护通知：本周六2:00-4:00",
+                  deadline: "2024-01-21",
+                  priority: "normal",
+                },
+                {
+                  id: 5,
+                  type: "declaration",
+                  description: '审核刘教授的"区块链应用研究"申报',
+                  deadline: "2024-01-23",
+                  priority: "important",
+                },
+              ];
+            } catch (error) {
+              ElMessage.error("加载数据失败，请重试");
+            } finally {
+              loading.value = false;
+            }
+          };
+
+          // 统计卡片点击处理
+          const handleStatClick = (type) => {
+            const typeMap = {
+              total: "项目列表",
+              progress: "进行中项目",
+              pending: "验收列表",
+              completed: "已完成项目",
+            };
+
+            ElMessage.info(`跳转到${typeMap[type]}页面`);
+
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              const pathMap = {
+                total: "project/list",
+                progress: "project/list?status=progress",
+                pending: "acceptance/list",
+                completed: "project/list?status=completed",
+              };
+
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: pathMap[type],
+                },
+                "*"
+              );
+            }
+          };
+
+          // 申报点击处理
+          const handleDeclarationClick = (row) => {
+            ElMessage.info(`查看申报详情：${row.number}`);
+
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "declaration/detail",
+                },
+                "*"
+              );
+            }
+          };
+
+          // 查看全部申报
+          const handleViewAllDeclarations = () => {
+            ElMessage.info("跳转到申报列表页面");
+
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "declaration/list",
+                },
+                "*"
+              );
+            }
+          };
+
+          // 项目点击处理
+          const handleProjectClick = (projectId) => {
+            ElMessage.info(`查看项目详情：项目ID ${projectId}`);
+
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "project/detail",
+                },
+                "*"
+              );
+            }
+          };
+
+          // 查看全部项目
+          const handleViewAllProjects = () => {
+            ElMessage.info("跳转到项目列表页面");
+
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "project/list",
+                },
+                "*"
+              );
+            }
+          };
+
+          // 待办事项点击处理
+          const handleTodoClick = (todoId) => {
+            ElMessage.info(`查看待办事项详情：ID ${todoId}`);
+          };
+
+          // 查看全部待办事项
+          const handleViewAllTodos = () => {
+            ElMessage.info("跳转到待办事项页面");
+          };
+
+          // 快捷操作处理
+          const handleQuickAction = (action) => {
+            const actionMap = {
+              newDeclaration: "新建申报",
+              createProject: "创建项目",
+              applyAcceptance: "申请验收",
+              knowledgeSearch: "知识库搜索",
+            };
+
+            ElMessage.info(`执行操作：${actionMap[action]}`);
+
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              const pathMap = {
+                newDeclaration: "declaration/create",
+                createProject: "project/create",
+                applyAcceptance: "acceptance/apply",
+                knowledgeSearch: "ai/knowledge",
+              };
+
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: pathMap[action],
+                },
+                "*"
+              );
+            }
+          };
+
+          // 组件挂载时加载数据
+          onMounted(() => {
+            loadDashboardData();
+          });
+
+          return {
+            loading,
+            stats,
+            recentDeclarations,
+            projectProgress,
+            todos,
+            formatNumber,
+            getProgressClass,
+            getTodoTypeText,
+            getPriorityText,
+            getStatusStyle,
+            handleStatClick,
+            handleDeclarationClick,
+            handleViewAllDeclarations,
+            handleProjectClick,
+            handleViewAllProjects,
+            handleTodoClick,
+            handleViewAllTodos,
+            handleQuickAction,
+          };
+        },
+      })
+        .use(ElementPlus)
+        .mount("#app");
+    </script>
+  </body>
+</html>

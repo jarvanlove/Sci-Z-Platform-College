@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>组件-通用表单</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <link rel="stylesheet" href="样式.css" />
+  </head>
+  <body>
+    <div id="app" class="content">
+      <div class="card">
+        <h3 class="title">申报信息表单（示例）</h3>
+        <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
+          <el-form-item label="研究方向" prop="direction">
+            <el-input
+              v-model="form.direction"
+              maxlength="100"
+              show-word-limit
+              placeholder="请输入研究方向"
+            />
+          </el-form-item>
+          <el-form-item label="研究领域" prop="field">
+            <el-select
+              v-model="form.field"
+              multiple
+              filterable
+              placeholder="请选择研究领域"
+            >
+              <el-option v-for="o in fields" :key="o" :label="o" :value="o" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="时间范围" prop="range">
+            <el-date-picker
+              v-model="form.range"
+              type="daterange"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+            />
+          </el-form-item>
+          <el-form-item label="附件上传" prop="files">
+            <el-upload
+              :auto-upload="false"
+              :limit="3"
+              :on-exceed="()=>ElMessage.warning('最多3个')"
+            >
+              <el-button type="primary">选择文件</el-button>
+            </el-upload>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="submit">提交</el-button>
+            <el-button @click="reset">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+    </div>
+    <script>
+      const { createApp, ref } = Vue;
+      createApp({
+        setup() {
+          const formRef = ref();
+          const form = ref({ direction: "", field: [], range: [], files: [] });
+          const fields = [
+            "计算机科学",
+            "人工智能",
+            "生物医学",
+            "材料科学",
+            "数学",
+          ];
+          const rules = {
+            direction: [
+              { required: true, message: "请输入研究方向", trigger: "blur" },
+            ],
+            field: [
+              { required: true, message: "请选择研究领域", trigger: "change" },
+            ],
+          };
+          const submit = () => {
+            formRef.value.validate((ok) => {
+              if (!ok) return;
+              ElMessage.success("提交成功（示例）");
+            });
+          };
+          const reset = () => formRef.value.resetFields();
+          return { formRef, form, rules, submit, reset, fields };
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>

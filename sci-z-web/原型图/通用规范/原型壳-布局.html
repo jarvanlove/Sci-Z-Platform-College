@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.iife.js"></script>
+    <!-- <script>
+      // 备用图标加载方案
+      if (typeof ElementPlusIconsVue === "undefined") {
+        console.warn("Element Plus Icons not loaded, using fallback icons");
+        window.ElementPlusIconsVue = {
+          Odometer: "🎛️",
+          Document: "📄",
+          List: "📋",
+          Plus: "➕",
+          View: "👁️",
+          Folder: "📁",
+          TrendCharts: "📈",
+          Setting: "⚙️",
+          User: "👤",
+          Key: "🔑",
+          ChatDotRound: "💭",
+          Search: "🔍",
+          ChatDotSquare: "💬",
+          FolderOpened: "📂",
+          UserFilled: "👤",
+          Refresh: "🔄",
+          DataAnalysis: "📊",
+          Monitor: "🖥️",
+          Check: "✅",
+          ChatLineRound: "💭",
+          ChatLineSquare: "💬",
+        };
+      }
+    </script> -->
+    <link rel="stylesheet" href="样式.css" />
+    <style>
+      /* 菜单字体区分样式 - 使用圆润字体 */
+      .el-menu .el-sub-menu__title {
+        font-family: "Inter", "SF Pro Display", -apple-system,
+          BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+          sans-serif !important;
+        font-size: 15px !important;
+        font-weight: 400 !important;
+        color: #374151 !important;
+        padding: 0 20px !important;
+        letter-spacing: 0.01em !important;
+        height: 48px !important;
+        line-height: 48px !important;
+      }
+
+      .el-menu .el-sub-menu__title:hover {
+        background-color: #f8fafc !important;
+        color: #1e3a8a !important;
+      }
+
+      .el-menu .el-menu-item {
+        font-size: 12px !important;
+        font-weight: 400 !important;
+        color: #6b7280 !important;
+        padding: 0 20px 0 56px !important;
+        height: 40px !important;
+        line-height: 40px !important;
+        margin: 2px 8px !important;
+        border-radius: 6px !important;
+      }
+
+      .el-menu .el-menu-item:hover {
+        background-color: #f0f9ff !important;
+        color: #1e3a8a !important;
+      }
+
+      .el-menu .el-menu-item.is-active {
+        background-color: #1e3a8a !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        border-radius: 12px !important;
+        margin: 2px 8px !important;
+      }
+
+      .el-menu .el-menu-item .el-icon {
+        margin-right: 8px !important;
+        font-size: 16px !important;
+      }
+
+      .el-menu .el-sub-menu__title .el-icon {
+        margin-right: 8px !important;
+        font-size: 16px !important;
+      }
+
+      /* 一级菜单项样式（如仪表板） */
+      .el-menu .el-menu-item:not(.el-sub-menu__title) {
+        font-family: "Inter", "SF Pro Display", -apple-system,
+          BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+          sans-serif !important;
+        font-size: 15px !important;
+        font-weight: 400 !important;
+        color: #374151 !important;
+        padding: 0 20px !important;
+        height: 48px !important;
+        line-height: 48px !important;
+        letter-spacing: 0.01em !important;
+        margin: 2px 8px !important;
+        border-radius: 6px !important;
+      }
+
+      /* 一级菜单项悬停效果 */
+      .el-menu .el-menu-item:not(.el-sub-menu__title):hover {
+        background-color: #f8fafc !important;
+        color: #1e3a8a !important;
+      }
+
+      /* 一级菜单项选中状态 */
+      .el-menu .el-menu-item:not(.el-sub-menu__title).is-active {
+        background-color: #1e3a8a !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        border-radius: 12px !important;
+        margin: 2px 8px !important;
+      }
+
+      .el-menu {
+        border-right: none !important;
+        overflow-x: hidden !important;
+      }
+
+      /* 隐藏水平滚动条 */
+      .sidebar {
+        overflow-x: hidden !important;
+      }
+
+      .el-menu--collapse {
+        overflow-x: hidden !important;
+      }
+
+      /* Emoji图标样式 */
+      .menu-icon {
+        margin-right: 8px !important;
+        font-size: 16px !important;
+        display: inline-block;
+        width: 16px;
+        text-align: center;
+      }
+
+      /* 折叠按钮样式 */
+      .menu-toggle-btn {
+        position: absolute;
+        top: 60px;
+        right: -15px;
+        width: 30px;
+        height: 30px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s;
+        z-index: 1000;
+      }
+
+      .menu-toggle-btn:hover {
+        background: #f8fafc;
+        border-color: #1e3a8a;
+        color: #1e3a8a;
+      }
+
+      .menu-toggle-btn .el-icon {
+        font-size: 14px;
+        transition: transform 0.3s;
+      }
+
+      /* 侧边栏容器 */
+      .sidebar {
+        position: relative;
+        transition: width 0.3s;
+      }
+
+      .sidebar.collapsed {
+        width: 64px !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="layout">
+        <div class="header">
+          <div class="logo">
+            <img src="../images/logo.svg" alt="Logo" />高校科研管理平台
+          </div>
+          <div class="header-right">
+            <el-dropdown @command="handleCommand">
+              <span class="user-info">
+                <el-avatar :size="32" src="../images/favicon.ico" />张三
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="profile"
+                    >个人中心</el-dropdown-item
+                  >
+                  <el-dropdown-item command="settings"
+                    >系统设置</el-dropdown-item
+                  >
+                  <el-dropdown-item divided command="logout"
+                    >退出登录</el-dropdown-item
+                  >
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </div>
+        <div class="main">
+          <div class="sidebar" :class="{ collapsed: collapsed }">
+            <el-menu
+              :default-active="activeMenu"
+              :collapse="collapsed"
+              @select="handleMenuSelect"
+            >
+              <!-- 认证模块菜单已隐藏 - 登录成功后不再显示 -->
+              <!-- <el-sub-menu index="auth">
+                <template #title>
+                  <el-icon><User /></el-icon>
+                  <span>认证模块</span>
+                </template>
+                <el-menu-item index="auth/login">
+                  <el-icon><Key /></el-icon>
+                  <span>登录</span>
+                </el-menu-item>
+                <el-menu-item index="auth/register">
+                  <el-icon><UserFilled /></el-icon>
+                  <span>注册</span>
+                </el-menu-item>
+                <el-menu-item index="auth/reset-password">
+                  <el-icon><Refresh /></el-icon>
+                  <span>重置密码</span>
+                </el-menu-item>
+              </el-sub-menu> -->
+
+              <el-menu-item index="dashboard">
+                <el-icon><Odometer /></el-icon>
+                <span>仪表板</span>
+              </el-menu-item>
+
+              <el-sub-menu index="declaration">
+                <template #title>
+                  <el-icon><Document /></el-icon>
+                  <span>申报管理</span>
+                </template>
+                <el-menu-item index="declaration/list">
+                  <el-icon><List /></el-icon>
+                  <span>申报列表</span>
+                </el-menu-item>
+                <!-- 隐藏新建申报和申报详情子菜单 -->
+                <!-- <el-menu-item index="declaration/create">
+                  <el-icon><Plus /></el-icon>
+                  <span>新建申报</span>
+                </el-menu-item>
+                <el-menu-item index="declaration/detail">
+                  <el-icon><View /></el-icon>
+                  <span>申报详情</span>
+                </el-menu-item> -->
+              </el-sub-menu>
+
+              <el-sub-menu index="project">
+                <template #title>
+                  <el-icon><Folder /></el-icon>
+                  <span>项目管理</span>
+                </template>
+                <el-menu-item index="project/list">
+                  <el-icon><List /></el-icon>
+                  <span>项目列表</span>
+                </el-menu-item>
+                <el-menu-item index="project/detail">
+                  <el-icon><View /></el-icon>
+                  <span>项目详情</span>
+                </el-menu-item>
+                <el-menu-item index="project/progress">
+                  <el-icon><TrendCharts /></el-icon>
+                  <span>项目进度</span>
+                </el-menu-item>
+              </el-sub-menu>
+
+              <el-sub-menu index="acceptance">
+                <template #title>
+                  <el-icon><Check /></el-icon>
+                  <span>验收管理</span>
+                </template>
+                <el-menu-item index="acceptance/list">
+                  <el-icon><List /></el-icon>
+                  <span>验收列表</span>
+                </el-menu-item>
+                <el-menu-item index="acceptance/apply">
+                  <el-icon><Plus /></el-icon>
+                  <span>验收申请</span>
+                </el-menu-item>
+                <el-menu-item index="acceptance/report">
+                  <el-icon><Document /></el-icon>
+                  <span>报告管理</span>
+                </el-menu-item>
+              </el-sub-menu>
+
+              <el-sub-menu index="system">
+                <template #title>
+                  <el-icon><Setting /></el-icon>
+                  <span>系统管理</span>
+                </template>
+                <el-menu-item index="system/user">
+                  <el-icon><User /></el-icon>
+                  <span>用户管理</span>
+                </el-menu-item>
+                <el-menu-item index="system/role">
+                  <el-icon><Key /></el-icon>
+                  <span>角色权限</span>
+                </el-menu-item>
+              </el-sub-menu>
+
+              <el-sub-menu index="ai">
+                <template #title>
+                  <el-icon><Monitor /></el-icon>
+                  <span>AI助手</span>
+                </template>
+                <el-menu-item index="ai/chat">
+                  <el-icon><Avatar /></el-icon>
+                  <span>AI对话</span>
+                </el-menu-item>
+                <el-menu-item index="ai/knowledge">
+                  <el-icon><Search /></el-icon>
+                  <span>知识库搜索</span>
+                </el-menu-item>
+              </el-sub-menu>
+            </el-menu>
+            <!-- 折叠按钮 -->
+            <div class="menu-toggle-btn" @click="toggleMenu">
+              <el-icon>
+                <component :is="collapsed ? 'Expand' : 'Fold'" />
+              </el-icon>
+            </div>
+          </div>
+          <div class="content">
+            <div class="breadcrumb">
+              <el-breadcrumb separator="/"
+                ><el-breadcrumb-item>首页</el-breadcrumb-item
+                ><el-breadcrumb-item v-for="item in breadcrumbs" :key="item"
+                  >{{item}}</el-breadcrumb-item
+                ></el-breadcrumb
+              >
+            </div>
+            <div class="page-content">
+              <iframe
+                :src="currentPage"
+                frameborder="0"
+                width="100%"
+                height="100%"
+              ></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const { createApp, ref, computed } = Vue;
+      const { ElMessage } = ElementPlus;
+      const {
+        Odometer,
+        Document,
+        List,
+        Plus,
+        View,
+        Folder,
+        TrendCharts,
+        Setting,
+        User,
+        Key,
+        ChatDotRound,
+        Search,
+        ChatDotSquare,
+        FolderOpened,
+        UserFilled,
+        Refresh,
+        DataAnalysis,
+        Monitor,
+        Check,
+        ChatLineRound,
+        ChatLineSquare,
+        Fold,
+        Expand,
+        Avatar,
+      } = ElementPlusIconsVue;
+
+      createApp({
+        components: {
+          Odometer,
+          Document,
+          List,
+          Plus,
+          View,
+          Folder,
+          TrendCharts,
+          Setting,
+          User,
+          Key,
+          ChatDotRound,
+          Search,
+          ChatDotSquare,
+          FolderOpened,
+          UserFilled,
+          Refresh,
+          DataAnalysis,
+          Monitor,
+          Check,
+          ChatLineRound,
+          ChatLineSquare,
+          Fold,
+          Expand,
+          Avatar,
+        },
+        setup() {
+          const activeMenu = ref("dashboard");
+          const collapsed = ref(false);
+          const currentPage = ref("../仪表板/仪表板.html");
+          const breadcrumbs = ref(["仪表板"]);
+
+          const menuMap = {
+            "auth/login": {
+              page: "../认证模块/登录.html",
+              breadcrumb: ["认证", "登录"],
+            },
+            "auth/register": {
+              page: "../认证模块/注册.html",
+              breadcrumb: ["认证", "注册"],
+            },
+            "auth/reset-password": {
+              page: "../认证模块/重置密码.html",
+              breadcrumb: ["认证", "重置密码"],
+            },
+            "user/profile": {
+              page: "../用户中心/个人信息.html",
+              breadcrumb: ["用户中心", "个人信息"],
+            },
+            "user/security": {
+              page: "../用户中心/安全设置.html",
+              breadcrumb: ["用户中心", "安全设置"],
+            },
+            dashboard: {
+              page: "../仪表板/仪表板.html",
+              breadcrumb: ["仪表板"],
+            },
+            "declaration/list": {
+              page: "../申报模块/申报列表.html",
+              breadcrumb: ["申报管理", "申报列表"],
+            },
+            "declaration/create": {
+              page: "../申报模块/新建申报.html",
+              breadcrumb: ["申报管理", "新建申报"],
+            },
+            "declaration/detail": {
+              page: "../申报模块/申报详情.html",
+              breadcrumb: ["申报管理", "申报详情"],
+            },
+            "project/create": {
+              page: "../项目模块/新建项目.html",
+              breadcrumb: ["项目管理", "新建项目"],
+            },
+            "project/list": {
+              page: "../项目模块/项目列表.html",
+              breadcrumb: ["项目管理", "项目列表"],
+            },
+            "project/detail": {
+              page: "../项目模块/项目详情.html",
+              breadcrumb: ["项目管理", "项目详情"],
+            },
+            "project/progress": {
+              page: "../项目模块/项目进度.html",
+              breadcrumb: ["项目管理", "项目进度"],
+            },
+            "acceptance/list": {
+              page: "../验收模块/验收列表.html",
+              breadcrumb: ["验收管理", "验收列表"],
+            },
+            "acceptance/apply": {
+              page: "../验收模块/验收申请.html",
+              breadcrumb: ["验收管理", "验收申请"],
+            },
+            "acceptance/report": {
+              page: "../验收模块/报告管理.html",
+              breadcrumb: ["验收管理", "报告管理"],
+            },
+            "system/user": {
+              page: "../系统管理/用户管理.html",
+              breadcrumb: ["系统管理", "用户管理"],
+            },
+            "system/role": {
+              page: "../系统管理/角色权限.html",
+              breadcrumb: ["系统管理", "角色权限"],
+            },
+            "ai/chat": {
+              page: "../AI助手/AI对话.html",
+              breadcrumb: ["AI助手", "AI对话"],
+            },
+            "ai/knowledge": {
+              page: "../AI助手/知识库搜索.html",
+              breadcrumb: ["AI助手", "知识库搜索"],
+            },
+          };
+
+          const handleMenuSelect = (index) => {
+            console.log("菜单选择:", index);
+            const menuItem = menuMap[index];
+            if (menuItem) {
+              activeMenu.value = index;
+              currentPage.value = menuItem.page;
+              breadcrumbs.value = menuItem.breadcrumb;
+              console.log("加载页面:", menuItem.page);
+            } else {
+              console.warn("未找到菜单项:", index);
+            }
+          };
+
+          const handleCommand = (command) => {
+            console.log("用户菜单命令:", command);
+            switch (command) {
+              case "profile":
+                ElMessage.info("跳转到个人中心");
+                break;
+              case "settings":
+                ElMessage.info("跳转到系统设置");
+                break;
+              case "logout":
+                ElMessage.success("退出登录成功");
+                // 清除本地存储
+                localStorage.removeItem("auth_token");
+                localStorage.removeItem("remember_token");
+                // 跳转到登录页面
+                setTimeout(() => {
+                  window.location.href = "../认证模块/登录.html";
+                }, 1000);
+                break;
+            }
+          };
+
+          // 折叠菜单切换函数
+          const toggleMenu = () => {
+            collapsed.value = !collapsed.value;
+          };
+
+          // 监听来自iframe的消息
+          window.addEventListener("message", (event) => {
+            console.log("收到iframe消息:", event.data);
+            if (event.data && event.data.type === "navigate") {
+              handleMenuSelect(event.data.path);
+            }
+          });
+
+          // 初始化时加载登录页面
+          console.log("初始化应用，加载登录页面");
+
+          return {
+            activeMenu,
+            collapsed,
+            currentPage,
+            breadcrumbs,
+            handleMenuSelect,
+            handleCommand,
+            toggleMenu,
+          };
+        },
+      })
+        .use(ElementPlus)
+        .mount("#app");
+    </script>
+  </body>
+</html>

@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>新建申报 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.4.4/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.4.4"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .new-declaration-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+      }
+
+      .page-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .back-button {
+        margin-right: 12px;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0;
+      }
+
+      .form-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      .form-group {
+        margin-bottom: 24px;
+      }
+
+      .group-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .form-item {
+        margin-bottom: 16px;
+      }
+
+      .form-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .rich-text-editor {
+        min-height: 200px;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        padding: 12px;
+      }
+
+      .rich-text-editor:focus-within {
+        border-color: #1e3a8a;
+        box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1);
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .toolbar-button {
+        padding: 6px 12px;
+        border: 1px solid #e5e7eb;
+        background: #ffffff;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+      }
+
+      .toolbar-button:hover {
+        background: #f8fafc;
+        border-color: #1e3a8a;
+      }
+
+      .toolbar-button.active {
+        background: #1e3a8a;
+        color: #ffffff;
+        border-color: #1e3a8a;
+      }
+
+      .editor-content {
+        min-height: 120px;
+        outline: none;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #374151;
+      }
+
+      .editor-content:empty:before {
+        content: "请详细描述您的研究方向...";
+        color: #9ca3af;
+      }
+
+      .char-count {
+        text-align: right;
+        font-size: 12px;
+        color: #6b7280;
+        margin-top: 8px;
+      }
+
+      .char-count.warning {
+        color: #f59e0b;
+      }
+
+      .char-count.error {
+        color: #dc2626;
+      }
+
+      .tag-input-container {
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        padding: 8px;
+        min-height: 40px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .tag-input-container:focus-within {
+        border-color: #1e3a8a;
+        box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1);
+      }
+
+      .tag-input {
+        border: none;
+        outline: none;
+        flex: 1;
+        min-width: 120px;
+        font-size: 14px;
+      }
+
+      .tag-input::placeholder {
+        color: #9ca3af;
+      }
+
+      .tag-item {
+        background: #e0e7ff;
+        color: #1e3a8a;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .tag-remove {
+        cursor: pointer;
+        color: #6b7280;
+        font-weight: bold;
+      }
+
+      .tag-remove:hover {
+        color: #dc2626;
+      }
+
+      .suggestions {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+      }
+
+      .suggestion-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 14px;
+        color: #374151;
+      }
+
+      .suggestion-item:hover {
+        background: #f8fafc;
+      }
+
+      .form-actions {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      .auto-save-indicator {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        padding: 8px 12px;
+        font-size: 12px;
+        color: #6b7280;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+      }
+
+      .auto-save-indicator.saving {
+        color: #f59e0b;
+      }
+
+      .auto-save-indicator.saved {
+        color: #16a34a;
+      }
+
+      .error-message {
+        color: #dc2626;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+
+      .success-icon {
+        color: #16a34a;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="new-declaration-container">
+        <!-- 页面标题和返回按钮 -->
+        <div class="page-header">
+          <el-button class="back-button" @click="handleBack" :icon="ArrowLeft">
+            返回列表
+          </el-button>
+          <h1 class="page-title">新建申报</h1>
+        </div>
+
+        <!-- 申报表单 -->
+        <div class="form-card">
+          <el-form
+            :model="form"
+            :rules="rules"
+            ref="formRef"
+            label-width="100px"
+          >
+            <!-- 研究方向 -->
+            <div class="form-group">
+              <div class="group-title">
+                研究方向 <span style="color: #dc2626">*</span>
+              </div>
+              <div class="form-item">
+                <div class="rich-text-editor" ref="editorRef">
+                  <div class="toolbar">
+                    <button
+                      class="toolbar-button"
+                      :class="{ active: editorState.bold }"
+                      @click="toggleBold"
+                    >
+                      <strong>B</strong>
+                    </button>
+                    <button
+                      class="toolbar-button"
+                      :class="{ active: editorState.italic }"
+                      @click="toggleItalic"
+                    >
+                      <em>I</em>
+                    </button>
+                    <button
+                      class="toolbar-button"
+                      :class="{ active: editorState.underline }"
+                      @click="toggleUnderline"
+                    >
+                      <u>U</u>
+                    </button>
+                    <button class="toolbar-button" @click="insertBulletList">
+                      • 列表
+                    </button>
+                  </div>
+                  <div
+                    class="editor-content"
+                    contenteditable="true"
+                    @input="handleEditorInput"
+                    @paste="handlePaste"
+                    ref="editorContentRef"
+                  ></div>
+                </div>
+                <div
+                  class="char-count"
+                  :class="{
+                    warning: charCount >= 500 && charCount < 1000,
+                    error: charCount >= 1000,
+                  }"
+                >
+                  {{ charCount }} / 1000 字符
+                </div>
+                <div v-if="formErrors.researchDirection" class="error-message">
+                  {{ formErrors.researchDirection }}
+                </div>
+                <div v-if="formSuccess.researchDirection" class="success-icon">
+                  ✓ 研究方向描述完整
+                </div>
+              </div>
+            </div>
+
+            <!-- 研究领域 -->
+            <div class="form-group">
+              <div class="group-title">
+                研究领域 <span style="color: #dc2626">*</span>
+              </div>
+              <div class="form-item">
+                <div class="tag-input-container" ref="tagInputRef">
+                  <div
+                    v-for="(tag, index) in form.researchField"
+                    :key="index"
+                    class="tag-item"
+                  >
+                    {{ tag }}
+                    <span class="tag-remove" @click="removeTag(index)">
+                      ×
+                    </span>
+                  </div>
+                  <input
+                    v-model="tagInput"
+                    class="tag-input"
+                    placeholder="请输入研究领域，回车添加"
+                    @keydown.enter="addTag"
+                    @keydown.backspace="handleBackspace"
+                    @input="handleTagInput"
+                    ref="tagInputElementRef"
+                  />
+                  <div
+                    v-if="showSuggestions && suggestions.length > 0"
+                    class="suggestions"
+                  >
+                    <div
+                      v-for="suggestion in suggestions"
+                      :key="suggestion"
+                      class="suggestion-item"
+                      @click="selectSuggestion(suggestion)"
+                    >
+                      {{ suggestion }}
+                    </div>
+                  </div>
+                </div>
+                <div style="margin-top: 8px; font-size: 12px; color: #6b7280">
+                  已选择 {{ form.researchField.length }} / 10 个领域
+                </div>
+                <div v-if="formErrors.researchField" class="error-message">
+                  {{ formErrors.researchField }}
+                </div>
+                <div v-if="formSuccess.researchField" class="success-icon">
+                  ✓ 研究领域选择完成
+                </div>
+              </div>
+            </div>
+
+            <!-- 表单操作按钮 -->
+            <div class="form-actions">
+              <el-button
+                type="primary"
+                size="large"
+                :loading="submitting"
+                @click="handleSubmit"
+              >
+                <el-icon><Check /></el-icon>
+                {{ submitting ? "提交中..." : "提交申报" }}
+              </el-button>
+              <el-button
+                size="large"
+                @click="handleSaveDraft"
+                :disabled="submitting"
+              >
+                <el-icon><Document /></el-icon>
+                保存草稿
+              </el-button>
+              <el-button size="large" @click="handleBack">
+                <el-icon><Close /></el-icon>
+                取消
+              </el-button>
+            </div>
+          </el-form>
+        </div>
+
+        <!-- 自动保存指示器 -->
+        <div
+          v-if="autoSaveStatus !== 'idle'"
+          class="auto-save-indicator"
+          :class="autoSaveStatus"
+        >
+          <span v-if="autoSaveStatus === 'saving'">
+            <el-icon><Loading /></el-icon>
+            正在保存草稿...
+          </span>
+          <span v-if="autoSaveStatus === 'saved'">
+            <el-icon><Check /></el-icon>
+            草稿已保存
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, computed, onMounted, onUnmounted } =
+        Vue;
+      const { ElMessage, ElMessageBox } = ElementPlus;
+
+      createApp({
+        setup() {
+          // 表单数据
+          const form = reactive({
+            researchDirection: "",
+            researchField: [],
+          });
+
+          // 表单验证规则
+          const rules = {
+            researchDirection: [
+              { required: true, message: "研究方向不能为空", trigger: "blur" },
+              {
+                min: 10,
+                message: "研究方向至少需要10个字符",
+                trigger: "blur",
+              },
+            ],
+            researchField: [
+              {
+                required: true,
+                message: "请至少选择一个研究领域",
+                trigger: "change",
+              },
+            ],
+          };
+
+          // 状态管理
+          const submitting = ref(false);
+          const formRef = ref();
+          const editorRef = ref();
+          const editorContentRef = ref();
+          const tagInputRef = ref();
+          const tagInputElementRef = ref();
+
+          // 编辑器状态
+          const editorState = reactive({
+            bold: false,
+            italic: false,
+            underline: false,
+          });
+
+          // 标签输入
+          const tagInput = ref("");
+          const showSuggestions = ref(false);
+          const suggestions = ref([]);
+
+          // 预设研究领域
+          const presetFields = [
+            "人工智能",
+            "机器学习",
+            "深度学习",
+            "自然语言处理",
+            "计算机视觉",
+            "数据挖掘",
+            "区块链",
+            "物联网",
+            "网络安全",
+            "云计算",
+            "大数据",
+            "生物信息学",
+            "医学影像",
+            "材料科学",
+            "数学",
+            "物理",
+            "化学",
+            "生物学",
+            "心理学",
+            "经济学",
+            "管理学",
+            "教育学",
+          ];
+
+          // 字符计数
+          const charCount = computed(() => {
+            return form.researchDirection.length;
+          });
+
+          // 表单验证状态
+          const formErrors = reactive({
+            researchDirection: "",
+            researchField: "",
+          });
+
+          const formSuccess = reactive({
+            researchDirection: false,
+            researchField: false,
+          });
+
+          // 自动保存
+          const autoSaveStatus = ref("idle");
+          let autoSaveTimer = null;
+
+          // 编辑器功能
+          const toggleBold = () => {
+            document.execCommand("bold");
+            editorState.bold = !editorState.bold;
+          };
+
+          const toggleItalic = () => {
+            document.execCommand("italic");
+            editorState.italic = !editorState.italic;
+          };
+
+          const toggleUnderline = () => {
+            document.execCommand("underline");
+            editorState.underline = !editorState.underline;
+          };
+
+          const insertBulletList = () => {
+            document.execCommand("insertUnorderedList");
+          };
+
+          const handleEditorInput = () => {
+            const content = editorContentRef.value.innerText;
+            form.researchDirection = content;
+            validateResearchDirection();
+            triggerAutoSave();
+          };
+
+          const handlePaste = (e) => {
+            e.preventDefault();
+            const text = e.clipboardData.getData("text/plain");
+            document.execCommand("insertText", false, text);
+            handleEditorInput();
+          };
+
+          // 标签功能
+          const addTag = (e) => {
+            e.preventDefault();
+            const value = tagInput.value.trim();
+            if (
+              value &&
+              !form.researchField.includes(value) &&
+              form.researchField.length < 10
+            ) {
+              form.researchField.push(value);
+              tagInput.value = "";
+              validateResearchField();
+              triggerAutoSave();
+            }
+          };
+
+          const removeTag = (index) => {
+            form.researchField.splice(index, 1);
+            validateResearchField();
+            triggerAutoSave();
+          };
+
+          const handleBackspace = () => {
+            if (tagInput.value === "" && form.researchField.length > 0) {
+              form.researchField.pop();
+              validateResearchField();
+              triggerAutoSave();
+            }
+          };
+
+          const handleTagInput = () => {
+            const value = tagInput.value.toLowerCase();
+            if (value) {
+              suggestions.value = presetFields.filter(
+                (field) =>
+                  field.toLowerCase().includes(value) &&
+                  !form.researchField.includes(field)
+              );
+              showSuggestions.value = suggestions.value.length > 0;
+            } else {
+              showSuggestions.value = false;
+            }
+          };
+
+          const selectSuggestion = (suggestion) => {
+            if (
+              !form.researchField.includes(suggestion) &&
+              form.researchField.length < 10
+            ) {
+              form.researchField.push(suggestion);
+              tagInput.value = "";
+              showSuggestions.value = false;
+              validateResearchField();
+              triggerAutoSave();
+            }
+          };
+
+          // 表单验证
+          const validateResearchDirection = () => {
+            formErrors.researchDirection = "";
+            formSuccess.researchDirection = false;
+
+            if (!form.researchDirection) {
+              formErrors.researchDirection = "研究方向不能为空";
+              return false;
+            }
+
+            if (form.researchDirection.length < 10) {
+              formErrors.researchDirection = "研究方向至少需要10个字符";
+              return false;
+            }
+
+            formSuccess.researchDirection = true;
+            return true;
+          };
+
+          const validateResearchField = () => {
+            formErrors.researchField = "";
+            formSuccess.researchField = false;
+
+            if (form.researchField.length === 0) {
+              formErrors.researchField = "请至少选择一个研究领域";
+              return false;
+            }
+
+            formSuccess.researchField = true;
+            return true;
+          };
+
+          const validateForm = () => {
+            const directionValid = validateResearchDirection();
+            const fieldValid = validateResearchField();
+            return directionValid && fieldValid;
+          };
+
+          // 自动保存
+          const triggerAutoSave = () => {
+            if (autoSaveTimer) {
+              clearTimeout(autoSaveTimer);
+            }
+            autoSaveTimer = setTimeout(() => {
+              saveDraft();
+            }, 30000); // 30秒后自动保存
+          };
+
+          const saveDraft = async () => {
+            try {
+              autoSaveStatus.value = "saving";
+              // 模拟保存草稿
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+              localStorage.setItem("declaration_draft", JSON.stringify(form));
+              autoSaveStatus.value = "saved";
+              setTimeout(() => {
+                autoSaveStatus.value = "idle";
+              }, 2000);
+            } catch (error) {
+              console.error("保存草稿失败:", error);
+              autoSaveStatus.value = "idle";
+            }
+          };
+
+          // 事件处理
+          const handleSubmit = async () => {
+            if (!validateForm()) {
+              ElMessage.error("请完善申报信息");
+              return;
+            }
+
+            try {
+              await ElMessageBox.confirm(
+                "确定要提交此申报吗？提交后将触发Dify工作流处理。",
+                "确认提交",
+                {
+                  confirmButtonText: "确定提交",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+
+              submitting.value = true;
+
+              // 模拟提交申报
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+
+              ElMessage.success("申报提交成功！正在处理中...");
+
+              // 清除草稿
+              localStorage.removeItem("declaration_draft");
+
+              // 跳转到申报详情页面
+              setTimeout(() => {
+                if (window.parent !== window) {
+                  window.parent.postMessage(
+                    {
+                      type: "navigate",
+                      path: "declaration/detail",
+                    },
+                    "*"
+                  );
+                } else {
+                  window.location.href = "申报详情.html";
+                }
+              }, 1000);
+            } catch (error) {
+              if (error !== "cancel") {
+                ElMessage.error("提交失败，请重试");
+              }
+            } finally {
+              submitting.value = false;
+            }
+          };
+
+          const handleSaveDraft = async () => {
+            try {
+              await saveDraft();
+              ElMessage.success("草稿已保存");
+            } catch (error) {
+              ElMessage.error("保存草稿失败，请重试");
+            }
+          };
+
+          const handleBack = () => {
+            ElMessageBox.confirm(
+              "确定要离开吗？未保存的内容将丢失。",
+              "确认离开",
+              {
+                confirmButtonText: "确定离开",
+                cancelButtonText: "继续编辑",
+                type: "warning",
+              }
+            )
+              .then(() => {
+                if (window.parent !== window) {
+                  window.parent.postMessage(
+                    {
+                      type: "navigate",
+                      path: "declaration/list",
+                    },
+                    "*"
+                  );
+                } else {
+                  window.location.href = "申报列表.html";
+                }
+              })
+              .catch(() => {
+                // 用户取消离开
+              });
+          };
+
+          // 加载草稿
+          const loadDraft = () => {
+            try {
+              const draft = localStorage.getItem("declaration_draft");
+              if (draft) {
+                const draftData = JSON.parse(draft);
+                form.researchDirection = draftData.researchDirection || "";
+                form.researchField = draftData.researchField || [];
+
+                // 更新编辑器内容
+                if (editorContentRef.value && form.researchDirection) {
+                  editorContentRef.value.innerText = form.researchDirection;
+                }
+
+                // 验证表单
+                validateResearchDirection();
+                validateResearchField();
+
+                ElMessage.info("已加载草稿内容");
+              }
+            } catch (error) {
+              console.error("加载草稿失败:", error);
+            }
+          };
+
+          // 生命周期
+          onMounted(() => {
+            loadDraft();
+            triggerAutoSave();
+          });
+
+          onUnmounted(() => {
+            if (autoSaveTimer) {
+              clearTimeout(autoSaveTimer);
+            }
+          });
+
+          return {
+            form,
+            rules,
+            submitting,
+            formRef,
+            editorRef,
+            editorContentRef,
+            tagInputRef,
+            tagInputElementRef,
+            editorState,
+            tagInput,
+            showSuggestions,
+            suggestions,
+            charCount,
+            formErrors,
+            formSuccess,
+            autoSaveStatus,
+            toggleBold,
+            toggleItalic,
+            toggleUnderline,
+            insertBulletList,
+            handleEditorInput,
+            handlePaste,
+            addTag,
+            removeTag,
+            handleBackspace,
+            handleTagInput,
+            selectSuggestion,
+            validateForm,
+            handleSubmit,
+            handleSaveDraft,
+            handleBack,
+          };
+        },
+      })
+        .use(ElementPlus)
+        .mount("#app");
+    </script>
+  </body>
+</html>

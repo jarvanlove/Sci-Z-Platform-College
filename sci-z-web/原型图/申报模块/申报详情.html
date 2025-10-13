@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>申报详情 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.4.4/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.4.4"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .declaration-detail-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+      }
+
+      .page-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .back-button {
+        margin-right: 12px;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0;
+      }
+
+      .detail-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+        margin-bottom: 20px;
+      }
+
+      .card-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .info-item {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .info-label {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 4px;
+        font-weight: 500;
+      }
+
+      .info-value {
+        font-size: 16px;
+        color: #374151;
+        font-weight: 500;
+      }
+
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .status-draft {
+        background-color: #f3f4f6;
+        color: #6b7280;
+      }
+
+      .status-submitting {
+        background-color: #fef3c7;
+        color: #f59e0b;
+      }
+
+      .status-success {
+        background-color: #dcfce7;
+        color: #16a34a;
+      }
+
+      .status-failed {
+        background-color: #fee2e2;
+        color: #dc2626;
+      }
+
+      .status-withdrawn {
+        background-color: #e0e7ff;
+        color: #2563eb;
+      }
+
+      .field-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .field-tag {
+        background: #e0e7ff;
+        color: #1e3a8a;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .research-direction {
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 16px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #374151;
+        white-space: pre-wrap;
+      }
+
+      /* 工作流状态样式 */
+      .workflow-container {
+        margin-top: 16px;
+      }
+
+      .workflow-status {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+      }
+
+      .workflow-icon {
+        font-size: 20px;
+      }
+
+      .workflow-info {
+        flex: 1;
+      }
+
+      .workflow-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 4px;
+      }
+
+      .workflow-description {
+        font-size: 14px;
+        color: #6b7280;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 6px;
+        background: #e5e7eb;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 8px;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #1e3a8a, #0ea5e9);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
+
+      .workflow-timeline {
+        margin-top: 16px;
+      }
+
+      .timeline-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 8px 0;
+        position: relative;
+      }
+
+      .timeline-item:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        left: 8px;
+        top: 32px;
+        bottom: -8px;
+        width: 2px;
+        background: #e5e7eb;
+      }
+
+      .timeline-icon {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: #ffffff;
+        z-index: 1;
+        position: relative;
+      }
+
+      .timeline-icon.pending {
+        background: #e5e7eb;
+        color: #6b7280;
+      }
+
+      .timeline-icon.processing {
+        background: #f59e0b;
+        animation: pulse 2s infinite;
+      }
+
+      .timeline-icon.completed {
+        background: #16a34a;
+      }
+
+      .timeline-icon.failed {
+        background: #dc2626;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .timeline-content {
+        flex: 1;
+      }
+
+      .timeline-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 2px;
+      }
+
+      .timeline-time {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      /* 结果展示样式 */
+      .result-container {
+        margin-top: 16px;
+      }
+
+      .result-success {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 6px;
+        padding: 16px;
+      }
+
+      .result-failed {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 6px;
+        padding: 16px;
+      }
+
+      .result-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .result-success .result-title {
+        color: #16a34a;
+      }
+
+      .result-failed .result-title {
+        color: #dc2626;
+      }
+
+      .result-content {
+        font-size: 14px;
+        color: #374151;
+        line-height: 1.6;
+      }
+
+      .project-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: #1e3a8a;
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      .project-link:hover {
+        text-decoration: underline;
+      }
+
+      /* 操作按钮样式 */
+      .action-buttons {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      .action-buttons .el-button {
+        padding: 10px 20px;
+      }
+
+      /* 错误信息样式 */
+      .error-details {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 8px;
+        font-family: monospace;
+        font-size: 12px;
+        color: #dc2626;
+        white-space: pre-wrap;
+      }
+
+      /* 响应式设计 */
+      @media (max-width: 768px) {
+        .info-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .action-buttons {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="declaration-detail-container">
+        <!-- 页面标题和返回按钮 -->
+        <div class="page-header">
+          <el-button class="back-button" @click="handleBack" :icon="ArrowLeft">
+            返回列表
+          </el-button>
+          <h1 class="page-title">申报详情</h1>
+        </div>
+
+        <!-- 基本信息 -->
+        <div class="detail-card">
+          <div class="card-title">基本信息</div>
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="info-label">申报编号</div>
+              <div class="info-value">{{ declaration.number }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">申报人</div>
+              <div class="info-value">{{ declaration.applicant }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">申报时间</div>
+              <div class="info-value">{{ declaration.submitTime }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">当前状态</div>
+              <div class="info-value">
+                <span
+                  class="status-badge"
+                  :class="`status-${declaration.statusType}`"
+                >
+                  {{ declaration.status }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 研究信息 -->
+        <div class="detail-card">
+          <div class="card-title">研究信息</div>
+          <div class="info-item" style="margin-bottom: 16px">
+            <div class="info-label">研究方向</div>
+            <div class="research-direction">{{ declaration.direction }}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">研究领域</div>
+            <div class="field-tags">
+              <span
+                v-for="field in declaration.fields"
+                :key="field"
+                class="field-tag"
+              >
+                {{ field }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 工作流状态 -->
+        <div class="detail-card">
+          <div class="card-title">处理状态</div>
+          <div class="workflow-container">
+            <div class="workflow-status">
+              <div class="workflow-icon" :class="workflowStatus.type">
+                {{ workflowStatus.icon }}
+              </div>
+              <div class="workflow-info">
+                <div class="workflow-title">{{ workflowStatus.title }}</div>
+                <div class="workflow-description">
+                  {{ workflowStatus.description }}
+                </div>
+                <div v-if="workflowStatus.showProgress" class="progress-bar">
+                  <div
+                    class="progress-fill"
+                    :style="{ width: workflowStatus.progress + '%' }"
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 时间线 -->
+            <div v-if="workflowTimeline.length > 0" class="workflow-timeline">
+              <div
+                v-for="item in workflowTimeline"
+                :key="item.id"
+                class="timeline-item"
+              >
+                <div class="timeline-icon" :class="item.status">
+                  {{ item.icon }}
+                </div>
+                <div class="timeline-content">
+                  <div class="timeline-title">{{ item.title }}</div>
+                  <div class="timeline-time">{{ item.time }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 结果展示 -->
+            <div v-if="workflowResult" class="result-container">
+              <div
+                class="result-success"
+                v-if="declaration.statusType === 'success'"
+              >
+                <div class="result-title">
+                  <el-icon><Check /></el-icon>
+                  申报处理成功
+                </div>
+                <div class="result-content">
+                  <p>
+                    <strong>Dify 项目 ID:</strong> {{ workflowResult.projectId
+                    }}
+                  </p>
+                  <p>
+                    <strong>项目名称:</strong> {{ workflowResult.projectName }}
+                  </p>
+                  <p>
+                    <strong>项目描述:</strong> {{
+                    workflowResult.projectDescription }}
+                  </p>
+                  <p>
+                    <a class="project-link" href="#" @click="handleViewProject">
+                      <el-icon><View /></el-icon>
+                      查看项目详情
+                    </a>
+                  </p>
+                </div>
+              </div>
+
+              <div
+                class="result-failed"
+                v-else-if="declaration.statusType === 'failed'"
+              >
+                <div class="result-title">
+                  <el-icon><Close /></el-icon>
+                  申报处理失败
+                </div>
+                <div class="result-content">
+                  <p>
+                    <strong>失败原因:</strong> {{ workflowResult.errorMessage }}
+                  </p>
+                  <p>
+                    <strong>建议操作:</strong> {{ workflowResult.suggestion }}
+                  </p>
+                  <div v-if="workflowResult.errorDetails" class="error-details">
+                    {{ workflowResult.errorDetails }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="detail-card">
+          <div class="action-buttons">
+            <el-button
+              v-if="declaration.statusType === 'submitting'"
+              type="warning"
+              @click="handleWithdraw"
+            >
+              <el-icon><Close /></el-icon>
+              撤回申报
+            </el-button>
+            <el-button
+              v-if="declaration.statusType === 'failed'"
+              type="info"
+              @click="handleRedeclare"
+            >
+              <el-icon><Refresh /></el-icon>
+              重新申报
+            </el-button>
+            <el-button
+              v-if="declaration.statusType === 'success'"
+              type="primary"
+              @click="handleViewProject"
+            >
+              <el-icon><View /></el-icon>
+              查看项目
+            </el-button>
+            <el-button
+              v-if="declaration.statusType === 'draft'"
+              type="primary"
+              @click="handleEdit"
+            >
+              <el-icon><Edit /></el-icon>
+              编辑申报
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, computed, onMounted } = Vue;
+      const { ElMessage, ElMessageBox } = ElementPlus;
+
+      createApp({
+        setup() {
+          // 申报数据
+          const declaration = ref({
+            id: 1,
+            number: "SB2024001",
+            applicant: "张教授",
+            direction:
+              "人工智能在教育领域的应用研究\n\n本研究旨在探索人工智能技术在教育领域的创新应用，重点关注个性化学习、智能评估和教学辅助等方面。通过机器学习算法分析学生学习行为，为每位学生提供定制化的学习路径和资源推荐。\n\n主要研究内容包括：\n1. 学生行为数据挖掘与分析\n2. 个性化推荐算法设计\n3. 智能评估系统开发\n4. 教学效果验证与优化",
+            fields: ["人工智能", "教育技术", "机器学习", "数据分析"],
+            submitTime: "2024-01-15 14:30:25",
+            status: "申报中",
+            statusType: "submitting",
+          });
+
+          // 工作流时间线
+          const workflowTimeline = ref([
+            {
+              id: 1,
+              title: "申报提交",
+              time: "2024-01-15 14:30:25",
+              status: "completed",
+              icon: "✓",
+            },
+            {
+              id: 2,
+              title: "Dify 工作流启动",
+              time: "2024-01-15 14:30:28",
+              status: "completed",
+              icon: "✓",
+            },
+            {
+              id: 3,
+              title: "AI 内容分析",
+              time: "2024-01-15 14:31:15",
+              status: "completed",
+              icon: "✓",
+            },
+            {
+              id: 4,
+              title: "项目信息生成",
+              time: "2024-01-15 14:32:45",
+              status: "processing",
+              icon: "⏳",
+            },
+            {
+              id: 5,
+              title: "数据库存储",
+              time: "预计 14:33:00",
+              status: "pending",
+              icon: "⏸",
+            },
+          ]);
+
+          // 工作流结果
+          const workflowResult = ref(null);
+
+          // 工作流状态
+          const workflowStatus = computed(() => {
+            const status = declaration.value.statusType;
+
+            switch (status) {
+              case "draft":
+                return {
+                  type: "pending",
+                  icon: "⏸",
+                  title: "草稿状态",
+                  description: "申报尚未提交，可以继续编辑",
+                  showProgress: false,
+                  progress: 0,
+                };
+              case "submitting":
+                return {
+                  type: "processing",
+                  icon: "⏳",
+                  title: "处理中",
+                  description: "Dify 工作流正在处理您的申报，请稍候...",
+                  showProgress: true,
+                  progress: 65,
+                };
+              case "success":
+                return {
+                  type: "completed",
+                  icon: "✓",
+                  title: "处理完成",
+                  description: "申报已成功处理，项目已创建",
+                  showProgress: false,
+                  progress: 100,
+                };
+              case "failed":
+                return {
+                  type: "failed",
+                  icon: "✗",
+                  title: "处理失败",
+                  description: "申报处理过程中出现错误",
+                  showProgress: false,
+                  progress: 0,
+                };
+              case "withdrawn":
+                return {
+                  type: "pending",
+                  icon: "⏸",
+                  title: "已撤回",
+                  description: "申报已被撤回",
+                  showProgress: false,
+                  progress: 0,
+                };
+              default:
+                return {
+                  type: "pending",
+                  icon: "?",
+                  title: "未知状态",
+                  description: "状态信息异常",
+                  showProgress: false,
+                  progress: 0,
+                };
+            }
+          });
+
+          // 加载申报详情
+          const loadDeclarationDetail = async () => {
+            try {
+              // 模拟API调用
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
+              // 模拟成功结果
+              if (declaration.value.statusType === "success") {
+                workflowResult.value = {
+                  projectId: "PRJ_20240115_001",
+                  projectName: "AI教育应用研究项目",
+                  projectDescription:
+                    "基于人工智能技术的个性化教育系统研发项目，专注于学生行为分析和智能推荐算法优化。",
+                };
+              }
+
+              // 模拟失败结果
+              if (declaration.value.statusType === "failed") {
+                workflowResult.value = {
+                  errorMessage: "AI内容分析阶段超时，无法完成项目信息生成",
+                  suggestion:
+                    "请检查研究方向描述是否过于复杂，建议简化后重新申报",
+                  errorDetails:
+                    "Error: AI Analysis Timeout\nCode: AI_TIMEOUT_001\nTime: 2024-01-15 14:32:45\nDetails: The AI model took longer than expected to process the research direction content. This may be due to the complexity or length of the input text.",
+                };
+              }
+            } catch (error) {
+              ElMessage.error("加载申报详情失败");
+            }
+          };
+
+          // 事件处理
+          const handleBack = () => {
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "declaration/list",
+                },
+                "*"
+              );
+            } else {
+              window.location.href = "申报列表.html";
+            }
+          };
+
+          const handleWithdraw = async () => {
+            try {
+              await ElMessageBox.confirm(
+                "确定要撤回此申报吗？撤回后将无法恢复。",
+                "确认撤回",
+                {
+                  confirmButtonText: "确定撤回",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+
+              // 模拟撤回操作
+              declaration.value.status = "已撤回";
+              declaration.value.statusType = "withdrawn";
+
+              ElMessage.success("申报已撤回");
+
+              // 更新工作流状态
+              workflowTimeline.value.push({
+                id: 6,
+                title: "申报撤回",
+                time: new Date().toLocaleString(),
+                status: "completed",
+                icon: "✓",
+              });
+            } catch {
+              ElMessage.info("已取消撤回");
+            }
+          };
+
+          const handleRedeclare = () => {
+            ElMessage.info("跳转到重新申报页面");
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "declaration/create",
+                },
+                "*"
+              );
+            } else {
+              window.location.href = "新建申报.html";
+            }
+          };
+
+          const handleViewProject = () => {
+            ElMessage.info("跳转到项目详情页面");
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "project/detail",
+                },
+                "*"
+              );
+            } else {
+              window.location.href = "../项目模块/项目详情.html";
+            }
+          };
+
+          const handleEdit = () => {
+            ElMessage.info("跳转到编辑申报页面");
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "declaration/create",
+                },
+                "*"
+              );
+            } else {
+              window.location.href = "新建申报.html";
+            }
+          };
+
+          // 组件挂载时加载数据
+          onMounted(() => {
+            loadDeclarationDetail();
+          });
+
+          return {
+            declaration,
+            workflowTimeline,
+            workflowResult,
+            workflowStatus,
+            handleBack,
+            handleWithdraw,
+            handleRedeclare,
+            handleViewProject,
+            handleEdit,
+          };
+        },
+      })
+        .use(ElementPlus)
+        .mount("#app");
+    </script>
+  </body>
+</html>
