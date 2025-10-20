@@ -200,15 +200,13 @@
           <div class="header-right">
             <el-dropdown @command="handleCommand">
               <span class="user-info">
-                <el-avatar :size="32" src="../images/favicon.ico" />张三
+                <el-avatar :size="32" src="../images/favicon.ico"></el-avatar>
+                <span>管理员</span>
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="profile"
                     >个人中心</el-dropdown-item
-                  >
-                  <el-dropdown-item command="settings"
-                    >系统设置</el-dropdown-item
                   >
                   <el-dropdown-item divided command="logout"
                     >退出登录</el-dropdown-item
@@ -279,14 +277,14 @@
                   <el-icon><List /></el-icon>
                   <span>项目列表</span>
                 </el-menu-item>
-                <el-menu-item index="project/detail">
+                <!-- <el-menu-item index="project/detail">
                   <el-icon><View /></el-icon>
                   <span>项目详情</span>
                 </el-menu-item>
                 <el-menu-item index="project/progress">
                   <el-icon><TrendCharts /></el-icon>
                   <span>项目进度</span>
-                </el-menu-item>
+                </el-menu-item> -->
               </el-sub-menu>
 
               <el-sub-menu index="acceptance">
@@ -294,17 +292,47 @@
                   <el-icon><Check /></el-icon>
                   <span>验收管理</span>
                 </template>
-                <el-menu-item index="acceptance/list">
+                <!-- <el-menu-item index="acceptance/list">
                   <el-icon><List /></el-icon>
-                  <span>验收列表</span>
-                </el-menu-item>
-                <el-menu-item index="acceptance/apply">
-                  <el-icon><Plus /></el-icon>
-                  <span>验收申请</span>
-                </el-menu-item>
+                  <span>报告列表</span>
+                </el-menu-item> -->
                 <el-menu-item index="acceptance/report">
-                  <el-icon><Document /></el-icon>
+                  <el-icon><List /></el-icon>
                   <span>报告管理</span>
+                </el-menu-item>
+                <!-- <el-menu-item index="acceptance/generate">
+                  <el-icon><Plus /></el-icon>
+                  <span>报告生成</span>
+                </el-menu-item> -->
+              </el-sub-menu>
+
+              <el-sub-menu index="ai">
+                <template #title>
+                  <el-icon><Monitor /></el-icon>
+                  <span>AI助手</span>
+                </template>
+                <el-menu-item index="ai/knowledge">
+                  <el-icon><Reading /></el-icon>
+                  <span>知识库</span>
+                </el-menu-item>
+                <el-menu-item index="ai/chat">
+                  <el-icon><Avatar /></el-icon>
+                  <span>AI对话</span>
+                </el-menu-item>
+              </el-sub-menu>
+
+              <el-sub-menu index="user">
+                <template #title>
+                  <el-icon><User /></el-icon>
+                  <span>用户中心</span>
+                </template>
+                <el-menu-item index="user/profile">
+                  <el-icon><House /></el-icon>
+                  <span>个人信息</span>
+                </el-menu-item>
+                <el-menu-item index="user/security">
+                  <el-icon><Lock /></el-icon>
+                  <span>安全设置</span>
                 </el-menu-item>
               </el-sub-menu>
 
@@ -321,20 +349,13 @@
                   <el-icon><Key /></el-icon>
                   <span>角色权限</span>
                 </el-menu-item>
-              </el-sub-menu>
-
-              <el-sub-menu index="ai">
-                <template #title>
-                  <el-icon><Monitor /></el-icon>
-                  <span>AI助手</span>
-                </template>
-                <el-menu-item index="ai/chat">
-                  <el-icon><Avatar /></el-icon>
-                  <span>AI对话</span>
+                <el-menu-item index="system/config">
+                  <el-icon><Setting /></el-icon>
+                  <span>系统配置</span>
                 </el-menu-item>
-                <el-menu-item index="ai/knowledge">
-                  <el-icon><Search /></el-icon>
-                  <span>知识库搜索</span>
+                <el-menu-item index="system/logs">
+                  <el-icon><Document /></el-icon>
+                  <span>日志管理</span>
                 </el-menu-item>
               </el-sub-menu>
             </el-menu>
@@ -381,7 +402,7 @@
         User,
         Key,
         ChatDotRound,
-        Search,
+        Reading,
         ChatDotSquare,
         FolderOpened,
         UserFilled,
@@ -394,6 +415,8 @@
         Fold,
         Expand,
         Avatar,
+        Lock,
+        House,
       } = ElementPlusIconsVue;
 
       createApp({
@@ -409,7 +432,7 @@
           User,
           Key,
           ChatDotRound,
-          Search,
+          Reading,
           ChatDotSquare,
           FolderOpened,
           UserFilled,
@@ -422,6 +445,8 @@
           Fold,
           Expand,
           Avatar,
+          Lock,
+          House,
         },
         setup() {
           const activeMenu = ref("dashboard");
@@ -483,15 +508,15 @@
               breadcrumb: ["项目管理", "项目进度"],
             },
             "acceptance/list": {
-              page: "../验收模块/验收列表.html",
-              breadcrumb: ["验收管理", "验收列表"],
+              page: "../验收模块/报告列表.html",
+              breadcrumb: ["验收管理", "报告列表"],
             },
-            "acceptance/apply": {
-              page: "../验收模块/验收申请.html",
-              breadcrumb: ["验收管理", "验收申请"],
+            "acceptance/generate": {
+              page: "../验收模块/报告生成.html",
+              breadcrumb: ["验收管理", "报告生成"],
             },
             "acceptance/report": {
-              page: "../验收模块/报告管理.html",
+              page: "../验收模块/报告列表.html",
               breadcrumb: ["验收管理", "报告管理"],
             },
             "system/user": {
@@ -502,13 +527,21 @@
               page: "../系统管理/角色权限.html",
               breadcrumb: ["系统管理", "角色权限"],
             },
+            "system/config": {
+              page: "../系统管理/系统配置.html",
+              breadcrumb: ["系统管理", "系统配置"],
+            },
+            "system/logs": {
+              page: "../系统管理/日志管理.html",
+              breadcrumb: ["系统管理", "日志管理"],
+            },
             "ai/chat": {
               page: "../AI助手/AI对话.html",
               breadcrumb: ["AI助手", "AI对话"],
             },
             "ai/knowledge": {
-              page: "../AI助手/知识库搜索.html",
-              breadcrumb: ["AI助手", "知识库搜索"],
+              page: "../AI助手/知识库.html",
+              breadcrumb: ["AI助手", "知识库"],
             },
           };
 
@@ -529,10 +562,8 @@
             console.log("用户菜单命令:", command);
             switch (command) {
               case "profile":
-                ElMessage.info("跳转到个人中心");
-                break;
-              case "settings":
-                ElMessage.info("跳转到系统设置");
+                // 跳转到个人信息页面
+                handleMenuSelect("user/profile");
                 break;
               case "logout":
                 ElMessage.success("退出登录成功");

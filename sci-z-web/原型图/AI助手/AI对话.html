@@ -1,0 +1,5133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI对话 - Sci-Z Platform 高校科研管理平台</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/element-plus/dist/index.full.js"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue/dist/index.iife.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus/dist/index.css"
+    />
+    <!-- 多类型内容渲染库 -->
+    <script src="https://unpkg.com/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+    <script src="https://unpkg.com/highlight.js@11.9.0/lib/core.min.js"></script>
+    <script src="https://unpkg.com/highlight.js@11.9.0/lib/languages/javascript.min.js"></script>
+    <script src="https://unpkg.com/highlight.js@11.9.0/lib/languages/python.min.js"></script>
+    <script src="https://unpkg.com/highlight.js@11.9.0/lib/languages/sql.min.js"></script>
+    <script src="https://unpkg.com/highlight.js@11.9.0/lib/languages/json.min.js"></script>
+    <script src="https://unpkg.com/highlight.js@11.9.0/lib/languages/xml.min.js"></script>
+    <script src="https://unpkg.com/highlight.js@11.9.0/lib/languages/css.min.js"></script>
+    <script src="https://unpkg.com/highlight.js@11.9.0/lib/languages/bash.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/highlight.js@11.9.0/styles/github.min.css"
+    />
+    <script src="https://unpkg.com/dompurify@3.0.8/dist/purify.min.js"></script>
+    <script src="https://unpkg.com/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script>
+      // LLM 配置（仅原型，勿提交到生产）
+      window.LLM_CONFIG = {
+        provider: "dashscope", // 'dashscope' | 'custom'
+        apiKey: "sk-62c7d519b9b543c7aa6215ef7190a7ed", // 仅测试用途
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        model: "qwen3-max",
+        useStream: true, // 默认开启流式；若CORS失败会自动降级非流式
+      };
+
+      // 可切换为本地GPU（OpenAI兼容）
+      // window.LLM_CONFIG = {
+      //   provider: 'custom',
+      //   apiKey: 'YOUR_LOCAL_KEY',
+      //   baseUrl: 'http://localhost:8000/v1',
+      //   model: 'your-local-model',
+      //   useStream: true
+      // };
+
+      async function callLLM(messages, options = {}) {
+        const cfg = Object.assign({}, window.LLM_CONFIG || {}, options);
+        const url = `${cfg.baseUrl}/chat/completions`;
+        const body = {
+          model: cfg.model,
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          stream: false,
+        };
+
+        try {
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${cfg.apiKey}`,
+            },
+            body: JSON.stringify(body),
+          });
+          if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(`LLM请求失败: ${resp.status} ${text}`);
+          }
+          const data = await resp.json();
+          // OpenAI兼容：data.choices[0].message.content
+          const content = data?.choices?.[0]?.message?.content || "";
+          return normalizeLLMContent(content);
+        } catch (e) {
+          console.error("callLLM error", e);
+          return {
+            contentType: "text",
+            content: `调用模型失败：${e.message || e}`,
+          };
+        }
+      }
+
+      // 流式SSE
+      async function streamLLM(messages, onDelta, options = {}, abortSignal) {
+        const cfg = Object.assign({}, window.LLM_CONFIG || {}, options);
+        const url = `${cfg.baseUrl}/chat/completions`;
+        const body = {
+          model: cfg.model,
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          stream: true,
+        };
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${cfg.apiKey}`,
+          },
+          body: JSON.stringify(body),
+          signal: abortSignal,
+        });
+        if (!resp.ok || !resp.body) {
+          throw new Error(`流式请求失败: ${resp.status}`);
+        }
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() || ""; // 剩余不完整片段留在 buffer
+          for (const chunk of parts) {
+            const line = chunk.trim();
+            if (!line) continue;
+            // 处理多行，取 data: 开头
+            const dataLine = line
+              .split("\n")
+              .find((l) => l.startsWith("data:"));
+            if (!dataLine) continue;
+            const data = dataLine.replace(/^data:\s*/, "");
+            if (data === "[DONE]") continue;
+            try {
+              const json = JSON.parse(data);
+              const delta = json?.choices?.[0]?.delta?.content || "";
+              if (delta) onDelta(delta);
+            } catch (e) {
+              // 忽略解析错误
+            }
+          }
+        }
+      }
+
+      // 将 ```lang\n...\n``` 转换为深色代码块
+      function transformCodeBlocks(text) {
+        if (!text) return "";
+        return text.replace(/```(\w+)?\n([\s\S]*?)```/g, (m, lang, inner) => {
+          const safe = inner.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          return `<div class=\"code-view\"><pre><code>${safe}</code></pre></div>`;
+        });
+      }
+
+      function normalizeLLMContent(text) {
+        if (!text) return { contentType: "text", content: "" };
+        // 简单识别代码块 ```lang\n...\n```
+        const codeBlockMatch = text.match(/```(\w+)?\n[\s\S]*?```/);
+        if (codeBlockMatch) {
+          const full = codeBlockMatch[0];
+          const lang = (codeBlockMatch[1] || "text").toLowerCase();
+          const inner = full.replace(/```(\w+)?\n/, "").replace(/```$/, "");
+          return {
+            contentType: "code",
+            payload: { language: lang, content: inner },
+          };
+        }
+        // 否则作为markdown文本（回退）
+        return { contentType: "markdown", content: text };
+      }
+    </script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      .ai-chat-container {
+        display: flex;
+        height: 100vh;
+        background: #f7f9fc;
+      }
+
+      /* 左侧对话列表 */
+      .chat-list-sidebar {
+        width: 280px;
+        background: #ffffff;
+        border-right: 1px solid #e5e7eb;
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+      }
+
+      .chat-list-header {
+        padding: 16px;
+        background: linear-gradient(135deg, #fafbfc 0%, #f7f9fc 100%);
+        border-bottom: 1px solid #f3f4f6;
+      }
+
+      .new-chat-btn {
+        width: 100%;
+        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+        color: white;
+        border: none;
+        padding: 12px 16px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.15);
+      }
+
+      .new-chat-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        color: white;
+      }
+
+      .new-chat-icon svg {
+        color: white;
+        stroke: currentColor;
+      }
+
+      .new-chat-btn:hover {
+        background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+        transform: translateY(-2px);
+      }
+
+      .new-chat-btn:active {
+        transform: translateY(0);
+      }
+
+      .chat-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+      }
+
+      .chat-list::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .chat-list::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .chat-list::-webkit-scrollbar-thumb {
+        background: #d1d5db;
+        border-radius: 3px;
+      }
+
+      .chat-list::-webkit-scrollbar-thumb:hover {
+        background: #9ca3af;
+      }
+
+      .chat-item {
+        padding: 12px;
+        margin-bottom: 4px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .chat-item:hover {
+        background: #f9fafb;
+      }
+
+      .chat-item.active {
+        background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.08);
+      }
+
+      .chat-item.active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 24px;
+        background: linear-gradient(180deg, #1e3a8a 0%, #0ea5e9 100%);
+        border-radius: 0 2px 2px 0;
+      }
+
+      .chat-item-content {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chat-item-actions {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        display: flex;
+        align-items: center;
+        margin-left: 8px;
+        flex-shrink: 0;
+      }
+
+      .chat-item:hover .chat-item-actions,
+      .chat-item.active .chat-item-actions {
+        opacity: 1;
+      }
+
+      .chat-more-btn {
+        width: 24px;
+        height: 24px;
+        border: none;
+        background: transparent;
+        color: #9ca3af;
+        cursor: pointer;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        font-size: 16px;
+        font-weight: bold;
+      }
+
+      .chat-more-btn:hover {
+        background: #f3f4f6;
+        color: #6b7280;
+      }
+
+      .chat-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #111827;
+        margin-bottom: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .chat-item.active .chat-title {
+        color: #1e3a8a;
+        font-weight: 600;
+      }
+
+      .chat-item.pinned {
+        background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.08);
+      }
+
+      .chat-item.pinned .chat-title {
+        color: #1e3a8a;
+        font-weight: 600;
+      }
+
+      .pin-icon {
+        width: 16px;
+        height: 16px;
+        color: #1e3a8a;
+        margin-right: 8px;
+        flex-shrink: 0;
+      }
+
+      .chat-preview {
+        font-size: 12px;
+        color: #6b7280;
+        line-height: 1.5;
+        margin-bottom: 6px;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .chat-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .chat-time {
+        font-size: 11px;
+        color: #9ca3af;
+      }
+
+      .unread-badge {
+        background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+        color: white;
+        font-size: 10px;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+      }
+
+      /* 会话右键菜单 */
+      .chat-context-menu {
+        position: fixed;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        min-width: 140px;
+        overflow: hidden;
+      }
+
+      .context-menu-item {
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        color: #374151;
+        transition: background-color 0.2s;
+      }
+
+      .context-menu-item:hover {
+        background: #f9fafb;
+      }
+
+      .context-menu-item:first-child {
+        border-radius: 8px 8px 0 0;
+      }
+
+      .context-menu-item:last-child {
+        border-radius: 0 0 8px 8px;
+      }
+
+      .context-menu-item.delete-item {
+        color: #dc2626;
+      }
+
+      .context-menu-item.delete-item:hover {
+        background: #fef2f2;
+        color: #dc2626;
+      }
+
+      /* 统一弹窗样式 - 与知识库.html保持一致 */
+      .context-menu-item {
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        color: #374151;
+        transition: all 0.2s ease;
+        border-bottom: 1px solid #f3f4f6;
+      }
+
+      .context-menu-item:last-child {
+        border-bottom: none;
+      }
+
+      .context-menu-item:hover {
+        background: #f9fafb;
+        color: #111827;
+      }
+
+      .context-menu-item.delete-item:hover {
+        background: #fef2f2;
+        color: #dc2626;
+      }
+
+      /* 右侧对话内容 */
+      .chat-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #ffffff;
+        position: relative;
+      }
+
+      .chat-header {
+        padding: 16px 24px;
+        border-bottom: 1px solid #f3f4f6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #fafbfc;
+        backdrop-filter: blur(10px);
+      }
+
+      .chat-title-header {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1e3a8a;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .chat-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #16a34a;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        background: #16a34a;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .chat-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .action-btn {
+        padding: 8px 16px;
+        border: 1px solid #e5e7eb;
+        background: white;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+      }
+
+      .action-btn:hover {
+        background: #f9fafb;
+        border-color: #d1d5db;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+
+      /* 对话菜单 */
+      .chat-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        margin-top: 8px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        min-width: 120px;
+      }
+
+      .menu-item {
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        color: #374151;
+        transition: background-color 0.2s;
+      }
+
+      .menu-item:hover {
+        background: #f9fafb;
+      }
+
+      .menu-item:first-child {
+        border-radius: 8px 8px 0 0;
+      }
+
+      .menu-item:last-child {
+        border-radius: 0 0 8px 8px;
+      }
+
+      .messages-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        background: linear-gradient(180deg, #fafbfc 0%, #f7f9fc 100%);
+      }
+
+      .messages-container::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .messages-container::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .messages-container::-webkit-scrollbar-thumb {
+        background: #d1d5db;
+        border-radius: 4px;
+      }
+
+      .messages-container::-webkit-scrollbar-thumb:hover {
+        background: #9ca3af;
+      }
+
+      .message {
+        margin-bottom: 24px;
+        display: flex;
+        align-items: flex-start;
+        animation: slideIn 0.3s ease-out;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .message.user {
+        justify-content: flex-end;
+      }
+
+      .message.ai {
+        justify-content: flex-start;
+      }
+
+      .message-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 600;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .message-avatar.user {
+        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        color: white;
+        margin-left: 12px;
+      }
+
+      .message-avatar.ai {
+        background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+        color: white;
+        margin-right: 12px;
+      }
+
+      .message-bubble {
+        max-width: 65%;
+        position: relative;
+      }
+
+      .message.user .message-bubble {
+        text-align: right;
+      }
+
+      .message-content-wrapper {
+        padding: 14px 18px;
+        border-radius: 16px;
+        line-height: 1.6;
+        word-wrap: break-word;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        transition: all 0.2s ease;
+      }
+
+      .message.user .message-content-wrapper {
+        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+        color: white;
+        border-radius: 16px 16px 4px 16px;
+      }
+
+      .message.ai .message-content-wrapper {
+        background: white;
+        border: 1px solid #e5e7eb;
+        color: #374151;
+        border-radius: 16px 16px 16px 4px;
+      }
+
+      .message-content-wrapper:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+
+      .message-content {
+        font-size: 14px;
+      }
+
+      .message-content strong {
+        font-weight: 600;
+      }
+
+      .message-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        font-size: 11px;
+        color: #9ca3af;
+      }
+
+      .message.user .message-meta {
+        justify-content: flex-end;
+      }
+
+      .typing-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #6b7280;
+        font-size: 13px;
+        padding: 14px 18px;
+      }
+
+      .typing-dots {
+        display: flex;
+        gap: 4px;
+      }
+
+      .typing-dot {
+        width: 6px;
+        height: 6px;
+        background: #6b7280;
+        border-radius: 50%;
+        animation: typing 1.4s infinite ease-in-out;
+      }
+
+      .typing-dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .typing-dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes typing {
+        0%,
+        60%,
+        100% {
+          transform: translateY(0);
+        }
+        30% {
+          transform: translateY(-8px);
+        }
+      }
+
+      /* 输入区域 */
+      .input-area {
+        padding: 20px 24px;
+        background: white;
+        border-top: 1px solid #f0f0f0;
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+      }
+
+      .input-container {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        background: #f8f9fa;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+      }
+
+      .input-wrapper {
+        flex: 1;
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+      }
+
+      .message-input {
+        flex: 1;
+        min-height: 20px;
+        max-height: 120px;
+        padding: 8px 0;
+        border: none;
+        font-size: 14px;
+        line-height: 1.5;
+        resize: none;
+        outline: none;
+        font-family: inherit;
+        background: transparent;
+        color: #333;
+      }
+
+      .message-input::placeholder {
+        color: #9ca3af;
+      }
+
+      .send-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: #e5e7eb;
+        color: #6b7280;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+      }
+
+      .send-btn:hover {
+        background: #d1d5db;
+        color: #374151;
+      }
+
+      .send-btn.active {
+        background: #1e3a8a;
+        color: white;
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+      }
+
+      .send-btn.active:hover {
+        background: #1e40af;
+        box-shadow: 0 4px 8px rgba(30, 58, 138, 0.4);
+      }
+
+      .send-btn:disabled {
+        background: #f3f4f6;
+        color: #d1d5db;
+        cursor: not-allowed;
+      }
+
+      /* 复制按钮样式 */
+      .copy-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        color: #6b7280;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-left: 8px;
+      }
+
+      .copy-btn:hover {
+        background: #e5e7eb;
+        color: #374151;
+        border-color: #d1d5db;
+      }
+
+      .copy-btn:active {
+        background: #d1d5db;
+      }
+
+      /* 消息操作按钮 */
+      .message-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .message-actions .copy-btn,
+      .message-actions .retry-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        color: #6b7280;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .message-actions .copy-btn:hover,
+      .message-actions .retry-btn:hover {
+        background: #e5e7eb;
+        color: #374151;
+        border-color: #d1d5db;
+      }
+
+      .message-actions .copy-btn:active,
+      .message-actions .retry-btn:active {
+        background: #d1d5db;
+      }
+
+      .input-container {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        position: relative;
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 16px;
+        padding: 16px;
+        min-height: 80px;
+      }
+
+      /* 模型选择按钮 */
+      .model-selector-new {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        background: #1e3a8a;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: white;
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+
+      .model-selector-new:hover {
+        background: #1e40af;
+      }
+
+      .model-name-new {
+        color: white;
+      }
+
+      .model-arrow {
+        color: white;
+        font-size: 12px;
+      }
+
+      /* 联网状态 */
+      .network-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: #666;
+        white-space: nowrap;
+      }
+
+      .network-dot {
+        width: 6px;
+        height: 6px;
+        background: #666;
+        border-radius: 50%;
+      }
+
+      /* 主输入框 */
+      .input-wrapper-new {
+        flex: 1;
+        position: relative;
+        min-height: 48px;
+      }
+
+      .message-input-new {
+        width: 100%;
+        min-height: 48px;
+        max-height: 120px;
+        padding: 12px 0;
+        border: none;
+        font-size: 14px;
+        line-height: 1.6;
+        resize: none;
+        outline: none;
+        font-family: inherit;
+        background: transparent;
+        color: #333;
+      }
+
+      .message-input-new::placeholder {
+        color: #999;
+      }
+
+      /* 右侧控制区 */
+      .input-right-controls-new {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .attachment-btn-new,
+      .tools-btn-new,
+      .more-btn-new {
+        width: 32px;
+        height: 32px;
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        cursor: pointer;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s ease;
+        margin-bottom: 4px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .attachment-btn-new:hover,
+      .tools-btn-new:hover,
+      .more-btn-new:hover {
+        background: #f3f4f6;
+        border-color: #9ca3af;
+        color: #111827;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+      }
+
+      .send-btn-new {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: #e5e7eb;
+        cursor: pointer;
+        color: #666;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+        margin-top: 4px;
+      }
+
+      .send-btn-new:hover {
+        background: #d1d5db;
+        color: #333;
+      }
+
+      .send-btn-new.send-btn-active {
+        background: #1e3a8a;
+        color: white;
+        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.3);
+      }
+
+      .send-btn-new.send-btn-active:hover {
+        background: #1e40af;
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.4);
+        transform: translateY(-1px);
+      }
+
+      .send-btn-new:disabled {
+        background: #f5f5f5;
+        color: #ccc;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      /* 底部提示 */
+      .input-footer {
+        margin-top: 12px;
+        text-align: center;
+        font-size: 12px;
+        color: #999;
+      }
+
+      /* 模型选择菜单 */
+      .model-selector-menu {
+        position: absolute;
+        bottom: 100%;
+        left: 0;
+        margin-bottom: 8px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        min-width: 200px;
+        overflow: hidden;
+      }
+
+      .model-option {
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .model-option:hover {
+        background: #f9fafb;
+      }
+
+      .model-icon {
+        font-size: 20px;
+      }
+
+      .model-details {
+        flex: 1;
+      }
+
+      .model-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #111827;
+        margin-bottom: 2px;
+      }
+
+      .model-desc {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      /* 空状态 */
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #6b7280;
+        padding: 40px;
+      }
+
+      .empty-icon {
+        font-size: 64px;
+        margin-bottom: 24px;
+        opacity: 0.6;
+      }
+
+      .empty-text {
+        font-size: 18px;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 12px;
+      }
+
+      .empty-desc {
+        font-size: 14px;
+        color: #9ca3af;
+      }
+
+      /* 代码块样式 */
+      .code-block {
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 8px 0;
+        font-family: "Courier New", monospace;
+        font-size: 13px;
+        overflow-x: auto;
+      }
+
+      /* 轻量代码视图（无依赖） */
+      .code-view {
+        background: #0b1021;
+        color: #e2e8f0;
+        border-radius: 8px;
+        border: 1px solid #111827;
+        padding: 12px 14px;
+        margin: 8px 0;
+        font-family: "Courier New", Monaco, Menlo, Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        overflow-x: auto;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      }
+
+      /* 轻量表格视图（无依赖） */
+      .ai-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .ai-table th,
+      .ai-table td {
+        border-bottom: 1px solid #e5e7eb;
+        padding: 10px 12px;
+        text-align: left;
+        font-size: 13px;
+      }
+      .ai-table th {
+        background: #f8fafc;
+        color: #1e3a8a;
+        font-weight: 600;
+      }
+      .ai-table tr:hover {
+        background: #f9fafb;
+      }
+      .ai-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      /* 轻量条形图（纯CSS，无JS） */
+      .mini-chart {
+        width: 100%;
+        max-width: 520px;
+        margin: 10px 0;
+      }
+      .mini-chart__row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 6px 0;
+      }
+      .mini-chart__label {
+        width: 64px;
+        color: #374151;
+        font-size: 12px;
+      }
+      .mini-chart__bar-wrap {
+        flex: 1;
+        background: #f3f4f6;
+        border-radius: 6px;
+        overflow: hidden;
+        height: 10px;
+      }
+      .mini-chart__bar {
+        height: 100%;
+        background: linear-gradient(90deg, #60a5fa, #1e3a8a);
+      }
+      .mini-chart__value {
+        width: 44px;
+        text-align: right;
+        color: #6b7280;
+        font-size: 12px;
+      }
+
+      /* 底部提示 */
+      .footer-tip {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        border-top: 1px solid #f3f4f6;
+        font-size: 12px;
+        color: #9ca3af;
+        z-index: 100;
+      }
+
+      /* 移植自知识库.html的对话样式 */
+
+      /* 消息容器样式 */
+      .kb-messages-container {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: visible;
+        padding: 24px;
+        background: linear-gradient(180deg, #fafbfc 0%, #f7f9fc 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        z-index: 1;
+      }
+
+      /* 自定义滚动条样式 - 更短、更浅、悬停显示 */
+      .kb-messages-container {
+        /* Firefox滚动条样式 */
+        scrollbar-width: thin;
+        scrollbar-color: transparent transparent;
+        transition: scrollbar-color 0.3s ease;
+      }
+
+      .kb-messages-container:hover {
+        scrollbar-color: #e5e7eb transparent;
+      }
+
+      /* Webkit浏览器滚动条样式 */
+      .kb-messages-container::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .kb-messages-container::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .kb-messages-container::-webkit-scrollbar-thumb {
+        background: transparent;
+        border-radius: 2px;
+        transition: all 0.3s ease;
+        min-height: 30px;
+      }
+
+      /* 悬停时显示滚动条 */
+      .kb-messages-container:hover::-webkit-scrollbar-thumb {
+        background: #e5e7eb;
+      }
+
+      /* 滚动条悬停效果 */
+      .kb-messages-container::-webkit-scrollbar-thumb:hover {
+        background: #d1d5db;
+      }
+
+      /* 滚动条长度控制 - 只显示1/4长度 */
+      .kb-messages-container::-webkit-scrollbar-thumb {
+        background: linear-gradient(
+          to bottom,
+          transparent 0%,
+          transparent 75%,
+          transparent 75%,
+          transparent 100%
+        );
+      }
+
+      .kb-messages-container:hover::-webkit-scrollbar-thumb {
+        background: linear-gradient(
+          to bottom,
+          transparent 0%,
+          transparent 75%,
+          #e5e7eb 75%,
+          #e5e7eb 100%
+        );
+      }
+
+      .kb-messages-container::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(
+          to bottom,
+          transparent 0%,
+          transparent 75%,
+          #d1d5db 75%,
+          #d1d5db 100%
+        );
+      }
+
+      .kb-messages-container.has-messages {
+        align-items: stretch;
+        justify-content: flex-start;
+      }
+
+      .kb-messages {
+        width: 100%;
+        max-width: 100%;
+        overflow: visible;
+      }
+
+      .empty-chat-message {
+        font-size: 16px;
+        color: #6b7280;
+        text-align: center;
+        line-height: 1.6;
+      }
+
+      /* 消息样式 */
+      .kb-message {
+        margin-bottom: 24px;
+        display: flex;
+        align-items: flex-start;
+      }
+
+      .kb-message.user {
+        justify-content: flex-end;
+      }
+
+      .kb-message.ai {
+        justify-content: flex-start;
+      }
+
+      .kb-message-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 600;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .kb-message-avatar.user {
+        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        color: #fff;
+        margin-left: 12px;
+        margin-right: 12px;
+      }
+
+      .kb-message-avatar.ai {
+        background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+        color: #fff;
+        margin-right: 12px;
+      }
+
+      .kb-message-bubble {
+        max-width: 70%;
+        position: relative;
+        height: auto;
+        min-height: auto;
+        overflow: visible;
+        width: auto;
+      }
+
+      .kb-message-content-wrapper {
+        padding: 14px 18px;
+        border-radius: 16px;
+        line-height: 1.6;
+        word-wrap: break-word;
+        word-break: break-word;
+        white-space: pre-wrap;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        transition: all 0.2s ease;
+        border: 1px solid #e5e7eb;
+        background: #fff;
+        color: #374151;
+        min-height: auto;
+        height: auto;
+        overflow: visible;
+      }
+
+      .kb-message.user .kb-message-content-wrapper {
+        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+        color: #fff;
+        border-color: transparent;
+        border-radius: 16px 16px 4px 16px;
+      }
+
+      .kb-message.ai .kb-message-content-wrapper {
+        border-radius: 16px 16px 16px 4px;
+      }
+
+      /* 停止状态的消息样式 */
+      .kb-message.ai .kb-message-content-wrapper.stopped {
+        background: #f9fafb;
+        color: #6b7280;
+        border: 1px solid #e5e7eb;
+      }
+
+      .kb-message-content {
+        font-size: 14px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        word-break: break-word;
+        overflow: visible;
+        height: auto;
+        min-height: auto;
+      }
+
+      .kb-message-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        font-size: 11px;
+        color: #9ca3af;
+      }
+
+      .kb-message.user .kb-message-meta {
+        justify-content: flex-end;
+      }
+
+      .kb-message-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .kb-message-actions .kb-copy-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        color: #9ca3af;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+      }
+
+      .kb-message-actions .kb-copy-btn:hover {
+        background: #e5e7eb;
+        color: #374151;
+        border-color: #d1d5db;
+      }
+
+      .kb-message-actions .kb-retry-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        color: #9ca3af;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .kb-message-actions .kb-retry-btn:hover {
+        background: #e5e7eb;
+        color: #374151;
+        border-color: #d1d5db;
+      }
+
+      .kb-message-actions .kb-edit-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        color: #9ca3af;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .kb-message-actions .kb-edit-btn:hover {
+        background: #e5e7eb;
+        color: #374151;
+        border-color: #d1d5db;
+      }
+
+      /* 编辑状态样式 */
+      .kb-message.editing .kb-message-content-wrapper {
+        padding: 14px 18px;
+        border: 2px solid #1e3a8a;
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 2px 12px rgba(30, 58, 138, 0.15);
+        position: relative;
+        height: auto;
+        min-height: auto;
+        max-height: none;
+        overflow: visible;
+        width: auto;
+        max-width: none;
+      }
+
+      .kb-message.editing .kb-message-content {
+        height: auto;
+        min-height: auto;
+        max-height: none;
+        overflow: visible;
+        width: auto;
+        max-width: none;
+      }
+
+      .kb-edit-input {
+        width: 100%;
+        min-height: 20px;
+        padding: 0;
+        margin: 0;
+        border: none;
+        outline: none;
+        font-size: 14px;
+        line-height: 1.6;
+        resize: none;
+        font-family: inherit;
+        background: transparent;
+        overflow: visible;
+        word-wrap: break-word;
+        word-break: break-word;
+        white-space: pre-wrap;
+        color: #374151;
+        height: auto;
+        box-sizing: border-box;
+        display: block;
+      }
+
+      .kb-edit-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 12px;
+        padding-top: 8px;
+      }
+
+      .kb-edit-btn-cancel,
+      .kb-edit-btn-send {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        min-width: 60px;
+        text-align: center;
+      }
+
+      .kb-edit-btn-cancel {
+        background: #f8f9fa;
+        color: #6b7280;
+        border: 1px solid #e9ecef;
+      }
+
+      .kb-edit-btn-cancel:hover {
+        background: #e9ecef;
+        color: #495057;
+        transform: translateY(-1px);
+      }
+
+      .kb-edit-btn-send {
+        background: #1e3a8a;
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.3);
+      }
+
+      .kb-edit-btn-send:hover {
+        background: #1e40af;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.4);
+      }
+
+      .kb-edit-btn-send:disabled {
+        background: #d1d5db;
+        color: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .kb-message.editing {
+        transform: scale(1.02);
+        transition: transform 0.2s ease;
+      }
+
+      .kb-message.editing .kb-message-avatar {
+        transform: scale(1.05);
+        transition: transform 0.2s ease;
+      }
+
+      /* 输入区域样式 */
+      .kb-input-area {
+        padding: 20px;
+        border-top: 1px solid #f0f0f0;
+        background: #fff;
+        position: relative;
+        z-index: 10;
+      }
+
+      .custom-model-selector {
+        position: relative;
+        min-width: 120px;
+        flex-shrink: 0;
+        z-index: 1000;
+      }
+
+      .model-display {
+        padding: 8px 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 12px;
+        color: #6b7280;
+        background: #ffffff;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-weight: bold;
+      }
+
+      .model-display:hover {
+        border-color: #d1d5db;
+        background: #f9fafb;
+      }
+
+      .model-dropdown {
+        position: fixed;
+        bottom: auto;
+        left: auto;
+        right: auto;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 1001;
+        margin-bottom: 8px;
+        overflow: hidden;
+        max-height: 300px;
+        overflow-y: auto;
+        width: 320px;
+      }
+
+      .model-option {
+        padding: 12px 16px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        border-bottom: 1px solid #f3f4f6;
+      }
+
+      .model-option:last-child {
+        border-bottom: none;
+      }
+
+      .model-option:hover {
+        background: #f8f9fa;
+      }
+
+      .model-option.active {
+        background: #eef2ff;
+      }
+
+      .model-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: #111827;
+        margin-bottom: 2px;
+      }
+
+      .model-desc {
+        font-size: 11px;
+        color: #6b7280;
+        line-height: 1.3;
+      }
+
+      .check-icon {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #3b82f6;
+        font-weight: bold;
+        font-size: 14px;
+      }
+
+      .kb-input-container {
+        display: flex;
+        flex-direction: column;
+        background: #f8f9fa;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 0;
+        transition: all 0.2s ease;
+        overflow: visible;
+      }
+
+      .kb-input-container:has(.kb-message-input:placeholder-shown) {
+        background: #f3f4f6;
+      }
+
+      .kb-input-container:has(.kb-message-input:not(:placeholder-shown)) {
+        background: #ffffff;
+      }
+
+      .kb-message-input {
+        width: 100%;
+        min-height: 44px;
+        max-height: 200px;
+        padding: 12px 16px 8px 16px;
+        border: none;
+        font-size: 14px;
+        line-height: 1.5;
+        resize: none;
+        outline: none;
+        background: transparent;
+        color: #333;
+        overflow-y: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+      }
+
+      /* 底部控制栏 */
+      .kb-input-bottom-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 16px 12px 16px;
+        border-top: 1px solid #e5e7eb;
+        background: transparent;
+      }
+
+      .kb-send-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: #e5e7eb;
+        color: #fff;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+      }
+
+      .kb-send-btn.active {
+        background: #1e3a8a;
+        color: #fff;
+      }
+
+      .kb-send-btn.active:hover {
+        background: #1e40af;
+      }
+
+      /* 停止按钮样式 */
+      .kb-stop-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: #1e3a8a;
+        color: #fff;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+      }
+
+      .kb-stop-btn:hover {
+        background: #1e40af;
+        transform: scale(1.05);
+      }
+
+      /* 知识库选择下拉框样式 */
+      .knowledge-base-dropdown {
+        position: absolute;
+        bottom: 100%;
+        left: 0;
+        right: 0;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        z-index: 1002;
+        margin-bottom: 8px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .kb-dropdown-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f3f4f6;
+        background: #fafbfc;
+        border-radius: 12px 12px 0 0;
+      }
+
+      .kb-dropdown-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e3a8a;
+      }
+
+      .kb-dropdown-section {
+        padding: 8px 0;
+      }
+
+      .kb-section-title {
+        padding: 8px 16px;
+        font-size: 12px;
+        color: #6b7280;
+        font-weight: 500;
+        background: #f9fafb;
+        margin-bottom: 4px;
+      }
+
+      .kb-list {
+        padding: 0 8px;
+      }
+
+      .kb-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        margin: 2px 0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+      }
+
+      .kb-item:hover {
+        background: #e3f2fd;
+        border-color: #bbdefb;
+      }
+
+      .kb-item.selected {
+        background: #bbdefb;
+        border-color: #90caf9;
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.1);
+      }
+
+      .kb-icon {
+        width: 24px;
+        height: 24px;
+        background: #1e3a8a;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        flex-shrink: 0;
+      }
+
+      .kb-name {
+        font-size: 13px;
+        color: #374151;
+        font-weight: 500;
+        flex: 1;
+      }
+
+      /* 右侧控制按钮组样式 */
+      .kb-right-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* 附件按钮样式 */
+      .kb-attachment-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: #f3f4f6;
+        color: #6b7280;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+      }
+
+      .kb-attachment-btn:hover {
+        background: #e5e7eb;
+        color: #374151;
+        transform: translateY(-1px);
+      }
+
+      .kb-attachment-btn:active {
+        transform: translateY(0);
+      }
+
+      .kb-attachment-btn.disabled {
+        background: #f9fafb;
+        color: #d1d5db;
+        cursor: not-allowed;
+      }
+
+      .kb-attachment-btn.disabled:hover {
+        background: #f9fafb;
+        color: #d1d5db;
+        transform: none;
+      }
+
+      /* 附件相关样式 */
+      .attachment-preview {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding: 8px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+      }
+
+      .attachment-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        font-size: 12px;
+        color: #374151;
+        max-width: 200px;
+      }
+
+      .attachment-icon {
+        font-size: 16px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+      }
+
+      .attachment-name {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .attachment-size {
+        color: #9ca3af;
+        font-size: 11px;
+      }
+
+      .attachment-remove {
+        width: 16px;
+        height: 16px;
+        color: #9ca3af;
+        cursor: pointer;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+      }
+
+      .attachment-remove:hover {
+        background: #f3f4f6;
+        color: #dc2626;
+      }
+
+      .attachment-btn-wrapper {
+        position: relative;
+        display: inline-block;
+      }
+
+      .attachment-tooltip {
+        position: absolute;
+        bottom: 100%;
+        right: 0;
+        margin-bottom: 8px;
+        background: white;
+        color: #374151;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 12px;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        border: 1px solid #e5e7eb;
+        min-width: 280px;
+        line-height: 1.4;
+      }
+
+      .attachment-tooltip::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        right: 12px;
+        border: 6px solid transparent;
+        border-top-color: white;
+      }
+
+      .attachment-menu {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        overflow: hidden;
+        border: 1px solid #e5e7eb;
+        min-width: 140px;
+      }
+
+      .attachment-menu-item {
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 14px;
+        color: #374151;
+        border-bottom: 1px solid #f3f4f6;
+      }
+
+      .attachment-menu-item:last-child {
+        border-bottom: none;
+      }
+
+      .attachment-menu-item:hover {
+        background: #f9fafb;
+        color: #1e3a8a;
+      }
+
+      .attachment-menu-item el-icon {
+        font-size: 18px;
+      }
+
+      /* 知识库文件列表样式 */
+      .kb-file-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .kb-file-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .kb-file-item:hover {
+        background: #eef2ff;
+        border-color: #1e3a8a;
+      }
+
+      .kb-file-icon {
+        font-size: 24px;
+        color: #1e3a8a;
+        flex-shrink: 0;
+      }
+
+      .kb-file-info {
+        flex: 1;
+      }
+
+      .kb-file-name {
+        font-size: 14px;
+        font-weight: 500;
+        color: #111827;
+        margin-bottom: 4px;
+      }
+
+      .kb-file-meta {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      /* Element Plus弹窗主题统一 */
+      .el-message-box {
+        border-radius: 8px !important;
+        border: 1px solid #e5e7eb !important;
+      }
+
+      .el-message-box__header {
+        padding: 20px !important;
+        border-bottom: 1px solid #e5e7eb !important;
+      }
+
+      .el-message-box__title {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #1e3a8a !important;
+      }
+
+      .el-message-box__content {
+        padding: 20px !important;
+      }
+
+      .el-message-box__btns {
+        padding: 16px 20px !important;
+        border-top: 1px solid #e5e7eb !important;
+      }
+
+      .el-message-box__btns .el-button--default {
+        padding: 10px 20px !important;
+        background: white !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 8px !important;
+        color: #374151 !important;
+        font-size: 14px !important;
+      }
+
+      .el-message-box__btns .el-button--default:hover {
+        background: #f9fafb !important;
+        border-color: #9ca3af !important;
+      }
+
+      .el-message-box__btns .el-button--primary {
+        padding: 10px 20px !important;
+        background: #1e3a8a !important;
+        border: none !important;
+        border-radius: 8px !important;
+        color: white !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+      }
+
+      .el-message-box__btns .el-button--primary:hover {
+        background: #1e40af !important;
+      }
+
+      .el-input__wrapper {
+        border-radius: 8px !important;
+      }
+
+      /* 知识库文件选择弹窗 */
+      .create-kb-dialog {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        backdrop-filter: blur(4px);
+      }
+
+      .create-kb-content {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        overflow: hidden;
+        max-width: 90vw;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .create-kb-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #fafbfc;
+      }
+
+      .create-kb-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 18px;
+        font-weight: 600;
+        color: #1e3a8a;
+      }
+
+      .create-kb-close {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+        color: #6b7280;
+        cursor: pointer;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+      }
+
+      .create-kb-close:hover {
+        background: #f3f4f6;
+        color: #374151;
+      }
+
+      .create-kb-body {
+        padding: 24px;
+        flex: 1;
+        overflow-y: auto;
+      }
+
+      /* KB 搜索框聚焦高亮为主色 */
+      .create-kb-body .form-input:focus {
+        outline: none;
+        border-color: #1e3a8a !important;
+        box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.15);
+      }
+
+      .create-kb-footer {
+        padding: 16px 24px;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #fafbfc;
+      }
+
+      .btn-cancel {
+        padding: 8px 16px;
+        border: 1px solid #d1d5db;
+        background: white;
+        color: #374151;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+
+      .btn-cancel:hover {
+        background: #f9fafb;
+        border-color: #9ca3af;
+      }
+
+      .btn-confirm {
+        padding: 8px 16px;
+        border: none;
+        background: #e5e7eb;
+        color: #6b7280;
+        border-radius: 6px;
+        cursor: not-allowed;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+
+      .btn-confirm.has-name {
+        background: #1e3a8a;
+        color: white;
+        cursor: pointer;
+      }
+
+      .btn-confirm.has-name:hover {
+        background: #1e40af;
+      }
+
+      /* Element Plus复选框样式覆盖 */
+      .el-checkbox__input.is-checked .el-checkbox__inner {
+        background-color: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+      }
+
+      .el-checkbox__input.is-checked .el-checkbox__inner::after {
+        border-color: white !important;
+      }
+
+      /* 多类型内容渲染样式 - 与当前主题保持一致 */
+
+      /* Markdown 渲染样式 */
+      .markdown-content {
+        line-height: 1.6;
+        color: inherit;
+      }
+
+      .markdown-content h1,
+      .markdown-content h2,
+      .markdown-content h3,
+      .markdown-content h4,
+      .markdown-content h5,
+      .markdown-content h6 {
+        margin: 16px 0 8px 0;
+        font-weight: 600;
+        color: #1e3a8a;
+      }
+
+      .markdown-content h1 {
+        font-size: 1.5em;
+      }
+      .markdown-content h2 {
+        font-size: 1.3em;
+      }
+      .markdown-content h3 {
+        font-size: 1.2em;
+      }
+
+      .markdown-content p {
+        margin: 8px 0;
+      }
+
+      .markdown-content ul,
+      .markdown-content ol {
+        margin: 8px 0;
+        padding-left: 24px;
+      }
+
+      .markdown-content li {
+        margin: 4px 0;
+      }
+
+      .markdown-content blockquote {
+        margin: 12px 0;
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-left: 4px solid #1e3a8a;
+        border-radius: 0 8px 8px 0;
+      }
+
+      .markdown-content blockquote p {
+        margin: 0;
+        color: #6b7280;
+      }
+
+      /* 代码块样式 */
+      .code-block {
+        margin: 12px 0;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        background: #f8f9fa;
+        border: 1px solid #e5e7eb;
+      }
+
+      .code-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        background: #1e3a8a;
+        color: white;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .code-language {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .code-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .code-action-btn {
+        padding: 4px 8px;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        border-radius: 4px;
+        color: white;
+        font-size: 11px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .code-action-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .code-content {
+        padding: 16px;
+        overflow-x: auto;
+        font-family: "Courier New", "Monaco", "Menlo", monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        background: #f8f9fa;
+      }
+
+      .code-content pre {
+        margin: 0;
+        white-space: pre;
+      }
+
+      /* 表格样式 */
+      .table-container {
+        margin: 12px 0;
+        overflow-x: auto;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+      }
+
+      .table-content {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+      }
+
+      .table-content th,
+      .table-content td {
+        padding: 12px 16px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .table-content th {
+        background: #f8f9fa;
+        font-weight: 600;
+        color: #1e3a8a;
+        font-size: 13px;
+      }
+
+      .table-content td {
+        font-size: 14px;
+        color: #374151;
+      }
+
+      .table-content tr:hover {
+        background: #f9fafb;
+      }
+
+      .table-content tr:last-child td {
+        border-bottom: none;
+      }
+
+      /* 图表容器样式 */
+      .chart-container {
+        margin: 12px 0;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+        background: white;
+      }
+
+      .chart-header {
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e5e7eb;
+        font-weight: 500;
+        color: #1e3a8a;
+        font-size: 14px;
+      }
+
+      .chart-content {
+        padding: 16px;
+        min-height: 300px;
+      }
+
+      /* 图片容器样式 */
+      .image-container {
+        margin: 12px 0;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+        background: white;
+      }
+
+      .image-content {
+        width: 100%;
+        height: auto;
+        display: block;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+      }
+
+      .image-content:hover {
+        transform: scale(1.02);
+      }
+
+      .image-caption {
+        padding: 8px 12px;
+        background: #f8f9fa;
+        font-size: 12px;
+        color: #6b7280;
+        text-align: center;
+      }
+
+      /* 混合内容容器 */
+      .mixed-content {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .content-block {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+        background: white;
+      }
+
+      .content-block-header {
+        padding: 8px 12px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 12px;
+        font-weight: 500;
+        color: #6b7280;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .content-block-body {
+        padding: 16px;
+      }
+
+      /* 提示块样式 */
+      .alert-block {
+        margin: 12px 0;
+        padding: 12px 16px;
+        border-radius: 8px;
+        border-left: 4px solid;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .alert-block.info {
+        background: #eef2ff;
+        border-left-color: #1e3a8a;
+        color: #1e3a8a;
+      }
+
+      .alert-block.warning {
+        background: #fef3c7;
+        border-left-color: #f59e0b;
+        color: #92400e;
+      }
+
+      .alert-block.success {
+        background: #d1fae5;
+        border-left-color: #10b981;
+        color: #065f46;
+      }
+
+      .alert-block.error {
+        background: #fee2e2;
+        border-left-color: #ef4444;
+        color: #991b1b;
+      }
+
+      .alert-icon {
+        font-size: 16px;
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+
+      .alert-content {
+        flex: 1;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      /* 响应式设计 */
+      @media (max-width: 768px) {
+        .chat-list-sidebar {
+          width: 0;
+          overflow: hidden;
+        }
+
+        .message-bubble {
+          max-width: 85%;
+        }
+
+        .table-container {
+          font-size: 12px;
+        }
+
+        .table-content th,
+        .table-content td {
+          padding: 8px 12px;
+        }
+
+        .chart-content {
+          min-height: 200px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="ai-chat-container">
+        <!-- 左侧对话列表 -->
+        <div class="chat-list-sidebar">
+          <div class="chat-list-header">
+            <button class="new-chat-btn" @click="createNewChat">
+              <div class="new-chat-icon">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 5V19M5 12H19"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+              新建对话
+            </button>
+          </div>
+          <div class="chat-list">
+            <div
+              v-for="chat in chats"
+              :key="chat.id"
+              class="chat-item"
+              :class="{ 
+                active: currentChat && currentChat.id === chat.id,
+                pinned: chat.pinned 
+              }"
+              @click="selectChat(chat)"
+            >
+              <div class="chat-item-content">
+                <div class="chat-title">
+                  <svg
+                    v-if="chat.pinned"
+                    class="pin-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  {{ chat.title || '新对话' }}
+                </div>
+              </div>
+
+              <div class="chat-item-actions">
+                <button
+                  class="chat-more-btn"
+                  @click.stop="showChatContextMenu($event, chat)"
+                  title="更多操作"
+                >
+                  ⋯
+                </button>
+              </div>
+
+              <!-- 会话右键菜单 -->
+              <div
+                v-if="contextMenu.chat && contextMenu.chat.id === chat.id"
+                class="chat-context-menu"
+                :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
+              >
+                <div class="context-menu-item" @click="editChatTitle(chat)">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  编辑标题
+                </div>
+                <div class="context-menu-item" @click="pinChat(chat)">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  {{ chat.pinned ? '取消置顶' : '置顶' }}
+                </div>
+                <div
+                  class="context-menu-item delete-item"
+                  @click="deleteChat(chat)"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  删除
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧对话内容 -->
+        <div class="chat-content">
+          <div v-if="!currentChat" class="empty-state">
+            <div class="empty-icon">💬</div>
+            <div class="empty-text">开始新的对话</div>
+            <div class="empty-desc">选择一个对话或点击"新建对话"开始聊天</div>
+          </div>
+
+          <template v-else>
+            <!-- 对话头部 -->
+            <div class="chat-header">
+              <div class="chat-title-header">{{ currentChat.title }}</div>
+            </div>
+
+            <!-- 对话区（移植自知识库.html） -->
+            <div
+              class="kb-messages-container"
+              :class="{ 'has-messages': messages.length > 0 }"
+              ref="kbMessages"
+            >
+              <!-- 空状态显示 -->
+              <div v-if="messages.length === 0" class="empty-chat-message">
+                Hi，任何问题都可以问我
+              </div>
+
+              <!-- 消息列表 -->
+              <template v-if="messages.length > 0">
+                <div class="kb-messages">
+                  <div
+                    v-for="msg in messages"
+                    :key="msg.id"
+                    class="kb-message"
+                    :class="[msg.type, { editing: msg.editing }]"
+                  >
+                    <div class="kb-message-avatar" :class="msg.type">
+                      {{ msg.type === 'user' ? '我' : 'AI' }}
+                    </div>
+                    <div class="kb-message-bubble">
+                      <div
+                        class="kb-message-content-wrapper"
+                        :class="{ 'stopped': msg.status === 'stopped' }"
+                      >
+                        <!-- 正常显示状态（回退为原有v-html，确保不影响现有功能） -->
+                        <div
+                          v-if="!msg.editing"
+                          class="kb-message-content"
+                          v-html="formatKbContent(msg.content)"
+                        ></div>
+
+                        <!-- 编辑状态 - 完全模仿原始消息布局 -->
+                        <div v-if="msg.editing" class="kb-message-content">
+                          <textarea
+                            v-model="msg.editContent"
+                            class="kb-edit-input"
+                            @input="autoResizeTextarea"
+                            @keydown.enter.prevent="sendEditMessage(msg)"
+                            @keydown.escape="cancelEdit(msg)"
+                            ref="editInput"
+                          ></textarea>
+                          <div class="kb-edit-actions">
+                            <button
+                              class="kb-edit-btn-cancel"
+                              @click="cancelEdit(msg)"
+                            >
+                              取消
+                            </button>
+                            <button
+                              class="kb-edit-btn-send"
+                              :disabled="!msg.editContent.trim()"
+                              @click="sendEditMessage(msg)"
+                            >
+                              发送
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="kb-message-meta">
+                        <div class="kb-message-actions">
+                          <!-- AI消息的复制和重试按钮 -->
+                          <template v-if="msg.type === 'ai'">
+                            <button
+                              class="kb-copy-btn"
+                              @click="copyKbMessage(msg.content)"
+                            >
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <rect
+                                  x="9"
+                                  y="9"
+                                  width="13"
+                                  height="13"
+                                  rx="2"
+                                  ry="2"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  fill="none"
+                                />
+                                <path
+                                  d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  fill="none"
+                                />
+                              </svg>
+                              <span>复制</span>
+                            </button>
+                            <button
+                              class="kb-retry-btn"
+                              @click="retryKbMessage(msg)"
+                            >
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M1 4V10H7"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                />
+                                <path
+                                  d="M23 20V14H17"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                />
+                                <path
+                                  d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14L18.36 18.36A9 9 0 0 1 3.51 15"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                />
+                              </svg>
+                              <span>重试</span>
+                            </button>
+                          </template>
+
+                          <!-- 用户消息的编辑和复制按钮 -->
+                          <template v-if="msg.type === 'user' && !msg.editing">
+                            <button class="kb-edit-btn" @click="startEdit(msg)">
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                />
+                                <path
+                                  d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                />
+                              </svg>
+                              <span>编辑</span>
+                            </button>
+                            <button
+                              class="kb-copy-btn"
+                              @click="copyKbMessage(msg.content)"
+                            >
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <rect
+                                  x="9"
+                                  y="9"
+                                  width="13"
+                                  height="13"
+                                  rx="2"
+                                  ry="2"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  fill="none"
+                                />
+                                <path
+                                  d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  fill="none"
+                                />
+                              </svg>
+                              <span>复制</span>
+                            </button>
+                          </template>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- 输入区域（移植自知识库.html） -->
+            <div class="kb-input-area">
+              <div class="kb-input-container">
+                <!-- 附件预览区域 -->
+                <div v-if="attachments.length > 0" class="attachment-preview">
+                  <div
+                    v-for="(attachment, index) in attachments"
+                    :key="index"
+                    class="attachment-item"
+                  >
+                    <span class="attachment-icon"
+                      >{{ getFileIcon(attachment.type) }}</span
+                    >
+                    <div class="attachment-name">{{ attachment.name }}</div>
+                    <div class="attachment-size">{{ attachment.size }}</div>
+                    <div
+                      class="attachment-remove"
+                      @click="removeAttachment(index)"
+                    >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M18 6L6 18M6 6L18 18"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <textarea
+                  v-model="inputMessage"
+                  class="kb-message-input"
+                  placeholder="@知识库或直接提问"
+                  @keydown.enter.prevent="handleEnterKey"
+                  @keydown.up.prevent="navigateKbList('up')"
+                  @keydown.down.prevent="navigateKbList('down')"
+                  @keydown.escape="hideKnowledgeBaseList"
+                  @keydown.backspace="handleBackspace"
+                  @input="handleInputChange"
+                ></textarea>
+
+                <!-- 知识库选择下拉框 -->
+                <div
+                  v-if="showKnowledgeBaseList"
+                  class="knowledge-base-dropdown"
+                >
+                  <div class="kb-dropdown-header">
+                    <span class="kb-dropdown-title">共享知识库</span>
+                  </div>
+                  <div class="kb-dropdown-section">
+                    <!-- <div class="kb-section-title">我创建的</div> -->
+                    <div class="kb-list">
+                      <div
+                        v-for="(kb, index) in knowledgeBaseList"
+                        :key="kb.id"
+                        class="kb-item"
+                        :class="{ selected: selectedKbIndex === index }"
+                        @click="selectKnowledgeBase(kb)"
+                      >
+                        <div class="kb-icon">{{ kb.icon }}</div>
+                        <div class="kb-name">{{ kb.name }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 底部控制栏 -->
+                <div class="kb-input-bottom-bar">
+                  <div
+                    class="custom-model-selector"
+                    @click="toggleModelDropdown"
+                  >
+                    <div class="model-display">
+                      {{ getSelectedModelName(selectedModel) }}
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M6 9L12 15L18 9"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div v-if="showModelDropdown" class="model-dropdown">
+                      <div
+                        v-for="model in modelOptions"
+                        :key="model.value"
+                        class="model-option"
+                        :class="{ active: selectedModel === model.value }"
+                        @click.stop="selectModel(model.value)"
+                      >
+                        <div class="model-name">{{ model.name }}</div>
+                        <div class="model-desc">{{ model.description }}</div>
+                        <div
+                          v-if="selectedModel === model.value"
+                          class="check-icon"
+                        >
+                          ✓
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="kb-right-controls">
+                    <!-- 附件按钮 -->
+                    <div
+                      class="attachment-btn-wrapper"
+                      @mouseenter="handleAttachmentMouseEnter"
+                      @mouseleave="handleAttachmentMouseLeave"
+                    >
+                    <button
+                      class="kb-attachment-btn"
+                        :class="{ disabled: hasKnowledgeBaseSelected }"
+                        @click="handleAttachmentClick"
+                        :title="hasKnowledgeBaseSelected ? '知识库模式下不支持附件' : '添加附件'"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M21.44 11.05L12.25 20.24C11.1242 21.3658 9.59722 21.9983 8.005 21.9983C6.41278 21.9983 4.88583 21.3658 3.76 20.24C2.63417 19.1142 2.00167 17.5872 2.00167 15.995C2.00167 14.4028 2.63417 12.8758 3.76 11.75L12.95 2.56C13.7006 1.80944 14.7186 1.38787 15.785 1.38787C16.8514 1.38787 17.8694 1.80944 18.62 2.56C19.3706 3.31056 19.7921 4.32856 19.7921 5.395C19.7921 6.46144 19.3706 7.47944 18.62 8.23L9.41 17.42C9.03472 17.7953 8.46528 17.7953 8.09 17.42C7.71472 17.0447 7.71472 16.4753 8.09 16.1L16.93 7.26"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </button>
+
+                      <!-- 附件提示框 -->
+                      <div
+                        v-if="showAttachmentTooltip && !showAttachmentMenu"
+                        class="attachment-tooltip"
+                      >
+                        <!-- 知识库模式下的提示 -->
+                        <div
+                          v-if="hasKnowledgeBaseSelected"
+                          style="text-align: center"
+                        >
+                          @知识库后不支持附件上传
+                        </div>
+                        <!-- 正常模式下的提示 -->
+                        <div v-else>
+                          <div
+                            style="
+                              margin-bottom: 6px;
+                              display: flex;
+                              align-items: center;
+                            "
+                          >
+                            <span style="margin-right: 6px">•</span>
+                            <span>支持上传个人知识库与本地文件</span>
+                          </div>
+                          <div
+                            style="
+                              margin-bottom: 6px;
+                              display: flex;
+                              align-items: center;
+                            "
+                          >
+                            <span style="margin-right: 6px">•</span>
+                            <span>文件数量: 最多支持10个</span>
+                          </div>
+                          <div style="display: flex; align-items: flex-start">
+                            <span style="margin-right: 6px; margin-top: 2px"
+                              >•</span
+                            >
+                            <span
+                              >文件类型:
+                              支持pdf、doc、docx、ppt、pptx、xls、xlsx、csv、jpg、jpeg、png、md、txt</span
+                            >
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- 附件菜单 -->
+                      <div v-if="showAttachmentMenu" class="attachment-menu">
+                        <div
+                          class="attachment-menu-item"
+                          @click="selectLocalFile"
+                        >
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            />
+                          </svg>
+                          <span>本地文件</span>
+                        </div>
+                        <div
+                          class="attachment-menu-item"
+                          @click="selectKnowledgeBaseFile"
+                        >
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            />
+                            <path
+                              d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            />
+                          </svg>
+                          <span>知识库文件</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 隐藏的文件输入 -->
+                    <input
+                      ref="fileInput"
+                      type="file"
+                      multiple
+                      accept=".pdf,.doc,.docx,.xlsx,.ppt,.pptx,.txt"
+                      style="display: none"
+                      @change="handleFileUpload"
+                    />
+
+                    <!-- 发送/停止按钮 -->
+                    <button
+                      v-if="!isGenerating"
+                      class="kb-send-btn"
+                      :class="{ active: inputMessage.trim() }"
+                      @click="sendKbMessage"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M12 19V5M5 12L12 5L19 12"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </button>
+
+                    <!-- 停止按钮 -->
+                    <button
+                      v-if="isGenerating"
+                      class="kb-stop-btn"
+                      @click="stopGeneration"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <rect
+                          x="6"
+                          y="6"
+                          width="12"
+                          height="12"
+                          rx="2"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="input-footer">内容由AI生成仅供参考</div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 底部提示信息 -->
+      <div class="footer-tip">
+        <span>内容由AI生成,请仔细甄别</span>
+      </div>
+
+      <!-- 选择知识库文件弹窗 -->
+      <div
+        v-if="showKnowledgeBaseDialog"
+        class="create-kb-dialog"
+        @click.self="showKnowledgeBaseDialog = false"
+      >
+        <div class="create-kb-content" style="width: 700px; max-height: 80vh">
+          <div class="create-kb-header">
+            <div class="create-kb-title">选择共享知识库文件</div>
+            <button
+              class="create-kb-close"
+              @click="showKnowledgeBaseDialog = false"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <line
+                  x1="18"
+                  y1="6"
+                  x2="6"
+                  y2="18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <line
+                  x1="6"
+                  y1="6"
+                  x2="18"
+                  y2="18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+
+          <div
+            class="create-kb-body"
+            style="max-height: 60vh; overflow-y: auto"
+          >
+            <div class="form-group">
+              <div
+                class="search-input-wrap"
+                style="margin-bottom: 16px; position: relative"
+              >
+                <input
+                  class="form-input"
+                  v-model="kbFileSearchQuery"
+                  placeholder="搜索共享知识库文件"
+                  style="
+                    width: 100%;
+                    padding: 10px 16px 10px 40px;
+                    border-radius: 8px;
+                    border: 1px solid #1e3a8a;
+                  "
+                />
+                <span
+                  class="search-left-icon"
+                  style="
+                    position: absolute;
+                    left: 12px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    pointer-events: none;
+                  "
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle
+                      cx="11"
+                      cy="11"
+                      r="8"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    />
+                    <path
+                      d="M21 21l-4.35-4.35"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+
+            <div class="kb-file-list">
+              <div
+                v-for="file in filteredKbFiles"
+                :key="file.id"
+                class="kb-file-item"
+                @click="toggleKbFileSelection(file)"
+              >
+                <svg
+                  class="kb-file-icon"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <polyline
+                    points="14,2 14,8 20,8"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <line
+                    x1="16"
+                    y1="13"
+                    x2="8"
+                    y2="13"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <line
+                    x1="16"
+                    y1="17"
+                    x2="8"
+                    y2="17"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <polyline
+                    points="10,9 9,9 8,9"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <div class="kb-file-info">
+                  <div class="kb-file-name">{{ file.name }}</div>
+                  <div class="kb-file-meta">
+                    {{ file.size }} | {{ file.time }}
+                  </div>
+                </div>
+                <el-checkbox
+                  :model-value="isKbFileSelected(file.id)"
+                  @click.stop="toggleKbFileSelection(file)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="create-kb-footer">
+            <div style="color: #6b7280; font-size: 13px">
+              已选择 {{ selectedKbFiles.length }} 个文件
+            </div>
+            <div style="display: flex; gap: 12px">
+              <button
+                class="btn-cancel"
+                @click="showKnowledgeBaseDialog = false"
+              >
+                取消
+              </button>
+              <button
+                class="btn-confirm"
+                :class="{ 'has-name': selectedKbFiles.length > 0 }"
+                @click="confirmKbFileSelection"
+                :disabled="selectedKbFiles.length === 0"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, computed, onMounted, onUnmounted, nextTick } =
+        Vue;
+      const { ElMessage, ElMessageBox } = ElementPlus;
+
+      createApp({
+        setup() {
+          // 响应式数据
+          const chats = ref([]);
+          const currentChat = ref(null);
+          const messages = ref([]);
+          const inputMessage = ref("");
+          const loading = ref(false);
+          const messagesContainer = ref(null);
+          const messageInput = ref(null);
+          const showModelSelector = ref(false);
+          const selectedModel = ref("qwen3-max");
+          const contextMenu = ref({ chat: null, x: 0, y: 0 });
+
+          // 移植自知识库.html的对话功能数据
+          const kbMessages = ref(null);
+          const showModelDropdown = ref(false);
+
+          // 按钮状态管理
+          const isGenerating = ref(false);
+          const currentGeneratingId = ref(null);
+
+          // @知识库选择功能
+          const showKnowledgeBaseList = ref(false);
+          const selectedKnowledgeBases = ref([]);
+          const selectedKbIndex = ref(-1);
+
+          // 附件功能
+          const attachments = ref([]);
+          const showAttachmentTooltip = ref(false);
+          const showAttachmentMenu = ref(false);
+          const showKnowledgeBaseDialog = ref(false);
+          const fileInput = ref(null);
+          const selectedKbFiles = ref([]);
+          const kbFileSearchQuery = ref("");
+
+          // 检测是否选择了知识库
+          const hasKnowledgeBaseSelected = computed(() => {
+            return (
+              inputMessage.value.includes("@") &&
+              inputMessage.value.trim() !== ""
+            );
+          });
+
+          const mockKbFiles = [
+            {
+              id: 1,
+              name: "智能制造系统研究.pdf",
+              size: "2.3 MB",
+              time: "2024-01-15",
+            },
+            {
+              id: 2,
+              name: "人工智能算法研究.docx",
+              size: "1.8 MB",
+              time: "2024-01-14",
+            },
+            {
+              id: 3,
+              name: "项目实施计划.xlsx",
+              size: "1.2 MB",
+              time: "2024-01-13",
+            },
+            {
+              id: 4,
+              name: "技术文档汇总.pdf",
+              size: "3.5 MB",
+              time: "2024-01-12",
+            },
+            {
+              id: 5,
+              name: "研究方法论.docx",
+              size: "0.9 MB",
+              time: "2024-01-11",
+            },
+          ];
+
+          const filteredKbFiles = computed(() => {
+            if (!kbFileSearchQuery.value.trim()) return mockKbFiles;
+            return mockKbFiles.filter((file) =>
+              file.name
+                .toLowerCase()
+                .includes(kbFileSearchQuery.value.toLowerCase())
+            );
+          });
+          const knowledgeBaseList = ref([
+            {
+              id: 1,
+              name: "智能制造系统研究",
+              description: "智能制造相关技术文档和研究资料",
+              icon: "🏭",
+              type: "project",
+            },
+            {
+              id: 2,
+              name: "人工智能算法研究",
+              description: "AI算法和机器学习相关研究",
+              icon: "🤖",
+              type: "research",
+            },
+            {
+              id: 3,
+              name: "通用学术资料",
+              description: "通用学术研究资料和文献",
+              icon: "📚",
+              type: "academic",
+            },
+            {
+              id: 4,
+              name: "论文写作参考",
+              description: "学术论文写作指导和参考资料",
+              icon: "✍️",
+              type: "writing",
+            },
+          ]);
+
+          // 模型选项
+          const modelOptions = ref([
+            {
+              value: "qwen3-max",
+              id: "qwen3-max",
+              name: "Qwen3-Max",
+              description: "通义千问最新模型，擅长中文理解和生成",
+              desc: "多模态大模型",
+            },
+            {
+              value: "deepseek-v3.1",
+              id: "deepseek-v3.1",
+              name: "Deepseek-V3.1",
+              description: "深度求索V3.1，强大的代码和推理能力",
+              desc: "最新版本，性能强劲",
+            },
+            {
+              value: "deepseek-r1",
+              id: "deepseek-r1",
+              name: "Deepseek-R1",
+              description: "深度求索R1，强化学习模型",
+              desc: "推理优化版本",
+            },
+          ]);
+
+          // 模拟数据
+          const mockChats = [
+            {
+              id: 1,
+              title: "科研项目申报咨询",
+              lastMessage: "请问如何撰写科研项目申报书？",
+              updatedAt: new Date(Date.now() - 1000 * 60 * 30),
+              unreadCount: 0,
+            },
+            {
+              id: 2,
+              title: "数据分析方法讨论",
+              lastMessage: "关于机器学习算法的选择...",
+              updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
+              unreadCount: 0,
+            },
+            {
+              id: 3,
+              title: "论文写作指导",
+              lastMessage: "如何提高论文的学术价值？",
+              updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
+              unreadCount: 0,
+            },
+          ];
+
+          const mockMessages = [
+            {
+              id: 1,
+              type: "user",
+              content: "请问如何撰写科研项目申报书？",
+              timestamp: new Date(Date.now() - 1000 * 60 * 30),
+              status: "sent",
+            },
+            {
+              id: 2,
+              type: "ai",
+              content:
+                "撰写科研项目申报书需要注意以下几个方面：\n\n**1. 项目背景与意义**\n- 明确研究问题的现实意义\n- 分析国内外研究现状\n- 阐述项目的创新性\n\n**2. 研究目标与内容**\n- 设定明确的研究目标\n- 分解具体的研究任务\n- 制定详细的研究计划\n\n**3. 技术路线与方法**\n- 选择合适的研究方法\n- 设计科学的技术路线\n- 确保方案的可行性",
+              timestamp: new Date(Date.now() - 1000 * 60 * 29),
+              status: "sent",
+            },
+          ];
+
+          // 数据持久化方法
+          const saveChatsToStorage = () => {
+            localStorage.setItem("ai-chat-chats", JSON.stringify(chats.value));
+          };
+
+          const loadChatsFromStorage = () => {
+            const savedChats = localStorage.getItem("ai-chat-chats");
+            if (savedChats) {
+              chats.value = JSON.parse(savedChats);
+            } else {
+              chats.value = [];
+            }
+            // 按置顶状态和更新时间排序
+            sortChats();
+          };
+
+          const sortChats = () => {
+            chats.value.sort((a, b) => {
+              // 置顶的排在前面
+              if (a.pinned && !b.pinned) return -1;
+              if (!a.pinned && b.pinned) return 1;
+              // 同置顶状态下按创建时间排序（ID越大越新）
+              return b.id - a.id;
+            });
+          };
+
+          // 方法
+          const loadChats = () => {
+            loadChatsFromStorage();
+          };
+
+          // 移植自知识库.html的对话功能方法
+
+          // 格式化消息内容（保留向后兼容）
+          const formatKbContent = (content) => {
+            if (!content || typeof content !== "string") {
+              return "";
+            }
+            return content
+              .replace(/\n/g, "<br>")
+              .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+              .replace(/\*(.*?)\*/g, "<em>$1</em>")
+              .replace(/`(.*?)`/g, "<code>$1</code>");
+          };
+
+          // 多类型内容渲染系统
+          const MessageRenderer = {
+            props: ["content", "contentType", "payload"],
+            setup(props) {
+              const renderContent = () => {
+                const { content, contentType, payload } = props;
+
+                // 如果没有contentType，使用传统文本渲染
+                if (!contentType || contentType === "text") {
+                  return renderTextContent(content);
+                }
+
+                // 根据contentType分发到不同渲染器
+                switch (contentType) {
+                  case "markdown":
+                    return renderMarkdown(content);
+                  case "code":
+                    return renderCode(payload || { content, language: "text" });
+                  case "table":
+                    return renderTable(payload);
+                  case "chart":
+                    return renderChart(payload);
+                  case "image":
+                    return renderImage(payload);
+                  case "mixed":
+                    return renderMixed(payload);
+                  case "alert":
+                    return renderAlert(payload);
+                  default:
+                    return renderTextContent(content);
+                }
+              };
+
+              return { renderContent };
+            },
+            template: `
+              <div v-html="renderContent()"></div>
+            `,
+          };
+
+          // 文本内容渲染（向后兼容）
+          const renderTextContent = (content) => {
+            if (!content) return "";
+            return DOMPurify.sanitize(formatKbContent(content));
+          };
+
+          // Markdown渲染
+          const renderMarkdown = (content) => {
+            if (!content) return "";
+
+            // 初始化markdown-it
+            const md = window.markdownit({
+              html: true,
+              linkify: true,
+              typographer: true,
+              highlight: function (str, lang) {
+                if (lang && window.hljs.getLanguage(lang)) {
+                  try {
+                    return window.hljs.highlight(str, { language: lang }).value;
+                  } catch (__) {}
+                }
+                return "";
+              },
+            });
+
+            const html = md.render(content);
+            return DOMPurify.sanitize(html);
+          };
+
+          // 代码块渲染
+          const renderCode = (payload) => {
+            const { content, language = "text", title } = payload;
+            if (!content) return "";
+
+            const highlighted = window.hljs.highlightAuto(content).value;
+            const langDisplay =
+              language === "text" ? "Text" : language.toUpperCase();
+
+            return `
+              <div class="code-block">
+                <div class="code-header">
+                  <div class="code-language">
+                    <span>📄</span>
+                    <span>${title || langDisplay}</span>
+                  </div>
+                  <div class="code-actions">
+                    <button class="code-action-btn" onclick="copyCode(this)">复制</button>
+                    <button class="code-action-btn" onclick="toggleCode(this)">折叠</button>
+                  </div>
+                </div>
+                <div class="code-content">
+                  <pre><code class="hljs">${highlighted}</code></pre>
+                </div>
+              </div>
+            `;
+          };
+
+          // 表格渲染
+          const renderTable = (payload) => {
+            if (!payload || !payload.columns || !payload.rows) return "";
+
+            const { columns, rows, title } = payload;
+
+            let tableHtml = `
+              <div class="table-container">
+                ${title ? `<div class="table-header">${title}</div>` : ""}
+                <table class="table-content">
+                  <thead>
+                    <tr>
+                      ${columns.map((col) => `<th>${col}</th>`).join("")}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rows
+                      .map(
+                        (row) => `
+                      <tr>
+                        ${row.map((cell) => `<td>${cell}</td>`).join("")}
+                      </tr>
+                    `
+                      )
+                      .join("")}
+                  </tbody>
+                </table>
+              </div>
+            `;
+
+            return tableHtml;
+          };
+
+          // 图表渲染
+          const renderChart = (payload) => {
+            if (!payload || !payload.option) return "";
+
+            const { title, option } = payload;
+            const chartId =
+              "chart_" +
+              Date.now() +
+              "_" +
+              Math.random().toString(36).substr(2, 9);
+
+            // 异步渲染图表
+            setTimeout(() => {
+              const chartElement = document.getElementById(chartId);
+              if (chartElement && window.echarts) {
+                const chart = window.echarts.init(chartElement);
+                chart.setOption(option);
+
+                // 响应式调整
+                window.addEventListener("resize", () => {
+                  chart.resize();
+                });
+              }
+            }, 100);
+
+            return `
+              <div class="chart-container">
+                ${title ? `<div class="chart-header">${title}</div>` : ""}
+                <div class="chart-content">
+                  <div id="${chartId}" style="width: 100%; height: 300px;"></div>
+                </div>
+              </div>
+            `;
+          };
+
+          // 图片渲染
+          const renderImage = (payload) => {
+            if (!payload || !payload.src) return "";
+
+            const { src, caption, alt } = payload;
+
+            return `
+              <div class="image-container">
+                <img 
+                  src="${src}" 
+                  alt="${alt || caption || ""}" 
+                  class="image-content"
+                  onclick="previewImage('${src}')"
+                  onerror="this.style.display='none'"
+                />
+                ${caption ? `<div class="image-caption">${caption}</div>` : ""}
+              </div>
+            `;
+          };
+
+          // 混合内容渲染
+          const renderMixed = (payload) => {
+            if (!payload || !payload.blocks) return "";
+
+            let html = '<div class="mixed-content">';
+
+            payload.blocks.forEach((block, index) => {
+              html += `
+                <div class="content-block">
+                  <div class="content-block-header">
+                    <span>📦</span>
+                    <span>${block.type.toUpperCase()}</span>
+                  </div>
+                  <div class="content-block-body">
+                    ${renderBlock(block)}
+                  </div>
+                </div>
+              `;
+            });
+
+            html += "</div>";
+            return html;
+          };
+
+          // 渲染单个块
+          const renderBlock = (block) => {
+            switch (block.type) {
+              case "markdown":
+                return renderMarkdown(block.content);
+              case "code":
+                return renderCode(block);
+              case "table":
+                return renderTable(block);
+              case "chart":
+                return renderChart(block);
+              case "image":
+                return renderImage(block);
+              default:
+                return renderTextContent(block.content || "");
+            }
+          };
+
+          // 提示块渲染
+          const renderAlert = (payload) => {
+            if (!payload || !payload.content) return "";
+
+            const { content, type = "info", title } = payload;
+            const icons = {
+              info: "ℹ️",
+              warning: "⚠️",
+              success: "✅",
+              error: "❌",
+            };
+
+            return `
+              <div class="alert-block ${type}">
+                <div class="alert-icon">${icons[type] || icons.info}</div>
+                <div class="alert-content">
+                  ${title ? `<strong>${title}</strong><br>` : ""}
+                  ${content}
+                </div>
+              </div>
+            `;
+          };
+
+          // 全局辅助函数
+          window.copyCode = function (button) {
+            const codeBlock = button.closest(".code-block");
+            const codeContent = codeBlock.querySelector("code").textContent;
+            navigator.clipboard.writeText(codeContent).then(() => {
+              button.textContent = "已复制";
+              setTimeout(() => {
+                button.textContent = "复制";
+              }, 2000);
+            });
+          };
+
+          window.toggleCode = function (button) {
+            const codeBlock = button.closest(".code-block");
+            const codeContent = codeBlock.querySelector(".code-content");
+            if (codeContent.style.display === "none") {
+              codeContent.style.display = "block";
+              button.textContent = "折叠";
+            } else {
+              codeContent.style.display = "none";
+              button.textContent = "展开";
+            }
+          };
+
+          window.previewImage = function (src) {
+            // 简单的图片预览实现
+            const modal = document.createElement("div");
+            modal.style.cssText = `
+              position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+              background: rgba(0,0,0,0.8); display: flex; align-items: center;
+              justify-content: center; z-index: 10000; cursor: pointer;
+            `;
+            modal.innerHTML = `
+              <img src="${src}" style="max-width: 90%; max-height: 90%; object-fit: contain;">
+            `;
+            modal.onclick = () => document.body.removeChild(modal);
+            document.body.appendChild(modal);
+          };
+
+          // 发送消息
+          const sendKbMessage = () => {
+            if (!inputMessage.value.trim()) return;
+
+            // 添加用户消息
+            const userMessage = {
+              id: Date.now(),
+              type: "user",
+              content: inputMessage.value.trim(),
+              timestamp: new Date(),
+              attachments:
+                attachments.value.length > 0 ? [...attachments.value] : [],
+            };
+
+            // 保存消息到当前对话
+            if (currentChat.value) {
+              if (!currentChat.value.messages) {
+                currentChat.value.messages = [];
+              }
+              currentChat.value.messages.push(userMessage);
+              currentChat.value.lastMessage = userMessage.content;
+              currentChat.value.updatedAt = new Date();
+              saveChatsToStorage();
+
+              // 重新加载消息以保持同步
+              messages.value = [...currentChat.value.messages];
+            }
+
+            // 记录本次输入内容供模拟使用
+            const lastUserInput = userMessage.content;
+
+            // 清空输入框和附件
+            inputMessage.value = "";
+            attachments.value = [];
+            resetInputHeight();
+
+            // 设置生成状态
+            isGenerating.value = true;
+
+            // 模拟AI回复（将用户输入传入）
+            simulateAiResponse(lastUserInput);
+          };
+
+          // 真实LLM回复（流式优先，失败回退非流式）
+          const simulateAiResponse = async (userInputRaw = "") => {
+            const responseId = Date.now() + 1;
+            currentGeneratingId.value = responseId;
+
+            const generatingMessage = {
+              id: responseId,
+              type: "ai",
+              content: "正在生成回复...",
+              status: "generating",
+              timestamp: new Date(),
+            };
+
+            if (currentChat.value) {
+              messages.value = [
+                ...currentChat.value.messages,
+                generatingMessage,
+              ];
+            }
+
+            try {
+              // 组装历史消息（OpenAI兼容协议）
+              const history = (currentChat.value?.messages || []).map((m) => ({
+                role: m.type === "user" ? "user" : "assistant",
+                content: typeof m.content === "string" ? m.content : "",
+              }));
+              history.push({ role: "user", content: userInputRaw || "" });
+
+              let finalText = "";
+              if (window.LLM_CONFIG?.useStream) {
+                await streamLLM(
+                  history,
+                  (delta) => {
+                    finalText += delta;
+                    const html = transformCodeBlocks(finalText);
+                    messages.value = [
+                      ...currentChat.value.messages,
+                      { ...generatingMessage, content: html },
+                    ];
+                  },
+                  {}
+                );
+              } else {
+                const res = await callLLM(history);
+                if (res.contentType === "code" && res.payload?.content) {
+                  finalText = `\n\n\`\`\`${res.payload.language || ""}\n${
+                    res.payload.content
+                  }\n\`\`\``;
+                } else {
+                  finalText = res.content || "";
+                }
+              }
+
+              const contentHtml = transformCodeBlocks(finalText);
+              const completedMessage = {
+                    id: responseId,
+                    type: "ai",
+                contentType: "markdown",
+                content: contentHtml,
+                    status: "completed",
+                    timestamp: new Date(),
+                  };
+
+              if (currentChat.value) {
+                if (!currentChat.value.messages)
+                  currentChat.value.messages = [];
+                currentChat.value.messages.push(completedMessage);
+                currentChat.value.updatedAt = new Date();
+                saveChatsToStorage();
+                messages.value = [...currentChat.value.messages];
+              }
+
+                isGenerating.value = false;
+                currentGeneratingId.value = null;
+
+              // 新建对话首条消息作为标题
+              if (
+                currentChat.value &&
+                currentChat.value.isNew &&
+                !currentChat.value.title
+              ) {
+                const userMessage = messages.value.find(
+                  (msg) => msg.type === "user"
+                );
+                if (userMessage) {
+                  currentChat.value.title =
+                    userMessage.content.length > 20
+                      ? userMessage.content.substring(0, 20) + "..."
+                      : userMessage.content;
+                  currentChat.value.isNew = false;
+                  saveChatsToStorage();
+                }
+              }
+            } catch (err) {
+              console.error("LLM 调用失败", err);
+              const failMsg = {
+                id: responseId,
+                type: "ai",
+                content: `调用大模型失败：${err?.message || err}`,
+                status: "completed",
+                timestamp: new Date(),
+              };
+              if (currentChat.value) {
+                currentChat.value.messages.push(failMsg);
+                saveChatsToStorage();
+                messages.value = [...currentChat.value.messages];
+              }
+              isGenerating.value = false;
+              currentGeneratingId.value = null;
+            }
+          };
+
+          // 停止生成
+          const stopGeneration = () => {
+            if (currentGeneratingId.value) {
+              const messageIndex = messages.value.findIndex(
+                (msg) => msg.id === currentGeneratingId.value
+              );
+              if (messageIndex !== -1) {
+                messages.value[messageIndex] = {
+                  id: currentGeneratingId.value,
+                  type: "ai",
+                  content: "已停止内容生成\n已停止输出",
+                  status: "stopped",
+                  timestamp: new Date(),
+                };
+              }
+              isGenerating.value = false;
+              currentGeneratingId.value = null;
+            }
+          };
+
+          // 复制消息
+          const copyKbMessage = async (content) => {
+            try {
+              await navigator.clipboard.writeText(content);
+              ElMessage.success("已复制到剪贴板");
+            } catch (err) {
+              ElMessage.error("复制失败");
+            }
+          };
+
+          // 重试消息
+          const retryKbMessage = (msg) => {
+            // 找到对应的用户消息
+            const messageIndex = messages.value.findIndex(
+              (m) => m.id === msg.id
+            );
+            if (messageIndex > 0) {
+              const userMessage = messages.value[messageIndex - 1];
+              if (userMessage && userMessage.type === "user") {
+                // 移除当前AI回复
+                messages.value.splice(messageIndex, 1);
+
+                // 同时从持久化存储中移除
+                if (currentChat.value && currentChat.value.messages) {
+                  const persistentIndex = currentChat.value.messages.findIndex(
+                    (m) => m.id === msg.id
+                  );
+                  if (persistentIndex !== -1) {
+                    currentChat.value.messages.splice(persistentIndex, 1);
+                    saveChatsToStorage();
+                  }
+                }
+
+                // 设置生成状态并重新生成
+                isGenerating.value = true;
+                simulateAiResponse();
+
+                ElMessage.success("正在重新生成回答...");
+              }
+            }
+          };
+
+          // 开始编辑
+          const startEdit = (msg) => {
+            msg.editing = true;
+            msg.editContent = msg.content;
+            nextTick(() => {
+              const editInput = document.querySelector(".kb-edit-input");
+              if (editInput) {
+                editInput.focus();
+                editInput.select();
+                autoResizeTextarea();
+              }
+            });
+          };
+
+          // 取消编辑
+          const cancelEdit = (msg) => {
+            msg.editing = false;
+            msg.editContent = "";
+          };
+
+          // 发送编辑消息
+          const sendEditMessage = (msg) => {
+            if (!msg.editContent.trim()) return;
+
+            // 更新消息内容
+            msg.content = msg.editContent.trim();
+            msg.editing = false;
+            msg.editContent = "";
+
+            // 找到当前消息在显示列表中的位置
+            const messageIndex = messages.value.findIndex(
+              (m) => m.id === msg.id
+            );
+
+            // 移除当前消息之后的所有AI回复
+            if (messageIndex !== -1) {
+              // 从显示列表移除后续AI回复
+              for (let i = messages.value.length - 1; i > messageIndex; i--) {
+                if (messages.value[i].type === "ai") {
+                  messages.value.splice(i, 1);
+                }
+              }
+
+              // 从持久化存储移除后续AI回复
+              if (currentChat.value && currentChat.value.messages) {
+                const persistentIndex = currentChat.value.messages.findIndex(
+                  (m) => m.id === msg.id
+                );
+                if (persistentIndex !== -1) {
+                  for (
+                    let i = currentChat.value.messages.length - 1;
+                    i > persistentIndex;
+                    i--
+                  ) {
+                    if (currentChat.value.messages[i].type === "ai") {
+                      currentChat.value.messages.splice(i, 1);
+                    }
+                  }
+                  saveChatsToStorage();
+                }
+              }
+            }
+
+            // 设置生成状态并重新生成AI回复
+            isGenerating.value = true;
+            simulateAiResponse();
+          };
+
+          // 自动调整文本区域高度
+          const autoResizeTextarea = (event) => {
+            const textarea = event
+              ? event.target
+              : document.querySelector(".kb-edit-input");
+            if (textarea) {
+              textarea.style.height = "auto";
+              textarea.style.height = textarea.scrollHeight + "px";
+              textarea.style.overflowY = "hidden";
+              textarea.style.overflowX = "hidden";
+            }
+          };
+
+          // 自动调整输入框高度
+          const autoResizeInput = (event) => {
+            const textarea = event.target;
+            const minHeight = 44;
+            const lineHeight = 21;
+            const maxLines = 8;
+            const maxHeight = minHeight + (maxLines - 1) * lineHeight;
+
+            textarea.style.height = "auto";
+            const newHeight = Math.min(
+              Math.max(textarea.scrollHeight, minHeight),
+              maxHeight
+            );
+            textarea.style.height = newHeight + "px";
+            textarea.style.overflowY =
+              textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+          };
+
+          // @知识库选择相关方法
+          const handleInputChange = (event) => {
+            // 首先处理自动调整高度
+            autoResizeInput(event);
+
+            const value = event.target.value;
+            const cursorPos = event.target.selectionStart;
+
+            // 检查光标前是否有@符号且没有空格
+              const lastAtIndex = value.lastIndexOf("@", cursorPos - 1);
+              if (lastAtIndex !== -1) {
+                const textAfterAt = value.substring(lastAtIndex + 1, cursorPos);
+              // 如果@后面没有空格或换行，且没有选择知识库，显示列表
+                if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+                // 检查是否已经选择了知识库（通过检查@后面是否有知识库名称）
+                const hasSelectedKb = knowledgeBaseList.value.some((kb) => {
+                  const kbText = `@${kb.name}`;
+                  return value
+                    .substring(lastAtIndex, cursorPos)
+                    .includes(kbText);
+                });
+
+                if (!hasSelectedKb) {
+                  showKnowledgeBaseList.value = true;
+                  selectedKbIndex.value = 0; // 默认选中第一个
+                } else {
+                  showKnowledgeBaseList.value = false;
+                  selectedKbIndex.value = -1;
+                }
+              } else {
+                // @后面有空格，隐藏列表
+                showKnowledgeBaseList.value = false;
+                selectedKbIndex.value = -1;
+              }
+            } else {
+              // 光标前没有@符号，隐藏知识库列表
+              showKnowledgeBaseList.value = false;
+              selectedKbIndex.value = -1;
+            }
+          };
+
+          const selectKnowledgeBase = (kb) => {
+            const textarea = document.querySelector(".kb-message-input");
+            if (textarea) {
+              const cursorPos = textarea.selectionStart;
+              const value = textarea.value;
+              const lastAtIndex = value.lastIndexOf("@", cursorPos - 1);
+
+              if (lastAtIndex !== -1) {
+                // 替换@符号为知识库名称
+                const newValue =
+                  value.substring(0, lastAtIndex) +
+                  `@${kb.name} ` +
+                  value.substring(cursorPos);
+                inputMessage.value = newValue;
+
+                // 更新光标位置
+                nextTick(() => {
+                  const newCursorPos = lastAtIndex + kb.name.length + 2; // +2 for @ and space
+                  textarea.setSelectionRange(newCursorPos, newCursorPos);
+                  textarea.focus();
+                });
+              }
+            }
+
+            showKnowledgeBaseList.value = false;
+            selectedKbIndex.value = -1;
+            ElMessage.success(`已选择知识库：${kb.name}`);
+          };
+
+          // 键盘导航知识库列表
+          const navigateKbList = (direction) => {
+            if (!showKnowledgeBaseList.value) return;
+
+            if (direction === "up") {
+              selectedKbIndex.value =
+                selectedKbIndex.value > 0
+                  ? selectedKbIndex.value - 1
+                  : knowledgeBaseList.value.length - 1;
+            } else if (direction === "down") {
+              selectedKbIndex.value =
+                selectedKbIndex.value < knowledgeBaseList.value.length - 1
+                  ? selectedKbIndex.value + 1
+                  : 0;
+            }
+          };
+
+          // 处理Enter键
+          const handleEnterKey = (event) => {
+            if (showKnowledgeBaseList.value && selectedKbIndex.value >= 0) {
+              // 如果有选中的知识库，选择它
+              const selectedKb = knowledgeBaseList.value[selectedKbIndex.value];
+              selectKnowledgeBase(selectedKb);
+            } else {
+              // 否则发送消息
+              sendKbMessage();
+            }
+          };
+
+          // 隐藏知识库列表
+          const hideKnowledgeBaseList = () => {
+            showKnowledgeBaseList.value = false;
+            selectedKbIndex.value = -1;
+          };
+
+          // 智能删除处理
+          const handleBackspace = (event) => {
+            const textarea = event.target;
+            const cursorPos = textarea.selectionStart;
+            const value = textarea.value;
+
+            // 检查光标前是否有知识库文本
+            for (const kb of knowledgeBaseList.value) {
+              const kbText = `@${kb.name}`;
+              const kbStartPos = value.lastIndexOf(kbText, cursorPos - 1);
+
+              if (
+                kbStartPos !== -1 &&
+                kbStartPos + kbText.length === cursorPos
+              ) {
+                // 如果光标正好在知识库文本的末尾，整体删除
+                event.preventDefault();
+                const newValue =
+                  value.substring(0, kbStartPos) + value.substring(cursorPos);
+                inputMessage.value = newValue;
+
+                nextTick(() => {
+                  textarea.setSelectionRange(kbStartPos, kbStartPos);
+                  textarea.focus();
+                });
+                return;
+              }
+            }
+          };
+
+          const toggleKnowledgeBaseSelection = (kb) => {
+            const index = selectedKnowledgeBases.value.findIndex(
+              (k) => k.id === kb.id
+            );
+            if (index > -1) {
+              selectedKnowledgeBases.value.splice(index, 1);
+            } else {
+              selectedKnowledgeBases.value.push(kb);
+            }
+          };
+
+          // 附件相关方法
+          const triggerFileUpload = () => {
+            if (fileInput.value) {
+              fileInput.value.click();
+            }
+          };
+
+          const handleFileUpload = (event) => {
+            const files = Array.from(event.target.files);
+
+            // 检查文件数量限制
+            if (attachments.value.length + files.length > 10) {
+              ElMessage.warning("最多只能上传10个文件");
+              return;
+            }
+
+            files.forEach((file) => {
+              // 检查文件大小限制 (100MB)
+              if (file.size > 100 * 1024 * 1024) {
+                ElMessage.warning(`文件 ${file.name} 超过100MB限制`);
+                return;
+              }
+
+              // 检查文件类型
+              const allowedTypes = [
+                ".pdf",
+                ".doc",
+                ".docx",
+                ".ppt",
+                ".pptx",
+                ".xls",
+                ".xlsx",
+                ".csv",
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".md",
+                ".txt",
+              ];
+              const fileExtension =
+                "." + file.name.split(".").pop().toLowerCase();
+              if (!allowedTypes.includes(fileExtension)) {
+                ElMessage.warning(`文件 ${file.name} 格式不支持`);
+                return;
+              }
+
+              // 添加到附件列表
+              attachments.value.push({
+                name: file.name,
+                size: formatFileSize(file.size),
+                file: file,
+                type: fileExtension,
+              });
+            });
+
+            // 清空文件输入
+            event.target.value = "";
+            ElMessage.success(`已添加 ${files.length} 个文件`);
+          };
+
+          const formatFileSize = (bytes) => {
+            if (bytes === 0) return "0 B";
+            const k = 1024;
+            const sizes = ["B", "KB", "MB", "GB"];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return (
+              parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+            );
+          };
+
+          const getFileIcon = (fileType) => {
+            const iconMap = {
+              ".pdf": "📕",
+              ".doc": "📘",
+              ".docx": "📘",
+              ".ppt": "📗",
+              ".pptx": "📗",
+              ".xls": "📊",
+              ".xlsx": "📊",
+              ".csv": "📋",
+              ".jpg": "🖼️",
+              ".jpeg": "🖼️",
+              ".png": "🖼️",
+              ".md": "📝",
+              ".txt": "📄",
+            };
+            return iconMap[fileType] || "📄";
+          };
+
+          const removeAttachment = (index) => {
+            attachments.value.splice(index, 1);
+            ElMessage.success("已移除附件");
+          };
+
+          const selectLocalFile = () => {
+            showAttachmentMenu.value = false;
+            showAttachmentTooltip.value = false; // 立即隐藏悬浮提示
+            triggerFileUpload();
+          };
+
+          const selectKnowledgeBaseFile = () => {
+            showAttachmentMenu.value = false;
+            showKnowledgeBaseDialog.value = true;
+          };
+
+          const handleAttachmentClick = (event) => {
+            event.stopPropagation();
+            console.log("附件按钮被点击");
+            if (hasKnowledgeBaseSelected.value) {
+              console.log("知识库模式下不支持附件");
+              return;
+            }
+            console.log("切换附件菜单:", showAttachmentMenu.value);
+            showAttachmentMenu.value = !showAttachmentMenu.value;
+            console.log("附件菜单状态:", showAttachmentMenu.value);
+          };
+
+          const handleAttachmentMouseEnter = () => {
+            // 如果附件菜单已经打开，不显示悬浮提示
+            if (showAttachmentMenu.value) {
+              return;
+            }
+            showAttachmentTooltip.value = true;
+          };
+
+          const handleAttachmentMouseLeave = () => {
+            showAttachmentTooltip.value = false;
+          };
+
+          const isKbFileSelected = (fileId) => {
+            return selectedKbFiles.value.some((f) => f.id === fileId);
+          };
+
+          const toggleKbFileSelection = (file) => {
+            const index = selectedKbFiles.value.findIndex(
+              (f) => f.id === file.id
+            );
+            if (index > -1) {
+              selectedKbFiles.value.splice(index, 1);
+            } else {
+              if (selectedKbFiles.value.length >= 20) {
+                ElMessage.warning("最多只能选择20个文件");
+                return;
+              }
+              selectedKbFiles.value.push(file);
+            }
+          };
+
+          const confirmKbFileSelection = () => {
+            selectedKbFiles.value.forEach((file) => {
+              attachments.value.push({
+                name: file.name,
+                size: file.size,
+                type: file.name.split(".").pop().toUpperCase(),
+                source: "knowledge-base",
+              });
+            });
+            ElMessage.success(
+              `已添加 ${selectedKbFiles.value.length} 个知识库文件`
+            );
+            selectedKbFiles.value = [];
+            showKnowledgeBaseDialog.value = false;
+          };
+
+          const showAttachmentOptions = () => {
+            showAttachmentMenu.value = !showAttachmentMenu.value;
+          };
+
+          // 重置输入框高度
+          const resetInputHeight = () => {
+            const inputElement = document.querySelector(".kb-message-input");
+            if (inputElement) {
+              inputElement.style.height = "44px";
+              inputElement.style.overflowY = "hidden";
+            }
+          };
+
+          // 模型选择器相关方法
+          const toggleModelDropdown = () => {
+            showModelDropdown.value = !showModelDropdown.value;
+            if (showModelDropdown.value) {
+              nextTick(() => {
+                const selector = document.querySelector(
+                  ".custom-model-selector"
+                );
+                const dropdown = document.querySelector(".model-dropdown");
+                if (selector && dropdown) {
+                  const rect = selector.getBoundingClientRect();
+                  dropdown.style.left = rect.left + "px";
+                  dropdown.style.bottom = window.innerHeight - rect.top + "px";
+                }
+              });
+            }
+          };
+
+          const getSelectedModelName = (modelValue) => {
+            const model = modelOptions.value.find(
+              (m) => m.value === modelValue || m.id === modelValue
+            );
+            return model ? model.name : modelValue;
+          };
+
+          // 点击外部关闭下拉框
+          const closeDropdownOnClickOutside = (event) => {
+            const selector = document.querySelector(".custom-model-selector");
+            if (selector && !selector.contains(event.target)) {
+              showModelDropdown.value = false;
+            }
+          };
+
+          // 窗口调整大小处理
+          const handleResize = () => {
+            if (showModelDropdown.value) {
+              nextTick(() => {
+                const selector = document.querySelector(
+                  ".custom-model-selector"
+                );
+                const dropdown = document.querySelector(".model-dropdown");
+                if (selector && dropdown) {
+                  const rect = selector.getBoundingClientRect();
+                  dropdown.style.left = rect.left + "px";
+                  dropdown.style.bottom = window.innerHeight - rect.top + "px";
+                }
+              });
+            }
+          };
+
+          // 生命周期钩子
+          onMounted(() => {
+            loadChats();
+            document.addEventListener("click", closeDropdownOnClickOutside);
+            window.addEventListener("resize", handleResize);
+          });
+
+          const createNewChat = () => {
+            const newChat = {
+              id: Date.now(),
+              title: "", // 初始为空，等待用户输入后设置
+              lastMessage: "",
+              updatedAt: new Date(),
+              unreadCount: 0,
+              isNew: true, // 标记为新对话
+              pinned: false, // 默认不置顶
+              messages: [], // 存储消息数据
+            };
+            chats.value.unshift(newChat);
+            saveChatsToStorage();
+            selectChat(newChat);
+          };
+
+          const selectChat = (chat) => {
+            currentChat.value = chat;
+            loadMessages(chat.id);
+            chat.unreadCount = 0;
+            saveChatsToStorage();
+          };
+
+          const loadMessages = (chatId) => {
+            const chat = chats.value.find((c) => c.id === chatId);
+            if (chat && chat.messages) {
+              // 清空当前消息，然后重新加载
+              messages.value = [];
+              // 复制消息数组，避免引用问题
+              messages.value = [...chat.messages];
+            } else {
+              messages.value = [];
+            }
+            nextTick(() => {
+              scrollToBottom();
+            });
+          };
+
+          const generateAIResponse = (userInput) => {
+            const responses = [
+              "这是一个很好的问题！让我来为您详细解答...",
+              "根据您的描述，我建议从以下几个方面来考虑...",
+              "这个问题涉及到多个层面，我们可以分步骤来分析...",
+              "基于我的知识库，我可以为您提供以下建议...",
+            ];
+            return (
+              responses[Math.floor(Math.random() * responses.length)] +
+              "\n\n" +
+              "具体的解决方案需要根据您的具体情况来制定。如果您需要更详细的指导，请提供更多相关信息。"
+            );
+          };
+
+          const formatMessageContent = (content) => {
+            return content
+              .replace(/\n/g, "<br>")
+              .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+          };
+
+          const scrollToBottom = () => {
+            if (messagesContainer.value) {
+              messagesContainer.value.scrollTop =
+                messagesContainer.value.scrollHeight;
+            }
+          };
+
+          const handleKeyDown = (event) => {
+            if (event.ctrlKey && event.key === "Enter") {
+              event.preventDefault();
+              sendKbMessage();
+            }
+          };
+
+          const handleEnterKeyOriginal = (event) => {
+            event.preventDefault();
+            if (inputMessage.value.trim()) {
+              sendKbMessage();
+            }
+          };
+
+          const handleInput = () => {
+            if (messageInput.value) {
+              messageInput.value.style.height = "auto";
+              messageInput.value.style.height =
+                Math.min(messageInput.value.scrollHeight, 120) + "px";
+            }
+          };
+
+          const renameChat = async () => {
+            if (!currentChat.value) return;
+
+            try {
+              const { value: newTitle } = await ElMessageBox.prompt(
+                "请输入新的对话标题",
+                "重命名对话",
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  inputValue: currentChat.value.title,
+                }
+              );
+
+              if (newTitle && newTitle.trim()) {
+                currentChat.value.title = newTitle.trim();
+                ElMessage.success("重命名成功");
+              }
+            } catch (error) {
+              // 用户取消
+            }
+          };
+
+          const clearMessages = async () => {
+            try {
+              await ElMessageBox.confirm(
+                "确定要清空当前对话吗？此操作不可恢复。",
+                "清空对话",
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+
+              messages.value = [];
+              if (currentChat.value) {
+                currentChat.value.lastMessage = "";
+              }
+              ElMessage.success("对话已清空");
+            } catch (error) {
+              // 用户取消
+            }
+          };
+
+          const uploadImage = () => {
+            ElMessage.info("图片上传功能开发中...");
+          };
+
+          const uploadFile = () => {
+            ElMessage.info("文件上传功能开发中...");
+          };
+
+          const startVoiceInput = () => {
+            ElMessage.info("语音输入功能开发中...");
+          };
+
+          const showChatContextMenu = (event, chat) => {
+            contextMenu.value = {
+              chat: chat,
+              x: event.clientX,
+              y: event.clientY,
+            };
+          };
+
+          const editChatTitle = async (chat) => {
+            try {
+              const { value: newTitle } = await ElMessageBox.prompt(
+                "请输入新的对话标题",
+                "编辑标题",
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  inputValue: chat.title,
+                }
+              );
+
+              if (newTitle && newTitle.trim()) {
+                chat.title = newTitle.trim();
+                ElMessage.success("标题修改成功");
+              }
+            } catch (error) {
+              // 用户取消
+            }
+            contextMenu.value = { chat: null, x: 0, y: 0 };
+          };
+
+          const deleteChat = async (chat) => {
+            try {
+              await ElMessageBox.confirm(
+                "确定要删除该对话吗？此操作不可恢复。",
+                "删除对话",
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+
+              const index = chats.value.findIndex((c) => c.id === chat.id);
+              if (index !== -1) {
+                chats.value.splice(index, 1);
+              }
+              if (currentChat.value && currentChat.value.id === chat.id) {
+                currentChat.value = null;
+                messages.value = [];
+              }
+              ElMessage.success("对话删除成功");
+            } catch (error) {
+              // 用户取消
+            }
+            contextMenu.value = { chat: null, x: 0, y: 0 };
+          };
+
+          const toggleModelSelector = () => {
+            showModelSelector.value = !showModelSelector.value;
+            showAttachmentMenu.value = false;
+          };
+
+          const toggleAttachment = () => {
+            showAttachmentMenu.value = !showAttachmentMenu.value;
+            showModelSelector.value = false;
+          };
+
+          const toggleTools = () => {
+            ElMessage.info("工具功能开发中...");
+          };
+
+          const selectModel = (model) => {
+            selectedModel.value = model;
+            showModelSelector.value = false;
+            ElMessage.success(`已切换到${model}模式`);
+          };
+
+          const pinChat = (chat) => {
+            if (chat) {
+              const wasPinned = chat.pinned;
+              chat.pinned = !chat.pinned;
+              // 只有置顶时才更新updatedAt，取消置顶时保持原时间
+              if (!wasPinned) {
+                chat.updatedAt = new Date();
+              }
+              sortChats();
+              saveChatsToStorage();
+              ElMessage.success(chat.pinned ? "对话已置顶" : "已取消置顶");
+            }
+            contextMenu.value = { chat: null, x: 0, y: 0 };
+          };
+
+          const copyMessage = async (content) => {
+            try {
+              // 移除HTML标签，获取纯文本
+              const textContent = content.replace(/<[^>]*>/g, "");
+              await navigator.clipboard.writeText(textContent);
+              ElMessage.success("内容已复制到剪贴板");
+            } catch (error) {
+              // 降级方案
+              const textArea = document.createElement("textarea");
+              textArea.value = content.replace(/<[^>]*>/g, "");
+              document.body.appendChild(textArea);
+              textArea.select();
+              document.execCommand("copy");
+              document.body.removeChild(textArea);
+              ElMessage.success("内容已复制到剪贴板");
+            }
+          };
+
+          const retryMessage = (message) => {
+            ElMessage.info("重试功能开发中...");
+            // 这里可以添加重试逻辑
+          };
+
+          // 点击外部关闭菜单
+          const handleClickOutside = (event) => {
+            if (!event.target.closest(".chat-context-menu")) {
+              contextMenu.value = { chat: null, x: 0, y: 0 };
+            }
+            if (!event.target.closest(".model-selector-btn")) {
+              showModelSelector.value = false;
+            }
+            if (
+              !event.target.closest(".kb-attachment-btn") &&
+              !event.target.closest(".attachment-menu")
+            ) {
+              showAttachmentMenu.value = false;
+            }
+          };
+
+          onMounted(() => {
+            loadChats();
+            document.addEventListener("click", handleClickOutside);
+          });
+
+          onUnmounted(() => {
+            document.removeEventListener("click", handleClickOutside);
+          });
+
+          return {
+            chats,
+            currentChat,
+            messages,
+            inputMessage,
+            loading,
+            messagesContainer,
+            messageInput,
+            showModelSelector,
+            showAttachmentMenu,
+            selectedModel,
+            modelOptions,
+            contextMenu,
+            // 多类型内容渲染组件
+            MessageRenderer,
+            loadChats,
+            createNewChat,
+            selectChat,
+            sendKbMessage,
+            formatMessageContent,
+            handleKeyDown,
+            handleEnterKeyOriginal,
+            handleInput,
+            renameChat,
+            clearMessages,
+            uploadImage,
+            uploadFile,
+            startVoiceInput,
+            showChatContextMenu,
+            editChatTitle,
+            deleteChat,
+            toggleModelSelector,
+            toggleAttachment,
+            toggleTools,
+            selectModel,
+            pinChat,
+            copyMessage,
+            retryMessage,
+            // 移植自知识库.html的对话功能
+            kbMessages,
+            showModelDropdown,
+            isGenerating,
+            currentGeneratingId,
+            formatKbContent,
+            sendKbMessage,
+            simulateAiResponse,
+            stopGeneration,
+            copyKbMessage,
+            retryKbMessage,
+            startEdit,
+            cancelEdit,
+            sendEditMessage,
+            autoResizeTextarea,
+            autoResizeInput,
+            resetInputHeight,
+            toggleModelDropdown,
+            getSelectedModelName,
+            closeDropdownOnClickOutside,
+            handleResize,
+            // @知识库选择功能
+            showKnowledgeBaseList,
+            selectedKnowledgeBases,
+            knowledgeBaseList,
+            selectedKbIndex,
+            handleInputChange,
+            selectKnowledgeBase,
+            navigateKbList,
+            handleEnterKey,
+            hideKnowledgeBaseList,
+            handleBackspace,
+            toggleKnowledgeBaseSelection,
+            showAttachmentOptions,
+            // 附件功能
+            attachments,
+            showAttachmentTooltip,
+            showAttachmentMenu,
+            showKnowledgeBaseDialog,
+            fileInput,
+            selectedKbFiles,
+            kbFileSearchQuery,
+            hasKnowledgeBaseSelected,
+            filteredKbFiles,
+            triggerFileUpload,
+            handleFileUpload,
+            removeAttachment,
+            formatFileSize,
+            getFileIcon,
+            selectLocalFile,
+            selectKnowledgeBaseFile,
+            handleAttachmentClick,
+            handleAttachmentMouseEnter,
+            handleAttachmentMouseLeave,
+            isKbFileSelected,
+            toggleKbFileSelection,
+            confirmKbFileSelection,
+          };
+        },
+      })
+        .use(ElementPlus)
+        .mount("#app");
+    </script>
+  </body>
+</html>

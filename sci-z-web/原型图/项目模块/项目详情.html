@@ -10,6 +10,69 @@
     />
     <script src="https://unpkg.com/vue@3.2.47/dist/vue.global.prod.js"></script>
     <script src="https://unpkg.com/element-plus@2.3.14"></script>
+    <!-- Element Plus 中文本地化（修复 locale undefined 报错） -->
+    <script src="https://unpkg.com/element-plus@2.3.14/dist/locale/zh-cn.js"></script>
+    <script>
+      // 确保 Element Plus 中文本地化正确加载
+      window.ElementPlusLocaleZhCn = window.ElementPlusLocaleZhCn || {
+        name: "zh-cn",
+        el: {
+          datepicker: {
+            now: "此刻",
+            today: "今天",
+            cancel: "取消",
+            clear: "清空",
+            confirm: "确认",
+            selectDate: "选择日期",
+            selectTime: "选择时间",
+            startDate: "开始日期",
+            startTime: "开始时间",
+            endDate: "结束日期",
+            endTime: "结束时间",
+            prevYear: "前一年",
+            nextYear: "后一年",
+            prevMonth: "上个月",
+            nextMonth: "下个月",
+            year: "年",
+            month1: "1月",
+            month2: "2月",
+            month3: "3月",
+            month4: "4月",
+            month5: "5月",
+            month6: "6月",
+            month7: "7月",
+            month8: "8月",
+            month9: "9月",
+            month10: "10月",
+            month11: "11月",
+            month12: "12月",
+            weeks: {
+              sun: "日",
+              mon: "一",
+              tue: "二",
+              wed: "三",
+              thu: "四",
+              fri: "五",
+              sat: "六",
+            },
+            months: {
+              jan: "一月",
+              feb: "二月",
+              mar: "三月",
+              apr: "四月",
+              may: "五月",
+              jun: "六月",
+              jul: "七月",
+              aug: "八月",
+              sep: "九月",
+              oct: "十月",
+              nov: "十一月",
+              dec: "十二月",
+            },
+          },
+        },
+      };
+    </script>
     <link rel="stylesheet" href="../通用规范/样式.css" />
     <style>
       .project-detail-container {
@@ -32,23 +95,11 @@
         margin: 0;
       }
 
-      .content-grid {
-        display: grid;
-        grid-template-columns: 2fr 1fr;
+      .main-content-single {
+        display: flex;
+        flex-direction: column;
         gap: 20px;
         margin-bottom: 20px;
-      }
-
-      .main-content {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-      }
-
-      .sidebar-content {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
       }
 
       .card {
@@ -66,6 +117,21 @@
         margin-bottom: 16px;
         padding-bottom: 12px;
         border-bottom: 1px solid #e5e7eb;
+      }
+
+      .footer-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+        position: sticky;
+        bottom: 0;
+        background: #ffffff;
+        padding-bottom: 12px;
+        z-index: 10;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.03);
       }
 
       .card-title {
@@ -107,8 +173,13 @@
       }
 
       .status-progress {
+        display: inline-block;
         background-color: #fef3c7;
         color: #f59e0b;
+        padding: 2px 8px;
+        border-radius: 12px;
+        max-width: 120px;
+        white-space: nowrap;
       }
 
       /* 成员管理样式 */
@@ -332,6 +403,156 @@
         color: #9ca3af;
       }
 
+      /* 弹窗内表单可读性（修复文字看不清的问题） + 与页面统一风格 */
+      .el-dialog {
+        font-family: inherit;
+        color: #1f2937;
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+      .el-dialog .el-dialog__title {
+        font-weight: 600;
+        color: #1e3a8a;
+        font-size: 18px;
+      }
+      .el-dialog .el-form-item__label {
+        color: #374151;
+        font-weight: 500;
+        font-size: 14px;
+      }
+      .el-dialog .el-input__inner,
+      .el-dialog input,
+      .el-dialog .el-textarea__inner,
+      .el-dialog .el-select .el-input__inner {
+        color: #1f2937;
+        font-size: 14px;
+      }
+      .el-dialog .el-input__inner::placeholder,
+      .el-dialog input::placeholder,
+      .el-dialog .el-textarea__inner::placeholder,
+      .el-dialog .el-select .el-input__inner::placeholder {
+        color: #9ca3af;
+        font-size: 14px;
+      }
+      .el-dialog .el-option {
+        color: #1f2937;
+        font-size: 14px;
+      }
+      .el-dialog .el-option:hover {
+        background-color: #f8fafc;
+        color: #1f2937;
+      }
+
+      /* 自定义弹窗样式 */
+      .el-message-box {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-message-box__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #1f2937 !important;
+        line-height: 1.5 !important;
+      }
+
+      .el-message-box__headerbtn {
+        top: 16px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-message-box__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-message-box__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__content {
+        padding: 20px 24px !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__message {
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: #374151 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .el-message-box__btns {
+        padding: 16px 24px 20px 24px !important;
+        background: #ffffff !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 12px !important;
+      }
+
+      .el-message-box__btns .el-button {
+        padding: 8px 20px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        border: 1px solid !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .el-message-box__btns .el-button--default {
+        background: #ffffff !important;
+        border-color: #d1d5db !important;
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__btns .el-button--default:hover {
+        background: #f9fafb !important;
+        border-color: #9ca3af !important;
+        color: #374151 !important;
+      }
+
+      .el-message-box__btns .el-button--primary {
+        background: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+        color: #ffffff !important;
+      }
+
+      .el-message-box__btns .el-button--primary:hover {
+        background: #1e40af !important;
+        border-color: #1e40af !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+      }
+
+      .el-message-box__btns .el-button--primary:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+      }
+
+      /* 警告类型弹窗的特殊样式 */
+      .el-message-box--warning .el-message-box__content {
+        position: relative;
+      }
+
+      .el-message-box--warning .el-message-box__message::before {
+        content: "⚠️";
+        font-size: 18px !important;
+        margin-right: 8px !important;
+        vertical-align: -0.15em !important;
+        display: inline-block !important;
+      }
+
       /* 响应式设计 */
       @media (max-width: 768px) {
         .content-grid {
@@ -349,16 +570,14 @@
       <div class="project-detail-container">
         <!-- 页面头部 -->
         <div class="page-header">
-          <h1 class="page-title">项目详情</h1>
-          <div>
+          <div style="display: flex; align-items: center; gap: 16px">
             <el-button @click="handleBack">
               <el-icon><ArrowLeft /></el-icon>
               返回列表
             </el-button>
-            <el-button type="primary" @click="handleEdit">
-              <el-icon><Edit /></el-icon>
-              编辑项目
-            </el-button>
+            <h1 class="page-title">
+              {{ isEditMode ? '项目编辑' : '项目详情' }}
+            </h1>
           </div>
         </div>
 
@@ -369,228 +588,623 @@
         </div>
 
         <!-- 主要内容 -->
-        <div v-else class="content-grid">
-          <!-- 左侧主要内容 -->
-          <div class="main-content">
-            <!-- 基本信息 -->
-            <div class="card">
-              <div class="card-header">
-                <h2 class="card-title">基本信息</h2>
+        <div v-else class="main-content-single">
+          <!-- 基本信息 -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">基本信息</h2>
+            </div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">项目编号</span>
+                <span class="info-value">{{ project.number }}</span>
               </div>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">项目编号</span>
-                  <span class="info-value">{{ project.number }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">项目名称</span>
+              <div class="info-item">
+                <span class="info-label">项目名称</span>
+                <template v-if="isEditMode">
+                  <el-input
+                    v-model="project.name"
+                    placeholder="请输入项目名称"
+                  />
+                </template>
+                <template v-else>
                   <span class="info-value">{{ project.name }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">项目负责人</span>
-                  <span class="info-value">{{ project.manager }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">项目状态</span>
-                  <span class="status-tag status-progress"
-                    >{{ getStatusText(project.status) }}</span
-                  >
-                </div>
-                <div class="info-item">
-                  <span class="info-label">创建时间</span>
-                  <span class="info-value">{{ project.createTime }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">更新时间</span>
-                  <span class="info-value">{{ project.updateTime }}</span>
-                </div>
+                </template>
               </div>
-              <div class="info-item" style="margin-top: 16px">
-                <span class="info-label">项目描述</span>
+              <div class="info-item">
+                <span class="info-label">项目负责人</span>
+                <template v-if="isEditMode">
+                  <el-input
+                    v-model="project.manager"
+                    placeholder="请输入项目负责人"
+                  />
+                </template>
+                <template v-else>
+                  <span class="info-value">{{ project.manager }}</span>
+                </template>
+              </div>
+              <div class="info-item">
+                <span class="info-label">项目状态</span>
+                <span class="status-tag status-progress"
+                  >{{ getStatusText(project.status) }}</span
+                >
+              </div>
+              <div class="info-item">
+                <span class="info-label">项目预算</span>
+                <template v-if="isEditMode">
+                  <el-input-number
+                    v-model="project.budget"
+                    :min="0"
+                    :precision="2"
+                    style="width: 100%"
+                  />
+                </template>
+                <template v-else>
+                  <span class="info-value"
+                    >{{ Number(project.budget||0).toFixed(2) }} 元</span
+                  >
+                </template>
+              </div>
+              <div class="info-item">
+                <span class="info-label">创建时间</span>
+                <template v-if="isEditMode">
+                  <el-date-picker
+                    v-model="project.createTime"
+                    type="date"
+                    placeholder="选择创建时间"
+                    style="width: 100%"
+                    format="YYYY-MM-DD"
+                    value-format="YYYY-MM-DD"
+                  />
+                </template>
+                <template v-else>
+                  <span class="info-value">{{ project.createTime }}</span>
+                </template>
+              </div>
+              <div class="info-item">
+                <span class="info-label">预计完成时间</span>
+                <template v-if="isEditMode">
+                  <el-date-picker
+                    v-model="project.updateTime"
+                    type="date"
+                    placeholder="选择预计完成时间"
+                    style="width: 100%"
+                    format="YYYY-MM-DD"
+                    value-format="YYYY-MM-DD"
+                  />
+                </template>
+                <template v-else>
+                  <span class="info-value">{{ project.updateTime }}</span>
+                </template>
+              </div>
+            </div>
+            <div class="info-item" style="margin-top: 16px">
+              <span class="info-label">项目描述</span>
+              <template v-if="isEditMode">
+                <el-input
+                  type="textarea"
+                  :rows="3"
+                  v-model="project.description"
+                  placeholder="请输入项目描述"
+                />
+              </template>
+              <template v-else>
                 <span class="info-value">{{ project.description }}</span>
+              </template>
+            </div>
+          </div>
+
+          <!-- 成员管理 -->
+          <div class="card">
+            <div
+              class="card-header"
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              <h2 class="card-title">项目成员</h2>
+              <el-button
+                v-if="isEditMode"
+                type="primary"
+                size="small"
+                @click="openMemberDialog"
+              >
+                <el-icon><Plus /></el-icon>
+                添加成员
+              </el-button>
+            </div>
+
+            <!-- 已选成员列表 -->
+            <div v-if="members.length > 0">
+              <div
+                v-for="member in members"
+                :key="member.id"
+                class="member-item"
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 12px;
+                  padding: 16px;
+                  background: #f8fafc;
+                  border-radius: 8px;
+                  margin-bottom: 12px;
+                  border: 1px solid #e5e7eb;
+                "
+              >
+                <div
+                  style="
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 50%;
+                    background: #e5e7eb;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #374151;
+                    font-weight: 500;
+                    font-size: 18px;
+                  "
+                >
+                  {{ member.name.charAt(0) }}
+                </div>
+                <div style="flex: 1">
+                  <div
+                    style="
+                      font-weight: 500;
+                      color: #374151;
+                      font-size: 16px;
+                      margin-bottom: 4px;
+                    "
+                  >
+                    {{ member.name }}
+                  </div>
+                  <div style="font-size: 12px; color: #6b7280">
+                    {{ getRoleText(member.role) }} · 加入时间: {{
+                    member.joinTime }}
+                  </div>
+                </div>
+                <el-button
+                  v-if="isEditMode"
+                  type="danger"
+                  size="small"
+                  @click="handleRemoveMember(member.id)"
+                >
+                  移除
+                </el-button>
               </div>
             </div>
 
-            <!-- 成员管理 -->
-            <div class="card">
-              <div class="card-header">
-                <h2 class="card-title">成员管理</h2>
+            <div v-else class="empty-state">
+              <div class="empty-state-icon">👥</div>
+              <div class="empty-state-text">暂无项目成员</div>
+              <div class="empty-state-hint">请搜索并添加项目成员</div>
+            </div>
+          </div>
+
+          <!-- 添加成员对话框 -->
+          <el-dialog
+            v-model="showMemberDialog"
+            title="添加成员"
+            width="600px"
+            :close-on-click-modal="false"
+          >
+            <el-input
+              v-model="memberSearchKeyword"
+              placeholder="搜索成员（姓名或学工号）"
+              clearable
+              @keyup.enter="handleMemberSearch"
+              @input="handleMemberSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <div
+              v-if="memberSearchResults.length > 0"
+              class="search-results"
+              style="margin-top: 12px"
+            >
+              <div
+                v-for="user in memberSearchResults"
+                :key="user.id"
+                class="search-result-item"
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  padding: 12px;
+                  border: 1px solid #e5e7eb;
+                  border-radius: 6px;
+                  margin-bottom: 8px;
+                  background: #ffffff;
+                "
+              >
+                <div style="display: flex; align-items: center; gap: 12px">
+                  <div
+                    style="
+                      width: 40px;
+                      height: 40px;
+                      border-radius: 50%;
+                      background: #f3f4f6;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      color: #374151;
+                      font-weight: 500;
+                      font-size: 16px;
+                    "
+                  >
+                    {{ user.name.charAt(0) }}
+                  </div>
+                  <div>
+                    <div
+                      style="
+                        font-weight: 500;
+                        color: #374151;
+                        font-size: 14px;
+                        margin-bottom: 4px;
+                      "
+                    >
+                      {{ user.name }}
+                    </div>
+                    <!-- <div style="font-size:12px;color:#6b7280;">工号: {{ user.id }}</div> -->
+                  </div>
+                </div>
                 <el-button
                   type="primary"
                   size="small"
-                  @click="showAddMember = !showAddMember"
+                  :disabled="members.some(m=>m.id===user.id)"
+                  @click="handleAddMember(user)"
+                  style="min-width: 60px"
                 >
-                  <el-icon><Plus /></el-icon>
-                  添加成员
+                  {{ members.some(m=>m.id===user.id) ? '已添加' : '添加' }}
                 </el-button>
               </div>
+            </div>
+            <div v-else class="empty-state" style="padding: 20px 0">
+              <div class="empty-state-text">请输入关键词进行搜索</div>
+            </div>
+            <template #footer>
+              <el-button @click="closeMemberDialog">关闭</el-button>
+            </template>
+          </el-dialog>
 
-              <!-- 成员列表 -->
-              <div class="member-list">
+          <!-- 项目里程碑 -->
+          <div class="card">
+            <div
+              class="card-header"
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              <h2 class="card-title">项目里程碑</h2>
+              <el-button
+                v-if="isEditMode"
+                type="primary"
+                size="small"
+                @click="openMilestoneDialog"
+              >
+                <el-icon><Plus /></el-icon>
+                添加里程碑
+              </el-button>
+            </div>
+
+            <!-- 空态提示：仅当没有里程碑时显示 -->
+            <div
+              v-if="milestones.length === 0"
+              class="empty-state"
+              style="padding: 20px 0"
+            >
+              <div class="empty-state-icon">🎯</div>
+              <div class="empty-state-text">暂无里程碑</div>
+              <div class="empty-state-hint">请添加项目里程碑</div>
+            </div>
+
+            <!-- 里程碑列表 -->
+            <div v-if="milestones.length > 0">
+              <div
+                v-for="(milestone, index) in milestones"
+                :key="index"
+                class="milestone-item"
+                style="
+                  border: 1px solid #e5e7eb;
+                  border-radius: 6px;
+                  padding: 16px;
+                  margin-bottom: 12px;
+                  background: #fafafa;
+                "
+              >
                 <div
-                  v-for="member in members"
-                  :key="member.id"
-                  class="member-item"
+                  class="milestone-header"
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 12px;
+                  "
                 >
-                  <div class="member-avatar">{{ member.name.charAt(0) }}</div>
-                  <div class="member-info">
-                    <div class="member-name">{{ member.name }}</div>
-                    <div class="member-role">
-                      {{ member.role }} · 加入时间：{{ member.joinTime }}
-                    </div>
-                  </div>
-                  <div class="member-actions">
-                    <el-button
-                      size="small"
-                      @click="handleEditMember(member.id)"
-                    >
-                      编辑
-                    </el-button>
-                    <el-button
-                      size="small"
-                      type="danger"
-                      @click="handleRemoveMember(member.id)"
-                    >
-                      移除
-                    </el-button>
-                  </div>
+                  <span
+                    class="milestone-title"
+                    style="font-weight: 500; color: #374151"
+                    >里程碑 {{ index + 1 }}</span
+                  >
+                  <el-button
+                    v-if="isEditMode"
+                    type="danger"
+                    size="small"
+                    @click="handleRemoveMilestone(index)"
+                  >
+                    删除
+                  </el-button>
                 </div>
-              </div>
-
-              <!-- 添加成员区域 -->
-              <div v-if="showAddMember" class="add-member-section">
-                <div class="search-member">
+                <div
+                  class="milestone-content"
+                  style="
+                    display: grid;
+                    grid-template-columns: 1fr 1fr 1fr 1fr;
+                    gap: 12px;
+                  "
+                >
+                  <el-form-item label="里程碑名称">
+                    <el-input
+                      v-model="milestone.name"
+                      placeholder="请输入里程碑名称"
+                    />
+                  </el-form-item>
+                  <el-form-item label="开始时间">
+                    <el-date-picker
+                      v-model="milestone.startTime"
+                      type="date"
+                      placeholder="选择开始时间"
+                      style="width: 100%"
+                      format="YYYY-MM-DD"
+                      value-format="YYYY-MM-DD"
+                    />
+                  </el-form-item>
+                  <el-form-item label="结束时间">
+                    <el-date-picker
+                      v-model="milestone.endTime"
+                      type="date"
+                      placeholder="选择结束时间"
+                      style="width: 100%"
+                      format="YYYY-MM-DD"
+                      value-format="YYYY-MM-DD"
+                    />
+                  </el-form-item>
+                </div>
+                <el-form-item label="描述">
                   <el-input
-                    v-model="searchMemberKeyword"
-                    placeholder="搜索用户姓名或学工号"
-                    style="flex: 1"
-                  >
-                    <template #append>
-                      <el-button @click="searchMembers">
-                        <el-icon><Search /></el-icon>
-                      </el-button>
-                    </template>
-                  </el-input>
-                </div>
-
-                <div v-if="searchResults.length > 0" class="search-results">
-                  <div
-                    v-for="user in searchResults"
-                    :key="user.id"
-                    class="search-result-item"
-                    @click="handleAddMember(user)"
-                  >
-                    <div
-                      class="member-avatar"
-                      style="width: 32px; height: 32px"
-                    >
-                      {{ user.name.charAt(0) }}
-                    </div>
-                    <div class="member-info">
-                      <div class="member-name">{{ user.name }}</div>
-                      <div class="member-role">{{ user.studentId }}</div>
-                    </div>
-                    <el-button size="small" type="primary">添加</el-button>
-                  </div>
-                </div>
+                    v-model="milestone.description"
+                    type="textarea"
+                    :rows="2"
+                    placeholder="请输入里程碑描述"
+                  />
+                </el-form-item>
               </div>
             </div>
           </div>
 
-          <!-- 右侧边栏 -->
-          <div class="sidebar-content">
-            <!-- 文档管理 -->
-            <div class="card">
-              <div class="card-header">
-                <h2 class="card-title">文档管理</h2>
-              </div>
-
-              <!-- 文档列表 -->
-              <div v-if="documents.length > 0" class="document-list">
-                <div
-                  v-for="doc in documents"
-                  :key="doc.id"
-                  class="document-item"
+          <!-- 新增里程碑对话框 -->
+          <el-dialog
+            v-model="showMilestoneDialog"
+            title="新增里程碑"
+            width="700px"
+            :close-on-click-modal="false"
+          >
+            <div
+              class="form-row"
+              style="display: flex; gap: 20px; margin-bottom: 20px"
+            >
+              <el-form-item label="里程碑名称" style="flex: 1 1 100%">
+                <el-select
+                  v-model="milestoneDraft.name"
+                  placeholder="请选择里程碑名称"
+                  style="width: 100%"
                 >
-                  <div class="document-icon">
-                    <el-icon><Document /></el-icon>
-                  </div>
-                  <div class="document-info">
-                    <div class="document-name">{{ doc.name }}</div>
-                    <div class="document-meta">
-                      {{ doc.type }} · {{ doc.uploader }} · {{ doc.uploadTime }}
-                      · {{ doc.size }}
-                    </div>
-                  </div>
-                  <div class="document-actions">
-                    <el-button size="small" @click="handleDownload(doc.id)">
-                      下载
-                    </el-button>
-                    <el-button
-                      size="small"
-                      type="danger"
-                      @click="handleDeleteDoc(doc.id)"
-                    >
-                      删除
-                    </el-button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 空状态 -->
-              <div v-else class="empty-state">
-                <div class="empty-state-icon">📄</div>
-                <div class="empty-state-text">暂无文档</div>
-                <div class="empty-state-hint">上传项目相关文档</div>
-              </div>
-
-              <!-- 上传区域 -->
-              <div class="upload-section">
-                <div
-                  class="upload-area"
-                  @click="triggerUpload"
-                  @dragover.prevent="handleDragOver"
-                  @dragleave.prevent="handleDragLeave"
-                  @drop.prevent="handleDrop"
-                  :class="{ dragover: isDragOver }"
-                >
-                  <div class="upload-icon">
-                    <el-icon><Upload /></el-icon>
-                  </div>
-                  <div class="upload-text">点击上传或拖拽文件到此处</div>
-                  <div class="upload-hint">
-                    支持 PDF、DOC、DOCX、XLS、XLSX 等格式
-                  </div>
-                </div>
-                <input
-                  ref="fileInput"
-                  type="file"
-                  multiple
-                  style="display: none"
-                  @change="handleFileSelect"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                  <el-option
+                    v-for="opt in milestoneOptions"
+                    :key="opt"
+                    :label="opt"
+                    :value="opt"
+                    :disabled="addedMilestoneNames && addedMilestoneNames.includes(opt)"
+                  />
+                </el-select>
+              </el-form-item>
+            </div>
+            <div
+              class="form-row"
+              style="display: flex; gap: 20px; margin-bottom: 20px"
+            >
+              <el-form-item label="开始时间" style="flex: 1">
+                <el-date-picker
+                  v-model="milestoneDraft.startTime"
+                  type="date"
+                  placeholder="选择开始时间"
+                  style="width: 100%"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
                 />
+              </el-form-item>
+              <el-form-item label="结束时间" style="flex: 1">
+                <el-date-picker
+                  v-model="milestoneDraft.endTime"
+                  type="date"
+                  placeholder="选择结束时间"
+                  style="width: 100%"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                />
+              </el-form-item>
+            </div>
+            <el-form-item label="描述">
+              <el-input
+                v-model="milestoneDraft.description"
+                type="textarea"
+                :rows="2"
+                placeholder="请输入里程碑描述"
+              />
+            </el-form-item>
+            <template #footer>
+              <el-button @click="closeMilestoneDialog">取消</el-button>
+              <el-button type="primary" @click="confirmAddMilestone"
+                >确定添加</el-button
+              >
+            </template>
+          </el-dialog>
+
+          <!-- 文档管理 -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">文档管理</h2>
+            </div>
+
+            <div
+              v-if="documents.length > 0"
+              class="document-list"
+              style="display: flex; flex-direction: column; gap: 12px"
+            >
+              <div
+                v-for="doc in documents"
+                :key="doc.id"
+                class="document-item"
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 12px;
+                  padding: 12px;
+                  background: #f8fafc;
+                  border-radius: 6px;
+                  margin-bottom: 12px;
+                "
+              >
+                <div
+                  style="
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 4px;
+                    background: #dbeafe;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #1e40af;
+                  "
+                >
+                  📄
+                </div>
+                <div style="flex: 1">
+                  <div style="font-weight: 500; color: #374151">
+                    {{ doc.name }}
+                  </div>
+                  <div style="font-size: 12px; color: #6b7280">
+                    {{ doc.type }} · {{ doc.uploader }} · {{ doc.uploadTime }} ·
+                    {{ doc.size }}
+                  </div>
+                </div>
+                <div>
+                  <el-button size="small" @click="handlePreview(doc.id)"
+                    >预览</el-button
+                  >
+                  <el-button size="small" @click="handleDownload(doc.id)"
+                    >下载</el-button
+                  >
+                  <el-button
+                    size="small"
+                    type="danger"
+                    @click="handleDeleteDoc(doc.id)"
+                    >删除</el-button
+                  >
+                </div>
               </div>
+            </div>
+
+            <div v-else class="empty-state">
+              <div class="empty-state-icon">📄</div>
+              <div class="empty-state-text">暂无文档</div>
+              <div class="empty-state-hint">上传项目相关文档</div>
+            </div>
+
+            <!-- 上传区域 -->
+            <div
+              class="upload-section"
+              style="margin-top: 12px"
+              v-if="isEditMode"
+            >
+              <div
+                class="upload-area"
+                style="
+                  border: 2px dashed #d1d5db;
+                  border-radius: 6px;
+                  padding: 20px;
+                  text-align: center;
+                  cursor: pointer;
+                "
+                @click="triggerUpload"
+                @dragover.prevent="handleDragOver"
+                @dragleave.prevent="handleDragLeave"
+                @drop.prevent="handleDrop"
+                :class="{ dragover: isDragOver }"
+              >
+                <div
+                  class="upload-icon"
+                  style="font-size: 24px; color: #9ca3af; margin-bottom: 8px"
+                >
+                  <el-icon><Upload /></el-icon>
+                </div>
+                <div
+                  class="upload-text"
+                  style="font-size: 14px; color: #6b7280; margin-bottom: 4px"
+                >
+                  点击上传或拖拽文件到此处
+                </div>
+                <div
+                  class="upload-hint"
+                  style="font-size: 12px; color: #9ca3af"
+                >
+                  支持 PDF、DOC、DOCX、XLS、XLSX 等格式
+                </div>
+              </div>
+              <input
+                ref="fileInput"
+                type="file"
+                multiple
+                style="display: none"
+                @change="handleFileSelect"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+              />
             </div>
           </div>
         </div>
 
-        <!-- 操作按钮区域 -->
-        <div class="action-buttons">
-          <el-button @click="handleExport">
-            <el-icon><Download /></el-icon>
-            导出报告
-          </el-button>
-          <el-button type="danger" @click="handleDeleteProject">
-            <el-icon><Delete /></el-icon>
-            删除项目
+        <!-- 操作按钮 -->
+        <div
+          v-if="isEditMode"
+          class="button-group"
+          style="
+            background: #fff;
+            position: sticky;
+            bottom: 0;
+            border-top: 1px solid #e5e7eb;
+            padding: 16px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+          "
+        >
+          <el-button @click="handleBack">取消</el-button>
+          <el-button type="primary" @click="handleSaveProject">
+            <el-icon><Check /></el-icon>
+            保存项目
           </el-button>
         </div>
       </div>
     </div>
 
     <script>
-      const { createApp, ref, onMounted } = Vue;
+      const { createApp, ref, computed, onMounted } = Vue;
       const { ElMessage, ElMessageBox } = ElementPlus;
 
       // 注册Loading图标
@@ -606,7 +1220,19 @@
         setup() {
           // 响应式数据
           const loading = ref(false);
-          const project = ref({});
+          // 模式：view(查看) / edit(编辑)
+          const isEditMode = ref(false);
+          const project = ref({
+            id: 0,
+            number: "",
+            name: "",
+            description: "",
+            manager: "",
+            status: "progress",
+            createTime: "",
+            updateTime: "",
+            budget: 0,
+          });
           const members = ref([]);
           const documents = ref([]);
           const showAddMember = ref(false);
@@ -614,6 +1240,49 @@
           const searchResults = ref([]);
           const isDragOver = ref(false);
           const fileInput = ref(null);
+          const milestones = ref([
+            {
+              name: "项目启动",
+              description: "项目启动阶段",
+              startTime: "2024-01-15",
+              endTime: "2024-01-20",
+            },
+            {
+              name: "需求分析",
+              description: "需求分析阶段",
+              startTime: "2024-01-21",
+              endTime: "2024-01-31",
+            },
+          ]);
+
+          // 新增成员对话框相关
+          const showMemberDialog = ref(false);
+          const memberSearchKeyword = ref("");
+          const memberSearchResults = ref([]);
+
+          // 里程碑对话框相关
+          const showMilestoneDialog = ref(false);
+          const milestoneDraft = ref({
+            name: "",
+            startTime: "",
+            endTime: "",
+            description: "",
+          });
+          const milestoneOptions = ref([
+            "项目启动：建设方案通过审核并备案",
+            "任务分解与资源准备：项目任务书下达，资源配置完成，进入实施阶段",
+            "项目实施与过程管理：中期检查",
+            "成果整合与结题准备：结题验收",
+            "后续管理与成果转化：项目归档完成，成果转化",
+          ]);
+          const addedMilestoneNames = computed(() => {
+            if (!milestones.value || !Array.isArray(milestones.value)) {
+              return [];
+            }
+            return milestones.value
+              .map((m) => m.name)
+              .filter((name) => name && name.trim());
+          });
 
           // 模拟项目数据
           const mockProject = {
@@ -626,6 +1295,7 @@
             status: "progress",
             createTime: "2024-01-15 09:00:00",
             updateTime: "2024-01-20 14:30:00",
+            budget: 120000,
           };
 
           // 模拟成员数据
@@ -703,6 +1373,23 @@
             return statusMap[status] || "未知";
           };
 
+          // 解析URL参数
+          const getQueryParam = (key) => {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(key);
+          };
+
+          const resolveMode = () => {
+            // 优先URL参数，其次localStorage，默认view
+            const qs = getQueryParam("mode");
+            if (qs === "edit" || qs === "view") return qs;
+            try {
+              const ls = localStorage.getItem("projectDetailMode");
+              if (ls === "edit" || ls === "view") return ls;
+            } catch {}
+            return "view";
+          };
+
           // 加载项目详情
           const loadProjectDetail = async () => {
             loading.value = true;
@@ -713,6 +1400,9 @@
               project.value = mockProject;
               members.value = mockMembers;
               documents.value = mockDocuments;
+              // 设置模式
+              const mode = resolveMode();
+              isEditMode.value = mode === "edit";
             } catch (error) {
               ElMessage.error("加载项目详情失败");
             } finally {
@@ -737,12 +1427,6 @@
             }
           };
 
-          // 编辑项目
-          const handleEdit = () => {
-            ElMessage.info("编辑项目");
-            // 这里应该跳转到项目编辑页面
-          };
-
           // 搜索成员
           const searchMembers = () => {
             if (searchMemberKeyword.value.trim()) {
@@ -756,34 +1440,146 @@
             }
           };
 
+          // 实时搜索成员（旧版本，保留兼容性）
+          const handleMemberSearchOld = () => {
+            if (searchMemberKeyword.value.trim()) {
+              searchResults.value = mockSearchResults.filter(
+                (user) =>
+                  user.name
+                    .toLowerCase()
+                    .includes(searchMemberKeyword.value.toLowerCase()) ||
+                  user.studentId
+                    .toLowerCase()
+                    .includes(searchMemberKeyword.value.toLowerCase())
+              );
+            } else {
+              searchResults.value = [];
+            }
+          };
+
+          // 打开成员对话框
+          const openMemberDialog = () => {
+            memberSearchKeyword.value = "";
+            memberSearchResults.value = [];
+            showMemberDialog.value = true;
+          };
+
+          // 关闭成员对话框
+          const closeMemberDialog = () => {
+            showMemberDialog.value = false;
+          };
+
+          // 成员搜索处理
+          const handleMemberSearch = () => {
+            if (!memberSearchKeyword.value.trim()) {
+              memberSearchResults.value = [];
+              return;
+            }
+
+            // 模拟搜索API
+            const keyword = memberSearchKeyword.value.toLowerCase();
+            memberSearchResults.value = mockSearchResults.filter(
+              (user) =>
+                user.name.toLowerCase().includes(keyword) ||
+                user.studentId.toLowerCase().includes(keyword)
+            );
+          };
+
           // 添加成员
           const handleAddMember = (user) => {
-            ElMessage.success(`添加成员: ${user.name}`);
-            // 这里应该调用API添加成员
+            // 检查是否已经是成员
+            const isAlreadyMember = members.value.some(
+              (member) => member.id === user.id
+            );
+            if (isAlreadyMember) {
+              ElMessage.warning("该用户已经是项目成员");
+              return;
+            }
+
+            // 添加到成员列表
+            const newMember = {
+              id: user.id,
+              name: user.name,
+              role: "普通成员",
+              joinTime: new Date().toISOString().split("T")[0],
+            };
+
+            members.value.push(newMember);
+            ElMessage.success(`成功添加成员: ${user.name}`);
+
+            // 清空搜索
+            memberSearchKeyword.value = "";
+            memberSearchResults.value = [];
+
+            // 延迟关闭对话框，让用户看到添加效果
+            setTimeout(() => {
+              showMemberDialog.value = false;
+            }, 1000);
+          };
+
+          // 获取角色文本
+          const getRoleText = (role) => {
+            const roleMap = {
+              manager: "项目负责人",
+              core: "核心成员",
+              member: "普通成员",
+            };
+            return roleMap[role] || "普通成员";
+          };
+
+          // 取消添加成员
+          const handleCancelAddMember = () => {
             showAddMember.value = false;
             searchMemberKeyword.value = "";
             searchResults.value = [];
           };
 
-          // 编辑成员
-          const handleEditMember = (memberId) => {
-            ElMessage.info(`编辑成员: ${memberId}`);
-            // 这里应该打开编辑成员对话框
-          };
-
           // 移除成员
           const handleRemoveMember = async (memberId) => {
-            try {
-              await ElMessageBox.confirm("确定要移除这个成员吗？", "确认移除", {
-                confirmButtonText: "确定",
-                cancelButtonText: "取消",
-                type: "warning",
-              });
+            const member = members.value.find((m) => m.id === memberId);
+            if (!member) return;
 
-              ElMessage.success("成员移除成功");
-              // 这里应该调用API移除成员
+            try {
+              await ElMessageBox.confirm(
+                `确定要移除成员"${member.name}"吗？移除后该成员将无法访问项目信息。`,
+                "确认移除",
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+
+              // 从成员列表中移除
+              const index = members.value.findIndex((m) => m.id === memberId);
+              if (index > -1) {
+                members.value.splice(index, 1);
+                ElMessage.success(`已成功移除成员: ${member.name}`);
+              }
             } catch (error) {
               // 用户取消操作
+            }
+          };
+
+          // 预览文档
+          const handlePreview = (docId) => {
+            const doc = documents.value.find((d) => d.id === docId);
+            if (!doc) return;
+
+            ElMessage.info(`预览文档: ${doc.name}`);
+            // 这里应该打开文档预览窗口或新标签页
+            // 根据文档类型决定预览方式
+            if (doc.type === "PDF") {
+              // PDF预览
+              window.open(`/api/documents/${docId}/preview`, "_blank");
+            } else if (["DOC", "DOCX"].includes(doc.type)) {
+              // Word文档预览
+              window.open(`/api/documents/${docId}/preview`, "_blank");
+            } else if (["XLS", "XLSX"].includes(doc.type)) {
+              // Excel文档预览
+              window.open(`/api/documents/${docId}/preview`, "_blank");
+            } else {
+              ElMessage.warning("该文档类型暂不支持预览");
             }
           };
 
@@ -852,30 +1648,58 @@
             }, 2000);
           };
 
-          // 导出报告
-          const handleExport = () => {
-            ElMessage.info("导出项目报告");
-            // 这里应该触发报告导出
+          // 保存项目（编辑）
+          const handleSaveProject = async () => {
+            // 这里应进行表单校验与提交
+            ElMessage.success("项目保存成功");
+            handleBack();
           };
 
-          // 删除项目
-          const handleDeleteProject = async () => {
-            try {
-              await ElMessageBox.confirm(
-                "确定要删除这个项目吗？删除后无法恢复。",
-                "确认删除",
-                {
-                  confirmButtonText: "确定",
-                  cancelButtonText: "取消",
-                  type: "warning",
-                }
-              );
+          // 里程碑对话框相关方法
+          const openMilestoneDialog = () => {
+            milestoneDraft.value = {
+              name: "",
+              startTime: "",
+              endTime: "",
+              description: "",
+            };
+            showMilestoneDialog.value = true;
+          };
 
-              ElMessage.success("项目删除成功");
-              handleBack();
-            } catch (error) {
-              // 用户取消删除
+          const closeMilestoneDialog = () => {
+            showMilestoneDialog.value = false;
+          };
+
+          const confirmAddMilestone = () => {
+            const d = milestoneDraft.value;
+            if (!d.name.trim()) {
+              ElMessage.warning("请输入里程碑名称");
+              return;
             }
+            if (addedMilestoneNames.value.includes(d.name.trim())) {
+              ElMessage.warning("该里程碑已添加");
+              return;
+            }
+            if (!d.startTime || !d.endTime) {
+              ElMessage.warning("请选择开始时间和结束时间");
+              return;
+            }
+            if (new Date(d.startTime) >= new Date(d.endTime)) {
+              ElMessage.warning("结束时间必须晚于开始时间");
+              return;
+            }
+            milestones.value.push({
+              name: d.name.trim(),
+              startTime: d.startTime,
+              endTime: d.endTime,
+              description: d.description || "",
+            });
+            showMilestoneDialog.value = false;
+            ElMessage.success("已添加里程碑");
+          };
+
+          const handleRemoveMilestone = (index) => {
+            milestones.value.splice(index, 1);
           };
 
           // 组件挂载时加载数据
@@ -886,9 +1710,11 @@
 
           return {
             loading,
+            isEditMode,
             project,
             members,
             documents,
+            milestones,
             showAddMember,
             searchMemberKeyword,
             searchResults,
@@ -896,11 +1722,12 @@
             fileInput,
             getStatusText,
             handleBack,
-            handleEdit,
             searchMembers,
+            handleMemberSearch,
             handleAddMember,
-            handleEditMember,
+            handleCancelAddMember,
             handleRemoveMember,
+            handlePreview,
             handleDownload,
             handleDeleteDoc,
             triggerUpload,
@@ -908,12 +1735,86 @@
             handleDragOver,
             handleDragLeave,
             handleDrop,
-            handleExport,
-            handleDeleteProject,
+            handleSaveProject,
+            // 新增的成员对话框相关
+            showMemberDialog,
+            memberSearchKeyword,
+            memberSearchResults,
+            openMemberDialog,
+            closeMemberDialog,
+            getRoleText,
+            // 新增的里程碑对话框相关
+            showMilestoneDialog,
+            milestoneDraft,
+            milestoneOptions,
+            addedMilestoneNames,
+            openMilestoneDialog,
+            closeMilestoneDialog,
+            confirmAddMilestone,
+            handleRemoveMilestone,
           };
         },
       })
-        .use(ElementPlus)
+        .use(ElementPlus, {
+          locale: window.ElementPlusLocaleZhCn || {
+            name: "zh-cn",
+            el: {
+              datepicker: {
+                now: "此刻",
+                today: "今天",
+                cancel: "取消",
+                clear: "清空",
+                confirm: "确认",
+                selectDate: "选择日期",
+                selectTime: "选择时间",
+                startDate: "开始日期",
+                startTime: "开始时间",
+                endDate: "结束日期",
+                endTime: "结束时间",
+                prevYear: "前一年",
+                nextYear: "后一年",
+                prevMonth: "上个月",
+                nextMonth: "下个月",
+                year: "年",
+                month1: "1月",
+                month2: "2月",
+                month3: "3月",
+                month4: "4月",
+                month5: "5月",
+                month6: "6月",
+                month7: "7月",
+                month8: "8月",
+                month9: "9月",
+                month10: "10月",
+                month11: "11月",
+                month12: "12月",
+                weeks: {
+                  sun: "日",
+                  mon: "一",
+                  tue: "二",
+                  wed: "三",
+                  thu: "四",
+                  fri: "五",
+                  sat: "六",
+                },
+                months: {
+                  jan: "一月",
+                  feb: "二月",
+                  mar: "三月",
+                  apr: "四月",
+                  may: "五月",
+                  jun: "六月",
+                  jul: "七月",
+                  aug: "八月",
+                  sep: "九月",
+                  oct: "十月",
+                  nov: "十一月",
+                  dec: "十二月",
+                },
+              },
+            },
+          },
+        })
         .mount("#app");
     </script>
   </body>

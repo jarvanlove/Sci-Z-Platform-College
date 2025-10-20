@@ -251,6 +251,115 @@
         font-size: 12px;
         margin-top: 4px;
       }
+
+      /* 自定义弹窗样式 */
+      .el-message-box {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-message-box__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #1f2937 !important;
+        line-height: 1.5 !important;
+      }
+
+      .el-message-box__headerbtn {
+        top: 16px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-message-box__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-message-box__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__content {
+        padding: 20px 24px !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__message {
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: #374151 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .el-message-box__btns {
+        padding: 16px 24px 20px 24px !important;
+        background: #ffffff !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 12px !important;
+      }
+
+      .el-message-box__btns .el-button {
+        padding: 8px 20px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        border: 1px solid !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .el-message-box__btns .el-button--default {
+        background: #ffffff !important;
+        border-color: #d1d5db !important;
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__btns .el-button--default:hover {
+        background: #f9fafb !important;
+        border-color: #9ca3af !important;
+        color: #374151 !important;
+      }
+
+      .el-message-box__btns .el-button--primary {
+        background: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+        color: #ffffff !important;
+      }
+
+      .el-message-box__btns .el-button--primary:hover {
+        background: #1e40af !important;
+        border-color: #1e40af !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+      }
+
+      .el-message-box__btns .el-button--primary:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+      }
+
+      /* 警告类型弹窗的特殊样式 */
+      .el-message-box--warning .el-message-box__content {
+        position: relative;
+      }
+
+      .el-message-box--warning .el-message-box__message::before {
+        content: "⚠️";
+        font-size: 18px !important;
+        margin-right: 8px !important;
+        vertical-align: -0.15em !important;
+        display: inline-block !important;
+      }
     </style>
   </head>
   <body>
@@ -444,18 +553,22 @@
           // 表单验证规则
           const rules = {
             researchDirection: [
-              { required: true, message: "研究方向不能为空", trigger: "blur" },
+              {
+                required: true,
+                message: "研究方向不能为空",
+                trigger: "submit",
+              },
               {
                 min: 10,
                 message: "研究方向至少需要10个字符",
-                trigger: "blur",
+                trigger: "submit",
               },
             ],
             researchField: [
               {
                 required: true,
                 message: "请至少选择一个研究领域",
-                trigger: "change",
+                trigger: "submit",
               },
             ],
           };
@@ -693,7 +806,7 @@
                 "确定要提交此申报吗？提交后将触发Dify工作流处理。",
                 "确认提交",
                 {
-                  confirmButtonText: "确定提交",
+                  confirmButtonText: "确定",
                   cancelButtonText: "取消",
                   type: "warning",
                 }
@@ -707,7 +820,7 @@
               ElMessage.success("申报提交成功！正在处理中...");
 
               // 清除草稿
-              localStorage.removeItem("declaration_draft");
+              clearDraft();
 
               // 跳转到申报详情页面
               setTimeout(() => {
@@ -746,7 +859,7 @@
               "确定要离开吗？未保存的内容将丢失。",
               "确认离开",
               {
-                confirmButtonText: "确定离开",
+                confirmButtonText: "确定",
                 cancelButtonText: "继续编辑",
                 type: "warning",
               }
@@ -769,6 +882,27 @@
               });
           };
 
+          // 清理草稿
+          const clearDraft = () => {
+            try {
+              localStorage.removeItem("declaration_draft");
+              // 清空表单
+              form.researchDirection = "";
+              form.researchField = [];
+              // 清空编辑器内容
+              if (editorContentRef.value) {
+                editorContentRef.value.innerText = "";
+              }
+              // 清空验证错误
+              formErrors.researchDirection = "";
+              formErrors.researchField = "";
+              formSuccess.researchDirection = false;
+              formSuccess.researchField = false;
+            } catch (error) {
+              console.error("清理草稿失败:", error);
+            }
+          };
+
           // 加载草稿
           const loadDraft = () => {
             try {
@@ -783,9 +917,9 @@
                   editorContentRef.value.innerText = form.researchDirection;
                 }
 
-                // 验证表单
-                validateResearchDirection();
-                validateResearchField();
+                // 不立即验证表单，只在用户提交时验证
+                // validateResearchDirection();
+                // validateResearchField();
 
                 ElMessage.info("已加载草稿内容");
               }
@@ -838,6 +972,7 @@
             handleSubmit,
             handleSaveDraft,
             handleBack,
+            clearDraft,
           };
         },
       })

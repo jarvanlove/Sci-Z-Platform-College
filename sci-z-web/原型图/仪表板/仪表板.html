@@ -31,19 +31,12 @@
         padding: 20px;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
         border: 1px solid #e5e7eb;
-        cursor: pointer;
-        transition: all 0.3s ease;
         height: 120px;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         text-align: center;
-      }
-
-      .stat-card:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        transform: translateY(-2px);
       }
 
       .stat-icon {
@@ -462,7 +455,6 @@
             :key="stat.type"
             class="stat-card"
             :class="`stat-${stat.type}`"
-            @click="handleStatClick(stat.type)"
           >
             <div class="stat-icon">{{ stat.icon }}</div>
             <div class="stat-value">{{ formatNumber(stat.value) }}</div>
@@ -1047,36 +1039,6 @@
             }
           };
 
-          // 统计卡片点击处理
-          const handleStatClick = (type) => {
-            const typeMap = {
-              total: "项目列表",
-              progress: "进行中项目",
-              pending: "验收列表",
-              completed: "已完成项目",
-            };
-
-            ElMessage.info(`跳转到${typeMap[type]}页面`);
-
-            // 检查是否在iframe中
-            if (window.parent !== window) {
-              const pathMap = {
-                total: "project/list",
-                progress: "project/list?status=progress",
-                pending: "acceptance/list",
-                completed: "project/list?status=completed",
-              };
-
-              window.parent.postMessage(
-                {
-                  type: "navigate",
-                  path: pathMap[type],
-                },
-                "*"
-              );
-            }
-          };
-
           // 申报点击处理
           const handleDeclarationClick = (row) => {
             ElMessage.info(`查看申报详情：${row.number}`);
@@ -1167,7 +1129,7 @@
               const pathMap = {
                 newDeclaration: "declaration/create",
                 createProject: "project/create",
-                applyAcceptance: "acceptance/apply",
+                applyAcceptance: "acceptance/list",
                 knowledgeSearch: "ai/knowledge",
               };
 
@@ -1197,7 +1159,6 @@
             getTodoTypeText,
             getPriorityText,
             getStatusStyle,
-            handleStatClick,
             handleDeclarationClick,
             handleViewAllDeclarations,
             handleProjectClick,

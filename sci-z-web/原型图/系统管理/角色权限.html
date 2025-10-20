@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>角色权限管理 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.3.14/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3.2.47/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.3.14"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.iife.js"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .role-management-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+      }
+
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0;
+      }
+
+      .content-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+      }
+
+      /* Loading 样式 */
+      .loading-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        color: #6b7280;
+        font-size: 14px;
+        gap: 12px;
+      }
+
+      .loading-container .el-icon {
+        font-size: 24px;
+      }
+
+      /* 表格样式 */
+      .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        margin-top: 20px;
+      }
+
+      .native-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #ffffff;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .native-table thead {
+        background: #f8fafc;
+      }
+
+      .native-table th {
+        padding: 14px 16px;
+        text-align: left;
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 2px solid #e5e7eb;
+        white-space: nowrap;
+      }
+
+      .native-table tbody tr {
+        transition: background-color 0.2s;
+      }
+
+      .native-table tbody tr:nth-child(even) {
+        background: #f9fafb;
+      }
+
+      .native-table tbody tr:hover {
+        background: #f0f9ff;
+      }
+
+      .native-table td {
+        padding: 12px 16px;
+        font-size: 14px;
+        color: #4b5563;
+        border-bottom: 1px solid #e5e7eb;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .native-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      /* 操作按钮 */
+      .action-btns {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .action-btn {
+        padding: 5px 12px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: none;
+        white-space: nowrap;
+      }
+
+      .btn-primary {
+        color: #1e3a8a;
+        border-color: #1e3a8a;
+      }
+
+      .btn-primary:hover {
+        background: #1e3a8a;
+        color: #ffffff;
+      }
+
+      .btn-primary-plain {
+        color: #1e3a8a;
+        background: #f0f9ff;
+        border-color: #bfdbfe;
+      }
+
+      .btn-primary-plain:hover {
+        background: #dbeafe;
+        border-color: #93c5fd;
+      }
+
+      .btn-danger {
+        color: #dc2626;
+        border-color: #dc2626;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+        color: #ffffff;
+      }
+
+      /* 统一弹窗样式 - 圆角设计 */
+      .el-dialog {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-dialog__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-dialog__title {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #1e3a8a !important;
+      }
+
+      .el-dialog__headerbtn {
+        top: 20px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-dialog__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-dialog__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-dialog__body {
+        padding: 20px 24px !important;
+        max-height: 600px;
+        overflow-y: auto;
+      }
+
+      .el-dialog__footer {
+        padding: 16px 24px 20px 24px !important;
+        border-top: 1px solid #f0f0f0 !important;
+      }
+
+      /* 统一 MessageBox 样式 */
+      .el-message-box {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-message-box__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #1e3a8a !important;
+        line-height: 1.5 !important;
+      }
+
+      .el-message-box__headerbtn {
+        top: 16px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-message-box__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-message-box__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__content {
+        padding: 20px 24px !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__message {
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: #374151 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .el-message-box__btns {
+        padding: 16px 24px 20px 24px !important;
+        background: #ffffff !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 12px !important;
+      }
+
+      /* 现代化按钮样式 */
+      .el-message-box__btns .el-button,
+      .el-dialog__footer .el-button {
+        padding: 8px 20px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        border: 1px solid !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .el-message-box__btns .el-button--default,
+      .el-dialog__footer .el-button--default {
+        background: #ffffff !important;
+        border-color: #d1d5db !important;
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__btns .el-button--default:hover,
+      .el-dialog__footer .el-button--default:hover {
+        background: #f9fafb !important;
+        border-color: #9ca3af !important;
+        color: #374151 !important;
+      }
+
+      .el-message-box__btns .el-button--primary,
+      .el-dialog__footer .el-button--primary {
+        background: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+        color: #ffffff !important;
+      }
+
+      .el-message-box__btns .el-button--primary:hover,
+      .el-dialog__footer .el-button--primary:hover {
+        background: #1e40af !important;
+        border-color: #1e40af !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+      }
+
+      .el-message-box__btns .el-button--primary:active,
+      .el-dialog__footer .el-button--primary:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+      }
+
+      /* 警告类型弹窗的特殊样式 */
+      .el-message-box--warning .el-message-box__content {
+        position: relative;
+      }
+
+      .el-message-box--warning .el-message-box__message::before {
+        content: "⚠️";
+        font-size: 18px !important;
+        margin-right: 8px !important;
+        vertical-align: -0.15em !important;
+        display: inline-block !important;
+      }
+
+      /* 表单样式 */
+      .role-form .el-form-item {
+        margin-bottom: 20px;
+      }
+
+      .role-form .el-form-item__label {
+        font-weight: 500;
+        color: #374151;
+      }
+
+      /* 权限树样式 */
+      .permission-tree-container {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 16px;
+        max-height: 400px;
+        overflow-y: auto;
+        background: #f9fafb;
+      }
+
+      .permission-tree-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .permission-tree-header > span {
+        color: #1e3a8a !important;
+      }
+
+      /* 当前角色文字颜色 */
+      .el-dialog__body > div > strong {
+        color: #1e3a8a !important;
+      }
+
+      /* 配置权限弹窗中的角色名称颜色 */
+      .el-dialog__body > div:first-child {
+        color: #1e3a8a !important;
+        font-weight: 600 !important;
+      }
+
+      /* 权限操作按钮悬浮效果 */
+      .permission-tree-header .el-button:hover {
+        color: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+      }
+
+      .permission-tree-search {
+        margin-bottom: 12px;
+      }
+
+      .el-tree {
+        background: transparent !important;
+      }
+
+      /* 树形选择框选中的对勾颜色 */
+      .el-tree .el-checkbox__input.is-checked .el-checkbox__inner {
+        background-color: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+      }
+
+      .el-tree .el-checkbox__input.is-indeterminate .el-checkbox__inner {
+        background-color: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+      }
+
+      .el-tree-node__content {
+        height: 32px;
+        line-height: 32px;
+        padding: 0 8px !important;
+        border-radius: 4px;
+      }
+
+      .el-tree-node__content:hover {
+        background: #e5e7eb;
+      }
+
+      .permission-node {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+      }
+
+      .permission-icon {
+        font-size: 14px;
+        color: #6b7280;
+      }
+
+      .permission-label {
+        font-size: 14px;
+        color: #374151;
+      }
+
+      .permission-code {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-left: 8px;
+      }
+
+      /* 分页容器 */
+      .pagination-wrapper {
+        margin-top: 20px;
+        display: flex;
+        justify-content: flex-end;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="role-management-container">
+        <!-- 页面头部 -->
+        <div class="page-header">
+          <h1 class="page-title">角色权限管理</h1>
+          <el-button type="primary" @click="handleAdd">
+            <el-icon><Plus /></el-icon>
+            新建角色
+          </el-button>
+        </div>
+
+        <!-- 内容卡片 -->
+        <div class="content-card">
+          <!-- 角色列表表格 -->
+          <div v-if="loading" class="loading-container">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>加载中...</span>
+          </div>
+
+          <!-- 原生HTML表格 -->
+          <div v-else class="table-wrapper">
+            <table class="native-table">
+              <thead>
+                <tr>
+                  <th style="width: 180px">角色名称</th>
+                  <th style="min-width: 250px">角色描述</th>
+                  <th style="width: 120px">用户数量</th>
+                  <th style="width: 180px">创建时间</th>
+                  <th style="width: 300px">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="role in roles" :key="role.id">
+                  <td>{{ role.name }}</td>
+                  <td :title="role.description">{{ role.description }}</td>
+                  <td style="text-align: center">{{ role.userCount }}</td>
+                  <td style="text-align: center">{{ role.createTime }}</td>
+                  <td>
+                    <div class="action-btns">
+                      <button
+                        class="action-btn btn-primary"
+                        @click="handleEdit(role)"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        class="action-btn btn-primary-plain"
+                        @click="handleConfigPermission(role)"
+                      >
+                        配置权限
+                      </button>
+                      <button
+                        class="action-btn btn-danger"
+                        @click="handleDelete(role)"
+                        :disabled="role.isSystem"
+                        :style="role.isSystem ? 'opacity: 0.5; cursor: not-allowed' : ''"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页 -->
+          <div v-if="roles.length > 0" class="pagination-container">
+            <!-- 通用分页组件 -->
+            <div id="pagination-component"></div>
+          </div>
+        </div>
+
+        <!-- 新建/编辑角色对话框 -->
+        <el-dialog
+          v-model="showRoleDialog"
+          :title="editMode ? '编辑角色' : '新建角色'"
+          width="600px"
+          @close="handleDialogClose"
+        >
+          <el-form
+            :model="roleForm"
+            :rules="roleRules"
+            ref="roleFormRef"
+            label-width="100px"
+            class="role-form"
+          >
+            <el-form-item label="角色名称" prop="name">
+              <el-input v-model="roleForm.name" placeholder="请输入角色名称" />
+            </el-form-item>
+
+            <el-form-item label="角色描述" prop="description">
+              <el-input
+                v-model="roleForm.description"
+                type="textarea"
+                :rows="3"
+                placeholder="请输入角色描述"
+              />
+            </el-form-item>
+
+            <el-form-item label="角色类型" prop="type">
+              <el-select
+                v-model="roleForm.type"
+                placeholder="请选择角色类型"
+                style="width: 100%"
+              >
+                <el-option label="系统角色" value="system" />
+                <el-option label="业务角色" value="business" />
+                <el-option label="自定义角色" value="custom" />
+              </el-select>
+            </el-form-item>
+          </el-form>
+
+          <template #footer>
+            <el-button @click="showRoleDialog = false">取消</el-button>
+            <el-button type="primary" @click="handleSubmit" :loading="saving">
+              确定
+            </el-button>
+          </template>
+        </el-dialog>
+
+        <!-- 配置权限对话框 -->
+        <el-dialog
+          v-model="showPermissionDialog"
+          title="配置权限"
+          width="700px"
+          @close="handlePermissionDialogClose"
+        >
+          <div style="margin-bottom: 16px">
+            <strong>当前角色：</strong>{{ currentRole.name }}
+          </div>
+
+          <div class="permission-tree-container">
+            <div class="permission-tree-header">
+              <span style="font-weight: 600; color: #374151">权限列表</span>
+              <div>
+                <el-button size="small" @click="handleExpandAll">
+                  全部展开
+                </el-button>
+                <el-button size="small" @click="handleCollapseAll">
+                  全部收起
+                </el-button>
+                <el-button size="small" @click="handleCheckAll">
+                  全选
+                </el-button>
+                <el-button size="small" @click="handleClearCheck">
+                  清空
+                </el-button>
+              </div>
+            </div>
+
+            <div class="permission-tree-search">
+              <el-input
+                v-model="permissionSearchKeyword"
+                placeholder="搜索权限名称"
+                clearable
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+            </div>
+
+            <el-tree
+              ref="permissionTreeRef"
+              :data="permissionTree"
+              :props="treeProps"
+              show-checkbox
+              node-key="id"
+              :default-checked-keys="checkedKeys"
+              :filter-node-method="filterNode"
+            >
+              <template #default="{ node, data }">
+                <div class="permission-node">
+                  <span class="permission-icon">
+                    {{ getPermissionIcon(data.type) }}
+                  </span>
+                  <span class="permission-label">{{ node.label }}</span>
+                  <span class="permission-code">{{ data.code }}</span>
+                </div>
+              </template>
+            </el-tree>
+          </div>
+
+          <template #footer>
+            <el-button @click="showPermissionDialog = false">取消</el-button>
+            <el-button
+              type="primary"
+              @click="handleSavePermission"
+              :loading="saving"
+            >
+              保存
+            </el-button>
+          </template>
+        </el-dialog>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, computed, watch, onMounted } = Vue;
+      const { ElMessage, ElMessageBox } = ElementPlus;
+      const { Plus, Search } = ElementPlusIconsVue;
+
+      const app = createApp({
+        components: {
+          Plus,
+          Search,
+        },
+        setup() {
+          const roleFormRef = ref();
+          const permissionTreeRef = ref();
+          const loading = ref(false);
+          const saving = ref(false);
+          const showRoleDialog = ref(false);
+          const showPermissionDialog = ref(false);
+          const editMode = ref(false);
+          const permissionSearchKeyword = ref("");
+
+          // 分页
+          const pagination = reactive({
+            current: 1,
+            size: 10,
+            total: 0,
+          });
+
+          // 角色列表数据
+          const roles = ref([
+            {
+              id: 1,
+              name: "系统管理员",
+              description: "拥有系统所有权限的超级管理员",
+              type: "system",
+              userCount: 2,
+              createTime: "2024-01-01 10:00:00",
+              isSystem: true,
+            },
+            {
+              id: 2,
+              name: "教师",
+              description: "可以创建和管理项目、申报科研项目",
+              type: "business",
+              userCount: 25,
+              createTime: "2024-01-05 14:30:00",
+              isSystem: false,
+            },
+            {
+              id: 3,
+              name: "学生",
+              description: "可以参与项目、查看项目信息",
+              type: "business",
+              userCount: 150,
+              createTime: "2024-01-05 14:35:00",
+              isSystem: false,
+            },
+            {
+              id: 4,
+              name: "审核员",
+              description: "负责审核项目申报和验收",
+              type: "custom",
+              userCount: 5,
+              createTime: "2024-02-10 09:00:00",
+              isSystem: false,
+            },
+          ]);
+
+          // 角色表单
+          const roleForm = reactive({
+            id: null,
+            name: "",
+            description: "",
+            type: "",
+          });
+
+          // 表单验证规则
+          const roleRules = {
+            name: [
+              { required: true, message: "请输入角色名称", trigger: "blur" },
+            ],
+            description: [
+              { required: true, message: "请输入角色描述", trigger: "blur" },
+            ],
+            type: [
+              { required: true, message: "请选择角色类型", trigger: "change" },
+            ],
+          };
+
+          // 当前编辑的角色
+          const currentRole = ref({});
+
+          // 权限树数据
+          const permissionTree = ref([
+            {
+              id: 1,
+              label: "系统管理",
+              code: "menu:system",
+              type: "menu",
+              children: [
+                {
+                  id: 11,
+                  label: "用户管理",
+                  code: "menu:system:user",
+                  type: "menu",
+                  children: [
+                    {
+                      id: 111,
+                      label: "查看用户",
+                      code: "btn:system:user:view",
+                      type: "button",
+                    },
+                    {
+                      id: 112,
+                      label: "新建用户",
+                      code: "btn:system:user:add",
+                      type: "button",
+                    },
+                    {
+                      id: 113,
+                      label: "编辑用户",
+                      code: "btn:system:user:edit",
+                      type: "button",
+                    },
+                    {
+                      id: 114,
+                      label: "删除用户",
+                      code: "btn:system:user:delete",
+                      type: "button",
+                    },
+                  ],
+                },
+                {
+                  id: 12,
+                  label: "角色权限",
+                  code: "menu:system:role",
+                  type: "menu",
+                  children: [
+                    {
+                      id: 121,
+                      label: "查看角色",
+                      code: "btn:system:role:view",
+                      type: "button",
+                    },
+                    {
+                      id: 122,
+                      label: "配置权限",
+                      code: "btn:system:role:permission",
+                      type: "button",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 2,
+              label: "项目管理",
+              code: "menu:project",
+              type: "menu",
+              children: [
+                {
+                  id: 21,
+                  label: "项目列表",
+                  code: "menu:project:list",
+                  type: "menu",
+                  children: [
+                    {
+                      id: 211,
+                      label: "查看项目",
+                      code: "btn:project:view",
+                      type: "button",
+                    },
+                    {
+                      id: 212,
+                      label: "新建项目",
+                      code: "btn:project:add",
+                      type: "button",
+                    },
+                    {
+                      id: 213,
+                      label: "编辑项目",
+                      code: "btn:project:edit",
+                      type: "button",
+                    },
+                    {
+                      id: 214,
+                      label: "删除项目",
+                      code: "btn:project:delete",
+                      type: "button",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 3,
+              label: "申报管理",
+              code: "menu:declare",
+              type: "menu",
+              children: [
+                {
+                  id: 31,
+                  label: "申报列表",
+                  code: "menu:declare:list",
+                  type: "menu",
+                  children: [
+                    {
+                      id: 311,
+                      label: "查看申报",
+                      code: "btn:declare:view",
+                      type: "button",
+                    },
+                    {
+                      id: 312,
+                      label: "新建申报",
+                      code: "btn:declare:add",
+                      type: "button",
+                    },
+                    {
+                      id: 313,
+                      label: "审核申报",
+                      code: "btn:declare:audit",
+                      type: "button",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 4,
+              label: "验收管理",
+              code: "menu:acceptance",
+              type: "menu",
+              children: [
+                {
+                  id: 41,
+                  label: "报告列表",
+                  code: "menu:acceptance:report",
+                  type: "menu",
+                  children: [
+                    {
+                      id: 411,
+                      label: "查看报告",
+                      code: "btn:acceptance:view",
+                      type: "button",
+                    },
+                    {
+                      id: 412,
+                      label: "生成报告",
+                      code: "btn:acceptance:generate",
+                      type: "button",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 5,
+              label: "用户中心",
+              code: "menu:user",
+              type: "menu",
+              children: [
+                {
+                  id: 51,
+                  label: "个人信息",
+                  code: "menu:user:profile",
+                  type: "menu",
+                },
+                {
+                  id: 52,
+                  label: "安全设置",
+                  code: "menu:user:security",
+                  type: "menu",
+                },
+              ],
+            },
+          ]);
+
+          // 树属性配置
+          const treeProps = {
+            label: "label",
+            children: "children",
+          };
+
+          // 已选中的权限
+          const checkedKeys = ref([]);
+
+          // 获取权限图标
+          const getPermissionIcon = (type) => {
+            const iconMap = {
+              menu: "📁",
+              button: "🔘",
+              data: "📊",
+              api: "🔌",
+            };
+            return iconMap[type] || "📄";
+          };
+
+          // 过滤节点
+          const filterNode = (value, data) => {
+            if (!value) return true;
+            return (
+              data.label.toLowerCase().includes(value.toLowerCase()) ||
+              data.code.toLowerCase().includes(value.toLowerCase())
+            );
+          };
+
+          // 监听搜索关键词
+          watch(permissionSearchKeyword, (val) => {
+            permissionTreeRef.value?.filter(val);
+          });
+
+          // 新建角色
+          const handleAdd = () => {
+            editMode.value = false;
+            resetForm();
+            showRoleDialog.value = true;
+          };
+
+          // 编辑角色
+          const handleEdit = (role) => {
+            editMode.value = true;
+            Object.assign(roleForm, { ...role });
+            showRoleDialog.value = true;
+          };
+
+          // 配置权限
+          const handleConfigPermission = (role) => {
+            currentRole.value = { ...role };
+            // 模拟加载该角色的权限
+            checkedKeys.value =
+              role.id === 1
+                ? [
+                    111, 112, 113, 114, 121, 122, 211, 212, 213, 214, 311, 312,
+                    313, 411, 412,
+                  ]
+                : [211, 311];
+            showPermissionDialog.value = true;
+          };
+
+          // 删除角色
+          const handleDelete = async (role) => {
+            if (role.isSystem) {
+              ElMessage.warning("系统角色不可删除");
+              return;
+            }
+
+            try {
+              await ElMessageBox.confirm(
+                `确定要删除角色 "${role.name}" 吗？此操作不可恢复。`,
+                "删除角色",
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+              const index = roles.value.findIndex((r) => r.id === role.id);
+              if (index > -1) {
+                roles.value.splice(index, 1);
+              }
+              ElMessage.success("删除成功");
+            } catch (error) {
+              // 用户取消
+            }
+          };
+
+          // 提交表单
+          const handleSubmit = async () => {
+            try {
+              await roleFormRef.value.validate();
+              saving.value = true;
+
+              // 模拟保存
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
+              if (editMode.value) {
+                // 编辑模式
+                const index = roles.value.findIndex(
+                  (r) => r.id === roleForm.id
+                );
+                if (index > -1) {
+                  Object.assign(roles.value[index], { ...roleForm });
+                }
+                ElMessage.success("角色信息更新成功");
+              } else {
+                // 新建模式
+                roles.value.push({
+                  ...roleForm,
+                  id: Date.now(),
+                  userCount: 0,
+                  createTime: new Date().toLocaleString("zh-CN"),
+                  isSystem: false,
+                });
+                ElMessage.success("角色创建成功");
+              }
+
+              saving.value = false;
+              showRoleDialog.value = false;
+            } catch (error) {
+              saving.value = false;
+              if (error !== "cancel") {
+                ElMessage.error("请完善表单信息");
+              }
+            }
+          };
+
+          // 保存权限
+          const handleSavePermission = async () => {
+            saving.value = true;
+
+            // 获取选中的权限
+            const checkedNodes = permissionTreeRef.value.getCheckedKeys();
+            console.log("已选中的权限：", checkedNodes);
+
+            // 模拟保存
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            ElMessage.success("权限配置保存成功");
+            saving.value = false;
+            showPermissionDialog.value = false;
+          };
+
+          // 展开所有节点
+          const handleExpandAll = () => {
+            const expandAllNodes = (nodes) => {
+              nodes.forEach((node) => {
+                permissionTreeRef.value.store.nodesMap[node.id].expanded = true;
+                if (node.children && node.children.length > 0) {
+                  expandAllNodes(node.children);
+                }
+              });
+            };
+            expandAllNodes(permissionTree.value);
+          };
+
+          // 收起所有节点
+          const handleCollapseAll = () => {
+            const collapseAllNodes = (nodes) => {
+              nodes.forEach((node) => {
+                permissionTreeRef.value.store.nodesMap[
+                  node.id
+                ].expanded = false;
+                if (node.children && node.children.length > 0) {
+                  collapseAllNodes(node.children);
+                }
+              });
+            };
+            collapseAllNodes(permissionTree.value);
+          };
+
+          // 全选
+          const handleCheckAll = () => {
+            const getAllKeys = (nodes) => {
+              let keys = [];
+              nodes.forEach((node) => {
+                keys.push(node.id);
+                if (node.children && node.children.length > 0) {
+                  keys = keys.concat(getAllKeys(node.children));
+                }
+              });
+              return keys;
+            };
+            permissionTreeRef.value.setCheckedKeys(
+              getAllKeys(permissionTree.value)
+            );
+          };
+
+          // 清空
+          const handleClearCheck = () => {
+            permissionTreeRef.value.setCheckedKeys([]);
+          };
+
+          // 重置表单
+          const resetForm = () => {
+            Object.assign(roleForm, {
+              id: null,
+              name: "",
+              description: "",
+              type: "",
+            });
+            if (roleFormRef.value) {
+              roleFormRef.value.resetFields();
+            }
+          };
+
+          // 对话框关闭
+          const handleDialogClose = () => {
+            resetForm();
+          };
+
+          // 权限对话框关闭
+          const handlePermissionDialogClose = () => {
+            currentRole.value = {};
+            checkedKeys.value = [];
+            permissionSearchKeyword.value = "";
+          };
+
+          // 初始化分页组件
+          const initPagination = () => {
+            const paginationContainer = document.getElementById(
+              "pagination-component"
+            );
+            if (paginationContainer) {
+              // 创建分页组件HTML
+              const paginationHTML = `
+                <div class="pagination-wrapper">
+                  <!-- 总数信息 -->
+                  <div class="pagination-info">
+                    共 ${pagination.total} 条记录
+                  </div>
+
+                  <!-- 每页显示数量 -->
+                  <div class="page-size-selector">
+                    每页显示
+                    <select id="page-size-select" class="page-size-select">
+                      <option value="10" ${
+                        pagination.size === 10 ? "selected" : ""
+                      }>10</option>
+                      <option value="20" ${
+                        pagination.size === 20 ? "selected" : ""
+                      }>20</option>
+                      <option value="50" ${
+                        pagination.size === 50 ? "selected" : ""
+                      }>50</option>
+                      <option value="100" ${
+                        pagination.size === 100 ? "selected" : ""
+                      }>100</option>
+                    </select>
+                    条
+                  </div>
+
+                  <!-- 分页控制器 -->
+                  <div class="pagination-controls">
+                    <!-- 上一页按钮 -->
+                    <a href="javascript:void(0)" class="page-btn ${
+                      pagination.current === 1 ? "disabled" : ""
+                    }" id="prev-btn">
+                      上一页
+                    </a>
+
+                    <!-- 页码按钮 -->
+                    <div class="page-nav" id="page-nav">
+                      ${generatePageButtons()}
+                    </div>
+
+                    <!-- 下一页按钮 -->
+                    <a href="javascript:void(0)" class="page-btn ${
+                      pagination.current ===
+                      Math.ceil(pagination.total / pagination.size)
+                        ? "disabled"
+                        : ""
+                    }" id="next-btn">
+                      下一页
+                    </a>
+                  </div>
+
+                  <!-- 快速跳转 -->
+                  <div class="page-jumper">
+                    跳至
+                    <input type="number" id="jump-input" value="${
+                      pagination.current
+                    }" min="1" max="${Math.ceil(
+                pagination.total / pagination.size
+              )}">
+                    页
+                    <button class="jump-btn" id="jump-btn">确定</button>
+                  </div>
+                </div>
+              `;
+
+              paginationContainer.innerHTML = paginationHTML;
+
+              // 绑定事件
+              bindPaginationEvents();
+            }
+          };
+
+          // 生成页码按钮
+          const generatePageButtons = () => {
+            const totalPages = Math.ceil(pagination.total / pagination.size);
+            const current = pagination.current;
+            const pagerCount = 7; // 显示的页码数量
+
+            let buttons = "";
+
+            if (totalPages <= pagerCount) {
+              // 总页数小于等于显示数量，显示所有页码
+              for (let i = 1; i <= totalPages; i++) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  i === current ? "active" : ""
+                }" data-page="${i}">${i}</a>`;
+              }
+            } else {
+              // 计算中间页码范围
+              const half = Math.floor(pagerCount / 2);
+              let start = Math.max(1, current - half);
+              let end = Math.min(totalPages, start + pagerCount - 1);
+
+              // 调整起始位置
+              if (end - start + 1 < pagerCount) {
+                start = Math.max(1, end - pagerCount + 1);
+              }
+
+              // 第一页
+              if (start > 1) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  1 === current ? "active" : ""
+                }" data-page="1">1</a>`;
+                if (start > 2) {
+                  buttons += '<span class="page-ellipsis">...</span>';
+                }
+              }
+
+              // 中间页码
+              for (let i = start; i <= end; i++) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  i === current ? "active" : ""
+                }" data-page="${i}">${i}</a>`;
+              }
+
+              // 最后一页
+              if (end < totalPages) {
+                if (end < totalPages - 1) {
+                  buttons += '<span class="page-ellipsis">...</span>';
+                }
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  totalPages === current ? "active" : ""
+                }" data-page="${totalPages}">${totalPages}</a>`;
+              }
+            }
+
+            return buttons;
+          };
+
+          // 绑定分页事件
+          const bindPaginationEvents = () => {
+            // 每页显示数量变化
+            const pageSizeSelect = document.getElementById("page-size-select");
+            if (pageSizeSelect) {
+              pageSizeSelect.addEventListener("change", (e) => {
+                pagination.size = parseInt(e.target.value);
+                pagination.current = 1;
+                initPagination();
+              });
+            }
+
+            // 上一页
+            const prevBtn = document.getElementById("prev-btn");
+            if (prevBtn) {
+              prevBtn.addEventListener("click", () => {
+                if (pagination.current > 1) {
+                  pagination.current--;
+                  initPagination();
+                }
+              });
+            }
+
+            // 下一页
+            const nextBtn = document.getElementById("next-btn");
+            if (nextBtn) {
+              nextBtn.addEventListener("click", () => {
+                const totalPages = Math.ceil(
+                  pagination.total / pagination.size
+                );
+                if (pagination.current < totalPages) {
+                  pagination.current++;
+                  initPagination();
+                }
+              });
+            }
+
+            // 页码点击
+            const pageNav = document.getElementById("page-nav");
+            if (pageNav) {
+              pageNav.addEventListener("click", (e) => {
+                if (
+                  e.target.classList.contains("page-btn") &&
+                  !e.target.classList.contains("active")
+                ) {
+                  const page = parseInt(e.target.getAttribute("data-page"));
+                  if (page) {
+                    pagination.current = page;
+                    initPagination();
+                  }
+                }
+              });
+            }
+
+            // 快速跳转
+            const jumpBtn = document.getElementById("jump-btn");
+            const jumpInput = document.getElementById("jump-input");
+            if (jumpBtn && jumpInput) {
+              jumpBtn.addEventListener("click", () => {
+                const page = parseInt(jumpInput.value);
+                const totalPages = Math.ceil(
+                  pagination.total / pagination.size
+                );
+                if (page >= 1 && page <= totalPages) {
+                  pagination.current = page;
+                  initPagination();
+                } else {
+                  ElMessage.warning("请输入有效的页码");
+                }
+              });
+
+              // 回车跳转
+              jumpInput.addEventListener("keyup", (e) => {
+                if (e.key === "Enter") {
+                  jumpBtn.click();
+                }
+              });
+            }
+          };
+
+          // 页面挂载后初始化分页
+          onMounted(() => {
+            pagination.total = roles.value.length;
+            Vue.nextTick(() => {
+              initPagination();
+            });
+          });
+
+          return {
+            roleFormRef,
+            permissionTreeRef,
+            loading,
+            saving,
+            showRoleDialog,
+            showPermissionDialog,
+            editMode,
+            permissionSearchKeyword,
+            roles,
+            roleForm,
+            roleRules,
+            currentRole,
+            permissionTree,
+            treeProps,
+            checkedKeys,
+            getPermissionIcon,
+            filterNode,
+            handleAdd,
+            handleEdit,
+            handleConfigPermission,
+            handleDelete,
+            handleSubmit,
+            handleSavePermission,
+            handleExpandAll,
+            handleCollapseAll,
+            handleCheckAll,
+            handleClearCheck,
+            handleDialogClose,
+            handlePermissionDialogClose,
+          };
+        },
+      });
+
+      // 注册 Element Plus Icons
+      for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+        app.component(key, component);
+      }
+
+      // 配置 Element Plus 中文
+      app.use(ElementPlus, {
+        locale: {
+          name: "zh-cn",
+          el: {
+            datepicker: {
+              now: "此刻",
+              today: "今天",
+              cancel: "取消",
+              clear: "清空",
+              confirm: "确认",
+            },
+          },
+        },
+      });
+
+      app.mount("#app");
+    </script>
+  </body>
+</html>

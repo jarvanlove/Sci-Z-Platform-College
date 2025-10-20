@@ -182,6 +182,7 @@
                     :prefix-icon="User"
                     clearable
                     @blur="validateUsername"
+                    @keydown.enter="handleLogin"
                   />
                   <div v-if="usernameError" class="error-message">
                     {{ usernameError }}
@@ -202,6 +203,7 @@
                     show-password
                     clearable
                     @blur="validatePassword"
+                    @keydown.enter="handleLogin"
                   />
                   <div v-if="passwordError" class="error-message">
                     {{ passwordError }}
@@ -221,6 +223,7 @@
                       class="captcha-input"
                       maxlength="4"
                       clearable
+                      @keydown.enter="handleLogin"
                     />
                     <div class="captcha-image" @click="refreshCaptcha">
                       <span v-if="!captchaUrl">点击获取</span>
@@ -255,6 +258,7 @@
                 size="large"
                 :loading="loading"
                 @click="handleLogin"
+                @keydown.enter="handleLogin"
               >
                 {{ loading ? '登录中...' : '登录' }}
               </el-button>

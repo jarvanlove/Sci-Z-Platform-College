@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>个人信息 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.iife.js"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .user-profile-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+      }
+
+      .page-header {
+        margin-bottom: 20px;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0;
+      }
+
+      .profile-content {
+        display: grid;
+        grid-template-columns: 3fr 1fr;
+        gap: 20px;
+      }
+
+      @media (max-width: 768px) {
+        .profile-content {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .info-card,
+      .avatar-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+      }
+
+      .card-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      /* 头像上传区域 */
+      .avatar-upload {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .avatar-container {
+        position: relative;
+        width: 120px;
+        height: 120px;
+      }
+
+      .avatar-display {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 2px solid #1e3a8a;
+        object-fit: cover;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+
+      .avatar-display:hover {
+        opacity: 0.8;
+        transform: scale(1.05);
+      }
+
+      .avatar-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s;
+        cursor: pointer;
+      }
+
+      .avatar-container:hover .avatar-overlay {
+        opacity: 1;
+      }
+
+      .avatar-overlay-text {
+        color: #ffffff;
+        font-size: 14px;
+        text-align: center;
+      }
+
+      .upload-tips {
+        text-align: center;
+        color: #6b7280;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .upload-tips p {
+        margin: 4px 0;
+      }
+
+      /* 表单样式 */
+      .el-form {
+        max-width: 600px;
+      }
+
+      .el-form-item {
+        margin-bottom: 20px;
+      }
+
+      .el-form-item__label {
+        width: 120px !important;
+        font-weight: 500;
+        color: #374151;
+      }
+
+      .readonly-input {
+        background-color: #f3f4f6 !important;
+        cursor: not-allowed;
+      }
+
+      .verify-button {
+        margin-left: 10px;
+      }
+
+      .success-icon {
+        color: #16a34a;
+        margin-left: 8px;
+      }
+
+      .error-text {
+        color: #dc2626;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+
+      .form-actions {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 32px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      /* 自定义弹窗样式 */
+      .el-message-box {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-message-box__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #1f2937 !important;
+        line-height: 1.5 !important;
+      }
+
+      .el-message-box__headerbtn {
+        top: 16px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-message-box__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-message-box__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__content {
+        padding: 20px 24px !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__message {
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: #374151 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .el-message-box__btns {
+        padding: 16px 24px 20px 24px !important;
+        background: #ffffff !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 12px !important;
+      }
+
+      .el-message-box__btns .el-button {
+        padding: 8px 20px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        border: 1px solid !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .el-message-box__btns .el-button--default {
+        background: #ffffff !important;
+        border-color: #d1d5db !important;
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__btns .el-button--default:hover {
+        background: #f9fafb !important;
+        border-color: #9ca3af !important;
+        color: #374151 !important;
+      }
+
+      .el-message-box__btns .el-button--primary {
+        background: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+        color: #ffffff !important;
+      }
+
+      .el-message-box__btns .el-button--primary:hover {
+        background: #1e40af !important;
+        border-color: #1e40af !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+      }
+
+      .el-message-box__btns .el-button--primary:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+      }
+
+      /* 警告类型弹窗的特殊样式 */
+      .el-message-box--warning .el-message-box__content {
+        position: relative;
+      }
+
+      .el-message-box--warning .el-message-box__message::before {
+        content: "⚠️";
+        font-size: 18px !important;
+        margin-right: 8px !important;
+        vertical-align: -0.15em !important;
+        display: inline-block !important;
+      }
+
+      /* Dialog 样式 */
+      .el-dialog {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-dialog__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-dialog__title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #1f2937 !important;
+      }
+
+      .el-dialog__body {
+        padding: 20px 24px !important;
+      }
+
+      .el-dialog__footer {
+        padding: 16px 24px 20px 24px !important;
+        border-top: 1px solid #f0f0f0 !important;
+      }
+
+      /* 图片裁剪预览 */
+      .crop-container {
+        width: 100%;
+        height: 400px;
+        background: #f3f4f6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .crop-preview {
+        max-width: 100%;
+        max-height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="user-profile-container">
+        <!-- 页面标题 -->
+        <div class="page-header">
+          <h1 class="page-title">个人信息管理</h1>
+        </div>
+
+        <!-- 内容区域 -->
+        <div class="profile-content">
+          <!-- 左侧：基本信息表单 -->
+          <div class="info-card">
+            <div class="card-title">基本信息</div>
+            <el-form
+              :model="userInfo"
+              :rules="rules"
+              ref="formRef"
+              label-width="120px"
+            >
+              <!-- 用户名 - 只读 -->
+              <el-form-item label="用户名" prop="username">
+                <el-input
+                  v-model="userInfo.username"
+                  readonly
+                  class="readonly-input"
+                >
+                  <template #suffix>
+                    <el-tooltip content="系统生成的唯一标识" placement="top">
+                      <el-icon><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </template>
+                </el-input>
+              </el-form-item>
+
+              <!-- 真实姓名 -->
+              <el-form-item label="真实姓名" prop="realName">
+                <el-input
+                  v-model="userInfo.realName"
+                  placeholder="请输入真实姓名"
+                  clearable
+                  @blur="validateField('realName')"
+                >
+                  <template #suffix v-if="validation.realName.success">
+                    <el-icon class="success-icon"><CircleCheck /></el-icon>
+                  </template>
+                </el-input>
+                <div v-if="validation.realName.error" class="error-text">
+                  {{ validation.realName.message }}
+                </div>
+              </el-form-item>
+
+              <!-- 邮箱 -->
+              <el-form-item label="邮箱" prop="email">
+                <el-input
+                  v-model="userInfo.email"
+                  placeholder="请输入邮箱地址"
+                  clearable
+                  @blur="validateField('email')"
+                >
+                  <template #suffix v-if="validation.email.success">
+                    <el-icon class="success-icon"><CircleCheck /></el-icon>
+                  </template>
+                  <template #append>
+                    <el-button
+                      :disabled="!userInfo.email || validation.email.error"
+                      @click="sendEmailVerification"
+                    >
+                      验证邮箱
+                    </el-button>
+                  </template>
+                </el-input>
+                <div v-if="validation.email.error" class="error-text">
+                  {{ validation.email.message }}
+                </div>
+                <div
+                  v-if="validation.email.loading"
+                  style="font-size: 12px; color: #6b7280; margin-top: 4px"
+                >
+                  <el-icon class="is-loading"><Loading /></el-icon>
+                  正在验证...
+                </div>
+              </el-form-item>
+
+              <!-- 手机号 -->
+              <el-form-item label="手机号" prop="phone">
+                <el-input
+                  v-model="userInfo.phone"
+                  placeholder="请输入手机号"
+                  clearable
+                  maxlength="11"
+                  @blur="validateField('phone')"
+                >
+                  <template #suffix v-if="validation.phone.success">
+                    <el-icon class="success-icon"><CircleCheck /></el-icon>
+                  </template>
+                  <template #append>
+                    <el-button
+                      :disabled="!userInfo.phone || validation.phone.error"
+                      @click="sendSMSVerification"
+                    >
+                      验证手机
+                    </el-button>
+                  </template>
+                </el-input>
+                <div v-if="validation.phone.error" class="error-text">
+                  {{ validation.phone.message }}
+                </div>
+                <div
+                  v-if="validation.phone.loading"
+                  style="font-size: 12px; color: #6b7280; margin-top: 4px"
+                >
+                  <el-icon class="is-loading"><Loading /></el-icon>
+                  正在验证...
+                </div>
+              </el-form-item>
+
+              <!-- 所属院系 -->
+              <el-form-item label="所属院系" prop="department">
+                <el-select
+                  v-model="userInfo.department"
+                  placeholder="请选择所属院系"
+                  filterable
+                  clearable
+                  style="width: 100%"
+                >
+                  <el-option
+                    v-for="dept in departments"
+                    :key="dept.value"
+                    :label="dept.label"
+                    :value="dept.value"
+                  />
+                </el-select>
+              </el-form-item>
+
+              <!-- 职称 -->
+              <el-form-item label="职称" prop="title">
+                <el-select
+                  v-model="userInfo.title"
+                  placeholder="请选择职称"
+                  filterable
+                  clearable
+                  style="width: 100%"
+                >
+                  <el-option
+                    v-for="title in titles"
+                    :key="title.value"
+                    :label="title.label"
+                    :value="title.value"
+                  />
+                </el-select>
+              </el-form-item>
+
+              <!-- 表单操作按钮 -->
+              <div class="form-actions">
+                <el-button
+                  type="primary"
+                  size="large"
+                  :loading="saving"
+                  @click="handleSave"
+                >
+                  <!-- <el-icon><Check /></el-icon> -->
+                  保存信息
+                </el-button>
+                <el-button size="large" @click="handleReset">
+                  <!-- <el-icon><Refresh /></el-icon> -->
+                  重置
+                </el-button>
+              </div>
+            </el-form>
+          </div>
+
+          <!-- 右侧：头像上传 -->
+          <div class="avatar-card">
+            <div class="card-title">头像管理</div>
+            <div class="avatar-upload">
+              <div class="avatar-container">
+                <img
+                  :src="userInfo.avatar || defaultAvatar"
+                  class="avatar-display"
+                  @click="openFileDialog"
+                />
+                <div class="avatar-overlay" @click="openFileDialog">
+                  <div class="avatar-overlay-text">
+                    <el-icon :size="24"><Upload /></el-icon>
+                    <div>点击上传</div>
+                  </div>
+                </div>
+              </div>
+
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/jpeg,image/png,image/gif"
+                style="display: none"
+                @change="handleFileSelect"
+              />
+
+              <div class="upload-tips">
+                <p>支持 JPG、PNG、GIF 格式</p>
+                <p>文件大小不超过 2MB</p>
+                <p>建议尺寸：200x200 像素</p>
+              </div>
+
+              <el-button type="primary" @click="openFileDialog">
+                <el-icon><Upload /></el-icon>
+                选择图片
+              </el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 图片裁剪对话框 -->
+        <el-dialog
+          v-model="showCropDialog"
+          title="裁剪头像"
+          width="600px"
+          @close="handleCropDialogClose"
+        >
+          <div class="crop-container">
+            <img v-if="cropImageSrc" :src="cropImageSrc" class="crop-preview" />
+          </div>
+          <template #footer>
+            <el-button @click="showCropDialog = false">取消</el-button>
+            <el-button type="primary" @click="handleCropConfirm">
+              确认上传
+            </el-button>
+          </template>
+        </el-dialog>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, onMounted } = Vue;
+      const { ElMessage, ElMessageBox } = ElementPlus;
+      const { InfoFilled, CircleCheck, Check, Refresh, Upload, Loading } =
+        ElementPlusIconsVue;
+
+      createApp({
+        components: {
+          InfoFilled,
+          CircleCheck,
+          Check,
+          Refresh,
+          Upload,
+          Loading,
+        },
+        setup() {
+          const formRef = ref();
+          const fileInput = ref();
+          const saving = ref(false);
+          const showCropDialog = ref(false);
+          const cropImageSrc = ref("");
+          const defaultAvatar = ref("../images/favicon.ico");
+
+          // 用户信息
+          const userInfo = reactive({
+            username: "admin",
+            realName: "管理员",
+            email: "admin@university.edu.cn",
+            phone: "13800138000",
+            department: "computer",
+            title: "professor",
+            avatar: "../images/favicon.ico",
+          });
+
+          // 院系列表
+          const departments = ref([
+            { label: "计算机科学学院", value: "computer" },
+            { label: "人工智能学院", value: "ai" },
+            { label: "软件学院", value: "software" },
+            { label: "信息工程学院", value: "information" },
+            { label: "数学学院", value: "math" },
+            { label: "物理学院", value: "physics" },
+          ]);
+
+          // 职称列表
+          const titles = ref([
+            { label: "教授", value: "professor" },
+            { label: "副教授", value: "associate_professor" },
+            { label: "讲师", value: "lecturer" },
+            { label: "助教", value: "assistant" },
+            { label: "研究员", value: "researcher" },
+          ]);
+
+          // 表单验证规则
+          const rules = {
+            realName: [
+              { required: true, message: "请输入真实姓名", trigger: "blur" },
+              {
+                min: 2,
+                max: 10,
+                message: "姓名长度应在2-10个字符之间",
+                trigger: "blur",
+              },
+            ],
+            email: [
+              { required: true, message: "请输入邮箱地址", trigger: "blur" },
+              {
+                type: "email",
+                message: "请输入正确的邮箱格式",
+                trigger: "blur",
+              },
+            ],
+            phone: [
+              { required: true, message: "请输入手机号", trigger: "blur" },
+              {
+                pattern: /^1[3-9]\d{9}$/,
+                message: "请输入正确的手机号格式",
+                trigger: "blur",
+              },
+            ],
+            department: [
+              { required: true, message: "请选择所属院系", trigger: "change" },
+            ],
+          };
+
+          // 验证状态
+          const validation = reactive({
+            realName: { error: false, success: false, message: "" },
+            email: {
+              error: false,
+              success: false,
+              message: "",
+              loading: false,
+            },
+            phone: {
+              error: false,
+              success: false,
+              message: "",
+              loading: false,
+            },
+          });
+
+          // 验证字段
+          const validateField = async (field) => {
+            validation[field].error = false;
+            validation[field].success = false;
+            validation[field].message = "";
+
+            switch (field) {
+              case "realName":
+                if (!userInfo.realName) {
+                  validation.realName.error = true;
+                  validation.realName.message = "请输入真实姓名";
+                } else if (
+                  userInfo.realName.length < 2 ||
+                  userInfo.realName.length > 10
+                ) {
+                  validation.realName.error = true;
+                  validation.realName.message = "姓名长度应在2-10个字符之间";
+                } else {
+                  validation.realName.success = true;
+                }
+                break;
+
+              case "email":
+                if (!userInfo.email) {
+                  validation.email.error = true;
+                  validation.email.message = "请输入邮箱地址";
+                } else if (
+                  !/^[\w-]+(\.[\w-]+)*@[\w-]+(\.[\w-]+)+$/.test(userInfo.email)
+                ) {
+                  validation.email.error = true;
+                  validation.email.message = "请输入正确的邮箱格式";
+                } else {
+                  // 异步验证唯一性
+                  validation.email.loading = true;
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                  validation.email.loading = false;
+                  validation.email.success = true;
+                }
+                break;
+
+              case "phone":
+                if (!userInfo.phone) {
+                  validation.phone.error = true;
+                  validation.phone.message = "请输入手机号";
+                } else if (!/^1[3-9]\d{9}$/.test(userInfo.phone)) {
+                  validation.phone.error = true;
+                  validation.phone.message = "请输入正确的手机号格式";
+                } else {
+                  // 异步验证唯一性
+                  validation.phone.loading = true;
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                  validation.phone.loading = false;
+                  validation.phone.success = true;
+                }
+                break;
+            }
+          };
+
+          // 发送邮箱验证
+          const sendEmailVerification = () => {
+            ElMessage.info("验证邮件已发送，请查收");
+          };
+
+          // 发送短信验证
+          const sendSMSVerification = () => {
+            ElMessage.info("验证短信已发送，请查收");
+          };
+
+          // 打开文件选择对话框
+          const openFileDialog = () => {
+            fileInput.value.click();
+          };
+
+          // 处理文件选择
+          const handleFileSelect = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // 验证文件类型
+            if (!["image/jpeg", "image/png", "image/gif"].includes(file.type)) {
+              ElMessage.error("只支持 JPG、PNG、GIF 格式的图片");
+              return;
+            }
+
+            // 验证文件大小
+            if (file.size > 2 * 1024 * 1024) {
+              ElMessage.error("图片大小不能超过 2MB");
+              return;
+            }
+
+            // 读取文件并显示预览
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              cropImageSrc.value = e.target.result;
+              showCropDialog.value = true;
+            };
+            reader.readAsDataURL(file);
+          };
+
+          // 处理裁剪对话框关闭
+          const handleCropDialogClose = () => {
+            cropImageSrc.value = "";
+            fileInput.value.value = "";
+          };
+
+          // 确认裁剪
+          const handleCropConfirm = async () => {
+            try {
+              ElMessage.success("头像上传成功");
+              userInfo.avatar = cropImageSrc.value;
+              showCropDialog.value = false;
+              cropImageSrc.value = "";
+              fileInput.value.value = "";
+            } catch (error) {
+              ElMessage.error("头像上传失败，请重试");
+            }
+          };
+
+          // 保存信息
+          const handleSave = async () => {
+            try {
+              await formRef.value.validate();
+
+              await ElMessageBox.confirm("确定要保存个人信息吗？", "确认保存", {
+                confirmButtonText: "确定",
+                cancelButtonText: "取消",
+                type: "warning",
+              });
+
+              saving.value = true;
+              // 模拟保存
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+              ElMessage.success("个人信息保存成功");
+              saving.value = false;
+            } catch (error) {
+              if (error !== "cancel") {
+                ElMessage.error("请完善表单信息");
+              }
+              saving.value = false;
+            }
+          };
+
+          // 重置表单
+          const handleReset = () => {
+            ElMessageBox.confirm(
+              "确定要重置表单吗？未保存的修改将丢失。",
+              "确认重置",
+              {
+                confirmButtonText: "确定",
+                cancelButtonText: "取消",
+                type: "warning",
+              }
+            )
+              .then(() => {
+                formRef.value.resetFields();
+                Object.keys(validation).forEach((key) => {
+                  validation[key].error = false;
+                  validation[key].success = false;
+                  validation[key].message = "";
+                });
+                ElMessage.info("表单已重置");
+              })
+              .catch(() => {});
+          };
+
+          onMounted(() => {
+            console.log("个人信息页面已加载");
+          });
+
+          return {
+            formRef,
+            fileInput,
+            saving,
+            showCropDialog,
+            cropImageSrc,
+            defaultAvatar,
+            userInfo,
+            departments,
+            titles,
+            rules,
+            validation,
+            validateField,
+            sendEmailVerification,
+            sendSMSVerification,
+            openFileDialog,
+            handleFileSelect,
+            handleCropDialogClose,
+            handleCropConfirm,
+            handleSave,
+            handleReset,
+          };
+        },
+      })
+        .use(ElementPlus)
+        .mount("#app");
+    </script>
+  </body>
+</html>

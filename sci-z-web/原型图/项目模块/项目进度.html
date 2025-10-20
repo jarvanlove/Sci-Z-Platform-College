@@ -416,6 +416,26 @@
         color: #9ca3af;
       }
 
+      /* 新增样式 */
+      .info-section {
+        padding: 16px;
+        background: #f8fafc;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+      }
+
+      .stat-card {
+        text-align: center;
+        padding: 12px;
+        background: #ffffff;
+        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+      }
+
+      .timeline-progress {
+        margin-top: 8px;
+      }
+
       /* 响应式设计 */
       @media (max-width: 768px) {
         .content-grid {
@@ -437,16 +457,12 @@
       <div class="project-progress-container">
         <!-- 页面头部 -->
         <div class="page-header">
-          <h1 class="page-title">项目进度</h1>
-          <div>
+          <div style="display: flex; align-items: center; gap: 16px">
             <el-button @click="handleBack">
               <el-icon><ArrowLeft /></el-icon>
-              返回详情
+              返回列表
             </el-button>
-            <el-button type="primary" @click="showAddDialog = true">
-              <el-icon><Plus /></el-icon>
-              添加里程碑
-            </el-button>
+            <h1 class="page-title">项目进度</h1>
           </div>
         </div>
 
@@ -457,117 +473,151 @@
         </div>
 
         <!-- 主要内容 -->
-        <div v-else class="content-grid">
-          <!-- 左侧：进度概览 -->
-          <div class="card">
+        <div v-else>
+          <!-- 项目概览 -->
+          <div class="card" style="margin-bottom: 20px">
             <div class="card-header">
-              <h2 class="card-title">进度概览</h2>
+              <h2 class="card-title">项目概览</h2>
             </div>
 
-            <div class="progress-overview">
-              <!-- 整体进度 -->
-              <div class="overall-progress">
-                <div class="progress-percentage">{{ overallProgress }}%</div>
-                <div class="progress-label">整体完成进度</div>
-                <div class="progress-bar-large">
-                  <div
-                    class="progress-fill-large"
-                    :style="{ width: overallProgress + '%' }"
-                  ></div>
-                </div>
-                <div class="progress-time">
-                  <span>开始时间：{{ projectStartTime }}</span>
-                  <span>预计完成：{{ projectEndTime }}</span>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 20px;
+              "
+            >
+              <!-- 项目基本信息 -->
+              <div class="info-section">
+                <h3
+                  style="
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: #374151;
+                    margin-bottom: 12px;
+                  "
+                >
+                  项目信息
+                </h3>
+                <div style="display: flex; flex-direction: column; gap: 8px">
+                  <div style="display: flex; justify-content: space-between">
+                    <span style="color: #6b7280">项目名称：</span>
+                    <span style="color: #111827; font-weight: 500"
+                      >{{ projectInfo.name }}</span
+                    >
+                  </div>
+                  <div style="display: flex; justify-content: space-between">
+                    <span style="color: #6b7280">项目编号：</span>
+                    <span style="color: #111827; font-weight: 500"
+                      >{{ projectInfo.number }}</span
+                    >
+                  </div>
+                  <div style="display: flex; justify-content: space-between">
+                    <span style="color: #6b7280">项目负责人：</span>
+                    <span style="color: #111827; font-weight: 500"
+                      >{{ projectInfo.manager }}</span
+                    >
+                  </div>
+                  <div style="display: flex; justify-content: space-between">
+                    <span style="color: #6b7280">项目状态：</span>
+                    <span
+                      class="status-tag"
+                      :class="`status-${projectInfo.status}`"
+                      >{{ getStatusText(projectInfo.status) }}</span
+                    >
+                  </div>
                 </div>
               </div>
 
               <!-- 进度统计 -->
-              <div class="progress-stats">
-                <div class="stat-item stat-completed">
-                  <div class="stat-number">{{ stats.completed }}</div>
-                  <div class="stat-label">已完成</div>
-                </div>
-                <div class="stat-item stat-progress">
-                  <div class="stat-number">{{ stats.progress }}</div>
-                  <div class="stat-label">进行中</div>
-                </div>
-                <div class="stat-item stat-planned">
-                  <div class="stat-number">{{ stats.planned }}</div>
-                  <div class="stat-label">未开始</div>
-                </div>
-                <div class="stat-item stat-delayed">
-                  <div class="stat-number">{{ stats.delayed }}</div>
-                  <div class="stat-label">已延期</div>
+              <div class="info-section">
+                <h3
+                  style="
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: #374151;
+                    margin-bottom: 12px;
+                  "
+                >
+                  进度统计
+                </h3>
+                <div
+                  style="
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 12px;
+                  "
+                >
+                  <div class="stat-card">
+                    <div
+                      style="font-size: 24px; font-weight: 700; color: #16a34a"
+                    >
+                      {{ stats.completed }}
+                    </div>
+                    <div style="font-size: 12px; color: #6b7280">已完成</div>
+                  </div>
+                  <div class="stat-card">
+                    <div
+                      style="font-size: 24px; font-weight: 700; color: #f59e0b"
+                    >
+                      {{ stats.progress }}
+                    </div>
+                    <div style="font-size: 12px; color: #6b7280">进行中</div>
+                  </div>
+                  <div class="stat-card">
+                    <div
+                      style="font-size: 24px; font-weight: 700; color: #2563eb"
+                    >
+                      {{ stats.planned }}
+                    </div>
+                    <div style="font-size: 12px; color: #6b7280">未开始</div>
+                  </div>
+                  <div class="stat-card">
+                    <div
+                      style="font-size: 24px; font-weight: 700; color: #dc2626"
+                    >
+                      {{ stats.delayed }}
+                    </div>
+                    <div style="font-size: 12px; color: #6b7280">已延期</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- 右侧：里程碑列表 -->
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">里程碑管理</h2>
-            </div>
-
-            <div v-if="milestones.length > 0" class="milestone-list">
-              <div
-                v-for="milestone in milestones"
-                :key="milestone.id"
-                class="milestone-item"
-                :class="milestone.status"
-              >
-                <div class="milestone-header">
-                  <div class="milestone-name">{{ milestone.name }}</div>
-                  <span :class="`milestone-status status-${milestone.status}`">
-                    {{ getStatusText(milestone.status) }}
-                  </span>
-                </div>
-
-                <div class="milestone-description">
-                  {{ milestone.description }}
-                </div>
-
-                <div class="milestone-progress">
-                  <div class="milestone-progress-bar">
+              <!-- 整体进度 -->
+              <div class="info-section">
+                <h3
+                  style="
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: #374151;
+                    margin-bottom: 12px;
+                  "
+                >
+                  整体进度
+                </h3>
+                <div style="text-align: center">
+                  <div
+                    style="
+                      font-size: 36px;
+                      font-weight: 700;
+                      color: #1e3a8a;
+                      margin-bottom: 8px;
+                    "
+                  >
+                    {{ overallProgress }}%
+                  </div>
+                  <div class="progress-bar-large" style="margin-bottom: 12px">
                     <div
-                      class="milestone-progress-fill"
-                      :class="milestone.status"
-                      :style="{ width: milestone.progress + '%' }"
+                      class="progress-fill-large"
+                      :style="{ width: overallProgress + '%' }"
                     ></div>
                   </div>
-                  <span class="milestone-progress-text"
-                    >{{ milestone.progress }}%</span
-                  >
-                </div>
-
-                <div class="milestone-time">
-                  <span>开始：{{ milestone.startTime }}</span>
-                  <span>结束：{{ milestone.endTime }}</span>
-                </div>
-
-                <div class="milestone-actions">
-                  <el-button
-                    size="small"
-                    @click="handleEditMilestone(milestone.id)"
-                  >
-                    编辑
-                  </el-button>
-                  <el-button
-                    size="small"
-                    type="danger"
-                    @click="handleDeleteMilestone(milestone.id)"
-                  >
-                    删除
-                  </el-button>
+                  <div style="font-size: 12px; color: #6b7280">
+                    <div>开始时间：{{ projectStartTime }}</div>
+                    <div>预计完成：{{ projectEndTime }}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <!-- 空状态 -->
-            <div v-else class="empty-state">
-              <div class="empty-state-icon">📅</div>
-              <div class="empty-state-text">暂无里程碑</div>
-              <div class="empty-state-hint">添加项目里程碑</div>
             </div>
           </div>
         </div>
@@ -594,6 +644,35 @@
                 <div class="timeline-description">
                   {{ milestone.description }}
                 </div>
+                <div class="timeline-progress">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      margin-top: 8px;
+                    "
+                  >
+                    <div
+                      style="
+                        flex: 1;
+                        height: 6px;
+                        background: #e5e7eb;
+                        border-radius: 3px;
+                        overflow: hidden;
+                      "
+                    >
+                      <div
+                        :class="`milestone-progress-fill ${milestone.status}`"
+                        :style="{ width: milestone.progress + '%' }"
+                      ></div>
+                    </div>
+                    <span
+                      style="font-size: 12px; color: #6b7280; min-width: 35px"
+                      >{{ milestone.progress }}%</span
+                    >
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -602,76 +681,9 @@
           <div v-else class="empty-state">
             <div class="empty-state-icon">📅</div>
             <div class="empty-state-text">暂无时间轴数据</div>
-            <div class="empty-state-hint">添加里程碑后显示时间轴</div>
+            <div class="empty-state-hint">项目里程碑将在此显示</div>
           </div>
         </div>
-
-        <!-- 添加里程碑对话框 -->
-        <el-dialog
-          v-model="showAddDialog"
-          title="添加里程碑"
-          width="600px"
-          :before-close="handleCloseDialog"
-        >
-          <div class="milestone-form">
-            <el-form :model="milestoneForm" label-width="100px">
-              <el-form-item label="里程碑名称" required>
-                <el-input
-                  v-model="milestoneForm.name"
-                  placeholder="请输入里程碑名称"
-                />
-              </el-form-item>
-
-              <el-form-item label="描述">
-                <el-input
-                  v-model="milestoneForm.description"
-                  type="textarea"
-                  :rows="3"
-                  placeholder="请输入里程碑描述"
-                />
-              </el-form-item>
-
-              <div class="form-row">
-                <el-form-item label="开始时间" required>
-                  <el-date-picker
-                    v-model="milestoneForm.startTime"
-                    type="date"
-                    placeholder="选择开始时间"
-                    style="width: 100%"
-                  />
-                </el-form-item>
-
-                <el-form-item label="结束时间" required>
-                  <el-date-picker
-                    v-model="milestoneForm.endTime"
-                    type="date"
-                    placeholder="选择结束时间"
-                    style="width: 100%"
-                  />
-                </el-form-item>
-              </div>
-
-              <el-form-item label="优先级">
-                <el-select
-                  v-model="milestoneForm.priority"
-                  placeholder="选择优先级"
-                  style="width: 100%"
-                >
-                  <el-option label="高" value="high" />
-                  <el-option label="中" value="medium" />
-                  <el-option label="低" value="low" />
-                </el-select>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <template #footer>
-            <el-button @click="handleCloseDialog">取消</el-button>
-            <el-button type="primary" @click="handleAddMilestone"
-              >确定</el-button
-            >
-          </template>
-        </el-dialog>
       </div>
     </div>
 
@@ -693,14 +705,6 @@
           // 响应式数据
           const loading = ref(false);
           const milestones = ref([]);
-          const showAddDialog = ref(false);
-          const milestoneForm = ref({
-            name: "",
-            description: "",
-            startTime: "",
-            endTime: "",
-            priority: "medium",
-          });
 
           // 计算属性
           const overallProgress = ref(0);
@@ -713,12 +717,133 @@
             delayed: 0,
           });
 
-          // 模拟里程碑数据
+          // 项目信息（从外部传入）
+          const projectInfo = ref({
+            name: "基于人工智能的智能诊断系统研究",
+            number: "PRJ-2024-001",
+            manager: "张教授",
+            status: "progress",
+          });
+
+          // 生成里程碑数据（基于传入的进度百分比动态生成）
+          const generateMilestonesFromProgress = (progress) => {
+            const baseMilestones = [
+              {
+                id: 1,
+                name: "项目启动：建设方案通过审核并备案",
+                description:
+                  "项目启动阶段，完成建设方案的制定、审核和备案工作，确保项目合法合规进行",
+                startTime: "2024-01-15",
+                endTime: "2024-01-31",
+              },
+              {
+                id: 2,
+                name: "任务分解与资源准备：项目任务书下达，资源配置完成，进入实施阶段",
+                description:
+                  "完成项目任务分解，下达项目任务书，完成人员、设备等资源配置，正式进入项目实施阶段",
+                startTime: "2024-02-01",
+                endTime: "2024-02-15",
+              },
+              {
+                id: 3,
+                name: "项目实施与过程管理：中期检查",
+                description:
+                  "项目实施阶段，进行中期检查，评估项目进展，确保项目按计划推进",
+                startTime: "2024-02-16",
+                endTime: "2024-04-15",
+              },
+              {
+                id: 4,
+                name: "成果整合与结题准备：结题验收",
+                description: "整合项目成果，准备结题材料，进行项目结题验收工作",
+                startTime: "2024-04-16",
+                endTime: "2024-05-31",
+              },
+              {
+                id: 5,
+                name: "后续管理与成果转化：项目归档完成，成果转化",
+                description:
+                  "完成项目归档工作，推进成果转化应用，确保项目价值的最大化实现",
+                startTime: "2024-06-01",
+                endTime: "2024-06-30",
+              },
+            ];
+
+            // 根据进度百分比分配里程碑状态和进度
+            return baseMilestones.map((milestone, index) => {
+              let status, milestoneProgress;
+
+              if (progress >= 80) {
+                // 80%以上：前4个已完成，第5个进行中
+                if (index < 4) {
+                  status = "completed";
+                  milestoneProgress = 100;
+                } else {
+                  status = "progress";
+                  milestoneProgress = Math.min(100, (progress - 80) * 5);
+                }
+              } else if (progress >= 60) {
+                // 60-80%：前3个已完成，第4个进行中，第5个未开始
+                if (index < 3) {
+                  status = "completed";
+                  milestoneProgress = 100;
+                } else if (index === 3) {
+                  status = "progress";
+                  milestoneProgress = Math.min(100, (progress - 60) * 5);
+                } else {
+                  status = "planned";
+                  milestoneProgress = 0;
+                }
+              } else if (progress >= 40) {
+                // 40-60%：前2个已完成，第3个进行中，后2个未开始
+                if (index < 2) {
+                  status = "completed";
+                  milestoneProgress = 100;
+                } else if (index === 2) {
+                  status = "progress";
+                  milestoneProgress = Math.min(100, (progress - 40) * 5);
+                } else {
+                  status = "planned";
+                  milestoneProgress = 0;
+                }
+              } else if (progress >= 20) {
+                // 20-40%：第1个已完成，第2个进行中，后3个未开始
+                if (index === 0) {
+                  status = "completed";
+                  milestoneProgress = 100;
+                } else if (index === 1) {
+                  status = "progress";
+                  milestoneProgress = Math.min(100, (progress - 20) * 5);
+                } else {
+                  status = "planned";
+                  milestoneProgress = 0;
+                }
+              } else {
+                // 20%以下：第1个进行中，其他未开始
+                if (index === 0) {
+                  status = "progress";
+                  milestoneProgress = Math.min(100, progress * 5);
+                } else {
+                  status = "planned";
+                  milestoneProgress = 0;
+                }
+              }
+
+              return {
+                ...milestone,
+                status,
+                progress: milestoneProgress,
+              };
+            });
+          };
+
+          // 模拟里程碑数据（基于新建项目.html中的5个里程碑）
           const mockMilestones = [
             {
               id: 1,
-              name: "需求分析完成",
-              description: "完成项目需求调研和分析，确定技术方案",
+              name: "项目启动：建设方案通过审核并备案",
+              description:
+                "项目启动阶段，完成建设方案的制定、审核和备案工作，确保项目合法合规进行",
               status: "completed",
               progress: 100,
               startTime: "2024-01-15",
@@ -726,8 +851,9 @@
             },
             {
               id: 2,
-              name: "系统设计完成",
-              description: "完成系统架构设计和数据库设计",
+              name: "任务分解与资源准备：项目任务书下达，资源配置完成，进入实施阶段",
+              description:
+                "完成项目任务分解，下达项目任务书，完成人员、设备等资源配置，正式进入项目实施阶段",
               status: "completed",
               progress: 100,
               startTime: "2024-02-01",
@@ -735,29 +861,31 @@
             },
             {
               id: 3,
-              name: "核心功能开发",
-              description: "开发系统核心功能模块",
+              name: "项目实施与过程管理：中期检查",
+              description:
+                "项目实施阶段，进行中期检查，评估项目进展，确保项目按计划推进",
               status: "progress",
-              progress: 65,
+              progress: 75,
               startTime: "2024-02-16",
               endTime: "2024-04-15",
             },
             {
               id: 4,
-              name: "系统测试",
-              description: "进行系统功能测试和性能测试",
+              name: "成果整合与结题准备：结题验收",
+              description: "整合项目成果，准备结题材料，进行项目结题验收工作",
               status: "planned",
               progress: 0,
               startTime: "2024-04-16",
-              endTime: "2024-05-15",
+              endTime: "2024-05-31",
             },
             {
               id: 5,
-              name: "项目验收",
-              description: "项目最终验收和交付",
+              name: "后续管理与成果转化：项目归档完成，成果转化",
+              description:
+                "完成项目归档工作，推进成果转化应用，确保项目价值的最大化实现",
               status: "planned",
               progress: 0,
-              startTime: "2024-05-16",
+              startTime: "2024-06-01",
               endTime: "2024-06-30",
             },
           ];
@@ -773,35 +901,187 @@
             return statusMap[status] || "未知";
           };
 
-          // 计算整体进度
+          // 计算整体进度（基于传入的进度百分比）
           const calculateOverallProgress = () => {
-            if (milestones.value.length === 0) {
-              overallProgress.value = 0;
+            // 如果已经有进度值，不要覆盖
+            if (overallProgress.value > 0) {
+              console.log("使用已有的进度值:", overallProgress.value);
               return;
             }
 
-            const totalProgress = milestones.value.reduce((sum, milestone) => {
-              return sum + milestone.progress;
-            }, 0);
+            // 检查URL参数
+            const params = new URLSearchParams(window.location.search);
+            const progressFromURL = params.get("progress");
 
-            overallProgress.value = Math.round(
-              totalProgress / milestones.value.length
-            );
+            if (progressFromURL) {
+              // 如果已经有URL传入的进度值，不要覆盖
+              console.log("使用URL传入的进度值:", overallProgress.value);
+              return;
+            } else {
+              // 否则根据里程碑计算
+              if (milestones.value.length === 0) {
+                overallProgress.value = 0;
+                return;
+              }
+
+              const totalProgress = milestones.value.reduce(
+                (sum, milestone) => {
+                  return sum + milestone.progress;
+                },
+                0
+              );
+
+              overallProgress.value = Math.round(
+                totalProgress / milestones.value.length
+              );
+            }
           };
 
-          // 计算统计数据
+          // 计算统计数据（基于传入的进度百分比动态计算）
           const calculateStats = () => {
-            stats.value = {
-              completed: milestones.value.filter(
-                (m) => m.status === "completed"
-              ).length,
-              progress: milestones.value.filter((m) => m.status === "progress")
-                .length,
-              planned: milestones.value.filter((m) => m.status === "planned")
-                .length,
-              delayed: milestones.value.filter((m) => m.status === "delayed")
-                .length,
-            };
+            // 直接使用当前的overallProgress值
+            const progress = overallProgress.value;
+            console.log("根据当前进度计算统计数据:", progress);
+
+            if (progress >= 80) {
+              stats.value = {
+                completed: 4,
+                progress: 1,
+                planned: 0,
+                delayed: 0,
+              };
+            } else if (progress >= 60) {
+              stats.value = {
+                completed: 3,
+                progress: 1,
+                planned: 2,
+                delayed: 0,
+              };
+            } else if (progress >= 40) {
+              stats.value = {
+                completed: 2,
+                progress: 1,
+                planned: 2,
+                delayed: 0,
+              };
+            } else if (progress >= 20) {
+              stats.value = {
+                completed: 1,
+                progress: 1,
+                planned: 3,
+                delayed: 0,
+              };
+            } else {
+              stats.value = {
+                completed: 0,
+                progress: 1,
+                planned: 4,
+                delayed: 0,
+              };
+            }
+          };
+
+          // 存储从外部传入的项目数据
+          // 移除externalProjectData变量，直接使用Vue响应式数据
+
+          // 解析URL参数获取项目数据
+          const getProjectDataFromURL = () => {
+            const params = new URLSearchParams(window.location.search);
+            const projectId = params.get("id");
+            const progress = params.get("progress");
+            const name = params.get("name");
+            const number = params.get("number");
+            const manager = params.get("manager");
+            const status = params.get("status");
+
+            if (projectId && progress) {
+              // 直接更新Vue响应式数据
+              projectInfo.value = {
+                name: name || "基于人工智能的智能诊断系统研究",
+                number: number || "PRJ-2024-001",
+                manager: manager || "张教授",
+                status: status || "progress",
+              };
+
+              // 直接设置整体进度
+              overallProgress.value = parseInt(progress) || 0;
+              console.log("从URL设置进度:", overallProgress.value);
+
+              return true; // 表示有URL参数
+            }
+            return false; // 表示没有URL参数
+          };
+
+          // 监听iframe消息
+          const handleIframeMessage = (event) => {
+            console.log("收到iframe消息:", event.data);
+            if (
+              event.data &&
+              event.data.type === "navigate" &&
+              event.data.path === "project/progress"
+            ) {
+              const params = event.data.params;
+              if (params) {
+                console.log("收到iframe参数:", params);
+
+                // 直接更新Vue响应式数据
+                projectInfo.value = {
+                  name: params.name || "基于人工智能的智能诊断系统研究",
+                  number: params.number || "PRJ-2024-001",
+                  manager: params.manager || "张教授",
+                  status: params.status || "progress",
+                };
+
+                // 直接设置整体进度
+                overallProgress.value = parseInt(params.progress) || 0;
+                console.log("直接设置进度:", overallProgress.value);
+
+                // 根据进度生成里程碑数据
+                milestones.value = generateMilestonesFromProgress(
+                  overallProgress.value
+                );
+
+                // 计算统计数据
+                calculateStats();
+
+                console.log("最终进度值:", overallProgress.value);
+                console.log("最终统计数据:", stats.value);
+              }
+            }
+          };
+
+          // 加载里程碑数据（不重新计算整体进度）
+          const loadMilestonesWithoutRecalculatingProgress = async () => {
+            loading.value = true;
+            try {
+              // 模拟API调用
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
+              // 检查URL参数
+              const params = new URLSearchParams(window.location.search);
+              const progressFromURL = params.get("progress");
+
+              if (progressFromURL) {
+                const progress = parseInt(progressFromURL);
+                console.log("从URL动态生成里程碑数据，进度:", progress);
+                milestones.value = generateMilestonesFromProgress(progress);
+                overallProgress.value = progress;
+              } else {
+                console.log("使用默认里程碑数据");
+                milestones.value = mockMilestones;
+              }
+
+              // 只计算统计数据，不重新计算整体进度
+              calculateStats();
+
+              console.log("最终进度值:", overallProgress.value);
+              console.log("最终统计数据:", stats.value);
+              console.log("最终里程碑数据:", milestones.value);
+            } catch (error) {
+              ElMessage.error("加载里程碑数据失败");
+            } finally {
+              loading.value = false;
+            }
           };
 
           // 加载里程碑数据
@@ -811,113 +1091,92 @@
               // 模拟API调用
               await new Promise((resolve) => setTimeout(resolve, 1000));
 
-              milestones.value = mockMilestones;
-              calculateOverallProgress();
+              // 检查URL参数
+              const params = new URLSearchParams(window.location.search);
+              const progressFromURL = params.get("progress");
+
+              if (progressFromURL) {
+                const progress = parseInt(progressFromURL);
+                console.log("从URL动态生成里程碑数据，进度:", progress);
+                milestones.value = generateMilestonesFromProgress(progress);
+                overallProgress.value = progress;
+              } else {
+                console.log("使用默认里程碑数据");
+                milestones.value = mockMilestones;
+              }
+
+              // 先计算统计数据，再计算整体进度
               calculateStats();
+              calculateOverallProgress();
+
+              console.log("最终进度值:", overallProgress.value);
+              console.log("最终统计数据:", stats.value);
+              console.log("最终里程碑数据:", milestones.value);
             } catch (error) {
+              console.error("加载里程碑数据失败:", error);
               ElMessage.error("加载里程碑数据失败");
             } finally {
               loading.value = false;
             }
           };
 
-          // 返回详情页
+          // 返回列表页
           const handleBack = () => {
-            ElMessage.info("返回项目详情");
+            ElMessage.info("返回项目列表");
             // 检查是否在iframe中
             if (window.parent !== window) {
               window.parent.postMessage(
                 {
                   type: "navigate",
-                  path: "project/detail",
+                  path: "project/list",
                 },
                 "*"
               );
             } else {
-              window.location.href = "项目详情.html";
+              window.location.href = "项目列表.html";
             }
-          };
-
-          // 编辑里程碑
-          const handleEditMilestone = (milestoneId) => {
-            ElMessage.info(`编辑里程碑: ${milestoneId}`);
-            // 这里应该打开编辑里程碑对话框
-          };
-
-          // 删除里程碑
-          const handleDeleteMilestone = async (milestoneId) => {
-            try {
-              await ElMessageBox.confirm(
-                "确定要删除这个里程碑吗？",
-                "确认删除",
-                {
-                  confirmButtonText: "确定",
-                  cancelButtonText: "取消",
-                  type: "warning",
-                }
-              );
-
-              ElMessage.success("里程碑删除成功");
-              // 这里应该调用API删除里程碑
-              loadMilestones();
-            } catch (error) {
-              // 用户取消删除
-            }
-          };
-
-          // 关闭对话框
-          const handleCloseDialog = () => {
-            showAddDialog.value = false;
-            milestoneForm.value = {
-              name: "",
-              description: "",
-              startTime: "",
-              endTime: "",
-              priority: "medium",
-            };
-          };
-
-          // 添加里程碑
-          const handleAddMilestone = () => {
-            if (!milestoneForm.value.name.trim()) {
-              ElMessage.warning("请输入里程碑名称");
-              return;
-            }
-
-            if (
-              !milestoneForm.value.startTime ||
-              !milestoneForm.value.endTime
-            ) {
-              ElMessage.warning("请选择开始时间和结束时间");
-              return;
-            }
-
-            ElMessage.success("里程碑添加成功");
-            handleCloseDialog();
-            loadMilestones();
           };
 
           // 组件挂载时加载数据
           onMounted(() => {
             console.log("项目进度页面加载中...");
-            loadMilestones();
+            console.log("当前URL:", window.location.href);
+            console.log(
+              "URL参数:",
+              new URLSearchParams(window.location.search).toString()
+            );
+
+            // 监听iframe消息
+            window.addEventListener("message", handleIframeMessage);
+
+            // 先尝试获取URL参数
+            const hasURLParams = getProjectDataFromURL();
+
+            // 如果没有URL参数，延迟加载默认数据，给iframe消息留出时间
+            if (!hasURLParams) {
+              console.log("没有URL参数，延迟加载默认数据");
+              setTimeout(() => {
+                // 检查是否已经通过iframe消息设置了数据
+                if (overallProgress.value === 0) {
+                  console.log("iframe消息未到达，使用默认数据");
+                  loadMilestones();
+                } else {
+                  console.log("iframe消息已处理，跳过默认数据");
+                }
+              }, 200);
+            }
           });
 
           return {
             loading,
             milestones,
-            showAddDialog,
-            milestoneForm,
             overallProgress,
             projectStartTime,
             projectEndTime,
             stats,
+            projectInfo,
             getStatusText,
             handleBack,
-            handleEditMilestone,
-            handleDeleteMilestone,
-            handleCloseDialog,
-            handleAddMilestone,
           };
         },
       })
