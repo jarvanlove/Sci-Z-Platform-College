@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>组件-顶部用户菜单</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <link rel="stylesheet" href="样式.css" />
+  </head>
+  <body>
+    <div id="app" class="card" style="margin: 24px">
+      <div
+        style="
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+          align-items: center;
+        "
+      >
+        <el-input
+          v-model="kw"
+          placeholder="全局搜索"
+          size="small"
+          style="width: 220px"
+        />
+        <el-badge :value="3"
+          ><el-button text @click="message('暂无新消息')"
+            >消息</el-button
+          ></el-badge
+        >
+        <el-dropdown>
+          <span class="el-dropdown-link"
+            ><el-avatar size="small">U</el-avatar></span
+          >
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="message('个人信息')"
+                >个人信息</el-dropdown-item
+              >
+              <el-dropdown-item @click="message('安全设置')"
+                >安全设置</el-dropdown-item
+              >
+              <el-dropdown-item divided @click="message('退出登录')"
+                >退出登录</el-dropdown-item
+              >
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
+    </div>
+    <script>
+      const { createApp, ref } = Vue;
+      createApp({
+        setup() {
+          const kw = ref("");
+          const message = (t) => ElMessage.info(t);
+          return { kw, message };
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>

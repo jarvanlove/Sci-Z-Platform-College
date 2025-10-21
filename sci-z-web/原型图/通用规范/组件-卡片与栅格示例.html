@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>组件-卡片与栅格示例</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <link rel="stylesheet" href="样式.css" />
+  </head>
+  <body>
+    <div id="app" class="content">
+      <el-row :gutter="16">
+        <el-col :span="6"><div class="card">统计卡 1</div></el-col>
+        <el-col :span="6"><div class="card">统计卡 2</div></el-col>
+        <el-col :span="6"><div class="card">统计卡 3</div></el-col>
+        <el-col :span="6"><div class="card">统计卡 4</div></el-col>
+      </el-row>
+      <div style="height: 16px"></div>
+      <div class="card">内容卡片</div>
+    </div>
+    <script>
+      Vue.createApp({}).mount("#app");
+    </script>
+  </body>
+</html>

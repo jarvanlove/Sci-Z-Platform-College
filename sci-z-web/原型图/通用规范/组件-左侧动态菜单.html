@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>组件-左侧动态菜单</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue/dist/index.iife.js"></script>
+    <link rel="stylesheet" href="样式.css" />
+    <style>
+      /* 菜单字体区分样式 - 使用圆润字体 */
+      .el-menu .el-sub-menu__title {
+        font-family: "Inter", "SF Pro Display", -apple-system,
+          BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+          sans-serif !important;
+        font-size: 15px !important;
+        font-weight: 400 !important;
+        color: #374151 !important;
+        padding: 0 20px !important;
+        height: 48px !important;
+        line-height: 48px !important;
+        letter-spacing: 0.01em !important;
+      }
+
+      .el-menu .el-sub-menu__title:hover {
+        background-color: #f8fafc !important;
+        color: #1e3a8a !important;
+      }
+
+      .el-menu .el-menu-item {
+        font-size: 12px !important;
+        font-weight: 400 !important;
+        color: #6b7280 !important;
+        padding: 0 20px 0 56px !important;
+        height: 40px !important;
+        line-height: 40px !important;
+        margin: 2px 8px !important;
+        border-radius: 6px !important;
+      }
+
+      .el-menu .el-menu-item:hover {
+        background-color: #f0f9ff !important;
+        color: #1e3a8a !important;
+      }
+
+      .el-menu .el-menu-item.is-active {
+        background-color: #1e3a8a !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        border-radius: 12px !important;
+        margin: 2px 8px !important;
+      }
+
+      .el-menu .el-menu-item .el-icon {
+        margin-right: 8px !important;
+        font-size: 16px !important;
+      }
+
+      .el-menu .el-sub-menu__title .el-icon {
+        margin-right: 8px !important;
+        font-size: 16px !important;
+      }
+
+      /* 一级菜单项样式（如仪表板） */
+      .el-menu .el-menu-item:not(.el-sub-menu__title) {
+        font-family: "Inter", "SF Pro Display", -apple-system,
+          BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+          sans-serif !important;
+        font-size: 15px !important;
+        font-weight: 400 !important;
+        color: #374151 !important;
+        padding: 0 20px !important;
+        height: 48px !important;
+        line-height: 48px !important;
+        letter-spacing: 0.01em !important;
+        margin: 2px 8px !important;
+        border-radius: 6px !important;
+      }
+
+      /* 一级菜单项悬停效果 */
+      .el-menu .el-menu-item:not(.el-sub-menu__title):hover {
+        background-color: #f8fafc !important;
+        color: #1e3a8a !important;
+      }
+
+      /* 一级菜单项选中状态 */
+      .el-menu .el-menu-item:not(.el-sub-menu__title).is-active {
+        background-color: #1e3a8a !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        border-radius: 12px !important;
+        margin: 2px 8px !important;
+      }
+
+      .el-menu {
+        border-right: none !important;
+        overflow-x: hidden !important;
+      }
+
+      /* 隐藏水平滚动条 */
+      .aside {
+        overflow-x: hidden !important;
+      }
+
+      .el-menu--collapse {
+        overflow-x: hidden !important;
+      }
+
+      /* 折叠按钮样式 */
+      .menu-toggle-btn {
+        position: absolute;
+        top: 60px;
+        right: -15px;
+        width: 30px;
+        height: 30px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s;
+        z-index: 1000;
+      }
+
+      .menu-toggle-btn:hover {
+        background: #f8fafc;
+        border-color: #1e3a8a;
+        color: #1e3a8a;
+      }
+
+      .menu-toggle-btn .el-icon {
+        font-size: 14px;
+        transition: transform 0.3s;
+      }
+
+      /* 侧边栏容器 */
+      .aside {
+        position: relative;
+        transition: width 0.3s;
+      }
+
+      .aside.collapsed {
+        width: 64px !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app" class="app">
+      <aside
+        class="aside"
+        :class="{ collapsed: collapsed }"
+        style="width: 280px"
+      >
+        <el-menu :default-active="active" :collapse="collapsed">
+          <template v-for="m in menus" :key="m.path">
+            <el-sub-menu v-if="m.children && m.children.length" :index="m.path">
+              <template #title>
+                <el-icon v-if="m.icon">
+                  <component :is="m.icon" />
+                </el-icon>
+                <span>{{m.name}}</span>
+              </template>
+              <el-menu-item
+                v-for="c in m.children"
+                :key="c.path"
+                :index="c.path"
+              >
+                <el-icon v-if="c.icon">
+                  <component :is="c.icon" />
+                </el-icon>
+                <span>{{c.name}}</span>
+              </el-menu-item>
+            </el-sub-menu>
+            <el-menu-item v-else :index="m.path">
+              <el-icon v-if="m.icon">
+                <component :is="m.icon" />
+              </el-icon>
+              <span>{{m.name}}</span>
+            </el-menu-item>
+          </template>
+        </el-menu>
+        <!-- 折叠按钮 -->
+        <div class="menu-toggle-btn" @click="toggleMenu">
+          <el-icon>
+            <component :is="collapsed ? 'Expand' : 'Fold'" />
+          </el-icon>
+        </div>
+      </aside>
+      <section class="main">
+        <header class="header">
+          <div class="logo">动态菜单（权限驱动示例）</div>
+          <el-switch v-model="collapsed" active-text="折叠" />
+        </header>
+        <div class="content">
+          <div class="card">
+            <h3 class="title">权限与数据结构</h3>
+            <pre class="card">{{menus}}</pre>
+            <p>权限码示例：menu:system:user、btn:user:create、api:user:list</p>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script>
+      const { createApp, ref } = Vue;
+      const {
+        DataBoard,
+        Document,
+        List,
+        Plus,
+        View,
+        Folder,
+        TrendCharts,
+        Setting,
+        User,
+        Key,
+        ChatDotRound,
+        Search,
+        ChatDotSquare,
+        FolderOpened,
+        Fold,
+        Expand,
+        Monitor,
+        Avatar,
+      } = ElementPlusIconsVue;
+
+      createApp({
+        components: {
+          DataBoard,
+          Document,
+          List,
+          Plus,
+          View,
+          Folder,
+          TrendCharts,
+          Setting,
+          User,
+          Key,
+          ChatDotRound,
+          Search,
+          ChatDotSquare,
+          FolderOpened,
+          Fold,
+          Expand,
+          Monitor,
+          Avatar,
+        },
+        setup() {
+          // 模拟从 /api/v1/user/permissions 拉取到的菜单（已按权限过滤）
+          const menus = ref([
+            // 认证模块已隐藏 - 登录成功后不再显示
+            // {
+            //   name: "认证模块",
+            //   path: "/auth",
+            //   code: "menu:auth",
+            //   icon: "User",
+            //   children: [
+            //     {
+            //       name: "登录",
+            //       path: "/auth/login",
+            //       code: "menu:auth:login",
+            //       icon: "Key",
+            //     },
+            //     {
+            //       name: "注册",
+            //       path: "/auth/register",
+            //       code: "menu:auth:register",
+            //       icon: "UserFilled",
+            //     },
+            //     {
+            //       name: "重置密码",
+            //       path: "/auth/reset-password",
+            //       code: "menu:auth:reset-password",
+            //       icon: "Refresh",
+            //     },
+            //   ],
+            // },
+            {
+              name: "仪表板",
+              path: "/dashboard",
+              code: "menu:dashboard",
+              icon: "DataBoard",
+            },
+            {
+              name: "申报管理",
+              path: "/declaration",
+              code: "menu:declaration",
+              icon: "Document",
+              children: [
+                {
+                  name: "申报列表",
+                  path: "/declaration/list",
+                  code: "menu:declaration:list",
+                  icon: "List",
+                },
+                // 隐藏新建申报和申报详情子菜单
+                // {
+                //   name: "新建申报",
+                //   path: "/declaration/create",
+                //   code: "menu:declaration:create",
+                //   icon: "Plus",
+                // },
+                // {
+                //   name: "申报详情",
+                //   path: "/declaration/detail",
+                //   code: "menu:declaration:detail",
+                //   icon: "View",
+                // },
+              ],
+            },
+            {
+              name: "项目管理",
+              path: "/project",
+              code: "menu:project",
+              icon: "Folder",
+              children: [
+                {
+                  name: "项目列表",
+                  path: "/project/list",
+                  code: "menu:project:list",
+                  icon: "List",
+                },
+                {
+                  name: "项目详情",
+                  path: "/project/detail",
+                  code: "menu:project:detail",
+                  icon: "View",
+                },
+                {
+                  name: "项目进度",
+                  path: "/project/progress",
+                  code: "menu:project:progress",
+                  icon: "TrendCharts",
+                },
+              ],
+            },
+            {
+              name: "验收管理",
+              path: "/acceptance",
+              code: "menu:acceptance",
+              icon: "FolderOpened",
+              children: [
+                {
+                  name: "验收列表",
+                  path: "/acceptance/list",
+                  code: "menu:acceptance:list",
+                  icon: "List",
+                },
+                {
+                  name: "验收申请",
+                  path: "/acceptance/apply",
+                  code: "menu:acceptance:apply",
+                  icon: "Plus",
+                },
+                {
+                  name: "报告管理",
+                  path: "/acceptance/report",
+                  code: "menu:acceptance:report",
+                  icon: "Document",
+                },
+              ],
+            },
+            {
+              name: "系统管理",
+              path: "/system",
+              code: "menu:system",
+              icon: "Setting",
+              children: [
+                {
+                  name: "用户管理",
+                  path: "/system/user",
+                  code: "menu:system:user",
+                  icon: "User",
+                },
+                {
+                  name: "角色权限",
+                  path: "/system/role",
+                  code: "menu:system:role",
+                  icon: "Key",
+                },
+              ],
+            },
+            {
+              name: "AI助手",
+              path: "/ai",
+              code: "menu:ai",
+              icon: "Monitor",
+              children: [
+                {
+                  name: "AI对话",
+                  path: "/ai/chat",
+                  code: "menu:ai:chat",
+                  icon: "Avatar",
+                },
+                {
+                  name: "知识库搜索",
+                  path: "/ai/knowledge",
+                  code: "menu:ai:knowledge",
+                  icon: "Search",
+                },
+              ],
+            },
+          ]);
+          const active = ref("/dashboard");
+          const collapsed = ref(false);
+
+          // 折叠菜单切换函数
+          const toggleMenu = () => {
+            collapsed.value = !collapsed.value;
+          };
+
+          return { menus, active, collapsed, toggleMenu };
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>

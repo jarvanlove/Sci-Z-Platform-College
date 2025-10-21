@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>组件-空状态与结果页</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <link rel="stylesheet" href="样式.css" />
+  </head>
+  <body>
+    <div id="app" class="content">
+      <div class="card" style="margin-bottom: 12px">
+        <el-empty description="暂无数据" />
+      </div>
+      <div class="card">
+        <el-result
+          icon="success"
+          title="操作成功"
+          sub-title="已完成提交，稍后可在列表查看状态"
+        >
+          <template #extra>
+            <el-button type="primary">返回列表</el-button>
+          </template>
+        </el-result>
+      </div>
+    </div>
+    <script>
+      Vue.createApp({}).mount("#app");
+    </script>
+  </body>
+</html>
