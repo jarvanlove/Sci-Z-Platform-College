@@ -11,35 +11,6 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://unpkg.com/element-plus"></script>
     <script src="https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.iife.js"></script>
-    <!-- <script>
-      // 备用图标加载方案
-      if (typeof ElementPlusIconsVue === "undefined") {
-        console.warn("Element Plus Icons not loaded, using fallback icons");
-        window.ElementPlusIconsVue = {
-          Odometer: "🎛️",
-          Document: "📄",
-          List: "📋",
-          Plus: "➕",
-          View: "👁️",
-          Folder: "📁",
-          TrendCharts: "📈",
-          Setting: "⚙️",
-          User: "👤",
-          Key: "🔑",
-          ChatDotRound: "💭",
-          Search: "🔍",
-          ChatDotSquare: "💬",
-          FolderOpened: "📂",
-          UserFilled: "👤",
-          Refresh: "🔄",
-          DataAnalysis: "📊",
-          Monitor: "🖥️",
-          Check: "✅",
-          ChatLineRound: "💭",
-          ChatLineSquare: "💬",
-        };
-      }
-    </script> -->
     <link rel="stylesheet" href="样式.css" />
     <style>
       /* 菜单字体区分样式 - 使用圆润字体 */
@@ -221,6 +192,7 @@
             <el-menu
               :default-active="activeMenu"
               :collapse="collapsed"
+              :unique-opened="true"
               @select="handleMenuSelect"
             >
               <!-- 认证模块菜单已隐藏 - 登录成功后不再显示 -->

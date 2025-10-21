@@ -1232,6 +1232,78 @@
       .advanced-content .el-textarea__inner:hover {
         border-color: #1e3a8a;
       }
+
+      /* 工作流选择样式 */
+      .workflow-option {
+        padding: 8px 0;
+      }
+
+      .workflow-name {
+        font-size: 14px;
+        font-weight: 500;
+        color: #374151;
+        line-height: 1.4;
+      }
+
+      .workflow-description {
+        font-size: 12px;
+        color: #6b7280;
+        line-height: 1.3;
+        margin-top: 2px;
+      }
+
+      .workflow-info {
+        margin-top: 12px;
+        padding: 16px;
+        background: #f8fafc;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+      }
+
+      .workflow-info-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin-bottom: 8px;
+      }
+
+      .workflow-info-description {
+        font-size: 14px;
+        color: #64748b;
+        line-height: 1.5;
+      }
+
+      /* 下拉框选项样式优化 */
+      .el-select-dropdown__item {
+        height: auto !important;
+        padding: 8px 20px !important;
+        line-height: normal !important;
+      }
+
+      /* 搜索框样式 */
+      .el-select .el-input__inner {
+        cursor: pointer;
+      }
+
+      .el-select .el-input.is-focus .el-input__inner {
+        cursor: text;
+      }
+
+      /* 搜索结果高亮 */
+      .workflow-option .highlight {
+        background-color: #fef3c7;
+        color: #92400e;
+        padding: 0 2px;
+        border-radius: 2px;
+      }
+
+      /* 无搜索结果时的样式 */
+      .el-select-dropdown__empty {
+        padding: 20px 0 !important;
+        color: #9ca3af !important;
+        text-align: center !important;
+        font-size: 14px !important;
+      }
     </style>
   </head>
   <body>
@@ -1336,6 +1408,46 @@
                 </div>
               </div>
 
+              <!-- 工作流选择 -->
+              <div class="form-group">
+                <label class="form-label required">选择工作流</label>
+                <el-select
+                  v-model="config.workflow"
+                  placeholder="请选择工作流"
+                  style="width: 100%"
+                  filterable
+                  :filter-method="filterWorkflow"
+                  no-match-text="未找到匹配的工作流"
+                  no-data-text="暂无工作流数据"
+                >
+                  <el-option
+                    v-for="workflow in filteredWorkflowOptions"
+                    :key="workflow.id"
+                    :label="workflow.name"
+                    :value="workflow.id"
+                  >
+                    <div class="workflow-option">
+                      <div
+                        class="workflow-name"
+                        v-html="highlightText(workflow.name, workflowSearchQuery)"
+                      ></div>
+                      <div
+                        class="workflow-description"
+                        v-html="highlightText(workflow.description, workflowSearchQuery)"
+                      ></div>
+                    </div>
+                  </el-option>
+                </el-select>
+                <div v-if="selectedWorkflow" class="workflow-info">
+                  <div class="workflow-info-title">
+                    {{ selectedWorkflow.name }}
+                  </div>
+                  <div class="workflow-info-description">
+                    {{ selectedWorkflow.description }}
+                  </div>
+                </div>
+              </div>
+
               <!-- 报告类型选择 -->
               <div class="form-group">
                 <label class="form-label required">报告类型</label>
@@ -1421,7 +1533,7 @@
               </button>
               <div v-if="!canGenerate" class="generate-hint">
                 <span class="generate-hint-icon">💡</span>
-                请选择项目和报告类型
+                请选择项目、工作流和报告类型
               </div>
             </div>
           </div>
@@ -1775,6 +1887,7 @@
           const config = ref({
             projectId: "",
             projectInfo: null,
+            workflow: "", // 工作流
             reportType: "tech",
             style: "formal",
             detail: "standard",
@@ -1816,6 +1929,33 @@
           ]);
           const loadingProjects = ref(false);
 
+          // 工作流选项
+          const workflowOptions = [
+            {
+              id: "workflow_001",
+              name: "科研项目申报审核流程",
+              description:
+                "适用于科研项目的标准申报审核，包含初审、专家评审、终审等环节",
+            },
+            {
+              id: "workflow_002",
+              name: "快速申报流程",
+              description: "简化的申报流程，适用于小型项目或紧急项目的快速审批",
+            },
+            {
+              id: "workflow_003",
+              name: "重点项目专项流程",
+              description:
+                "针对重点科研项目的专项审核流程，包含多轮专家评审和答辩环节",
+            },
+            {
+              id: "workflow_004",
+              name: "产学研合作项目流程",
+              description:
+                "专门用于产学研合作项目的审核流程，涉及企业参与和成果转化评估",
+            },
+          ];
+
           // 生成状态
           const generating = ref(false);
           const generateProgress = ref(0);
@@ -1844,6 +1984,10 @@
           const editMode = ref(false);
           const showAdvanced = ref(false);
 
+          // 工作流搜索
+          const workflowSearchQuery = ref("");
+          const filteredWorkflowOptions = ref([...workflowOptions]);
+
           // 富文本编辑器
           let quillEditor = null;
 
@@ -1851,6 +1995,7 @@
           const canGenerate = computed(() => {
             return (
               config.value.projectId &&
+              config.value.workflow &&
               config.value.reportType &&
               !generating.value
             );
@@ -1872,6 +2017,12 @@
           const reportTypeText = computed(() => {
             const typeMap = { tech: "科技报告", self: "自评报告" };
             return typeMap[config.value.reportType];
+          });
+
+          const selectedWorkflow = computed(() => {
+            return workflowOptions.find(
+              (workflow) => workflow.id === config.value.workflow
+            );
           });
 
           // 方法
@@ -1909,6 +2060,33 @@
 
           const toggleAdvanced = () => {
             showAdvanced.value = !showAdvanced.value;
+          };
+
+          // 工作流过滤方法
+          const filterWorkflow = (query) => {
+            workflowSearchQuery.value = query;
+            if (!query) {
+              filteredWorkflowOptions.value = [...workflowOptions];
+              return;
+            }
+
+            const lowerQuery = query.toLowerCase();
+            filteredWorkflowOptions.value = workflowOptions.filter(
+              (workflow) => {
+                return (
+                  workflow.name.toLowerCase().includes(lowerQuery) ||
+                  workflow.description.toLowerCase().includes(lowerQuery)
+                );
+              }
+            );
+          };
+
+          // 文本高亮方法
+          const highlightText = (text, query) => {
+            if (!query || !text) return text;
+
+            const regex = new RegExp(`(${query})`, "gi");
+            return text.replace(regex, '<span class="highlight">$1</span>');
           };
 
           const handleStartGenerate = async () => {
@@ -2321,6 +2499,9 @@
             config,
             projects,
             loadingProjects,
+            workflowOptions,
+            filteredWorkflowOptions,
+            workflowSearchQuery,
             generating,
             generateProgress,
             estimatedTime,
@@ -2338,11 +2519,14 @@
             isGenerateComplete,
             reportTitle,
             reportTypeText,
+            selectedWorkflow,
 
             // 方法
             handleBack,
             handleProjectChange,
             toggleAdvanced,
+            filterWorkflow,
+            highlightText,
             handleStartGenerate,
             handleCancelGenerate,
             handleSaveReport,

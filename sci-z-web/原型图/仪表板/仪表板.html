@@ -16,6 +16,8 @@
         padding: 20px;
         background: #f7f9fc;
         min-height: calc(100vh - 56px);
+        overflow-x: hidden;
+        max-width: 100%;
       }
 
       .stats-cards {
@@ -37,22 +39,73 @@
         justify-content: center;
         align-items: center;
         text-align: center;
+        position: relative;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        overflow: hidden;
+      }
+
+      .stat-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(
+          135deg,
+          #1e3a8a 0%,
+          #3b82f6 50%,
+          #60a5fa 100%
+        );
+        border-radius: 8px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: -1;
+      }
+
+      .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(30, 58, 138, 0.15);
+        border: 1px solid transparent;
+      }
+
+      .stat-card:hover::before {
+        opacity: 1;
+      }
+
+      .stat-card:hover .stat-icon {
+        transform: scale(1.1);
+        transition: transform 0.3s ease;
+      }
+
+      .stat-card:hover .stat-value {
+        color: #ffffff;
+        transition: color 0.3s ease;
+      }
+
+      .stat-card:hover .stat-label {
+        color: #e0e7ff;
+        transition: color 0.3s ease;
       }
 
       .stat-icon {
         font-size: 24px;
         margin-bottom: 8px;
+        transition: transform 0.3s ease;
       }
 
       .stat-value {
         font-size: 28px;
         font-weight: 600;
         margin-bottom: 4px;
+        transition: color 0.3s ease;
       }
 
       .stat-label {
         font-size: 14px;
         color: #6b7280;
+        transition: color 0.3s ease;
       }
 
       .stat-total {
@@ -72,15 +125,56 @@
       }
 
       .main-content {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      .top-section {
         display: grid;
         grid-template-columns: 2fr 1fr;
         gap: 24px;
+        align-items: start;
+      }
+
+      .bottom-section {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      .declaration-card {
+        min-height: auto;
+        height: fit-content;
+      }
+
+      .quick-actions-card {
+        min-height: auto;
+        height: fit-content;
+      }
+
+      .progress-card {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+        box-sizing: border-box;
+      }
+
+      .progress-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        width: 100%;
+        box-sizing: border-box;
       }
 
       .content-card {
         background: #ffffff;
         border-radius: 8px;
-        padding: 20px;
+        padding: 16px;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
         border: 1px solid #e5e7eb;
       }
@@ -97,7 +191,7 @@
       .card-title {
         font-size: 16px;
         font-weight: 600;
-        color: #374151;
+        color: #1e3a8a;
         margin: 0;
       }
 
@@ -112,30 +206,119 @@
         text-decoration: underline;
       }
 
+      .declaration-table-container {
+        margin-bottom: 0;
+        overflow-x: auto;
+      }
+
       .declaration-table {
         width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #e5e7eb;
+        font-size: 14px;
       }
 
-      .declaration-table .el-table__row {
+      .declaration-table thead {
+        background-color: #f8fafc;
+      }
+
+      .declaration-table th {
+        border: 1px solid #e5e7eb;
+        padding: 10px 8px;
+        font-size: 13px;
+        color: #6b7280;
+        font-weight: 600;
+        text-align: left;
+      }
+
+      .declaration-table td {
+        border: 1px solid #e5e7eb;
+        padding: 10px 8px;
+        font-size: 13px;
+        color: #374151;
+      }
+
+      .declaration-table tbody tr {
         cursor: pointer;
+        transition: background-color 0.2s;
       }
 
-      .declaration-table .el-table__row:hover {
-        background-color: #f0f9ff !important;
+      .declaration-table tbody tr:hover {
+        background-color: #f0f9ff;
+      }
+
+      .declaration-table tbody tr.even-row {
+        background-color: #f9fafb;
+      }
+
+      .declaration-table tbody tr.even-row:hover {
+        background-color: #f0f9ff;
+      }
+
+      .number-cell {
+        text-align: center;
+        color: #9ca3af;
+        font-weight: 500;
+      }
+
+      .direction-cell {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .time-cell {
+        text-align: center;
+        color: #9ca3af;
+      }
+
+      .status-cell {
+        text-align: center;
+      }
+
+      .action-cell {
+        text-align: center;
+      }
+
+      .view-button {
+        background: #f3f4f6;
+        color: #6b7280;
+        border: 1px solid #d1d5db;
+        padding: 4px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .view-button:hover {
+        background: #1e3a8a;
+        color: #ffffff;
+        border-color: #1e3a8a;
       }
 
       .progress-item {
         display: flex;
         align-items: center;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
         padding: 12px;
-        border-radius: 6px;
+        border-radius: 8px;
         cursor: pointer;
         transition: background-color 0.2s;
+        gap: 8px;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        width: 100%;
+        box-sizing: border-box;
       }
 
       .progress-item:hover {
-        background-color: #f8fafc;
+        background-color: #f0f9ff;
+        border-color: #1e3a8a;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.1);
       }
 
       .progress-item:last-child {
@@ -144,7 +327,8 @@
 
       .progress-info {
         flex: 1;
-        margin-right: 12px;
+        min-width: 0;
+        max-width: 40%;
       }
 
       .progress-name {
@@ -152,16 +336,23 @@
         font-size: 14px;
         color: #374151;
         margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .progress-time {
         font-size: 12px;
         color: #6b7280;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .progress-bar-container {
-        width: 120px;
-        margin-right: 8px;
+        width: 100px;
+        flex-shrink: 0;
+        margin: 0 8px;
       }
 
       .progress-bar {
@@ -192,108 +383,22 @@
       .progress-percentage {
         font-size: 12px;
         font-weight: 600;
-        color: #374151;
-        min-width: 40px;
-        text-align: right;
-      }
-
-      .todo-item {
-        display: flex;
-        align-items: flex-start;
-        margin-bottom: 12px;
-        padding: 12px;
-        border-radius: 6px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-      }
-
-      .todo-item:hover {
-        background-color: #f8fafc;
-      }
-
-      .todo-item:last-child {
-        margin-bottom: 0;
-      }
-
-      .todo-type {
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 500;
-        margin-right: 8px;
-        flex-shrink: 0;
-      }
-
-      .todo-type.declaration {
-        background-color: #dbeafe;
-        color: #2563eb;
-      }
-
-      .todo-type.acceptance {
-        background-color: #fef3c7;
-        color: #f59e0b;
-      }
-
-      .todo-type.report {
-        background-color: #e0e7ff;
         color: #1e3a8a;
-      }
-
-      .todo-type.notification {
-        background-color: #f3f4f6;
-        color: #6b7280;
-      }
-
-      .todo-content {
-        flex: 1;
-        margin-right: 8px;
-      }
-
-      .todo-description {
-        font-size: 14px;
-        color: #374151;
-        margin-bottom: 4px;
-        line-height: 1.4;
-      }
-
-      .todo-time {
-        font-size: 12px;
-        color: #6b7280;
-      }
-
-      .todo-priority {
-        padding: 2px 6px;
-        border-radius: 8px;
-        font-size: 10px;
-        font-weight: 600;
+        min-width: 30px;
+        text-align: right;
         flex-shrink: 0;
-      }
-
-      .priority-urgent {
-        background-color: #fee2e2;
-        color: #dc2626;
-      }
-
-      .priority-important {
-        background-color: #fef3c7;
-        color: #f59e0b;
-      }
-
-      .priority-normal {
-        background-color: #dbeafe;
-        color: #2563eb;
       }
 
       .quick-actions {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 10px;
       }
 
       .action-button {
         display: flex;
         align-items: center;
-        padding: 12px 16px;
+        padding: 10px 14px;
         border-radius: 6px;
         text-decoration: none;
         color: #374151;
@@ -308,12 +413,15 @@
       }
 
       .action-button.primary {
-        background-color: #1e3a8a;
-        color: #ffffff;
+        background-color: #ffffff;
+        border: 1px solid #1e3a8a;
+        color: #1e3a8a;
       }
 
       .action-button.primary:hover {
-        background-color: #1e40af;
+        background-color: #f0f9ff;
+        border-color: #1e40af;
+        color: #1e40af;
       }
 
       .action-button.secondary {
@@ -327,13 +435,15 @@
       }
 
       .action-button.text {
-        background-color: transparent;
+        background-color: #ffffff;
         color: #1e3a8a;
-        border: none;
+        border: 1px solid #1e3a8a;
       }
 
       .action-button.text:hover {
-        background-color: #f8fafc;
+        background-color: #f0f9ff;
+        border-color: #1e40af;
+        color: #1e40af;
       }
 
       .action-icon {
@@ -400,13 +510,42 @@
         margin-bottom: 16px;
       }
 
+      @media (max-width: 1200px) {
+        .top-section {
+          grid-template-columns: 1fr;
+        }
+
+        .progress-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
       @media (max-width: 1024px) {
         .stats-cards {
           grid-template-columns: repeat(2, 1fr);
         }
 
-        .main-content {
-          grid-template-columns: 1fr;
+        .progress-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 768px) {
+        .stats-cards {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+
+        .dashboard-container {
+          padding: 16px;
+        }
+
+        .declaration-table-container {
+          overflow-x: auto;
+        }
+
+        .declaration-table {
+          min-width: 600px;
         }
       }
 
@@ -416,23 +555,22 @@
         }
 
         .dashboard-container {
-          padding: 16px;
+          padding: 12px;
+        }
+
+        .progress-grid {
+          grid-template-columns: 1fr;
         }
 
         .progress-item {
-          flex-direction: column;
-          align-items: flex-start;
+          flex-direction: row;
+          align-items: center;
         }
 
-        .progress-info {
-          margin-right: 0;
-          margin-bottom: 8px;
-        }
-
-        .progress-bar-container {
-          width: 100%;
-          margin-right: 0;
-          margin-bottom: 4px;
+        .declaration-table th,
+        .declaration-table td {
+          padding: 8px 4px;
+          font-size: 12px;
         }
       }
     </style>
@@ -464,10 +602,10 @@
 
         <!-- 主要内容区域 -->
         <div class="main-content">
-          <!-- 左侧内容 -->
-          <div>
+          <!-- 上半部分：最近申报和快捷入口并排 -->
+          <div class="top-section">
             <!-- 最近申报列表 -->
-            <div class="content-card">
+            <div class="content-card declaration-card">
               <div class="card-header">
                 <h3 class="card-title">最近申报</h3>
                 <a
@@ -484,136 +622,39 @@
                 class="skeleton-content loading-skeleton"
               ></div>
 
-              <!-- 调试信息 -->
-              <!-- <div
-                v-if="!loading"
-                style="margin-bottom: 10px; font-size: 12px; color: #666"
-              >
-                数据条数: {{ recentDeclarations.length }} | 加载状态: {{ loading
-                }}
-                Element Plus测试按钮已隐藏 
-              </div> -->
-
               <!-- 申报数据表格 -->
               <div
                 v-if="!loading && recentDeclarations.length > 0"
-                style="margin-bottom: 20px"
+                class="declaration-table-container"
               >
-                <table
-                  style="
-                    width: 100%;
-                    border-collapse: collapse;
-                    border: 1px solid #e5e7eb;
-                  "
-                >
-                  <thead style="background-color: #f5f5f5">
+                <table class="declaration-table">
+                  <thead>
                     <tr>
-                      <th
-                        style="
-                          border: 1px solid #e5e7eb;
-                          padding: 8px;
-                          font-size: 13px;
-                          color: #6b7280;
-                        "
-                      >
-                        申报编号
-                      </th>
-                      <th
-                        style="
-                          border: 1px solid #e5e7eb;
-                          padding: 8px;
-                          font-size: 13px;
-                          color: #6b7280;
-                        "
-                      >
-                        研究方向
-                      </th>
-                      <th
-                        style="
-                          border: 1px solid #e5e7eb;
-                          padding: 8px;
-                          font-size: 13px;
-                          color: #6b7280;
-                        "
-                      >
-                        申报时间
-                      </th>
-                      <th style="border: 1px solid #e5e7eb; padding: 8px">
-                        状态
-                      </th>
-                      <th style="border: 1px solid #e5e7eb; padding: 8px">
-                        操作
-                      </th>
+                      <th>申报编号</th>
+                      <th>研究方向</th>
+                      <th>申报时间</th>
+                      <th>状态</th>
+                      <th>操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr
                       v-for="(item, index) in recentDeclarations"
                       :key="item.id"
-                      :style="{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb' }"
+                      :class="{ 'even-row': index % 2 === 0 }"
                     >
-                      <td
-                        style="
-                          border: 1px solid #e5e7eb;
-                          padding: 8px;
-                          text-align: center;
-                          font-size: 13px;
-                          color: #9ca3af;
-                        "
-                      >
-                        {{ item.number }}
+                      <td class="number-cell">{{ item.number }}</td>
+                      <td class="direction-cell">{{ item.direction }}</td>
+                      <td class="time-cell">{{ item.submitTime }}</td>
+                      <td class="status-cell">
+                        <span :style="getStatusStyle(item.statusType)">
+                          {{ item.status }}
+                        </span>
                       </td>
-                      <td
-                        style="
-                          border: 1px solid #e5e7eb;
-                          padding: 8px;
-                          font-size: 13px;
-                          color: #9ca3af;
-                        "
-                      >
-                        {{ item.direction }}
-                      </td>
-                      <td
-                        style="
-                          border: 1px solid #e5e7eb;
-                          padding: 8px;
-                          text-align: center;
-                          font-size: 13px;
-                          color: #9ca3af;
-                        "
-                      >
-                        {{ item.submitTime }}
-                      </td>
-                      <td
-                        style="
-                          border: 1px solid #e5e7eb;
-                          padding: 8px;
-                          text-align: center;
-                        "
-                      >
-                        <span :style="getStatusStyle(item.statusType)"
-                          >{{ item.status }}</span
-                        >
-                      </td>
-                      <td
-                        style="
-                          border: 1px solid #e5e7eb;
-                          padding: 8px;
-                          text-align: center;
-                        "
-                      >
+                      <td class="action-cell">
                         <button
                           @click="handleDeclarationClick(item)"
-                          style="
-                            background: #e5e7eb;
-                            color: #6b7280;
-                            border: 1px solid #d1d5db;
-                            padding: 2px 6px;
-                            border-radius: 3px;
-                            cursor: pointer;
-                            font-size: 12px;
-                            font-weight: 400;
-                          "
+                          class="view-button"
                         >
                           查看
                         </button>
@@ -622,149 +663,10 @@
                   </tbody>
                 </table>
               </div>
-
-              <!-- Element Plus表格已隐藏，使用原生HTML表格 -->
-              <!-- <el-table
-                v-if="!loading && recentDeclarations.length > 0"
-                :data="recentDeclarations"
-                class="declaration-table"
-                @row-click="handleDeclarationClick"
-                border
-                stripe
-              >
-                <el-table-column
-                  prop="number"
-                  label="申报编号"
-                  width="120"
-                  show-overflow-tooltip
-                  align="center"
-                />
-                <el-table-column
-                  prop="direction"
-                  label="研究方向"
-                  min-width="200"
-                  show-overflow-tooltip
-                />
-                <el-table-column
-                  prop="submitTime"
-                  label="申报时间"
-                  width="120"
-                  align="center"
-                />
-                <el-table-column
-                  prop="status"
-                  label="状态"
-                  width="100"
-                  align="center"
-                >
-                  <template #default="{ row }">
-                    <span
-                      class="status-tag"
-                      :class="`status-${row.statusType}`"
-                    >
-                      {{ row.status }}
-                    </span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="操作" width="80" align="center">
-                  <template #default="{ row }">
-                    <el-button
-                      type="primary"
-                      size="small"
-                      link
-                      @click.stop="handleDeclarationClick(row)"
-                    >
-                      查看
-                    </el-button>
-                  </template>
-                </el-table-column>
-              </el-table> -->
-            </div>
-
-            <!-- 项目进度概览 -->
-            <div class="content-card">
-              <div class="card-header">
-                <h3 class="card-title">项目进度概览</h3>
-                <a href="#" class="card-action" @click="handleViewAllProjects">
-                  查看全部
-                </a>
-              </div>
-
-              <div
-                v-if="loading"
-                class="skeleton-content loading-skeleton"
-              ></div>
-
-              <div v-else>
-                <div
-                  v-for="project in projectProgress"
-                  :key="project.id"
-                  class="progress-item"
-                  @click="handleProjectClick(project.id)"
-                >
-                  <div class="progress-info">
-                    <div class="progress-name">{{ project.name }}</div>
-                    <div class="progress-time">
-                      预计完成：{{ project.expectedDate }}
-                    </div>
-                  </div>
-                  <div class="progress-bar-container">
-                    <div class="progress-bar">
-                      <div
-                        class="progress-fill"
-                        :class="getProgressClass(project.progress)"
-                        :style="{ width: project.progress + '%' }"
-                      ></div>
-                    </div>
-                  </div>
-                  <div class="progress-percentage">{{ project.progress }}%</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 右侧内容 -->
-          <div>
-            <!-- 待办事项 -->
-            <div class="content-card">
-              <div class="card-header">
-                <h3 class="card-title">待办事项</h3>
-                <a href="#" class="card-action" @click="handleViewAllTodos">
-                  查看全部
-                </a>
-              </div>
-
-              <div
-                v-if="loading"
-                class="skeleton-content loading-skeleton"
-              ></div>
-
-              <div v-else>
-                <div
-                  v-for="todo in todos"
-                  :key="todo.id"
-                  class="todo-item"
-                  @click="handleTodoClick(todo.id)"
-                >
-                  <span class="todo-type" :class="todo.type">
-                    {{ getTodoTypeText(todo.type) }}
-                  </span>
-                  <div class="todo-content">
-                    <div class="todo-description">{{ todo.description }}</div>
-                    <div class="todo-time">{{ todo.deadline }}</div>
-                  </div>
-                  <span
-                    class="todo-priority"
-                    :class="`priority-${todo.priority}`"
-                  >
-                    {{ getPriorityText(todo.priority) }}
-                  </span>
-                </div>
-              </div>
             </div>
 
             <!-- 快捷入口 -->
-            <div class="content-card">
+            <div class="content-card quick-actions-card">
               <div class="card-header">
                 <h3 class="card-title">快捷入口</h3>
               </div>
@@ -798,6 +700,46 @@
                   <span class="action-icon">🔍</span>
                   知识库搜索
                 </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 下半部分：项目进度概览全宽 -->
+          <div class="bottom-section">
+            <div class="content-card progress-card">
+              <div class="card-header">
+                <h3 class="card-title">项目进度概览</h3>
+                <a href="#" class="card-action" @click="handleViewAllProjects">
+                  查看全部
+                </a>
+              </div>
+
+              <div
+                v-if="loading"
+                class="skeleton-content loading-skeleton"
+              ></div>
+
+              <div v-else class="progress-grid">
+                <div
+                  v-for="project in projectProgress"
+                  :key="project.id"
+                  class="progress-item"
+                  @click="handleProjectClick(project.id)"
+                >
+                  <div class="progress-info">
+                    <div class="progress-name">{{ project.name }}</div>
+                  </div>
+                  <div class="progress-bar-container">
+                    <div class="progress-bar">
+                      <div
+                        class="progress-fill"
+                        :class="getProgressClass(project.progress)"
+                        :style="{ width: project.progress + '%' }"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="progress-percentage">{{ project.progress }}%</div>
+                </div>
               </div>
             </div>
           </div>
@@ -848,9 +790,6 @@
           // 项目进度
           const projectProgress = ref([]);
 
-          // 待办事项
-          const todos = ref([]);
-
           // 格式化数字
           const formatNumber = (num) => {
             return num.toLocaleString();
@@ -861,27 +800,6 @@
             if (progress <= 30) return "low";
             if (progress <= 70) return "medium";
             return "high";
-          };
-
-          // 获取待办事项类型文本
-          const getTodoTypeText = (type) => {
-            const typeMap = {
-              declaration: "申报审核",
-              acceptance: "项目验收",
-              report: "报告审核",
-              notification: "系统通知",
-            };
-            return typeMap[type] || type;
-          };
-
-          // 获取优先级文本
-          const getPriorityText = (priority) => {
-            const priorityMap = {
-              urgent: "紧急",
-              important: "重要",
-              normal: "普通",
-            };
-            return priorityMap[priority] || priority;
           };
 
           // 获取状态样式
@@ -993,45 +911,6 @@
                   expectedDate: "2024-03-30",
                 },
               ];
-
-              // 模拟待办事项数据
-              todos.value = [
-                {
-                  id: 1,
-                  type: "declaration",
-                  description: '审核张教授的"机器学习算法优化"申报材料',
-                  deadline: "2024-01-20",
-                  priority: "urgent",
-                },
-                {
-                  id: 2,
-                  type: "acceptance",
-                  description: '验收李博士的"智能医疗诊断系统"项目',
-                  deadline: "2024-01-25",
-                  priority: "important",
-                },
-                {
-                  id: 3,
-                  type: "report",
-                  description: "审核王研究员的季度研究报告",
-                  deadline: "2024-01-22",
-                  priority: "normal",
-                },
-                {
-                  id: 4,
-                  type: "notification",
-                  description: "系统维护通知：本周六2:00-4:00",
-                  deadline: "2024-01-21",
-                  priority: "normal",
-                },
-                {
-                  id: 5,
-                  type: "declaration",
-                  description: '审核刘教授的"区块链应用研究"申报',
-                  deadline: "2024-01-23",
-                  priority: "important",
-                },
-              ];
             } catch (error) {
               ElMessage.error("加载数据失败，请重试");
             } finally {
@@ -1103,16 +982,6 @@
             }
           };
 
-          // 待办事项点击处理
-          const handleTodoClick = (todoId) => {
-            ElMessage.info(`查看待办事项详情：ID ${todoId}`);
-          };
-
-          // 查看全部待办事项
-          const handleViewAllTodos = () => {
-            ElMessage.info("跳转到待办事项页面");
-          };
-
           // 快捷操作处理
           const handleQuickAction = (action) => {
             const actionMap = {
@@ -1153,18 +1022,13 @@
             stats,
             recentDeclarations,
             projectProgress,
-            todos,
             formatNumber,
             getProgressClass,
-            getTodoTypeText,
-            getPriorityText,
             getStatusStyle,
             handleDeclarationClick,
             handleViewAllDeclarations,
             handleProjectClick,
             handleViewAllProjects,
-            handleTodoClick,
-            handleViewAllTodos,
             handleQuickAction,
           };
         },

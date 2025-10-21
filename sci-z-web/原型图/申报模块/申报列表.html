@@ -66,11 +66,6 @@
         font-weight: 500;
       }
 
-      .status-draft {
-        background-color: #f3f4f6;
-        color: #6b7280;
-      }
-
       .status-submitting {
         background-color: #fef3c7;
         color: #f59e0b;
@@ -86,11 +81,6 @@
         color: #dc2626;
       }
 
-      .status-withdrawn {
-        background-color: #e0e7ff;
-        color: #2563eb;
-      }
-
       .operation-buttons {
         display: flex;
         gap: 8px;
@@ -99,6 +89,209 @@
       .operation-buttons .el-button {
         padding: 4px 8px;
         font-size: 12px;
+      }
+
+      /* 下拉菜单样式 */
+      .operation-buttons .el-dropdown {
+        margin-right: 8px;
+      }
+
+      .operation-buttons .el-dropdown .el-button {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+
+      /* 预览对话框样式 */
+      .preview-dialog {
+        width: 600px;
+      }
+
+      .preview-dialog .el-message-box__message {
+        white-space: pre-line;
+        line-height: 1.6;
+      }
+
+      /* 状态下拉框样式 */
+      .status-dropdown {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+      }
+
+      .status-clickable {
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.2s ease;
+        position: relative;
+      }
+
+      .status-clickable:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .status-arrow {
+        font-size: 12px;
+        opacity: 0.6;
+        transition: transform 0.2s ease;
+      }
+
+      .status-clickable:hover .status-arrow {
+        opacity: 1;
+        transform: translateY(1px);
+      }
+
+      /* 状态下拉菜单样式 */
+      .status-dropdown-menu {
+        min-width: 120px;
+        padding: 8px 0;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        border: 1px solid #e5e7eb;
+      }
+
+      .status-dropdown-menu .el-dropdown-menu__item {
+        padding: 8px 16px;
+        line-height: 1.4;
+        transition: background-color 0.2s ease;
+      }
+
+      .status-dropdown-menu .el-dropdown-menu__item:hover {
+        background-color: #f8fafc;
+      }
+
+      .status-dropdown-menu .el-dropdown-menu__item.is-disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .status-dropdown-menu .el-dropdown-menu__item.is-disabled:hover {
+        background-color: transparent;
+      }
+
+      .status-dropdown-menu .status-tag {
+        width: 100%;
+        text-align: center;
+        display: block;
+        margin: 0;
+      }
+
+      /* 简洁确认对话框样式 */
+      .modern-confirm-dialog {
+        border-radius: 8px !important;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+        border: none !important;
+        width: 400px !important;
+        z-index: 9999 !important;
+      }
+
+      .modern-confirm-dialog .el-overlay {
+        z-index: 9998 !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__header {
+        background: white !important;
+        color: #333 !important;
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__title {
+        color: #1e3a8a !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__headerbtn {
+        top: 16px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__close {
+        color: #999 !important;
+        font-size: 16px !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__close:hover {
+        color: #666 !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__content {
+        padding: 20px 24px !important;
+        background: white !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__message {
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+        color: #666 !important;
+        margin: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__message::before {
+        content: "" !important;
+        font-size: 16px !important;
+        margin-right: 8px !important;
+        flex-shrink: 0 !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__btns {
+        padding: 16px 24px 20px 24px !important;
+        background: white !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 12px !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__btns .el-button {
+        padding: 8px 20px !important;
+        border-radius: 4px !important;
+        font-size: 14px !important;
+        font-weight: 400 !important;
+        border: 1px solid !important;
+        transition: all 0.2s ease !important;
+        min-width: 80px !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__btns .el-button--default {
+        background: white !important;
+        border-color: #d9d9d9 !important;
+        color: #333 !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__btns .el-button--default:hover {
+        background: #f5f5f5 !important;
+        border-color: #b3b3b3 !important;
+        color: #333 !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__btns .el-button--primary {
+        background: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+        color: white !important;
+      }
+
+      .modern-confirm-dialog .el-message-box__btns .el-button--primary:hover {
+        background: #1e40af !important;
+        border-color: #1e40af !important;
+      }
+
+      /* 状态选择器下拉选项样式 */
+      .el-select-dropdown .el-select-dropdown__item {
+        padding: 8px 16px !important;
+      }
+
+      .el-select-dropdown .el-select-dropdown__item .status-tag {
+        width: 100%;
+        text-align: center;
+        display: block;
       }
 
       .empty-state {
@@ -141,15 +334,18 @@
       /* 原生HTML表格样式 */
       .table-wrapper {
         overflow-x: auto;
+        min-width: 100%;
       }
 
       .native-table {
         width: 100%;
+        min-width: 1200px; /* 设置最小宽度确保所有列正常显示 */
         border-collapse: collapse;
         font-size: 14px;
         color: #374151;
         background-color: #ffffff;
         border: 1px solid #e5e7eb;
+        table-layout: fixed; /* 固定表格布局 */
       }
 
       /* 表头样式 */
@@ -170,6 +366,8 @@
         border-right: 1px solid #e5e7eb;
         border-bottom: 1px solid #e5e7eb;
         vertical-align: top;
+        word-wrap: break-word;
+        word-break: break-all;
       }
 
       /* 斑马纹效果 */
@@ -182,48 +380,146 @@
         background-color: #f3f4f6;
       }
 
-      /* 列宽度设置 */
+      /* 列宽度设置 - 使用百分比和最小宽度 */
       .native-table .col-number {
-        width: 150px;
-        min-width: 120px;
+        width: 12%;
+        min-width: 110px;
       }
 
       .native-table .col-applicant {
-        width: 120px;
+        width: 8%;
+        min-width: 80px;
+        text-align: center;
+      }
+
+      .native-table .col-time {
+        width: 10%;
         min-width: 100px;
         text-align: center;
       }
 
       .native-table .col-direction {
-        width: 300px;
-        min-width: 200px;
-      }
-
-      .native-table .col-time {
-        width: 140px;
-        min-width: 120px;
-        text-align: center;
+        width: 20%;
+        min-width: 180px;
       }
 
       .native-table .col-fields {
-        width: 180px;
-        min-width: 150px;
+        width: 15%;
+        min-width: 120px;
+        line-height: 1.4;
+      }
+
+      .native-table .col-fields .el-tag {
+        margin-right: 4px !important;
+        margin-bottom: 4px !important;
+        display: inline-block;
+      }
+
+      .native-table .col-topic {
+        width: 20%;
+        min-width: 160px;
+        line-height: 1.4;
+        word-break: break-word;
+        white-space: normal;
       }
 
       .native-table .col-status {
-        width: 100px;
+        width: 8%;
+        min-width: 80px;
         text-align: center;
       }
 
       .native-table .col-actions {
-        width: 120px;
+        width: 12%;
+        min-width: 180px;
         text-align: center;
+      }
+
+      .operation-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 4px;
+        line-height: 1.2;
+      }
+
+      .operation-buttons .el-button {
+        margin: 0 !important;
+        padding: 4px 8px !important;
+        font-size: 12px !important;
+        height: auto !important;
+        min-height: 24px !important;
       }
 
       /* 最后一列不显示右边框 */
       .native-table thead th:last-child,
       .native-table tbody td:last-child {
         border-right: none;
+      }
+
+      /* 响应式设计 */
+      @media (max-width: 1400px) {
+        .native-table {
+          min-width: 1100px;
+        }
+
+        .native-table .col-direction {
+          width: 18%;
+          min-width: 160px;
+        }
+
+        .native-table .col-topic {
+          width: 18%;
+          min-width: 140px;
+        }
+      }
+
+      @media (max-width: 1200px) {
+        .native-table {
+          min-width: 1000px;
+        }
+
+        .native-table .col-direction {
+          width: 15%;
+          min-width: 140px;
+        }
+
+        .native-table .col-topic {
+          width: 15%;
+          min-width: 120px;
+        }
+
+        .native-table .col-fields {
+          width: 13%;
+          min-width: 100px;
+        }
+
+        .native-table .col-actions {
+          width: 13%;
+          min-width: 160px;
+        }
+      }
+
+      /* 确保表格在小屏幕上可以水平滚动 */
+      @media (max-width: 768px) {
+        .table-wrapper {
+          overflow-x: scroll;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .native-table {
+          min-width: 900px;
+        }
+
+        .native-table .col-actions {
+          min-width: 140px;
+        }
+
+        .operation-buttons .el-button {
+          font-size: 11px !important;
+          padding: 2px 6px !important;
+        }
       }
     </style>
   </head>
@@ -299,9 +595,10 @@
                 <tr>
                   <th class="col-number">申报编号</th>
                   <th class="col-applicant">申报人</th>
-                  <th class="col-direction">研究方向</th>
                   <th class="col-time">申报时间</th>
+                  <th class="col-direction">研究方向</th>
                   <th class="col-fields">研究领域</th>
+                  <th class="col-topic">研究课题</th>
                   <th class="col-status">状态</th>
                   <th class="col-actions">操作</th>
                 </tr>
@@ -310,32 +607,50 @@
                 <tr v-for="declaration in declarations" :key="declaration.id">
                   <td class="col-number">{{ declaration.number }}</td>
                   <td class="col-applicant">{{ declaration.applicant }}</td>
-                  <td class="col-direction">{{ declaration.direction }}</td>
                   <td class="col-time">{{ declaration.submitTime }}</td>
+                  <td class="col-direction">{{ declaration.direction }}</td>
                   <td class="col-fields">
                     <el-tag
-                      v-for="field in declaration.fields.slice(0, 2)"
+                      v-for="field in declaration.fields"
                       :key="field"
                       size="small"
                       style="margin-right: 4px; margin-bottom: 2px"
                     >
                       {{ field }}
                     </el-tag>
-                    <el-tag
-                      v-if="declaration.fields.length > 2"
-                      size="small"
-                      type="info"
-                    >
-                      +{{ declaration.fields.length - 2 }}
-                    </el-tag>
                   </td>
+                  <td class="col-topic">{{ declaration.topic || '暂无' }}</td>
                   <td class="col-status">
-                    <span
-                      class="status-tag"
-                      :class="`status-${declaration.statusType}`"
+                    <el-dropdown
+                      @command="(command) => handleStatusEdit(declaration.id, command)"
+                      trigger="click"
+                      class="status-dropdown"
                     >
-                      {{ declaration.status }}
-                    </span>
+                      <span
+                        class="status-tag status-clickable"
+                        :class="`status-${declaration.statusType}`"
+                      >
+                        {{ declaration.status }}
+                        <el-icon class="status-arrow"><ArrowDown /></el-icon>
+                      </span>
+                      <template #dropdown>
+                        <el-dropdown-menu class="status-dropdown-menu">
+                          <el-dropdown-item
+                            v-for="option in editableStatusOptions"
+                            :key="option.value"
+                            :command="option.value"
+                            :disabled="option.value === declaration.statusType"
+                          >
+                            <span
+                              class="status-tag"
+                              :class="`status-${option.value}`"
+                            >
+                              {{ option.label }}
+                            </span>
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
                   </td>
                   <td class="col-actions">
                     <div class="operation-buttons">
@@ -347,23 +662,48 @@
                       >
                         查看详情
                       </el-button>
-                      <el-button
-                        v-if="declaration.statusType === 'submitting'"
-                        type="warning"
-                        size="small"
-                        link
-                        @click="handleWithdraw(declaration.id)"
+                      <el-dropdown
+                        v-if="declaration.statusType === 'success'"
+                        @command="handleDownload"
+                        trigger="click"
                       >
-                        撤回申报
-                      </el-button>
+                        <el-button type="success" size="small" link>
+                          下载
+                          <el-icon class="el-icon--right"
+                            ><ArrowDown
+                          /></el-icon>
+                        </el-button>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item
+                              :command="{id: declaration.id, format: 'pdf'}"
+                            >
+                              <el-icon><Document /></el-icon>
+                              PDF格式
+                            </el-dropdown-item>
+                            <el-dropdown-item
+                              :command="{id: declaration.id, format: 'word'}"
+                            >
+                              <el-icon><Document /></el-icon>
+                              Word格式
+                            </el-dropdown-item>
+                            <el-dropdown-item
+                              :command="{id: declaration.id, format: 'markdown'}"
+                            >
+                              <el-icon><Document /></el-icon>
+                              Markdown格式
+                            </el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
                       <el-button
-                        v-if="declaration.statusType === 'failed'"
+                        v-if="declaration.statusType === 'success'"
                         type="info"
                         size="small"
                         link
-                        @click="handleRedeclare(declaration.id)"
+                        @click="handlePreview(declaration.id)"
                       >
-                        重新申报
+                        预览
                       </el-button>
                     </div>
                   </td>
@@ -427,11 +767,16 @@
           // 状态选项
           const statusOptions = ref([
             { label: "全部", value: "" },
-            { label: "草稿", value: "draft" },
             { label: "申报中", value: "submitting" },
             { label: "申报成功", value: "success" },
             { label: "申报失败", value: "failed" },
-            { label: "已撤回", value: "withdrawn" },
+          ]);
+
+          // 可编辑状态选项
+          const editableStatusOptions = ref([
+            { label: "申报中", value: "submitting" },
+            { label: "申报成功", value: "success" },
+            { label: "申报失败", value: "failed" },
           ]);
 
           // 加载申报列表
@@ -449,6 +794,7 @@
                   number: "SB2024001",
                   applicant: "张教授",
                   direction: "人工智能在教育领域的应用研究",
+                  topic: "基于深度学习的个性化学习系统研究",
                   fields: ["人工智能", "教育技术", "机器学习"],
                   submitTime: "2024-01-15",
                   status: "申报中",
@@ -459,6 +805,7 @@
                   number: "SB2024002",
                   applicant: "李博士",
                   direction: "区块链技术在供应链管理中的应用",
+                  topic: "面向供应链透明度的区块链溯源技术研究",
                   fields: ["区块链", "供应链", "分布式系统"],
                   submitTime: "2024-01-14",
                   status: "申报成功",
@@ -469,6 +816,7 @@
                   number: "SB2024003",
                   applicant: "王研究员",
                   direction: "量子计算算法优化研究",
+                  topic: "量子近似优化算法的改进与应用",
                   fields: ["量子计算", "算法优化", "物理"],
                   submitTime: "2024-01-13",
                   status: "申报失败",
@@ -479,26 +827,29 @@
                   number: "SB2024004",
                   applicant: "刘教授",
                   direction: "生物信息学数据分析方法研究",
+                  topic: "多组学数据整合分析新方法研究",
                   fields: ["生物信息学", "数据分析", "统计学"],
                   submitTime: "2024-01-12",
-                  status: "已撤回",
-                  statusType: "withdrawn",
+                  status: "申报成功",
+                  statusType: "success",
                 },
                 {
                   id: 5,
                   number: "SB2024005",
                   applicant: "陈博士",
                   direction: "物联网安全防护技术研究",
+                  topic: "轻量级物联网设备安全认证机制研究",
                   fields: ["物联网", "网络安全", "加密技术"],
                   submitTime: "2024-01-11",
-                  status: "草稿",
-                  statusType: "draft",
+                  status: "申报失败",
+                  statusType: "failed",
                 },
                 {
                   id: 6,
                   number: "SB2024006",
                   applicant: "赵教授",
                   direction: "机器学习在医疗诊断中的应用",
+                  topic: "基于联邦学习的医疗影像诊断系统",
                   fields: ["机器学习", "医疗诊断", "深度学习"],
                   submitTime: "2024-01-10",
                   status: "申报中",
@@ -509,6 +860,7 @@
                   number: "SB2024007",
                   applicant: "孙研究员",
                   direction: "新材料设计与性能预测",
+                  topic: "机器学习辅助的高性能复合材料设计",
                   fields: ["材料科学", "计算化学", "机器学习"],
                   submitTime: "2024-01-09",
                   status: "申报成功",
@@ -519,6 +871,7 @@
                   number: "SB2024008",
                   applicant: "周博士",
                   direction: "可再生能源系统优化",
+                  topic: "风光储一体化系统智能调度策略研究",
                   fields: ["可再生能源", "系统优化", "能源工程"],
                   submitTime: "2024-01-08",
                   status: "申报失败",
@@ -529,30 +882,11 @@
                   number: "SB2024009",
                   applicant: "吴教授",
                   direction: "数字孪生技术在智能制造中的应用",
+                  topic: "制造设备数字孪生建模与预测维护",
                   fields: ["数字孪生", "智能制造", "工业4.0"],
                   submitTime: "2024-01-07",
                   status: "申报中",
                   statusType: "submitting",
-                },
-                {
-                  id: 10,
-                  number: "SB2024010",
-                  applicant: "郑研究员",
-                  direction: "脑机接口技术研究",
-                  fields: ["脑机接口", "神经科学", "信号处理"],
-                  submitTime: "2024-01-06",
-                  status: "草稿",
-                  statusType: "draft",
-                },
-                {
-                  id: 11,
-                  number: "SB2024010",
-                  applicant: "李研究员",
-                  direction: "脑机接口技术研究",
-                  fields: ["脑机接口", "神经科学", "信号处理"],
-                  submitTime: "2024-01-06",
-                  status: "草稿",
-                  statusType: "draft",
                 },
               ];
 
@@ -560,7 +894,7 @@
               const start = (pagination.current - 1) * pagination.size;
               const end = start + pagination.size;
               declarations.value = declarations.value.slice(start, end);
-              pagination.total = 11; // 模拟总数
+              pagination.total = 9; // 模拟总数
             } catch (error) {
               ElMessage.error("加载申报列表失败，请重试");
             } finally {
@@ -624,39 +958,140 @@
             }
           };
 
-          // 撤回申报
-          const handleWithdraw = async (id) => {
-            try {
-              await ElMessageBox.confirm(
-                "确定要撤回此申报吗？撤回后将无法恢复。",
-                "确认撤回",
+          // 下载处理
+          const handleDownload = (command) => {
+            const { id, format } = command;
+            const formatNames = {
+              pdf: "PDF",
+              word: "Word",
+              markdown: "Markdown",
+            };
+
+            ElMessage.success(
+              `正在下载申报文档 (ID: ${id}, 格式: ${formatNames[format]})`
+            );
+
+            // 模拟下载过程
+            setTimeout(() => {
+              // 创建一个虚拟的下载链接
+              const link = document.createElement("a");
+              link.href = "#"; // 实际应用中这里应该是真实的文件URL
+              link.download = `申报文档_${id}.${
+                format === "word" ? "docx" : format
+              }`;
+
+              // 模拟文件内容（实际应用中应该从服务器获取）
+              const blob = new Blob(
+                [`申报文档内容 - ID: ${id}, 格式: ${formatNames[format]}`],
                 {
-                  confirmButtonText: "确定撤回",
-                  cancelButtonText: "取消",
-                  type: "warning",
+                  type:
+                    format === "pdf"
+                      ? "application/pdf"
+                      : format === "word"
+                      ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      : "text/markdown",
                 }
               );
-              ElMessage.success("申报已撤回");
-              loadDeclarations();
-            } catch {
-              ElMessage.info("已取消撤回");
-            }
+
+              link.href = URL.createObjectURL(blob);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(link.href);
+
+              ElMessage.success(`${formatNames[format]}格式文档下载完成`);
+            }, 1000);
           };
 
-          // 重新申报
-          const handleRedeclare = (id) => {
-            ElMessage.info(`重新申报：ID ${id}`);
-            // 跳转到新建申报页面，并预填数据
-            if (window.parent !== window) {
-              window.parent.postMessage(
+          // 预览处理
+          const handlePreview = (id) => {
+            ElMessage.info(`正在打开申报预览：ID ${id}`);
+
+            // 模拟预览功能
+            ElMessageBox.alert(
+              `这里将显示申报文档的预览内容。\n\n申报编号：SB2024${String(
+                id
+              ).padStart(
+                3,
+                "0"
+              )}\n研究方向：人工智能相关研究\n申报状态：申报成功\n\n实际应用中，这里会显示完整的申报文档内容或打开预览窗口。`,
+              "申报文档预览",
+              {
+                confirmButtonText: "关闭预览",
+                type: "info",
+                customClass: "preview-dialog",
+              }
+            );
+          };
+
+          // 状态编辑处理
+          const handleStatusEdit = async (id, newStatus) => {
+            console.log("handleStatusEdit called:", id, newStatus);
+
+            const statusLabels = {
+              submitting: "申报中",
+              success: "申报成功",
+              failed: "申报失败",
+            };
+
+            // 找到当前申报记录
+            const declaration = declarations.value.find((d) => d.id === id);
+            if (!declaration) {
+              console.log("Declaration not found:", id);
+              return;
+            }
+
+            const oldStatus = declaration.statusType;
+            const oldStatusLabel = declaration.status;
+
+            console.log("Status change:", oldStatus, "->", newStatus);
+
+            // 如果状态没有变化，直接返回
+            if (newStatus === oldStatus) {
+              console.log("No status change, returning");
+              return;
+            }
+
+            try {
+              await ElMessageBox.confirm(
+                `确定要将申报状态修改为"${statusLabels[newStatus]}"吗？`,
+                "确认修改",
                 {
-                  type: "navigate",
-                  path: "declaration/create",
-                },
-                "*"
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                  customClass: "modern-confirm-dialog",
+                  center: false,
+                  showClose: true,
+                  closeOnClickModal: false,
+                  closeOnPressEscape: true,
+                  beforeClose: (action, instance, done) => {
+                    if (action === "confirm") {
+                      instance.confirmButtonLoading = true;
+                      instance.confirmButtonText = "修改中...";
+                      setTimeout(() => {
+                        done();
+                        setTimeout(() => {
+                          instance.confirmButtonLoading = false;
+                        }, 300);
+                      }, 800);
+                    } else {
+                      done();
+                    }
+                  },
+                }
               );
-            } else {
-              window.location.href = "新建申报.html";
+
+              // 更新申报状态
+              declaration.statusType = newStatus;
+              declaration.status = statusLabels[newStatus];
+
+              ElMessage.success(`申报状态已修改为"${statusLabels[newStatus]}"`);
+            } catch {
+              // 用户取消，恢复原状态
+              declaration.statusType = oldStatus;
+              declaration.status = oldStatusLabel;
+              ElMessage.info("已取消修改");
             }
           };
 
@@ -971,13 +1406,15 @@
             declarations,
             pagination,
             statusOptions,
+            editableStatusOptions,
             handleSearch,
             handleStatusChange,
             handleReset,
             handleNewDeclaration,
             handleView,
-            handleWithdraw,
-            handleRedeclare,
+            handleDownload,
+            handlePreview,
+            handleStatusEdit,
             handleSizeChange,
             handleCurrentChange,
           };

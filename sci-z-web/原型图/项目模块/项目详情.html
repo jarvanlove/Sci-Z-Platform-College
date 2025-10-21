@@ -137,7 +137,7 @@
       .card-title {
         font-size: 16px;
         font-weight: 600;
-        color: #111827;
+        color: #1e3a8a;
         margin: 0;
       }
 
@@ -336,6 +336,25 @@
       }
 
       .upload-area.dragover {
+        border-color: #1e3a8a;
+        background: #f0f9ff;
+      }
+
+      /* 里程碑拖拽区域样式 */
+      .milestone-documents .upload-area {
+        border: 2px dashed #d1d5db;
+        border-radius: 6px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.3s, background-color 0.3s;
+      }
+
+      .milestone-documents .upload-area:hover {
+        border-color: #1e3a8a;
+      }
+
+      .milestone-documents .upload-area.dragover {
         border-color: #1e3a8a;
         background: #f0f9ff;
       }
@@ -595,33 +614,20 @@
               <h2 class="card-title">基本信息</h2>
             </div>
             <div class="info-grid">
+              <!-- 第一行：项目编号、项目名称 -->
               <div class="info-item">
                 <span class="info-label">项目编号</span>
                 <span class="info-value">{{ project.number }}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">项目名称</span>
-                <template v-if="isEditMode">
-                  <el-input
-                    v-model="project.name"
-                    placeholder="请输入项目名称"
-                  />
-                </template>
-                <template v-else>
-                  <span class="info-value">{{ project.name }}</span>
-                </template>
+                <span class="info-value">{{ project.name }}</span>
               </div>
+
+              <!-- 第二行：项目负责人、项目状态 -->
               <div class="info-item">
                 <span class="info-label">项目负责人</span>
-                <template v-if="isEditMode">
-                  <el-input
-                    v-model="project.manager"
-                    placeholder="请输入项目负责人"
-                  />
-                </template>
-                <template v-else>
-                  <span class="info-value">{{ project.manager }}</span>
-                </template>
+                <span class="info-value">{{ project.manager }}</span>
               </div>
               <div class="info-item">
                 <span class="info-label">项目状态</span>
@@ -629,6 +635,32 @@
                   >{{ getStatusText(project.status) }}</span
                 >
               </div>
+
+              <!-- 第三行：课题发布部门、研究方向 -->
+              <div class="info-item">
+                <span class="info-label">课题发布部门</span>
+                <span class="info-value"
+                  >{{ project.department || '暂无' }}</span
+                >
+              </div>
+              <div class="info-item">
+                <span class="info-label">研究方向</span>
+                <span class="info-value"
+                  >{{ project.researchDirection || '暂无' }}</span
+                >
+              </div>
+
+              <!-- 第四行：项目开始时间、项目结束时间 -->
+              <div class="info-item">
+                <span class="info-label">项目开始时间</span>
+                <span class="info-value">{{ project.createTime }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">项目结束时间</span>
+                <span class="info-value">{{ project.updateTime }}</span>
+              </div>
+
+              <!-- 第五行：项目预算 -->
               <div class="info-item">
                 <span class="info-label">项目预算</span>
                 <template v-if="isEditMode">
@@ -645,39 +677,9 @@
                   >
                 </template>
               </div>
-              <div class="info-item">
-                <span class="info-label">创建时间</span>
-                <template v-if="isEditMode">
-                  <el-date-picker
-                    v-model="project.createTime"
-                    type="date"
-                    placeholder="选择创建时间"
-                    style="width: 100%"
-                    format="YYYY-MM-DD"
-                    value-format="YYYY-MM-DD"
-                  />
-                </template>
-                <template v-else>
-                  <span class="info-value">{{ project.createTime }}</span>
-                </template>
-              </div>
-              <div class="info-item">
-                <span class="info-label">预计完成时间</span>
-                <template v-if="isEditMode">
-                  <el-date-picker
-                    v-model="project.updateTime"
-                    type="date"
-                    placeholder="选择预计完成时间"
-                    style="width: 100%"
-                    format="YYYY-MM-DD"
-                    value-format="YYYY-MM-DD"
-                  />
-                </template>
-                <template v-else>
-                  <span class="info-value">{{ project.updateTime }}</span>
-                </template>
-              </div>
             </div>
+
+            <!-- 项目描述单独一行 -->
             <div class="info-item" style="margin-top: 16px">
               <span class="info-label">项目描述</span>
               <template v-if="isEditMode">
@@ -929,7 +931,7 @@
                 >
                   <span
                     class="milestone-title"
-                    style="font-weight: 500; color: #374151"
+                    style="font-weight: 600; color: #1e3a8a"
                     >里程碑 {{ index + 1 }}</span
                   >
                   <el-button
@@ -953,6 +955,7 @@
                     <el-input
                       v-model="milestone.name"
                       placeholder="请输入里程碑名称"
+                      :disabled="!isEditMode"
                     />
                   </el-form-item>
                   <el-form-item label="开始时间">
@@ -963,6 +966,7 @@
                       style="width: 100%"
                       format="YYYY-MM-DD"
                       value-format="YYYY-MM-DD"
+                      :disabled="!isEditMode"
                     />
                   </el-form-item>
                   <el-form-item label="结束时间">
@@ -973,6 +977,7 @@
                       style="width: 100%"
                       format="YYYY-MM-DD"
                       value-format="YYYY-MM-DD"
+                      :disabled="!isEditMode"
                     />
                   </el-form-item>
                 </div>
@@ -982,8 +987,154 @@
                     type="textarea"
                     :rows="2"
                     placeholder="请输入里程碑描述"
+                    :disabled="!isEditMode"
                   />
                 </el-form-item>
+
+                <!-- 里程碑文档管理 -->
+                <div
+                  class="milestone-documents"
+                  style="
+                    margin-top: 16px;
+                    padding-top: 16px;
+                    border-top: 1px solid #e5e7eb;
+                  "
+                >
+                  <div style="margin-bottom: 12px">
+                    <h4
+                      style="
+                        margin: 0;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: #1e3a8a;
+                      "
+                    >
+                      里程碑文档
+                    </h4>
+                  </div>
+
+                  <!-- 文档列表 -->
+                  <div
+                    v-if="milestone.documents && milestone.documents.length > 0"
+                    class="document-list"
+                  >
+                    <div
+                      v-for="doc in milestone.documents"
+                      :key="doc.id"
+                      class="document-item"
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        padding: 12px;
+                        background: #f8fafc;
+                        border-radius: 6px;
+                        margin-bottom: 12px;
+                      "
+                    >
+                      <div
+                        style="
+                          width: 32px;
+                          height: 32px;
+                          border-radius: 4px;
+                          background: #dbeafe;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          color: #1e40af;
+                        "
+                      >
+                        📄
+                      </div>
+                      <div style="flex: 1">
+                        <div style="font-weight: 500; color: #374151">
+                          {{ doc.name }}
+                        </div>
+                        <div style="font-size: 12px; color: #6b7280">
+                          {{ doc.type }} · {{ doc.uploader }} · {{
+                          doc.uploadTime }} · {{ doc.size }}
+                        </div>
+                      </div>
+                      <div>
+                        <el-button size="small" @click="handlePreview(doc.id)"
+                          >预览</el-button
+                        >
+                        <el-button size="small" @click="handleDownload(doc.id)"
+                          >下载</el-button
+                        >
+                        <el-button
+                          v-if="isEditMode"
+                          size="small"
+                          type="danger"
+                          @click="handleDeleteMilestoneDoc(index, doc.id)"
+                        >
+                          删除
+                        </el-button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-else class="empty-state">
+                    <div class="empty-state-icon">📄</div>
+                    <div class="empty-state-text">暂无文档</div>
+                    <div class="empty-state-hint">上传里程碑相关文档</div>
+                  </div>
+
+                  <!-- 上传区域 -->
+                  <div class="upload-section" style="margin-top: 12px">
+                    <div
+                      class="upload-area"
+                      @click="triggerMilestoneUpload(index)"
+                      @dragover.prevent="handleMilestoneDragOver(index)"
+                      @dragleave.prevent="handleMilestoneDragLeave(index)"
+                      @drop.prevent="handleMilestoneDrop($event, index)"
+                      :class="{ dragover: milestonesDragOver[index] }"
+                      style="
+                        border: 2px dashed #d1d5db;
+                        border-radius: 6px;
+                        padding: 20px;
+                        text-align: center;
+                        cursor: pointer;
+                      "
+                    >
+                      <div
+                        class="upload-icon"
+                        style="
+                          font-size: 24px;
+                          color: #9ca3af;
+                          margin-bottom: 8px;
+                        "
+                      >
+                        <el-icon><Upload /></el-icon>
+                      </div>
+                      <div
+                        class="upload-text"
+                        style="
+                          font-size: 14px;
+                          color: #6b7280;
+                          margin-bottom: 4px;
+                        "
+                      >
+                        点击上传或拖拽文件到此处
+                      </div>
+                      <div
+                        class="upload-hint"
+                        style="font-size: 12px; color: #9ca3af"
+                      >
+                        支持
+                        PDF、DOC、DOCX、XLS、XLSX、PPT、TXT、MD、图片、压缩包等格式
+                      </div>
+                    </div>
+                    <input
+                      :id="`milestoneFileInput${index}`"
+                      type="file"
+                      multiple
+                      style="display: none"
+                      @change="handleMilestoneFileSelect($event, index)"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.rtf,.jpg,.jpeg,.png,.gif,.bmp,.svg,.webp,.zip,.rar,.7z,.tar,.gz,.mp4,.avi,.mov,.wmv,.flv,.mp3,.wav,.flac,.aac"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1055,128 +1206,6 @@
               >
             </template>
           </el-dialog>
-
-          <!-- 文档管理 -->
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">文档管理</h2>
-            </div>
-
-            <div
-              v-if="documents.length > 0"
-              class="document-list"
-              style="display: flex; flex-direction: column; gap: 12px"
-            >
-              <div
-                v-for="doc in documents"
-                :key="doc.id"
-                class="document-item"
-                style="
-                  display: flex;
-                  align-items: center;
-                  gap: 12px;
-                  padding: 12px;
-                  background: #f8fafc;
-                  border-radius: 6px;
-                  margin-bottom: 12px;
-                "
-              >
-                <div
-                  style="
-                    width: 32px;
-                    height: 32px;
-                    border-radius: 4px;
-                    background: #dbeafe;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: #1e40af;
-                  "
-                >
-                  📄
-                </div>
-                <div style="flex: 1">
-                  <div style="font-weight: 500; color: #374151">
-                    {{ doc.name }}
-                  </div>
-                  <div style="font-size: 12px; color: #6b7280">
-                    {{ doc.type }} · {{ doc.uploader }} · {{ doc.uploadTime }} ·
-                    {{ doc.size }}
-                  </div>
-                </div>
-                <div>
-                  <el-button size="small" @click="handlePreview(doc.id)"
-                    >预览</el-button
-                  >
-                  <el-button size="small" @click="handleDownload(doc.id)"
-                    >下载</el-button
-                  >
-                  <el-button
-                    size="small"
-                    type="danger"
-                    @click="handleDeleteDoc(doc.id)"
-                    >删除</el-button
-                  >
-                </div>
-              </div>
-            </div>
-
-            <div v-else class="empty-state">
-              <div class="empty-state-icon">📄</div>
-              <div class="empty-state-text">暂无文档</div>
-              <div class="empty-state-hint">上传项目相关文档</div>
-            </div>
-
-            <!-- 上传区域 -->
-            <div
-              class="upload-section"
-              style="margin-top: 12px"
-              v-if="isEditMode"
-            >
-              <div
-                class="upload-area"
-                style="
-                  border: 2px dashed #d1d5db;
-                  border-radius: 6px;
-                  padding: 20px;
-                  text-align: center;
-                  cursor: pointer;
-                "
-                @click="triggerUpload"
-                @dragover.prevent="handleDragOver"
-                @dragleave.prevent="handleDragLeave"
-                @drop.prevent="handleDrop"
-                :class="{ dragover: isDragOver }"
-              >
-                <div
-                  class="upload-icon"
-                  style="font-size: 24px; color: #9ca3af; margin-bottom: 8px"
-                >
-                  <el-icon><Upload /></el-icon>
-                </div>
-                <div
-                  class="upload-text"
-                  style="font-size: 14px; color: #6b7280; margin-bottom: 4px"
-                >
-                  点击上传或拖拽文件到此处
-                </div>
-                <div
-                  class="upload-hint"
-                  style="font-size: 12px; color: #9ca3af"
-                >
-                  支持 PDF、DOC、DOCX、XLS、XLSX 等格式
-                </div>
-              </div>
-              <input
-                ref="fileInput"
-                type="file"
-                multiple
-                style="display: none"
-                @change="handleFileSelect"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-              />
-            </div>
-          </div>
         </div>
 
         <!-- 操作按钮 -->
@@ -1197,14 +1226,14 @@
           <el-button @click="handleBack">取消</el-button>
           <el-button type="primary" @click="handleSaveProject">
             <el-icon><Check /></el-icon>
-            保存项目
+            更新项目
           </el-button>
         </div>
       </div>
     </div>
 
     <script>
-      const { createApp, ref, computed, onMounted } = Vue;
+      const { createApp, ref, computed, onMounted, nextTick } = Vue;
       const { ElMessage, ElMessageBox } = ElementPlus;
 
       // 注册Loading图标
@@ -1240,18 +1269,48 @@
           const searchResults = ref([]);
           const isDragOver = ref(false);
           const fileInput = ref(null);
+          // 里程碑拖拽状态管理
+          const milestonesDragOver = ref({});
           const milestones = ref([
             {
               name: "项目启动",
               description: "项目启动阶段",
               startTime: "2024-01-15",
               endTime: "2024-01-20",
+              documents: [
+                {
+                  id: 1,
+                  name: "项目启动会议纪要.pdf",
+                  type: "PDF",
+                  uploader: "张教授",
+                  uploadTime: "2024-01-15",
+                  size: "1.2MB",
+                },
+                {
+                  id: 2,
+                  name: "项目计划书.docx",
+                  type: "DOCX",
+                  uploader: "李博士",
+                  uploadTime: "2024-01-16",
+                  size: "2.1MB",
+                },
+              ],
             },
             {
               name: "需求分析",
               description: "需求分析阶段",
               startTime: "2024-01-21",
               endTime: "2024-01-31",
+              documents: [
+                {
+                  id: 3,
+                  name: "需求分析报告.pdf",
+                  type: "PDF",
+                  uploader: "王硕士",
+                  uploadTime: "2024-01-25",
+                  size: "3.5MB",
+                },
+              ],
             },
           ]);
 
@@ -1292,9 +1351,12 @@
             description:
               "本项目旨在开发一套基于深度学习的智能诊断系统，能够自动分析医学影像数据，为医生提供辅助诊断建议。系统将采用卷积神经网络和循环神经网络相结合的方法，提高诊断准确率和效率。",
             manager: "张教授",
+            department: "科委", // 新增：课题发布部门
+            researchDirection:
+              "基于深度学习的智能制造关键技术研究，重点围绕工业互联网、智能传感器、机器视觉等核心技术，推动制造业数字化转型升级。", // 新增：研究方向
             status: "progress",
-            createTime: "2024-01-15 09:00:00",
-            updateTime: "2024-01-20 14:30:00",
+            createTime: "2024-01-15",
+            updateTime: "2024-01-20",
             budget: 120000,
           };
 
@@ -1348,18 +1410,15 @@
             },
           ];
 
-          // 模拟搜索结果
-          const mockSearchResults = [
-            {
-              id: 4,
-              name: "赵博士",
-              studentId: "2021001",
-            },
-            {
-              id: 5,
-              name: "陈硕士",
-              studentId: "2021002",
-            },
+          // 用户列表数据（与新建项目保持一致）
+          const userList = [
+            { id: "1", name: "张教授", avatar: "../images/favicon.ico" },
+            { id: "2", name: "李博士", avatar: "../images/favicon.ico" },
+            { id: "3", name: "王教授", avatar: "../images/favicon.ico" },
+            { id: "4", name: "赵博士", avatar: "../images/favicon.ico" },
+            { id: "5", name: "陈教授", avatar: "../images/favicon.ico" },
+            { id: "6", name: "刘硕士", avatar: "../images/favicon.ico" },
+            { id: "7", name: "周博士", avatar: "../images/favicon.ico" },
           ];
 
           // 获取状态文本
@@ -1478,10 +1537,10 @@
 
             // 模拟搜索API
             const keyword = memberSearchKeyword.value.toLowerCase();
-            memberSearchResults.value = mockSearchResults.filter(
+            memberSearchResults.value = userList.filter(
               (user) =>
                 user.name.toLowerCase().includes(keyword) ||
-                user.studentId.toLowerCase().includes(keyword)
+                user.id.toLowerCase().includes(keyword)
             );
           };
 
@@ -1500,7 +1559,7 @@
             const newMember = {
               id: user.id,
               name: user.name,
-              role: "普通成员",
+              role: "member", // 使用与新建项目一致的角色标识
               joinTime: new Date().toISOString().split("T")[0],
             };
 
@@ -1523,6 +1582,9 @@
               manager: "项目负责人",
               core: "核心成员",
               member: "普通成员",
+              项目负责人: "项目负责人",
+              核心成员: "核心成员",
+              普通成员: "普通成员",
             };
             return roleMap[role] || "普通成员";
           };
@@ -1702,6 +1764,184 @@
             milestones.value.splice(index, 1);
           };
 
+          // 里程碑文档管理方法
+          const triggerMilestoneUpload = (milestoneIndex) => {
+            // 使用nextTick确保DOM已更新
+            nextTick(() => {
+              const fileInput = document.getElementById(
+                `milestoneFileInput${milestoneIndex}`
+              );
+              if (fileInput) {
+                fileInput.click();
+              } else {
+                // 备用方法：通过查询选择器查找
+                const allInputs =
+                  document.querySelectorAll('input[type="file"]');
+                const targetInput = Array.from(allInputs).find(
+                  (input) => input.id === `milestoneFileInput${milestoneIndex}`
+                );
+                if (targetInput) {
+                  targetInput.click();
+                }
+              }
+            });
+          };
+
+          const handleMilestoneFileSelect = (event, milestoneIndex) => {
+            const files = event.target.files;
+            if (files.length > 0) {
+              uploadMilestoneFiles(files, milestoneIndex);
+              // 清空input值，允许重复选择同一文件
+              event.target.value = "";
+            }
+          };
+
+          const uploadMilestoneFiles = (files, milestoneIndex) => {
+            // 验证文件 - 支持更多格式
+            const allowedTypes = [
+              ".pdf",
+              ".doc",
+              ".docx",
+              ".xls",
+              ".xlsx",
+              ".ppt",
+              ".pptx", // 办公文档
+              ".txt",
+              ".md",
+              ".rtf", // 文本文档
+              ".jpg",
+              ".jpeg",
+              ".png",
+              ".gif",
+              ".bmp",
+              ".svg",
+              ".webp", // 图片
+              ".zip",
+              ".rar",
+              ".7z",
+              ".tar",
+              ".gz", // 压缩包
+              ".mp4",
+              ".avi",
+              ".mov",
+              ".wmv",
+              ".flv", // 视频
+              ".mp3",
+              ".wav",
+              ".flac",
+              ".aac", // 音频
+            ];
+            const maxSize = 50 * 1024 * 1024; // 50MB
+
+            for (let file of files) {
+              const fileExt = "." + file.name.split(".").pop().toLowerCase();
+              if (!allowedTypes.includes(fileExt)) {
+                ElMessage.error(`不支持的文件类型: ${file.name}`);
+                return;
+              }
+              if (file.size > maxSize) {
+                ElMessage.error(`文件过大: ${file.name} (最大支持50MB)`);
+                return;
+              }
+            }
+
+            // 初始化文档数组
+            if (!milestones.value[milestoneIndex].documents) {
+              milestones.value[milestoneIndex].documents = [];
+            }
+
+            // 显示上传进度
+            const loadingMessage = ElMessage({
+              message: `正在上传 ${files.length} 个文件...`,
+              type: "info",
+              duration: 0,
+              showClose: false,
+            });
+
+            // 模拟上传过程
+            setTimeout(() => {
+              loadingMessage.close();
+
+              let successCount = 0;
+              for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+
+                // 检查是否已存在同名文件
+                const existingDoc = milestones.value[
+                  milestoneIndex
+                ].documents.find((doc) => doc.name === file.name);
+
+                if (existingDoc) {
+                  ElMessage.warning(`文件已存在: ${file.name}`);
+                  continue;
+                }
+
+                const newDoc = {
+                  id: Date.now() + Math.random() + i,
+                  name: file.name,
+                  type: file.name.split(".").pop().toUpperCase(),
+                  uploader: "当前用户",
+                  uploadTime: new Date().toISOString().split("T")[0],
+                  size: formatFileSize(file.size),
+                };
+
+                milestones.value[milestoneIndex].documents.push(newDoc);
+                successCount++;
+              }
+
+              if (successCount > 0) {
+                ElMessage.success(
+                  `已为里程碑 ${
+                    milestoneIndex + 1
+                  } 成功添加 ${successCount} 个文档`
+                );
+              }
+            }, 1000); // 模拟1秒上传时间
+          };
+
+          // 格式化文件大小
+          const formatFileSize = (bytes) => {
+            if (bytes === 0) return "0 B";
+            const k = 1024;
+            const sizes = ["B", "KB", "MB", "GB"];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return (
+              parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
+            );
+          };
+
+          const handleDeleteMilestoneDoc = (milestoneIndex, docId) => {
+            const milestone = milestones.value[milestoneIndex];
+            if (milestone.documents) {
+              const docIndex = milestone.documents.findIndex(
+                (doc) => doc.id === docId
+              );
+              if (docIndex > -1) {
+                const docName = milestone.documents[docIndex].name;
+                milestone.documents.splice(docIndex, 1);
+                ElMessage.success(`已删除文档: ${docName}`);
+              }
+            }
+          };
+
+          // 里程碑拖拽事件处理
+          const handleMilestoneDragOver = (milestoneIndex) => {
+            milestonesDragOver.value[milestoneIndex] = true;
+          };
+
+          const handleMilestoneDragLeave = (milestoneIndex) => {
+            milestonesDragOver.value[milestoneIndex] = false;
+          };
+
+          const handleMilestoneDrop = (event, milestoneIndex) => {
+            event.preventDefault();
+            milestonesDragOver.value[milestoneIndex] = false;
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+              uploadMilestoneFiles(files, milestoneIndex);
+            }
+          };
+
           // 组件挂载时加载数据
           onMounted(() => {
             console.log("项目详情页面加载中...");
@@ -1752,6 +1992,16 @@
             closeMilestoneDialog,
             confirmAddMilestone,
             handleRemoveMilestone,
+            // 里程碑文档管理相关
+            triggerMilestoneUpload,
+            handleMilestoneFileSelect,
+            handleDeleteMilestoneDoc,
+            formatFileSize,
+            // 里程碑拖拽相关
+            milestonesDragOver,
+            handleMilestoneDragOver,
+            handleMilestoneDragLeave,
+            handleMilestoneDrop,
           };
         },
       })

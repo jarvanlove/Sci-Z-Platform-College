@@ -461,6 +461,24 @@
                       <div class="help-text">API 请求的超时时间</div>
                     </el-form-item>
 
+                    <el-form-item label="工作流名称" prop="workflowName">
+                      <el-input
+                        v-model="difyConfig.workflowName"
+                        placeholder="请输入工作流名称"
+                      />
+                      <div class="help-text">工作流的显示名称</div>
+                    </el-form-item>
+
+                    <el-form-item label="工作流描述" prop="workflowDescription">
+                      <el-input
+                        v-model="difyConfig.workflowDescription"
+                        type="textarea"
+                        :rows="3"
+                        placeholder="请输入工作流描述"
+                      />
+                      <div class="help-text">描述该工作流的功能和用途</div>
+                    </el-form-item>
+
                     <el-form-item label="启用调试模式" prop="enableDebug">
                       <el-switch v-model="difyConfig.enableDebug" />
                       <div class="help-text">
@@ -756,6 +774,8 @@
             apiKey: "",
             workflowId: "",
             timeout: 60,
+            workflowName: "",
+            workflowDescription: "",
             enableDebug: false,
           });
 
@@ -776,6 +796,12 @@
             timeout: [
               { required: true, message: "请输入超时时间", trigger: "blur" },
               { type: "number", message: "必须为数字", trigger: "blur" },
+            ],
+            workflowName: [
+              { required: true, message: "请输入工作流名称", trigger: "blur" },
+            ],
+            workflowDescription: [
+              { required: true, message: "请输入工作流描述", trigger: "blur" },
             ],
           };
 
