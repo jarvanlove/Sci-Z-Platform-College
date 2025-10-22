@@ -451,7 +451,7 @@
           <div class="filter-section">
             <el-input
               v-model="searchForm.keyword"
-              placeholder="请输入用户名、姓名或学工号"
+              :placeholder="`请输入用户名、姓名或${industryConfig.employeeIdLabel}`"
               clearable
               style="width: 300px"
               @clear="handleSearch"
@@ -512,10 +512,14 @@
                 <tr>
                   <th style="width: 120px">用户名</th>
                   <th style="width: 100px">真实姓名</th>
-                  <th style="width: 120px">学工号</th>
+                  <th style="width: 120px">
+                    {{ industryConfig.employeeIdLabel }}
+                  </th>
                   <th style="width: 200px">邮箱</th>
-                  <th style="width: 150px">所属院系</th>
-                  <th style="width: 120px">角色</th>
+                  <th style="width: 150px">
+                    {{ industryConfig.departmentLabel }}
+                  </th>
+                  <th style="width: 120px">{{ industryConfig.roleLabel }}</th>
                   <th style="width: 100px">状态</th>
                   <th style="width: 280px">操作</th>
                 </tr>
@@ -611,10 +615,13 @@
               />
             </el-form-item>
 
-            <el-form-item label="学工号" prop="employeeId">
+            <el-form-item
+              :label="industryConfig.employeeIdLabel"
+              prop="employeeId"
+            >
               <el-input
                 v-model="userForm.employeeId"
-                placeholder="请输入学工号"
+                :placeholder="`请输入${industryConfig.employeeIdLabel}`"
               />
             </el-form-item>
 
@@ -634,24 +641,32 @@
               />
             </el-form-item>
 
-            <el-form-item label="所属院系" prop="department">
+            <el-form-item
+              :label="industryConfig.departmentLabel"
+              prop="department"
+            >
               <el-select
                 v-model="userForm.department"
-                placeholder="请选择所属院系"
+                :placeholder="`请选择${industryConfig.departmentLabel}`"
                 style="width: 100%"
               >
-                <el-option label="计算机科学学院" value="computer" />
-                <el-option label="人工智能学院" value="ai" />
-                <el-option label="软件学院" value="software" />
-                <el-option label="信息工程学院" value="information" />
+                <el-option
+                  v-for="dept in departments"
+                  :key="dept.value"
+                  :label="dept.label"
+                  :value="dept.value"
+                />
               </el-select>
             </el-form-item>
 
-            <el-form-item label="角色" prop="role">
+            <el-form-item :label="industryConfig.roleLabel" prop="role">
               <el-radio-group v-model="userForm.role">
-                <el-radio label="admin">管理员</el-radio>
-                <el-radio label="teacher">教师</el-radio>
-                <el-radio label="student">学生</el-radio>
+                <el-radio
+                  v-for="role in roles"
+                  :key="role.value"
+                  :label="role.value"
+                  >{{ role.label }}</el-radio
+                >
               </el-radio-group>
             </el-form-item>
 
@@ -707,6 +722,15 @@
           const showUserDialog = ref(false);
           const editMode = ref(false);
 
+          // 行业配置
+          const industryConfig = ref({
+            industryType: "education",
+            industryName: "教育行业",
+            departmentLabel: "所属院系",
+            roleLabel: "角色",
+            employeeIdLabel: "学工号",
+          });
+
           // 搜索表单
           const searchForm = reactive({
             keyword: "",
@@ -720,6 +744,60 @@
             size: 10,
             total: 0,
           });
+
+          // 部门列表 - 动态加载
+          const departments = ref([]);
+
+          // 角色列表 - 动态加载
+          const roles = ref([]);
+
+          // 加载行业配置
+          const loadIndustryConfig = async () => {
+            try {
+              const response = await fetch("/api/industry-config/current");
+              const data = await response.json();
+              industryConfig.value = data;
+            } catch (error) {
+              console.log("使用默认教育行业配置");
+            }
+          };
+
+          // 加载部门列表
+          const loadDepartments = async () => {
+            try {
+              const response = await fetch(
+                `/api/departments?industry=${industryConfig.value.industryType}`
+              );
+              const data = await response.json();
+              departments.value = data;
+            } catch (error) {
+              // 使用默认教育行业数据
+              departments.value = [
+                { label: "计算机科学学院", value: "computer" },
+                { label: "人工智能学院", value: "ai" },
+                { label: "软件学院", value: "software" },
+                { label: "信息工程学院", value: "information" },
+              ];
+            }
+          };
+
+          // 加载角色列表
+          const loadRoles = async () => {
+            try {
+              const response = await fetch(
+                `/api/roles?industry=${industryConfig.value.industryType}`
+              );
+              const data = await response.json();
+              roles.value = data;
+            } catch (error) {
+              // 使用默认教育行业数据
+              roles.value = [
+                { label: "管理员", value: "admin" },
+                { label: "教师", value: "teacher" },
+                { label: "学生", value: "student" },
+              ];
+            }
+          };
 
           // 用户列表数据
           const users = ref([
@@ -803,7 +881,11 @@
               { required: true, message: "请输入真实姓名", trigger: "blur" },
             ],
             employeeId: [
-              { required: true, message: "请输入学工号", trigger: "blur" },
+              {
+                required: true,
+                message: `请输入${industryConfig.value.employeeIdLabel}`,
+                trigger: "blur",
+              },
             ],
             email: [
               { required: true, message: "请输入邮箱", trigger: "blur" },
@@ -822,10 +904,18 @@
               },
             ],
             department: [
-              { required: true, message: "请选择所属院系", trigger: "change" },
+              {
+                required: true,
+                message: `请选择${industryConfig.value.departmentLabel}`,
+                trigger: "change",
+              },
             ],
             role: [
-              { required: true, message: "请选择角色", trigger: "change" },
+              {
+                required: true,
+                message: `请选择${industryConfig.value.roleLabel}`,
+                trigger: "change",
+              },
             ],
             password: [
               { required: true, message: "请输入初始密码", trigger: "blur" },
@@ -1306,7 +1396,14 @@
             }
           };
 
-          onMounted(() => {
+          onMounted(async () => {
+            // 加载行业配置
+            await loadIndustryConfig();
+            // 加载部门列表
+            await loadDepartments();
+            // 加载角色列表
+            await loadRoles();
+
             pagination.total = users.value.length;
             setTimeout(() => {
               initPagination();
@@ -1319,6 +1416,9 @@
             saving,
             showUserDialog,
             editMode,
+            industryConfig,
+            departments,
+            roles,
             searchForm,
             pagination,
             users,
@@ -1340,6 +1440,9 @@
             handleDelete,
             handleSubmit,
             handleDialogClose,
+            loadIndustryConfig,
+            loadDepartments,
+            loadRoles,
           };
         },
       });

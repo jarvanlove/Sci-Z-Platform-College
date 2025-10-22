@@ -441,11 +441,14 @@
                 </div>
               </el-form-item>
 
-              <!-- 所属院系 -->
-              <el-form-item label="所属院系" prop="department">
+              <!-- 所属部门 -->
+              <el-form-item
+                :label="industryConfig.departmentLabel"
+                prop="department"
+              >
                 <el-select
                   v-model="userInfo.department"
-                  placeholder="请选择所属院系"
+                  :placeholder="`请选择${industryConfig.departmentLabel}`"
                   filterable
                   clearable
                   style="width: 100%"
@@ -459,11 +462,11 @@
                 </el-select>
               </el-form-item>
 
-              <!-- 职称 -->
-              <el-form-item label="职称" prop="title">
+              <!-- 职务/职称 -->
+              <el-form-item :label="industryConfig.roleLabel" prop="title">
                 <el-select
                   v-model="userInfo.title"
-                  placeholder="请选择职称"
+                  :placeholder="`请选择${industryConfig.roleLabel}`"
                   filterable
                   clearable
                   style="width: 100%"
@@ -590,24 +593,73 @@
             avatar: "../images/favicon.ico",
           });
 
-          // 院系列表
-          const departments = ref([
-            { label: "计算机科学学院", value: "computer" },
-            { label: "人工智能学院", value: "ai" },
-            { label: "软件学院", value: "software" },
-            { label: "信息工程学院", value: "information" },
-            { label: "数学学院", value: "math" },
-            { label: "物理学院", value: "physics" },
-          ]);
+          // 行业配置
+          const industryConfig = ref({
+            industryType: "education",
+            industryName: "教育行业",
+            departmentLabel: "所属院系",
+            roleLabel: "职称",
+            employeeIdLabel: "学工号",
+          });
 
-          // 职称列表
-          const titles = ref([
-            { label: "教授", value: "professor" },
-            { label: "副教授", value: "associate_professor" },
-            { label: "讲师", value: "lecturer" },
-            { label: "助教", value: "assistant" },
-            { label: "研究员", value: "researcher" },
-          ]);
+          // 院系列表 - 动态加载
+          const departments = ref([]);
+
+          // 职称列表 - 动态加载
+          const titles = ref([]);
+
+          // 加载行业配置
+          const loadIndustryConfig = async () => {
+            try {
+              // 模拟API调用
+              const response = await fetch("/api/industry-config/current");
+              const data = await response.json();
+              industryConfig.value = data;
+            } catch (error) {
+              console.log("使用默认教育行业配置");
+            }
+          };
+
+          // 加载部门列表
+          const loadDepartments = async () => {
+            try {
+              const response = await fetch(
+                `/api/departments?industry=${industryConfig.value.industryType}`
+              );
+              const data = await response.json();
+              departments.value = data;
+            } catch (error) {
+              // 使用默认教育行业数据
+              departments.value = [
+                { label: "计算机科学学院", value: "computer" },
+                { label: "人工智能学院", value: "ai" },
+                { label: "软件学院", value: "software" },
+                { label: "信息工程学院", value: "information" },
+                { label: "数学学院", value: "math" },
+                { label: "物理学院", value: "physics" },
+              ];
+            }
+          };
+
+          // 加载职称列表
+          const loadTitles = async () => {
+            try {
+              const response = await fetch(
+                `/api/titles?industry=${industryConfig.value.industryType}`
+              );
+              const data = await response.json();
+              titles.value = data;
+            } catch (error) {
+              // 使用默认教育行业数据
+              titles.value = [
+                { label: "教授", value: "professor" },
+                { label: "副教授", value: "associate_professor" },
+                { label: "讲师", value: "lecturer" },
+                { label: "助教", value: "assistant" },
+                { label: "研究员", value: "researcher" },
+              ];
+            }
+          };
 
           // 表单验证规则
           const rules = {
@@ -637,7 +689,11 @@
               },
             ],
             department: [
-              { required: true, message: "请选择所属院系", trigger: "change" },
+              {
+                required: true,
+                message: `请选择${industryConfig.value.departmentLabel}`,
+                trigger: "change",
+              },
             ],
           };
 
@@ -823,7 +879,13 @@
               .catch(() => {});
           };
 
-          onMounted(() => {
+          onMounted(async () => {
+            // 加载行业配置
+            await loadIndustryConfig();
+            // 加载部门列表
+            await loadDepartments();
+            // 加载职称列表
+            await loadTitles();
             console.log("个人信息页面已加载");
           });
 
@@ -835,6 +897,7 @@
             cropImageSrc,
             defaultAvatar,
             userInfo,
+            industryConfig,
             departments,
             titles,
             rules,
@@ -848,6 +911,9 @@
             handleCropConfirm,
             handleSave,
             handleReset,
+            loadIndustryConfig,
+            loadDepartments,
+            loadTitles,
           };
         },
       })

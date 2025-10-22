@@ -353,6 +353,54 @@
             <el-tab-pane label="基本配置" name="basic">
               <div class="config-form">
                 <div class="config-section">
+                  <div class="config-section-title">行业配置</div>
+                  <el-form
+                    :model="industryConfig"
+                    :rules="industryRules"
+                    ref="industryFormRef"
+                    label-width="120px"
+                    class="config-form"
+                  >
+                    <el-form-item label="当前行业" prop="industryType">
+                      <el-select
+                        v-model="industryConfig.industryType"
+                        placeholder="请选择行业类型"
+                        style="width: 300px"
+                        @change="handleIndustryChange"
+                      >
+                        <el-option label="教育行业" value="education" />
+                        <el-option label="医疗行业" value="medical" />
+                        <el-option label="电力行业" value="power" />
+                      </el-select>
+                    </el-form-item>
+
+                    <el-form-item label="部门标签" prop="departmentLabel">
+                      <el-input
+                        v-model="industryConfig.departmentLabel"
+                        placeholder="请输入部门标签"
+                        style="width: 300px"
+                      />
+                    </el-form-item>
+
+                    <el-form-item label="角色标签" prop="roleLabel">
+                      <el-input
+                        v-model="industryConfig.roleLabel"
+                        placeholder="请输入角色标签"
+                        style="width: 300px"
+                      />
+                    </el-form-item>
+
+                    <el-form-item label="员工ID标签" prop="employeeIdLabel">
+                      <el-input
+                        v-model="industryConfig.employeeIdLabel"
+                        placeholder="请输入员工ID标签"
+                        style="width: 300px"
+                      />
+                    </el-form-item>
+                  </el-form>
+                </div>
+
+                <div class="config-section">
                   <div class="config-section-title">系统信息</div>
                   <el-form
                     :model="basicConfig"
@@ -735,6 +783,7 @@
       const app = createApp({
         setup() {
           const basicFormRef = ref();
+          const industryFormRef = ref();
           const difyFormRef = ref();
           const emailFormRef = ref();
           const fileFormRef = ref();
@@ -744,6 +793,31 @@
           const saving = ref(false);
           const testingEmail = ref(false);
           const newFormat = ref("");
+
+          // 行业配置
+          const industryConfig = reactive({
+            industryType: "education",
+            industryName: "教育行业",
+            departmentLabel: "所属院系",
+            roleLabel: "角色",
+            employeeIdLabel: "学工号",
+          });
+
+          // 行业配置验证规则
+          const industryRules = {
+            industryType: [
+              { required: true, message: "请选择行业类型", trigger: "change" },
+            ],
+            departmentLabel: [
+              { required: true, message: "请输入部门标签", trigger: "blur" },
+            ],
+            roleLabel: [
+              { required: true, message: "请输入角色标签", trigger: "blur" },
+            ],
+            employeeIdLabel: [
+              { required: true, message: "请输入员工ID标签", trigger: "blur" },
+            ],
+          };
 
           // 基本配置
           const basicConfig = reactive({
@@ -915,12 +989,46 @@
             }
           };
 
+          // 行业切换处理
+          const handleIndustryChange = (industryType) => {
+            const industryMap = {
+              education: {
+                industryName: "教育行业",
+                departmentLabel: "所属院系",
+                roleLabel: "角色",
+                employeeIdLabel: "学工号",
+              },
+              medical: {
+                industryName: "医疗行业",
+                departmentLabel: "所属科室",
+                roleLabel: "职务",
+                employeeIdLabel: "工号",
+              },
+              power: {
+                industryName: "电力行业",
+                departmentLabel: "所属部门",
+                roleLabel: "岗位",
+                employeeIdLabel: "员工号",
+              },
+            };
+
+            const config = industryMap[industryType];
+            if (config) {
+              industryConfig.industryName = config.industryName;
+              industryConfig.departmentLabel = config.departmentLabel;
+              industryConfig.roleLabel = config.roleLabel;
+              industryConfig.employeeIdLabel = config.employeeIdLabel;
+            }
+          };
+
           // 保存配置
           const handleSave = async (type) => {
             try {
               let formRef;
               switch (type) {
                 case "basic":
+                  // 验证行业配置和基本配置
+                  await industryFormRef.value.validate();
                   formRef = basicFormRef.value;
                   break;
                 case "dify":
@@ -994,6 +1102,7 @@
 
           return {
             basicFormRef,
+            industryFormRef,
             difyFormRef,
             emailFormRef,
             fileFormRef,
@@ -1002,6 +1111,8 @@
             saving,
             testingEmail,
             newFormat,
+            industryConfig,
+            industryRules,
             basicConfig,
             basicRules,
             difyConfig,
@@ -1017,6 +1128,7 @@
             handleSave,
             handleReset,
             handleTestEmail,
+            handleIndustryChange,
           };
         },
       });
