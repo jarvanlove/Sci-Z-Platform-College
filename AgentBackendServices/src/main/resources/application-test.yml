@@ -1,0 +1,79 @@
+# 测试环境配置
+spring:
+  # 数据源配置
+  datasource:
+    url: jdbc:postgresql://test-db-server:5432/sci_z_platform_test
+    username: test_user
+    password: test_password
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # Redis 配置
+  data:
+    redis:
+      host: test-redis-server
+      port: 6379
+      password: test_redis_password
+      database: 1
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-wait: -1ms
+          max-idle: 16
+          min-idle: 2
+
+  # RabbitMQ 配置
+  rabbitmq:
+    host: test-rabbitmq-server
+    port: 5672
+    username: test_user
+    password: test_password
+    virtual-host: /test
+    connection-timeout: 15000
+    listener:
+      simple:
+        acknowledge-mode: manual
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000
+
+# MyBatis 配置
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.server.agentbackendservices.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    cache-enabled: true
+    lazy-loading-enabled: true
+
+# 日志配置
+logging:
+  level:
+    root: WARN
+    com.server.agentbackendservices: INFO
+    org.springframework.web: INFO
+    org.mybatis: INFO
+  file:
+    name: logs/agent-backend-test.log
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 7
+
+# 测试专用配置
+test:
+  database:
+    cleanup: true
+    reset-data: true
+  mock:
+    external-services: true
+  performance:
+    timeout: 5000

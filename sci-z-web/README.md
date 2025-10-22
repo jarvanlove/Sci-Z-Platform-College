@@ -37,8 +37,8 @@
 
 #### 后端技术栈
 
-- Java 11 (LTS) - 编程语言
-- Spring Boot 2.7.x - 应用框架
+- Java 21 (LTS) - 编程语言
+- Spring Boot 3. - 应用框架
 - Spring Cloud Alibaba - 微服务框架
 - PostgreSQL 14+ - 关系型数据库
 - Redis 6+ - 缓存与会话

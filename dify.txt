@@ -1,0 +1,7 @@
+http://192.168.1.203/console/api/datasets/6866e4ef-91ba-492c-a91b-5a76dabea0f9/documents
+
+authorization
+Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMjEzNDI2ODMtNmU1Mi00MTliLThkNzMtMmJjYzMyN2QzZmFlIiwiZXhwIjoxNzYxMDM4Njk1LCJpc3MiOiJTRUxGX0hPU1RFRCIsInN1YiI6IkNvbnNvbGUgQVBJIFBhc3Nwb3J0In0.iubL0vYEemMyToMaNLEubbyTAiYqe_qFiOEFKyQcsxA
+content-type:application/json
+
+{"data_source":{"type":"upload_file","info_list":{"data_source_type":"upload_file","file_info_list":{"file_ids":["c0ed597d-7746-4c0c-8547-c80affc8fed6"]}}},"indexing_technique":"high_quality","process_rule":{"rules":{"pre_processing_rules":[{"id":"remove_extra_spaces","enabled":true},{"id":"remove_urls_emails","enabled":false}],"segmentation":{"separator":"\n\n","max_tokens":1024},"parent_mode":"paragraph","subchunk_segmentation":{"separator":"\n","max_tokens":512}},"mode":"hierarchical"},"doc_form":"hierarchical_model","doc_language":"English","retrieval_model":{"search_method":"hybrid_search","reranking_enable":true,"reranking_mode":"reranking_model","reranking_model":{"reranking_provider_name":"langgenius/tongyi/tongyi","reranking_model_name":"gte-rerank"},"weights":{"weight_type":"customized","keyword_setting":{"keyword_weight":0.3},"vector_setting":{"vector_weight":0.7,"embedding_model_name":"","embedding_provider_name":""}},"top_k":3,"score_threshold_enabled":false,"score_threshold":0},"embedding_model":"text-embedding-v3","embedding_model_provider":"langgenius/tongyi/tongyi"}
