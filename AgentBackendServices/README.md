@@ -1,4 +1,4 @@
-# AgentBackendServices
+~~# AgentBackendServices
 
 ## 📋 项目简介
 
@@ -58,13 +58,6 @@ AgentBackendServices/
 │   │   │       │   └── config/         # 系统配置
 │   │   │       │       ├── SaTokenConfig.java
 │   │   │       │       └── TokenValidationInterceptor.java
-│   │   │       ├── controller/         # 控制器层
-│   │   │       ├── service/            # 业务逻辑层
-│   │   │       ├── mapper/             # 数据访问层
-│   │   │       ├── entity/             # 实体类
-│   │   │       ├── dto/                # 数据传输对象
-│   │   │       ├── config/             # 配置类
-│   │   │       └── util/               # 工具类
 │   │   └── resources/
 │   │       ├── application.yml         # 基础配置
 │   │       ├── application-dev.yml     # 开发环境配置
@@ -714,4 +707,4 @@ public class SwaggerConfig {
   - OAuth 2.0 集成
   - 多因子认证
   - 数据加密
-  - 审计日志
+  - 审计日志~~
