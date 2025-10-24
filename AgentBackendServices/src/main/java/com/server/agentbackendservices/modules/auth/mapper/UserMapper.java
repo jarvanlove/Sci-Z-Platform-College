@@ -5,7 +5,7 @@ package com.server.agentbackendservices.modules.auth.mapper;
 
 import com.server.agentbackendservices.modules.auth.entity.User;
 import org.apache.ibatis.annotations.Mapper;
-import com.server.agentbackendservices.mapper.MyBaseMapper;
+import com.server.agentbackendservices.modules.common.mapper.MyBaseMapper;
 
 @Mapper
 public interface UserMapper extends MyBaseMapper<User> {

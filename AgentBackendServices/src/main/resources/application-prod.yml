@@ -117,6 +117,15 @@ security:
     allowed-headers: "*"
     allow-credentials: true
 
+# Dify API 配置
+dify:
+  base-url: ${DIFY_BASE_URL:https://api.dify.ai}
+  api-token: ${DIFY_API_TOKEN}
+  timeout: ${DIFY_TIMEOUT:60000}
+  connect-timeout: ${DIFY_CONNECT_TIMEOUT:30000}
+  retry-count: ${DIFY_RETRY_COUNT:5}
+  enable-retry: ${DIFY_ENABLE_RETRY:true}
+
 # 缓存配置
 cache:
   redis:

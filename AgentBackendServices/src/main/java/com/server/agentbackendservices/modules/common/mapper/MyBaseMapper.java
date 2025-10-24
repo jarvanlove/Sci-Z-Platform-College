@@ -1,4 +1,4 @@
-package com.server.agentbackendservices.mapper;
+package com.server.agentbackendservices.modules.common.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 

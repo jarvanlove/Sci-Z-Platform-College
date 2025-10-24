@@ -17,8 +17,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/users")
 public class UserController extends BaseController<UserMapper, User> {
-
-
     /**
      * 获取所有用户列表 (GET方法)
      * @return 用户列表

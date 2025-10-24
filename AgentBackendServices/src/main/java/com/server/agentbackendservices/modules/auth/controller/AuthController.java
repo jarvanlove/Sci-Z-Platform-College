@@ -24,9 +24,7 @@ import jakarta.validation.Valid;
 @RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
-
     private final AuthService authService;
-
     /**
      * 用户登录
      */
@@ -36,7 +34,6 @@ public class AuthController {
         LoginResponse response = authService.login(loginRequest);
         return ResultVO.ok(response, "登录成功");
     }
-
     /**
      * 用户登出
      */
