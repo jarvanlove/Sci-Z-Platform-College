@@ -1,0 +1,392 @@
+/**
+ * 高校科研项目管理平台 - 统一设计系统
+ * 基于原型图规范，建立统一的设计语言
+ */
+
+// ================================
+// 1. 设计令牌 (Design Tokens)
+// ================================
+
+:root {
+  /* 主色调 - 深蓝色系 (学术蓝) */
+  --color-primary: #1e3a8a;
+  --color-primary-light: #2563eb;
+  --color-primary-lighter: #3b82f6;
+  --color-primary-lightest: #60a5fa;
+  --color-primary-dark: #1e40af;
+
+  /* 辅助色 - 皇家蓝色系 (优雅蓝) */
+  --color-accent: #4169e1;
+  --color-accent-light: #6b8cff;
+  --color-accent-dark: #2952cc;
+
+  /* 功能色 */
+  --color-info: #2563eb;
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-error: #dc2626;
+
+  /* 中性色 */
+  --bg: #f7f9fc;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+  --border-hover: #cbd5e1;
+  --text: #111827;
+  --text-2: #4b5563;
+  --text-3: #6b7280;
+  --hover: #eef2ff;
+  --disabled: #9ca3af;
+
+  /* 间距系统 */
+  --gap-xs: 4px;
+  --gap-sm: 8px;
+  --gap-md: 12px;
+  --gap-lg: 16px;
+  --gap-xl: 20px;
+  --gap-2xl: 24px;
+  --gap-3xl: 32px;
+
+  /* 圆角系统 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* 阴影系统 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+
+  /* 字体系统 */
+  --font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Microsoft YaHei, sans-serif;
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 20px;
+  --font-size-3xl: 24px;
+
+  /* 行高系统 */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+}
+
+// ================================
+// 2. 全局基础样式
+// ================================
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// ================================
+// 3. 滚动条统一样式
+// ================================
+
+/* 全局滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(107, 114, 128, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.5);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+// ================================
+// 4. 弹窗统一样式
+// ================================
+
+/* Element Plus 弹窗统一样式 */
+.el-dialog {
+  border-radius: var(--radius-xl) !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg) !important;
+  font-family: var(--font-family);
+}
+
+.el-dialog__header {
+  padding: var(--gap-xl) var(--gap-2xl) var(--gap-lg) var(--gap-2xl) !important;
+  border-bottom: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+}
+
+.el-dialog__title {
+  font-size: var(--font-size-xl) !important;
+  font-weight: 600 !important;
+  color: var(--color-primary) !important;
+  line-height: var(--line-height-tight) !important;
+}
+
+.el-dialog__headerbtn {
+  top: var(--gap-lg) !important;
+  right: var(--gap-xl) !important;
+  width: 24px !important;
+  height: 24px !important;
+}
+
+.el-dialog__close {
+  color: var(--disabled) !important;
+  font-size: var(--font-size-lg) !important;
+}
+
+.el-dialog__close:hover {
+  color: var(--text-3) !important;
+}
+
+.el-dialog__body {
+  padding: var(--gap-xl) var(--gap-2xl) !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  font-size: var(--font-size-base) !important;
+  line-height: var(--line-height-normal) !important;
+}
+
+.el-dialog__footer {
+  padding: var(--gap-lg) var(--gap-2xl) var(--gap-xl) var(--gap-2xl) !important;
+  background: var(--surface) !important;
+  border-top: 1px solid var(--border) !important;
+}
+
+/* 弹窗内表单样式 */
+.el-dialog .el-form-item__label {
+  color: var(--text-2) !important;
+  font-weight: 500 !important;
+  font-size: var(--font-size-base) !important;
+}
+
+.el-dialog .el-input__inner,
+.el-dialog .el-textarea__inner,
+.el-dialog .el-select .el-input__inner {
+  color: var(--text) !important;
+  font-size: var(--font-size-base) !important;
+}
+
+.el-dialog .el-input__inner::placeholder,
+.el-dialog .el-textarea__inner::placeholder,
+.el-dialog .el-select .el-input__inner::placeholder {
+  color: var(--disabled) !important;
+  font-size: var(--font-size-base) !important;
+}
+
+// ================================
+// 5. 按钮统一样式
+// ================================
+
+/* 主要按钮 */
+.el-button--primary {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: var(--surface) !important;
+  border-radius: var(--radius-md) !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+.el-button--primary:hover {
+  background-color: var(--color-primary-dark) !important;
+  border-color: var(--color-primary-dark) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3) !important;
+}
+
+.el-button--primary:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3) !important;
+}
+
+/* 次要按钮 */
+.el-button--default {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-3) !important;
+  border-radius: var(--radius-md) !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+.el-button--default:hover {
+  background-color: #f9fafb !important;
+  border-color: var(--disabled) !important;
+  color: var(--text-2) !important;
+}
+
+/* 文本按钮 */
+.el-button--text {
+  color: var(--color-accent) !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+.el-button--text:hover {
+  color: var(--color-accent-dark) !important;
+  background-color: var(--hover) !important;
+}
+
+/* 危险按钮 */
+.el-button--danger {
+  background-color: var(--color-error) !important;
+  border-color: var(--color-error) !important;
+  color: var(--surface) !important;
+  border-radius: var(--radius-md) !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+.el-button--danger:hover {
+  background-color: #b91c1c !important;
+  border-color: #b91c1c !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3) !important;
+}
+
+// ================================
+// 6. 卡片统一样式
+// ================================
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--gap-lg);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--gap-lg);
+  padding-bottom: var(--gap-sm);
+  border-bottom: 1px solid var(--border);
+}
+
+.card-title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.card-content {
+  color: var(--text-2);
+  line-height: var(--line-height-normal);
+}
+
+// ================================
+// 7. 表单统一样式
+// ================================
+
+.form-section {
+  margin-bottom: var(--gap-2xl);
+}
+
+.form-section-title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: var(--gap-lg);
+  padding-bottom: var(--gap-sm);
+  border-bottom: 2px solid var(--border);
+}
+
+.form-row {
+  display: flex;
+  gap: var(--gap-xl);
+  margin-bottom: var(--gap-xl);
+}
+
+.form-row .el-form-item {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--gap-md);
+  margin-top: var(--gap-2xl);
+  padding-top: var(--gap-xl);
+  border-top: 1px solid var(--border);
+}
+
+// ================================
+// 8. 空状态统一样式
+// ================================
+
+.empty-state {
+  text-align: center;
+  padding: var(--gap-3xl) var(--gap-lg);
+  color: var(--text-3);
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: var(--gap-lg);
+  opacity: 0.5;
+}
+
+.empty-state-text {
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  margin-bottom: var(--gap-sm);
+  color: var(--text-2);
+}
+
+.empty-state-hint {
+  font-size: var(--font-size-sm);
+  color: var(--disabled);
+}
+
+// ================================
+// 9. 响应式设计
+// ================================
+
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .card {
+    padding: var(--gap-md);
+  }
+}

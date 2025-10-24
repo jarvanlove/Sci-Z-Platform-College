@@ -1,0 +1,92 @@
+@import './variables.scss';
+@import './mixins.scss';
+@import './design-system.scss';
+
+// 全局样式
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--text);
+  background: var(--bg);
+}
+
+// 标题字体
+h1 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+h2 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+h4 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+h5 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+// 正文字体
+.text-lg {
+  font-size: 16px;
+}
+
+.text-base {
+  font-size: 14px;
+}
+
+.text-sm {
+  font-size: 12px;
+}
+
+.text-xs {
+  font-size: 10px;
+}
+
+// 卡片样式
+.card {
+  @include card;
+}
+
+// 按钮样式覆盖
+.el-button--primary {
+  @include button-primary;
+}
+
+// 表单样式
+.el-form-item__label {
+  color: var(--text-2);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.el-input__inner {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.el-input__inner:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2);
+}
+
+.el-input__inner::placeholder {
+  color: var(--disabled);
+}

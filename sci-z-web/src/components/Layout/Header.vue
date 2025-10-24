@@ -1,0 +1,192 @@
+<template>
+  <div class="layout-header">
+    <div class="header-left">
+      <el-button
+        type="text"
+        class="sidebar-toggle"
+        @click="toggleSidebar"
+      >
+        <el-icon><Expand v-if="sidebarCollapsed" /><Fold v-else /></el-icon>
+      </el-button>
+      <h1>{{ $t('menu.dashboard') }}</h1>
+    </div>
+    <div class="header-right">
+      <!-- 语言切换 -->
+      <LanguageSwitcher />
+      
+      <!-- 主题切换 -->
+      <el-button type="text" @click="toggleTheme" class="theme-toggle">
+        <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
+      </el-button>
+      
+      <!-- 用户信息 -->
+      <el-dropdown @command="handleUserCommand" trigger="click">
+        <div class="user-info">
+          <el-avatar :size="32" :src="userInfo?.avatar">
+            {{ userInfo?.username?.charAt(0)?.toUpperCase() }}
+          </el-avatar>
+          <span class="username">{{ userInfo?.username || 'User' }}</span>
+          <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+        </div>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="profile">
+              <el-icon><User /></el-icon>
+              {{ $t('user.profile') }}
+            </el-dropdown-item>
+            <el-dropdown-item command="security">
+              <el-icon><Lock /></el-icon>
+              {{ $t('user.security') }}
+            </el-dropdown-item>
+            <el-dropdown-item divided command="logout">
+              <el-icon><SwitchButton /></el-icon>
+              {{ $t('auth.logout') }}
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
+import { useAppStore } from '@/store/modules/app'
+import LanguageSwitcher from '@/components/Common/LanguageSwitcher.vue'
+
+const router = useRouter()
+const { t } = useI18n()
+const appStore = useAppStore()
+
+// 侧边栏状态
+const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
+
+// 主题状态
+const isDark = computed(() => appStore.theme === 'dark')
+
+// 用户信息（这里应该从 store 获取）
+const userInfo = computed(() => {
+  // 临时从 localStorage 获取，实际应该从 auth store 获取
+  const userInfoStr = localStorage.getItem('user_info')
+  return userInfoStr ? JSON.parse(userInfoStr) : null
+})
+
+// 切换侧边栏
+const toggleSidebar = () => {
+  appStore.toggleSidebar()
+}
+
+// 切换主题
+const toggleTheme = () => {
+  appStore.toggleTheme()
+}
+
+// 处理用户菜单命令
+const handleUserCommand = (command) => {
+  switch (command) {
+    case 'profile':
+      router.push('/user/profile')
+      break
+    case 'security':
+      router.push('/user/security')
+      break
+    case 'logout':
+      handleLogout()
+      break
+  }
+}
+
+// 退出登录
+const handleLogout = () => {
+  // 清除本地存储的认证信息
+  localStorage.removeItem('auth_token')
+  localStorage.removeItem('user_info')
+  ElMessage.success(t('auth.logoutSuccess'))
+  router.push('/login')
+}
+</script>
+
+<style lang="scss" scoped>
+.layout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 60px;
+  padding: 0 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    .sidebar-toggle {
+      padding: 8px;
+      color: var(--text);
+      
+      &:hover {
+        color: var(--color-primary);
+        background-color: var(--hover);
+      }
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--color-primary);
+      margin: 0;
+    }
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    .theme-toggle {
+      padding: 8px;
+      color: var(--text);
+      
+      &:hover {
+        color: var(--color-primary);
+        background-color: var(--hover);
+      }
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:hover {
+        background-color: var(--hover);
+      }
+
+      .username {
+        font-size: 14px;
+        color: var(--text);
+        font-weight: 500;
+      }
+    }
+  }
+}
+
+:deep(.el-dropdown-menu__item) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  &:hover {
+    background-color: var(--hover);
+  }
+}
+</style>
