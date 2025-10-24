@@ -1,1 +1,0 @@
-项目基础使用 java 21  springboot 3.5.6  redis pgsql mybatis  rabbitmq 

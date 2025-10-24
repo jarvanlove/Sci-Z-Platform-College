@@ -7,7 +7,7 @@ spring:
 
 # 服务器配置
 server:
-  port: 8080
+  port: 8081
 #  servlet:
 #    context-path: /api
 
@@ -21,10 +21,6 @@ management:
     health:
       show-details: always
       show-components: always
-
-
-      
-
 # 日志配置
 logging:
   level:
@@ -59,17 +55,17 @@ sa-token:
   # 是否输出操作日志
   is-log: false
   # 是否从 cookie 中读取 token
-  is-read-cookie: false
+  is-read-cookie: true
   # 是否从 header 中读取 token
   is-read-header: true
   # 是否从 请求体 中读取 token
-  is-read-body: false
+  is-read-body: true
   # 是否在登录后将 Token 写入到响应头
-  is-write-header: false
+  is-write-header: true
   # 是否在登录后将 Token 写入到响应体
   is-write-body: true
   # 是否在登录后将 Token 写入到 Cookie
-  is-write-cookie: false
+  is-write-cookie: true
   # 配置 Sa-Token 单独使用的 Redis 连接
   alone-redis:
     # Redis 数据库索引

@@ -1,6 +1,6 @@
 package com.server.agentbackendservices.modules.common.controller;
 
-import com.server.agentbackendservices.mapper.MyBaseMapper;
+import com.server.agentbackendservices.modules.common.mapper.MyBaseMapper;
 
 import com.server.agentbackendservices.modules.common.entity.BaseEntity;
 

@@ -3,9 +3,9 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
-import com.server.agentbackendservices.mapper.MyBaseMapper;
+import com.server.agentbackendservices.modules.common.mapper.MyBaseMapper;
 import com.server.agentbackendservices.modules.common.entity.BaseEntity;
-import com.server.agentbackendservices.common.annotation.FuzzyQueries;
+import com.server.agentbackendservices.modules.common.annotation.FuzzyQueries;
 import com.server.agentbackendservices.modules.common.vo.ResultVO;
 
 import java.lang.reflect.Field;

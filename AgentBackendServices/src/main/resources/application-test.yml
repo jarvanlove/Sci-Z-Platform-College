@@ -68,6 +68,15 @@ logging:
       max-file-size: 50MB
       max-history: 7
 
+# Dify API 配置
+dify:
+  base-url: http://test-dify-server/console/api
+  api-token: ${DIFY_API_TOKEN:test-token-here}
+  timeout: 30000
+  connect-timeout: 10000
+  retry-count: 3
+  enable-retry: true
+
 # 测试专用配置
 test:
   database:
