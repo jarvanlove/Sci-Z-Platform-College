@@ -660,45 +660,79 @@
             total: 0,
           });
 
-          // 角色列表数据
-          const roles = ref([
-            {
-              id: 1,
-              name: "系统管理员",
-              description: "拥有系统所有权限的超级管理员",
-              type: "system",
-              userCount: 2,
-              createTime: "2024-01-01 10:00:00",
-              isSystem: true,
-            },
-            {
-              id: 2,
-              name: "教师",
-              description: "可以创建和管理项目、申报科研项目",
-              type: "business",
-              userCount: 25,
-              createTime: "2024-01-05 14:30:00",
-              isSystem: false,
-            },
-            {
-              id: 3,
-              name: "学生",
-              description: "可以参与项目、查看项目信息",
-              type: "business",
-              userCount: 150,
-              createTime: "2024-01-05 14:35:00",
-              isSystem: false,
-            },
-            {
-              id: 4,
-              name: "审核员",
-              description: "负责审核项目申报和验收",
-              type: "custom",
-              userCount: 5,
-              createTime: "2024-02-10 09:00:00",
-              isSystem: false,
-            },
-          ]);
+          // 行业配置
+          const industryConfig = ref({
+            industryType: "education",
+            industryName: "教育行业",
+            departmentLabel: "所属院系",
+            roleLabel: "角色",
+            employeeIdLabel: "学工号",
+          });
+
+          // 角色列表数据 - 动态加载
+          const roles = ref([]);
+
+          // 加载行业配置
+          const loadIndustryConfig = async () => {
+            try {
+              const response = await fetch("/api/industry-config/current");
+              const data = await response.json();
+              industryConfig.value = data;
+            } catch (error) {
+              console.log("使用默认教育行业配置");
+            }
+          };
+
+          // 加载角色列表
+          const loadRoles = async () => {
+            try {
+              const response = await fetch(
+                `/api/roles?industry=${industryConfig.value.industryType}`
+              );
+              const data = await response.json();
+              roles.value = data;
+            } catch (error) {
+              // 使用默认教育行业数据
+              roles.value = [
+                {
+                  id: 1,
+                  name: "系统管理员",
+                  description: "拥有系统所有权限的超级管理员",
+                  type: "system",
+                  userCount: 2,
+                  createTime: "2024-01-01 10:00:00",
+                  isSystem: true,
+                },
+                {
+                  id: 2,
+                  name: "教师",
+                  description: "可以创建和管理项目、申报科研项目",
+                  type: "business",
+                  userCount: 25,
+                  createTime: "2024-01-05 14:30:00",
+                  isSystem: false,
+                },
+                {
+                  id: 3,
+                  name: "学生",
+                  description: "可以参与项目、查看项目信息",
+                  type: "business",
+                  userCount: 150,
+                  createTime: "2024-01-05 14:35:00",
+                  isSystem: false,
+                },
+                {
+                  id: 4,
+                  name: "审核员",
+                  description: "负责审核项目申报和验收",
+                  type: "custom",
+                  userCount: 5,
+                  createTime: "2024-02-10 09:00:00",
+                  isSystem: false,
+                },
+              ];
+            }
+          };
 
           // 角色表单
           const roleForm = reactive({
@@ -724,191 +758,205 @@
           // 当前编辑的角色
           const currentRole = ref({});
 
-          // 权限树数据
-          const permissionTree = ref([
-            {
-              id: 1,
-              label: "系统管理",
-              code: "menu:system",
-              type: "menu",
-              children: [
+          // 权限树数据 - 动态加载
+          const permissionTree = ref([]);
+
+          // 加载权限树
+          const loadPermissionTree = async () => {
+            try {
+              const response = await fetch(
+                `/api/permissions/tree?industry=${industryConfig.value.industryType}`
+              );
+              const data = await response.json();
+              permissionTree.value = data;
+            } catch (error) {
+              // 使用默认教育行业权限数据
+              permissionTree.value = [
                 {
-                  id: 11,
-                  label: "用户管理",
-                  code: "menu:system:user",
+                  id: 1,
+                  label: "系统管理",
+                  code: "menu:system",
                   type: "menu",
                   children: [
                     {
-                      id: 111,
-                      label: "查看用户",
-                      code: "btn:system:user:view",
-                      type: "button",
+                      id: 11,
+                      label: "用户管理",
+                      code: "menu:system:user",
+                      type: "menu",
+                      children: [
+                        {
+                          id: 111,
+                          label: "查看用户",
+                          code: "btn:system:user:view",
+                          type: "button",
+                        },
+                        {
+                          id: 112,
+                          label: "新建用户",
+                          code: "btn:system:user:add",
+                          type: "button",
+                        },
+                        {
+                          id: 113,
+                          label: "编辑用户",
+                          code: "btn:system:user:edit",
+                          type: "button",
+                        },
+                        {
+                          id: 114,
+                          label: "删除用户",
+                          code: "btn:system:user:delete",
+                          type: "button",
+                        },
+                      ],
                     },
                     {
-                      id: 112,
-                      label: "新建用户",
-                      code: "btn:system:user:add",
-                      type: "button",
-                    },
-                    {
-                      id: 113,
-                      label: "编辑用户",
-                      code: "btn:system:user:edit",
-                      type: "button",
-                    },
-                    {
-                      id: 114,
-                      label: "删除用户",
-                      code: "btn:system:user:delete",
-                      type: "button",
+                      id: 12,
+                      label: "角色权限",
+                      code: "menu:system:role",
+                      type: "menu",
+                      children: [
+                        {
+                          id: 121,
+                          label: "查看角色",
+                          code: "btn:system:role:view",
+                          type: "button",
+                        },
+                        {
+                          id: 122,
+                          label: "配置权限",
+                          code: "btn:system:role:permission",
+                          type: "button",
+                        },
+                      ],
                     },
                   ],
                 },
                 {
-                  id: 12,
-                  label: "角色权限",
-                  code: "menu:system:role",
+                  id: 2,
+                  label: "项目管理",
+                  code: "menu:project",
                   type: "menu",
                   children: [
                     {
-                      id: 121,
-                      label: "查看角色",
-                      code: "btn:system:role:view",
-                      type: "button",
-                    },
-                    {
-                      id: 122,
-                      label: "配置权限",
-                      code: "btn:system:role:permission",
-                      type: "button",
+                      id: 21,
+                      label: "项目列表",
+                      code: "menu:project:list",
+                      type: "menu",
+                      children: [
+                        {
+                          id: 211,
+                          label: "查看项目",
+                          code: "btn:project:view",
+                          type: "button",
+                        },
+                        {
+                          id: 212,
+                          label: "新建项目",
+                          code: "btn:project:add",
+                          type: "button",
+                        },
+                        {
+                          id: 213,
+                          label: "编辑项目",
+                          code: "btn:project:edit",
+                          type: "button",
+                        },
+                        {
+                          id: 214,
+                          label: "删除项目",
+                          code: "btn:project:delete",
+                          type: "button",
+                        },
+                      ],
                     },
                   ],
                 },
-              ],
-            },
-            {
-              id: 2,
-              label: "项目管理",
-              code: "menu:project",
-              type: "menu",
-              children: [
                 {
-                  id: 21,
-                  label: "项目列表",
-                  code: "menu:project:list",
+                  id: 3,
+                  label: "申报管理",
+                  code: "menu:declare",
                   type: "menu",
                   children: [
                     {
-                      id: 211,
-                      label: "查看项目",
-                      code: "btn:project:view",
-                      type: "button",
-                    },
-                    {
-                      id: 212,
-                      label: "新建项目",
-                      code: "btn:project:add",
-                      type: "button",
-                    },
-                    {
-                      id: 213,
-                      label: "编辑项目",
-                      code: "btn:project:edit",
-                      type: "button",
-                    },
-                    {
-                      id: 214,
-                      label: "删除项目",
-                      code: "btn:project:delete",
-                      type: "button",
+                      id: 31,
+                      label: "申报列表",
+                      code: "menu:declare:list",
+                      type: "menu",
+                      children: [
+                        {
+                          id: 311,
+                          label: "查看申报",
+                          code: "btn:declare:view",
+                          type: "button",
+                        },
+                        {
+                          id: 312,
+                          label: "新建申报",
+                          code: "btn:declare:add",
+                          type: "button",
+                        },
+                        {
+                          id: 313,
+                          label: "审核申报",
+                          code: "btn:declare:audit",
+                          type: "button",
+                        },
+                      ],
                     },
                   ],
                 },
-              ],
-            },
-            {
-              id: 3,
-              label: "申报管理",
-              code: "menu:declare",
-              type: "menu",
-              children: [
                 {
-                  id: 31,
-                  label: "申报列表",
-                  code: "menu:declare:list",
+                  id: 4,
+                  label: "验收管理",
+                  code: "menu:acceptance",
                   type: "menu",
                   children: [
                     {
-                      id: 311,
-                      label: "查看申报",
-                      code: "btn:declare:view",
-                      type: "button",
-                    },
-                    {
-                      id: 312,
-                      label: "新建申报",
-                      code: "btn:declare:add",
-                      type: "button",
-                    },
-                    {
-                      id: 313,
-                      label: "审核申报",
-                      code: "btn:declare:audit",
-                      type: "button",
+                      id: 41,
+                      label: "报告列表",
+                      code: "menu:acceptance:report",
+                      type: "menu",
+                      children: [
+                        {
+                          id: 411,
+                          label: "查看报告",
+                          code: "btn:acceptance:view",
+                          type: "button",
+                        },
+                        {
+                          id: 412,
+                          label: "生成报告",
+                          code: "btn:acceptance:generate",
+                          type: "button",
+                        },
+                      ],
                     },
                   ],
                 },
-              ],
-            },
-            {
-              id: 4,
-              label: "验收管理",
-              code: "menu:acceptance",
-              type: "menu",
-              children: [
                 {
-                  id: 41,
-                  label: "报告列表",
-                  code: "menu:acceptance:report",
+                  id: 5,
+                  label: "用户中心",
+                  code: "menu:user",
                   type: "menu",
                   children: [
                     {
-                      id: 411,
-                      label: "查看报告",
-                      code: "btn:acceptance:view",
-                      type: "button",
+                      id: 51,
+                      label: "个人信息",
+                      code: "menu:user:profile",
+                      type: "menu",
                     },
                     {
-                      id: 412,
-                      label: "生成报告",
-                      code: "btn:acceptance:generate",
-                      type: "button",
+                      id: 52,
+                      label: "安全设置",
+                      code: "menu:user:security",
+                      type: "menu",
                     },
                   ],
                 },
-              ],
-            },
-            {
-              id: 5,
-              label: "用户中心",
-              code: "menu:user",
-              type: "menu",
-              children: [
-                {
-                  id: 51,
-                  label: "个人信息",
-                  code: "menu:user:profile",
-                  type: "menu",
-                },
-                {
-                  id: 52,
-                  label: "安全设置",
-                  code: "menu:user:security",
-                  type: "menu",
-                },
-              ],
-            },
-          ]);
+              ];
+            }
+          };
 
           // 树属性配置
           const treeProps = {
@@ -1348,7 +1396,14 @@
           };
 
           // 页面挂载后初始化分页
-          onMounted(() => {
+          onMounted(async () => {
+            // 加载行业配置
+            await loadIndustryConfig();
+            // 加载角色列表
+            await loadRoles();
+            // 加载权限树
+            await loadPermissionTree();
+
             pagination.total = roles.value.length;
             Vue.nextTick(() => {
               initPagination();
@@ -1364,6 +1419,7 @@
             showPermissionDialog,
             editMode,
             permissionSearchKeyword,
+            industryConfig,
             roles,
             roleForm,
             roleRules,
@@ -1385,6 +1441,9 @@
             handleClearCheck,
             handleDialogClose,
             handlePermissionDialogClose,
+            loadIndustryConfig,
+            loadRoles,
+            loadPermissionTree,
           };
         },
       });
