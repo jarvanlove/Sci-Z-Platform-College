@@ -4,13 +4,13 @@
  */
 
 // 项目列表组件
-export { default as ProjectList } from './ProjectList.vue'
+// export { default as ProjectList } from './ProjectList.vue'
 
 // 项目表单组件
-export { default as ProjectForm } from './ProjectForm.vue'
+// export { default as ProjectForm } from './ProjectForm.vue'
 
 // 项目详情组件
-export { default as ProjectDetail } from './ProjectDetail.vue'
+// export { default as ProjectDetail } from './ProjectDetail.vue'
 
 // 项目进度组件
-export { default as ProjectProgress } from './ProjectProgress.vue'
+// export { default as ProjectProgress } from './ProjectProgress.vue'

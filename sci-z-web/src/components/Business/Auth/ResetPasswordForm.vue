@@ -118,7 +118,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { BaseButton } from '@/components/Common'
-import { resetPassword, getCaptcha, sendEmailCode } from '@/api/Auth'
+import { resetPassword, getCaptcha, sendEmailCode as sendEmailCodeApi } from '@/api/Auth'
 
 // 定义事件
 const emit = defineEmits(['reset-success', 'go-to-login'])
@@ -240,7 +240,7 @@ const sendEmailCode = async () => {
   if (!canSendEmailCode.value) return
   
   try {
-    await sendEmailCode({
+    await sendEmailCodeApi({
       email: resetForm.email,
       captcha: resetForm.captcha
     })

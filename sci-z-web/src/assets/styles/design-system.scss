@@ -308,8 +308,243 @@ body {
 }
 
 // ================================
-// 7. 表单统一样式
+// 7. 复选框统一样式
 // ================================
+
+/* Element Plus 复选框统一样式 */
+.el-checkbox {
+  .el-checkbox__input {
+    .el-checkbox__inner {
+      border-color: var(--border) !important;
+      border-radius: var(--radius-sm) !important;
+      background-color: var(--surface) !important;
+      transition: all 0.2s ease !important;
+      width: 16px !important;
+      height: 16px !important;
+    }
+    
+    .el-checkbox__inner:hover {
+      border-color: var(--color-primary) !important;
+      background-color: var(--hover) !important;
+      border-radius: var(--radius-sm) !important;
+    }
+    
+    &.is-checked .el-checkbox__inner {
+      background-color: var(--color-primary) !important;
+      border-color: var(--color-primary) !important;
+      border-radius: var(--radius-sm) !important;
+    }
+    
+    &.is-checked .el-checkbox__inner::after {
+      border-color: var(--surface) !important;
+    }
+  }
+  
+  .el-checkbox__label {
+    color: var(--text-2) !important;
+    font-size: var(--font-size-base) !important;
+    font-weight: 500 !important;
+    transition: color 0.2s ease !important;
+  }
+  
+  &.is-checked .el-checkbox__label {
+    color: var(--color-primary) !important;
+  }
+  
+  &:hover .el-checkbox__label {
+    color: var(--color-primary) !important;
+  }
+}
+
+/* 复选框组样式 */
+.el-checkbox-group {
+  .el-checkbox {
+    margin-right: var(--gap-lg);
+    margin-bottom: var(--gap-sm);
+  }
+}
+
+// ================================
+// 8. 表单统一样式
+// ================================
+
+/* Element Plus 输入框统一样式 */
+.el-input {
+  .el-input__wrapper {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    transition: all 0.2s ease !important;
+    box-shadow: none !important;
+  }
+  
+  /* 确保输入框内部背景为白色 */
+  .el-input__inner {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+  }
+  
+  /* 覆盖Element Plus可能的默认背景色 */
+  &.el-input--large .el-input__wrapper {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+  }
+  
+  &.el-input--large .el-input__inner {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+  }
+  
+  /* 强制覆盖所有可能的背景色 */
+  .el-input__wrapper,
+  .el-input__wrapper:hover,
+  .el-input__wrapper.is-focus,
+  .el-input__wrapper.is-disabled {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+  }
+  
+  .el-input__inner,
+  .el-input__inner:hover,
+  .el-input__inner:focus,
+  .el-input__inner.is-disabled {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+  }
+  
+  .el-input__wrapper:hover {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1) !important;
+  }
+  
+  .el-input__wrapper.is-focus {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2) !important;
+  }
+  
+  .el-input__inner {
+    color: var(--text) !important;
+    font-size: var(--font-size-base) !important;
+    font-weight: 500 !important;
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+  
+  .el-input__inner::placeholder {
+    color: var(--disabled) !important;
+    font-size: var(--font-size-base) !important;
+  }
+  
+  .el-input__prefix,
+  .el-input__suffix {
+    color: var(--text-3) !important;
+  }
+  
+  .el-input__suffix .el-input__clear {
+    color: var(--text-3) !important;
+  }
+  
+  .el-input__suffix .el-input__clear:hover {
+    color: var(--text-2) !important;
+  }
+}
+
+/* 密码输入框特殊样式 */
+.el-input--password {
+  .el-input__suffix .el-input__password {
+    color: var(--text-3) !important;
+  }
+  
+  .el-input__suffix .el-input__password:hover {
+    color: var(--text-2) !important;
+  }
+}
+
+/* 选择器统一样式 */
+.el-select {
+  .el-select__wrapper {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    transition: all 0.2s ease !important;
+    box-shadow: none !important;
+  }
+  
+  .el-select__wrapper:hover {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1) !important;
+  }
+  
+  .el-select__wrapper.is-focus {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2) !important;
+  }
+  
+  .el-select__placeholder {
+    color: var(--disabled) !important;
+    font-size: var(--font-size-base) !important;
+  }
+  
+  .el-select__selected-item {
+    color: var(--text) !important;
+    font-size: var(--font-size-base) !important;
+    font-weight: 500 !important;
+  }
+}
+
+/* 文本域统一样式 */
+.el-textarea {
+  .el-textarea__inner {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: var(--text) !important;
+    font-size: var(--font-size-base) !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    box-shadow: none !important;
+  }
+  
+  .el-textarea__inner:hover {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1) !important;
+  }
+  
+  .el-textarea__inner:focus {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2) !important;
+  }
+  
+  .el-textarea__inner::placeholder {
+    color: var(--disabled) !important;
+    font-size: var(--font-size-base) !important;
+  }
+}
+
+/* 日期选择器统一样式 */
+.el-date-editor {
+  .el-input__wrapper {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    transition: all 0.2s ease !important;
+    box-shadow: none !important;
+  }
+  
+  .el-input__wrapper:hover {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1) !important;
+  }
+  
+  .el-input__wrapper.is-focus {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2) !important;
+  }
+}
 
 .form-section {
   margin-bottom: var(--gap-2xl);
@@ -345,7 +580,7 @@ body {
 }
 
 // ================================
-// 8. 空状态统一样式
+// 9. 空状态统一样式
 // ================================
 
 .empty-state {
@@ -373,7 +608,7 @@ body {
 }
 
 // ================================
-// 9. 响应式设计
+// 10. 响应式设计
 // ================================
 
 @media (max-width: 768px) {

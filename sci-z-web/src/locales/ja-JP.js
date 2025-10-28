@@ -1,4 +1,11 @@
 export default {
+  // アプリ情報
+  app: {
+    title: '生成式大学研究管理プラットフォーム',
+    description: 'AIGCベースの生成式大学研究管理プラットフォーム',
+    htmlTitle: '生成式大学研究管理プラットフォーム'
+  },
+
   // 共通
   common: {
     confirm: '確認',
@@ -60,6 +67,15 @@ export default {
     rememberMe: 'ログイン状態を保持',
     forgotPassword: 'パスワードを忘れた',
     resetPassword: 'パスワードリセット',
+    welcomeBack: 'おかえりなさい、アカウントにログインしてください',
+    noAccount: 'アカウントをお持ちでない方は？',
+    registerNow: '今すぐ登録',
+    rememberPassword: 'パスワードを思い出しましたか？',
+    sendCode: 'コードを送信',
+    emailCodeSent: '認証コードを送信しました',
+    sendCodeFailed: '認証コードの送信に失敗しました',
+    resetSuccess: 'パスワードリセットが成功しました',
+    resetFailed: 'パスワードリセットに失敗しました',
     loginSuccess: 'ログイン成功',
     logoutSuccess: 'ログアウト成功',
     loginFailed: 'ログイン失敗',

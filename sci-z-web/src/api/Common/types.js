@@ -32,7 +32,52 @@ export const PageResponse = {
 }
 
 // ================================
-// 2. 核心业务类型（只定义稳定字段）
+// 2. 认证相关类型
+// ================================
+
+/**
+ * 登录请求参数
+ */
+export const LoginRequest = {
+  username: String,
+  password: String,
+  captcha: String,
+  captchaId: String
+}
+
+/**
+ * 登录响应数据
+ */
+export const LoginResponse = {
+  token: String,
+  refreshToken: String,
+  user: Object
+}
+
+/**
+ * 注册请求参数
+ */
+export const RegisterRequest = {
+  username: String,
+  password: String,
+  email: String,
+  realName: String,
+  captcha: String,
+  captchaId: String
+}
+
+/**
+ * 重置密码请求参数
+ */
+export const ResetPasswordRequest = {
+  email: String,
+  captcha: String,
+  emailCode: String,
+  newPassword: String
+}
+
+// ================================
+// 3. 核心业务类型（只定义稳定字段）
 // ================================
 
 /**

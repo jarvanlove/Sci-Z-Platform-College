@@ -36,8 +36,59 @@ export const removeUserInfo = () => {
   localStorage.removeItem('user_info')
 }
 
+// 获取权限列表
+export const getPermissions = () => {
+  const permissions = localStorage.getItem('user_permissions')
+  return permissions ? JSON.parse(permissions) : []
+}
+
+// 设置权限列表
+export const setPermissions = (permissions) => {
+  localStorage.setItem('user_permissions', JSON.stringify(permissions))
+}
+
+// 移除权限列表
+export const removePermissions = () => {
+  localStorage.removeItem('user_permissions')
+}
+
+// 获取角色列表
+export const getRoles = () => {
+  const roles = localStorage.getItem('user_roles')
+  return roles ? JSON.parse(roles) : []
+}
+
+// 设置角色列表
+export const setRoles = (roles) => {
+  localStorage.setItem('user_roles', JSON.stringify(roles))
+}
+
+// 移除角色列表
+export const removeRoles = () => {
+  localStorage.removeItem('user_roles')
+}
+
+// 获取菜单列表
+export const getMenus = () => {
+  const menus = localStorage.getItem('user_menus')
+  return menus ? JSON.parse(menus) : []
+}
+
+// 设置菜单列表
+export const setMenus = (menus) => {
+  localStorage.setItem('user_menus', JSON.stringify(menus))
+}
+
+// 移除菜单列表
+export const removeMenus = () => {
+  localStorage.removeItem('user_menus')
+}
+
 // 清除所有认证信息
 export const clearAuth = () => {
   removeToken()
   removeUserInfo()
+  removePermissions()
+  removeRoles()
+  removeMenus()
 }

@@ -15,7 +15,7 @@
       <BaseCard class="login-card">
         <!-- Logo 区域 -->
         <div class="logo-section">
-          <img src="/images/logo.svg" alt="Logo" />
+              <img src="@/assets/images/logo.svg" alt="Logo" />
           <h1>{{ $t('app.title') }}</h1>
           <p>{{ $t('auth.welcomeBack') }}</p>
         </div>
@@ -195,8 +195,8 @@ const handleGoToRegister = () => {
   margin-bottom: var(--gap-xl);
   
   img {
-    width: 48px;
-    height: 48px;
+    width: 120px;
+    height: auto;
     margin-bottom: var(--gap-md);
   }
   

@@ -4,7 +4,7 @@
  */
 
 // 报告列表组件
-export { default as ReportList } from './ReportList.vue'
+// export { default as ReportList } from './ReportList.vue'
 
 // 报告生成组件
-export { default as ReportGenerate } from './ReportGenerate.vue'
+// export { default as ReportGenerate } from './ReportGenerate.vue'

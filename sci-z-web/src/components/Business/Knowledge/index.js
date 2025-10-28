@@ -4,7 +4,7 @@
  */
 
 // 知识库列表组件
-export { default as KnowledgeList } from './KnowledgeList.vue'
+// export { default as KnowledgeList } from './KnowledgeList.vue'
 
 // 知识库详情组件
-export { default as KnowledgeDetail } from './KnowledgeDetail.vue'
+// export { default as KnowledgeDetail } from './KnowledgeDetail.vue'

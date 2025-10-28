@@ -4,3 +4,6 @@
  */
 
 export * from './auth'
+
+// TODO: 后端开发完成后，取消注释以下导出
+// export { getPermissions, getMenus } from './auth'

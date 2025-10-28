@@ -4,73 +4,36 @@
       :default-active="activeMenu"
       class="sidebar-menu"
       :collapse="sidebarCollapsed"
+      :unique-opened="true"
       router
     >
-      <el-menu-item index="/dashboard">
-        <el-icon><House /></el-icon>
-        <template #title>{{ $t('menu.dashboard') }}</template>
-      </el-menu-item>
-      
-      <el-sub-menu index="declaration">
-        <template #title>
-          <el-icon><Document /></el-icon>
-          <span>{{ $t('menu.declaration') }}</span>
-        </template>
-        <el-menu-item index="/declaration/list">{{ $t('menu.declarationList') }}</el-menu-item>
-        <el-menu-item index="/declaration/create">{{ $t('menu.declarationCreate') }}</el-menu-item>
-      </el-sub-menu>
-      
-      <el-sub-menu index="project">
-        <template #title>
-          <el-icon><Folder /></el-icon>
-          <span>{{ $t('menu.project') }}</span>
-        </template>
-        <el-menu-item index="/project/list">{{ $t('menu.projectList') }}</el-menu-item>
-        <el-menu-item index="/project/detail">{{ $t('menu.projectDetail') }}</el-menu-item>
-        <el-menu-item index="/project/progress">{{ $t('menu.projectProgress') }}</el-menu-item>
-      </el-sub-menu>
-      
-      <el-sub-menu index="report">
-        <template #title>
-          <el-icon><Document /></el-icon>
-          <span>{{ $t('menu.report') }}</span>
-        </template>
-        <el-menu-item index="/report/list">{{ $t('menu.reportList') }}</el-menu-item>
-        <el-menu-item index="/report/generate">{{ $t('menu.reportGenerate') }}</el-menu-item>
-      </el-sub-menu>
-      
-      <el-sub-menu index="knowledge">
-        <template #title>
-          <el-icon><Collection /></el-icon>
-          <span>{{ $t('menu.knowledge') }}</span>
-        </template>
-        <el-menu-item index="/knowledge/list">{{ $t('menu.knowledgeList') }}</el-menu-item>
-      </el-sub-menu>
-      
-      <el-menu-item index="/ai/chat">
-        <el-icon><ChatDotRound /></el-icon>
-        <template #title>{{ $t('menu.ai') }}</template>
-      </el-menu-item>
-      
-      <el-sub-menu index="user">
-        <template #title>
-          <el-icon><User /></el-icon>
-          <span>{{ $t('menu.user') }}</span>
-        </template>
-        <el-menu-item index="/user/profile">{{ $t('menu.userProfile') }}</el-menu-item>
-        <el-menu-item index="/user/security">{{ $t('menu.userSecurity') }}</el-menu-item>
-      </el-sub-menu>
-      
-      <el-sub-menu index="system">
-        <template #title>
-          <el-icon><Setting /></el-icon>
-          <span>{{ $t('menu.system') }}</span>
-        </template>
-        <el-menu-item index="/system/user">{{ $t('menu.systemUser') }}</el-menu-item>
-        <el-menu-item index="/system/role">{{ $t('menu.systemRole') }}</el-menu-item>
-        <el-menu-item index="/system/config">{{ $t('menu.systemConfig') }}</el-menu-item>
-        <el-menu-item index="/system/logs">{{ $t('menu.systemLogs') }}</el-menu-item>
-      </el-sub-menu>
+      <!-- 动态渲染菜单 -->
+      <template v-for="menu in filteredMenus" :key="menu.path">
+        <!-- 单级菜单 -->
+        <el-menu-item 
+          v-if="!menu.children"
+          :index="menu.path"
+        >
+          <el-icon><component :is="menu.icon" /></el-icon>
+          <template #title>{{ menu.title }}</template>
+        </el-menu-item>
+        
+        <!-- 多级菜单 -->
+        <el-sub-menu v-else :index="menu.path">
+          <template #title>
+            <el-icon><component :is="menu.icon" /></el-icon>
+            <span>{{ menu.title }}</span>
+          </template>
+          <el-menu-item 
+            v-for="child in menu.children"
+            :key="child.path"
+            :index="child.path"
+          >
+            <el-icon v-if="child.icon"><component :is="child.icon" /></el-icon>
+            <template #title>{{ child.title }}</template>
+          </el-menu-item>
+        </el-sub-menu>
+      </template>
     </el-menu>
   </div>
 </template>
@@ -80,10 +43,12 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/store/modules/app'
+import { useAuthStore } from '@/store/modules/auth'
 
 const route = useRoute()
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 // 当前激活的菜单
 const activeMenu = computed(() => {
@@ -92,14 +57,34 @@ const activeMenu = computed(() => {
 
 // 侧边栏折叠状态
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
+
+// 根据权限过滤菜单
+const filteredMenus = computed(() => {
+  return authStore.menus.filter(menu => {
+    // 检查菜单权限
+    if (menu.permission) {
+      return authStore.hasPermission(menu.permission)
+    }
+    
+    // 检查子菜单权限
+    if (menu.children) {
+      const hasAccessibleChildren = menu.children.some(child => {
+        return !child.permission || authStore.hasPermission(child.permission)
+      })
+      return hasAccessibleChildren
+    }
+    
+    return true
+  })
+})
 </script>
 
 <style lang="scss" scoped>
 .layout-sidebar {
   width: 240px;
   height: 100vh;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
+  background: #ffffff;
+  border-right: none;
   transition: width 0.3s ease;
   overflow: hidden;
 
@@ -111,43 +96,109 @@ const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
     border: none;
     height: 100%;
     background: transparent;
+    overflow-x: hidden;
 
-    :deep(.el-menu-item) {
-      color: var(--text);
+    /* 一级菜单项样式（如仪表板） */
+    :deep(.el-menu-item:not(.el-sub-menu__title)) {
+      font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+      font-size: 15px !important;
+      font-weight: 400 !important;
+      color: #374151 !important;
+      padding: 0 20px !important;
+      height: 48px !important;
+      line-height: 48px !important;
+      letter-spacing: 0.01em !important;
+      margin: 2px 8px !important;
+      border-radius: 6px !important;
+      
+      .el-icon {
+        margin-right: 8px !important;
+        font-size: 16px !important;
+      }
       
       &:hover {
-        background-color: var(--hover);
-        color: var(--color-primary);
+        background-color: #f8fafc !important;
+        color: #1e3a8a !important;
       }
       
       &.is-active {
-        background-color: var(--color-primary-light);
-        color: var(--color-primary);
-        border-right: 3px solid var(--color-primary);
+        background-color: #1e3a8a !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        border-radius: 12px !important;
+        margin: 2px 8px !important;
       }
     }
 
+    /* 子菜单标题样式 */
     :deep(.el-sub-menu__title) {
-      color: var(--text);
+      font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+      font-size: 15px !important;
+      font-weight: 400 !important;
+      color: #374151 !important;
+      padding: 0 20px !important;
+      letter-spacing: 0.01em !important;
+      height: 48px !important;
+      line-height: 48px !important;
+      
+      .el-icon {
+        margin-right: 8px !important;
+        font-size: 16px !important;
+      }
       
       &:hover {
-        background-color: var(--hover);
-        color: var(--color-primary);
+        background-color: #f8fafc !important;
+        color: #1e3a8a !important;
       }
     }
 
+    /* 二级菜单项样式 */
     :deep(.el-sub-menu .el-menu-item) {
-      background-color: var(--bg);
+      font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+      font-size: 14px !important;
+      font-weight: 400 !important;
+      color: #6b7280 !important;
+      padding: 0 20px 0 56px !important;
+      height: 40px !important;
+      line-height: 40px !important;
+      margin: 2px 8px !important;
+      border-radius: 6px !important;
+      background-color: transparent !important;
+      
+      .el-icon {
+        margin-right: 8px !important;
+        font-size: 16px !important;
+      }
       
       &:hover {
-        background-color: var(--hover);
-        color: var(--color-primary);
+        background-color: #f0f9ff !important;
+        color: #1e3a8a !important;
       }
       
       &.is-active {
-        background-color: var(--color-primary-light);
-        color: var(--color-primary);
-        border-right: 3px solid var(--color-primary);
+        background-color: #1e3a8a !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        border-radius: 12px !important;
+        margin: 2px 8px !important;
+      }
+    }
+
+    /* 子菜单容器样式 */
+    :deep(.el-sub-menu) {
+      .el-menu {
+        background-color: transparent !important;
+      }
+    }
+
+    /* 折叠状态下的样式调整 */
+    &.el-menu--collapse {
+      overflow-x: hidden !important;
+      
+      :deep(.el-menu-item),
+      :deep(.el-sub-menu__title) {
+        padding: 0 20px !important;
+        text-align: center !important;
       }
     }
   }

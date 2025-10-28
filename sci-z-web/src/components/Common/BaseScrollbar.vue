@@ -69,12 +69,12 @@ const scrollbarSize = computed(() => `scrollbar--${props.size}`)
   
   // 滚动条滑块
   &::-webkit-scrollbar-thumb {
-    background: var(--color-border);
+    background: var(--border);
     border-radius: 4px;
     transition: all 0.3s ease;
     
     &:hover {
-      background: var(--color-border-hover);
+      background: var(--border-hover);
     }
   }
   
@@ -114,12 +114,12 @@ const scrollbarSize = computed(() => `scrollbar--${props.size}`)
   }
   
   &::-webkit-scrollbar-thumb {
-    background: var(--color-border);
+    background: var(--border);
     border-radius: 4px;
     transition: all 0.3s ease;
     
     &:hover {
-      background: var(--color-border-hover);
+      background: var(--border-hover);
     }
   }
   

@@ -1,4 +1,11 @@
 export default {
+  // App Info
+  app: {
+    title: 'Generative University Research Management Platform',
+    description: 'AIGC-based Generative University Research Management Platform',
+    htmlTitle: 'Generative University Research Management Platform'
+  },
+
   // Common
   common: {
     confirm: 'Confirm',
@@ -60,6 +67,15 @@ export default {
     rememberMe: 'Remember Me',
     forgotPassword: 'Forgot Password',
     resetPassword: 'Reset Password',
+    welcomeBack: 'Welcome back, please log in to your account',
+    noAccount: 'No account yet?',
+    registerNow: 'Register now',
+    rememberPassword: 'Remember password?',
+    sendCode: 'Send Code',
+    emailCodeSent: 'Verification code sent',
+    sendCodeFailed: 'Failed to send verification code',
+    resetSuccess: 'Password reset successful',
+    resetFailed: 'Password reset failed',
     loginSuccess: 'Login Success',
     logoutSuccess: 'Logout Success',
     loginFailed: 'Login Failed',

@@ -27,8 +27,11 @@ export const AUTH_API = {
   REGISTER: `${API_BASE_URL}/auth/register`,
   RESET_PASSWORD: `${API_BASE_URL}/auth/reset-password`,
   CAPTCHA: `${API_BASE_URL}/auth/captcha`,
+  SEND_EMAIL_CODE: `${API_BASE_URL}/auth/send-email-code`,
   REFRESH_TOKEN: `${API_BASE_URL}/auth/refresh`,
   USER_INFO: `${API_BASE_URL}/auth/user-info`,
+  PERMISSIONS: `${API_BASE_URL}/auth/permissions`,  // 获取用户权限列表
+  MENUS: `${API_BASE_URL}/auth/menus`,              // 获取用户菜单列表
   LOGOUT: `${API_BASE_URL}/auth/logout`
 }
 

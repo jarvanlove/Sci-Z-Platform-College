@@ -4,13 +4,13 @@
  */
 
 // 用户管理组件
-export { default as SystemUser } from './SystemUser.vue'
+// export { default as SystemUser } from './SystemUser.vue'
 
 // 角色权限组件
-export { default as SystemRole } from './SystemRole.vue'
+// export { default as SystemRole } from './SystemRole.vue'
 
 // 系统配置组件
-export { default as SystemConfig } from './SystemConfig.vue'
+// export { default as SystemConfig } from './SystemConfig.vue'
 
 // 日志管理组件
-export { default as SystemLogs } from './SystemLogs.vue'
+// export { default as SystemLogs } from './SystemLogs.vue'

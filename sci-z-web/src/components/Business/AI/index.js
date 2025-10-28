@@ -4,4 +4,4 @@
  */
 
 // AI对话组件
-export { default as AIChat } from './AIChat.vue'
+// export { default as AIChat } from './AIChat.vue'

@@ -50,6 +50,9 @@ export const setLocale = (locale) => {
     // 设置 HTML lang 属性
     document.documentElement.lang = locale
     
+    // 动态设置页面标题
+    updatePageTitle(locale)
+    
     // 设置 Element Plus 语言
     import(`element-plus/dist/locale/${locale}.mjs`).then(module => {
       // 这里需要根据实际的 Element Plus 语言包路径调整
@@ -58,6 +61,13 @@ export const setLocale = (locale) => {
       console.warn('Failed to load Element Plus locale:', err)
     })
   }
+}
+
+// 更新页面标题
+export const updatePageTitle = (locale) => {
+  const messages = i18n.global.messages.value[locale] || i18n.global.messages.value['zh-CN']
+  const title = messages?.app?.htmlTitle || '生成式高校科研管理平台'
+  document.title = title
 }
 
 // 获取当前语言

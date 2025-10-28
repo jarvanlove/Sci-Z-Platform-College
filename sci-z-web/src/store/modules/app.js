@@ -11,10 +11,11 @@ export const useAppStore = defineStore('app', {
     // 页面加载状态
     loading: false,
     // 页面标题
-    pageTitle: '高校科研项目管理平台'
+    pageTitle: '生成式高校科研管理平台'
   }),
 
   getters: {
+    // 是否暗色主题
     isDark: (state) => state.theme === 'dark'
   },
 

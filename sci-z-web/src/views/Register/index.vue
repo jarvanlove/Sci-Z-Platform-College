@@ -12,7 +12,7 @@
       <BaseCard class="register-card">
         <!-- Logo 区域 -->
         <div class="logo-section">
-          <img src="/images/logo.svg" alt="Logo" />
+          <img src="@/assets/images/logo.svg" alt="Logo" />
           <h1>{{ $t('auth.createAccount') }}</h1>
           <p>{{ $t('auth.joinPlatform') }}</p>
         </div>
@@ -146,8 +146,8 @@ const handleGoToLogin = () => {
   margin-bottom: var(--gap-xl);
   
   img {
-    width: 48px;
-    height: 48px;
+    width: 120px;
+    height: auto;
     margin-bottom: var(--gap-md);
   }
   

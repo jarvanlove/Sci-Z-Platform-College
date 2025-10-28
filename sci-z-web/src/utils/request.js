@@ -1,6 +1,10 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/store/modules/auth'
+import { createLogger } from './simpleLogger'
+
+// 创建请求模块日志器
+const requestLogger = createLogger('Request')
 
 // 创建axios实例
 const service = axios.create({
@@ -18,7 +22,7 @@ service.interceptors.request.use(
     return config
   },
   (error) => {
-    console.error('请求错误:', error)
+    requestLogger.error('请求错误', { error: error.message, url: error.config?.url })
     return Promise.reject(error)
   }
 )
@@ -42,7 +46,11 @@ service.interceptors.response.use(
     return data
   },
   (error) => {
-    console.error('响应错误:', error)
+    requestLogger.error('响应错误', { 
+      status: error.response?.status, 
+      url: error.config?.url,
+      message: error.message 
+    })
     
     if (error.response) {
       const { status, data } = error.response

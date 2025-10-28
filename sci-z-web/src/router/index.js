@@ -1,5 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useAuthStore } from '@/store/modules/auth'
+import { createLogger } from '@/utils/simpleLogger'
+
+// 创建路由模块日志器
+const routerLogger = createLogger('Router')
 
 // 路由配置
 const routes = [
@@ -23,7 +28,7 @@ const routes = [
   },
   {
     path: '/',
-    redirect: '/dashboard'
+    redirect: '/login'
   },
   {
     path: '/dashboard',
@@ -254,12 +259,6 @@ const routes = [
     ]
   },
   {
-    path: '/component-test',
-    name: 'ComponentTest',
-    component: () => import('@/views/ComponentTest.vue'),
-    meta: { title: '组件测试', layout: 'main' }
-  },
-  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/views/Error/404.vue'),
@@ -268,31 +267,83 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/'),
   routes
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const publicPages = ['/login', '/register', '/reset-password']
   const authRequired = !publicPages.includes(to.path)
+  const authStore = useAuthStore()
+
+  // 路由守卫日志
+  routerLogger.info('路由守卫触发', {
+    to: to.path,
+    from: from.path,
+    isLoggedIn: authStore.isLoggedIn,
+    permissionsCount: authStore.permissions?.length || 0,
+    authRequired,
+    isPublicPage: publicPages.includes(to.path)
+  })
 
   // 设置页面标题
   if (to.meta.title) {
-    document.title = `${to.meta.title} - 高校科研项目管理平台`
+    document.title = `${to.meta.title} - 高校科研管理平台`
   }
 
   // 检查是否需要认证
   if (authRequired) {
-    const token = localStorage.getItem('auth_token')
-    if (!token) {
-      // 暂时注释掉错误提示，避免在开发阶段干扰
-      // ElMessage.error('请先登录')
-      return next('/login')
+      if (!authStore.isLoggedIn) {
+        routerLogger.info('用户未登录，重定向到登录页面', { targetPath: to.path })
+        ElMessage.error('请先登录')
+        return next('/login')
+      }
+    
+    // 检查页面权限
+    if (to.meta.permission && !authStore.hasPermission(to.meta.permission)) {
+      routerLogger.warn('权限检查失败', { 
+        requiredPermission: to.meta.permission, 
+        userPermissions: authStore.permissions,
+        targetPath: to.path
+      })
+      ElMessage.error('没有权限访问该页面')
+      
+      // 如果当前要访问的就是dashboard，则重定向到登录页面避免无限循环
+      if (to.path === '/dashboard') {
+        routerLogger.warn('无权限访问dashboard，重定向到登录页面')
+        return next('/login')
+      }
+      
+      // 重定向到有权限的页面
+      return next('/dashboard')
     }
   }
 
+  // 如果已登录用户访问登录页面，重定向到仪表板
+  if (to.path === '/login' && authStore.isLoggedIn) {
+    routerLogger.info('已登录用户访问登录页面，重定向到仪表板')
+    return next('/dashboard')
+  }
+
   next()
+})
+
+// 路由解析完成后的日志
+router.afterEach((to, from, failure) => {
+  if (failure) {
+    routerLogger.error('路由解析失败', { 
+      to: to.path, 
+      from: from.path, 
+      failure: failure.message 
+    })
+  } else {
+    routerLogger.info('路由解析成功', { 
+      to: to.path, 
+      from: from.path,
+      component: to.matched[0]?.components?.default?.name || 'Unknown'
+    })
+  }
 })
 
 export default router

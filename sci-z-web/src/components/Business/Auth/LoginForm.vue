@@ -87,7 +87,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { BaseButton } from '@/components/Common'
-import { login, getCaptcha } from '@/api/Auth'
+import { getCaptcha } from '@/api/Auth'
 import { useAuthStore } from '@/store/modules/auth'
 
 // 定义事件
@@ -125,7 +125,7 @@ const loginRules = {
   ],
   password: [
     { required: true, message: t('auth.password'), trigger: 'blur' },
-    { min: 6, max: 20, message: '密码长度为6-20个字符', trigger: 'blur' }
+    { min: 3, max: 20, message: '密码长度为3-20个字符', trigger: 'blur' }
   ],
   captcha: [
     { required: true, message: t('auth.captcha'), trigger: 'blur' }
@@ -145,7 +145,7 @@ const handleLogin = async () => {
     await loginFormRef.value.validate()
     loading.value = true
 
-    const response = await login({
+    const response = await authStore.login({
       username: loginForm.username,
       password: loginForm.password,
       captcha: loginForm.captcha,
@@ -156,11 +156,8 @@ const handleLogin = async () => {
     ElMessage.success(t('auth.loginSuccess'))
     emit('login-success', response.data)
     
-    // 跳转到仪表板
-    router.push('/dashboard')
-    
   } catch (error) {
-    console.error('登录失败:', error)
+    // 错误日志已在auth store中记录
     
     // 增加失败次数
     loginFailCount.value++
@@ -192,7 +189,7 @@ const refreshCaptcha = async () => {
     const response = await getCaptcha()
     captchaUrl.value = response.data.captchaUrl
   } catch (error) {
-    console.error('获取验证码失败:', error)
+    // 验证码获取失败，静默处理
   }
 }
 

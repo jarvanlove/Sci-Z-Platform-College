@@ -55,6 +55,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { useAppStore } from '@/store/modules/app'
+import { useAuthStore } from '@/store/modules/auth'
 import LanguageSwitcher from '@/components/Common/LanguageSwitcher.vue'
 
 const router = useRouter()
@@ -69,9 +70,8 @@ const isDark = computed(() => appStore.theme === 'dark')
 
 // 用户信息（这里应该从 store 获取）
 const userInfo = computed(() => {
-  // 临时从 localStorage 获取，实际应该从 auth store 获取
-  const userInfoStr = localStorage.getItem('user_info')
-  return userInfoStr ? JSON.parse(userInfoStr) : null
+  const authStore = useAuthStore()
+  return authStore.userInfo
 })
 
 // 切换侧边栏
@@ -101,9 +101,8 @@ const handleUserCommand = (command) => {
 
 // 退出登录
 const handleLogout = () => {
-  // 清除本地存储的认证信息
-  localStorage.removeItem('auth_token')
-  localStorage.removeItem('user_info')
+  const authStore = useAuthStore()
+  authStore.logout()
   ElMessage.success(t('auth.logoutSuccess'))
   router.push('/login')
 }
@@ -168,7 +167,8 @@ const handleLogout = () => {
       transition: all 0.3s ease;
 
       &:hover {
-        background-color: var(--hover);
+        background-color: #f0f9ff;
+        color: #1e40af;
       }
 
       .username {

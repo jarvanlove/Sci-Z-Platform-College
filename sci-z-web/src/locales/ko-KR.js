@@ -1,4 +1,11 @@
 export default {
+  // 앱 정보
+  app: {
+    title: '생성형 대학 연구 관리 플랫폼',
+    description: 'AIGC 기반 생성형 대학 연구 관리 플랫폼',
+    htmlTitle: '생성형 대학 연구 관리 플랫폼'
+  },
+
   // 공통
   common: {
     confirm: '확인',
@@ -60,6 +67,15 @@ export default {
     rememberMe: '로그인 상태 유지',
     forgotPassword: '비밀번호 찾기',
     resetPassword: '비밀번호 재설정',
+    welcomeBack: '다시 오신 것을 환영합니다, 계정에 로그인해주세요',
+    noAccount: '아직 계정이 없으신가요?',
+    registerNow: '지금 가입하기',
+    rememberPassword: '비밀번호를 기억하셨나요?',
+    sendCode: '코드 전송',
+    emailCodeSent: '인증코드가 전송되었습니다',
+    sendCodeFailed: '인증코드 전송에 실패했습니다',
+    resetSuccess: '비밀번호 재설정이 성공했습니다',
+    resetFailed: '비밀번호 재설정에 실패했습니다',
     loginSuccess: '로그인 성공',
     logoutSuccess: '로그아웃 성공',
     loginFailed: '로그인 실패',

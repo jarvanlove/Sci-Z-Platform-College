@@ -1,4 +1,11 @@
 export default {
+  // 应用信息
+  app: {
+    title: '生成式高校科研管理平台',
+    description: '基于AIGC生成式高校科研管理平台',
+    htmlTitle: '生成式高校科研管理平台'
+  },
+
   // 通用
   common: {
     confirm: '确认',
@@ -18,7 +25,33 @@ export default {
     success: '操作成功',
     error: '操作失败',
     warning: '警告',
-    info: '提示'
+    info: '提示',
+    to: '至',
+    startDate: '开始日期',
+    endDate: '结束日期',
+    apply: '应用',
+    filter: '筛选'
+  },
+  // 分页
+  pagination: {
+    total: '共 {total} 条',
+    page: '第 {page} 页',
+    pageSize: '每页 {size} 条'
+  },
+  // 通用反馈
+  feedback: {
+    saved: '保存成功',
+    updated: '更新成功',
+    deleted: '删除成功',
+    created: '创建成功',
+    submitted: '提交成功',
+    operationFailed: '操作失败',
+    networkError: '网络错误，请检查网络连接',
+    serverError: '服务器错误，请稍后重试',
+    unauthorized: '未授权访问，请登录重试',
+    forbidden: '无权限执行该操作',
+    notFound: '资源不存在',
+    timeout: '请求超时，请稍后重试'
   },
 
   // 导航菜单
@@ -57,9 +90,21 @@ export default {
     email: '邮箱',
     phone: '手机号',
     captcha: '验证码',
+    emailCode: '邮箱验证码',
+    newPassword: '新密码',
+    confirmPassword: '确认密码',
     rememberMe: '记住我',
     forgotPassword: '忘记密码',
     resetPassword: '重置密码',
+    welcomeBack: '欢迎回来，请登录您的账户',
+    noAccount: '还没有账号？',
+    registerNow: '立即注册',
+    rememberPassword: '想起密码了？',
+    sendCode: '发送验证码',
+    emailCodeSent: '验证码已发送',
+    sendCodeFailed: '发送验证码失败',
+    resetSuccess: '密码重置成功',
+    resetFailed: '密码重置失败',
     loginSuccess: '登录成功',
     logoutSuccess: '退出登录成功',
     loginFailed: '登录失败',
@@ -67,6 +112,40 @@ export default {
     accountLocked: '账户已被锁定',
     captchaRequired: '请输入验证码',
     captchaError: '验证码错误'
+  },
+
+  // 认证模块页面
+  authPages: {
+    loginPage: {
+      title: '登录',
+      usernamePlaceholder: '请输入用户名/邮箱/手机号',
+      passwordPlaceholder: '请输入密码',
+      rememberMe: '记住我',
+      login: '登录',
+      register: '注册',
+      forgotPassword: '忘记密码',
+      loginSuccess: '登录成功',
+      loginError: '登录失败'
+    },
+    registerPage: {
+      title: '注册',
+      username: '用户名',
+      email: '邮箱',
+      phone: '手机号',
+      password: '密码',
+      confirmPassword: '确认密码',
+      department: '所属院系',
+      submit: '提交注册',
+      registerSuccess: '注册成功',
+      registerError: '注册失败'
+    },
+    resetPage: {
+      title: '重置密码',
+      emailPlaceholder: '请输入注册邮箱',
+      sendEmail: '发送重置邮件',
+      sendSuccess: '重置邮件发送成功',
+      sendError: '重置邮件发送失败'
+    }
   },
 
   // 用户相关
@@ -85,7 +164,60 @@ export default {
     newPassword: '新密码',
     confirmPassword: '确认密码',
     passwordMismatch: '两次输入的密码不一致',
-    passwordChanged: '密码修改成功'
+    passwordChanged: '密码修改成功',
+    // 安全设置页面
+    security: {
+      title: '安全设置',
+      changePassword: '修改密码',
+      oldPassword: '原密码',
+      newPassword: '新密码',
+      confirmPassword: '确认密码',
+      oldPasswordPlaceholder: '请输入原密码',
+      newPasswordPlaceholder: '请输入新密码',
+      confirmPasswordPlaceholder: '请再次输入新密码',
+      oldPasswordRequired: '请输入原密码',
+      newPasswordRequired: '请输入新密码',
+      confirmPasswordRequired: '请确认新密码',
+      passwordMinLength: '密码长度至少8位，且不超过32位',
+      passwordStrength: '密码需包含字母、数字，建议包含大小写与特殊字符',
+      passwordMismatch: '两次输入的密码不一致',
+      changePasswordTitle: '确认修改密码',
+      changePasswordConfirm: '确定要修改密码吗？',
+      changePasswordSuccess: '密码修改成功',
+      changePasswordError: '密码修改失败',
+      redirectToLogin: '即将跳转至登录页面',
+      weak: '弱',
+      medium: '中',
+      strong: '强',
+      weakTips: '建议增加密码长度并包含多种字符',
+      mediumTips: '可以考虑加入更多字符类型提升安全性',
+      strongTips: '密码强度良好，请妥善保管',
+      selectStatus: '选择状态',
+      loginSuccess: '登录成功',
+      loginFailed: '登录失败',
+      abnormalLogin: '异常登录',
+      loginTime: '登录时间',
+      loginIP: '登录IP',
+      loginLocation: '登录地点',
+      browser: '浏览器',
+      operatingSystem: '操作系统',
+      loginStatus: '登录状态',
+      loadLogsError: '登录日志加载失败'
+    }
+  },
+
+  // 用户中心-个人信息页面
+  userProfilePage: {
+    title: '个人信息',
+    baseInfo: '基础信息',
+    contactInfo: '联系信息',
+    save: '保存',
+    cancel: '取消',
+    saveSuccess: '保存成功',
+    saveError: '保存失败',
+    uploadAvatar: '上传头像',
+    uploadSuccess: '头像上传成功',
+    uploadError: '头像上传失败'
   },
 
   // 申报相关
@@ -105,7 +237,40 @@ export default {
     deleteDeclaration: '删除申报',
     declarationCreated: '申报创建成功',
     declarationUpdated: '申报更新成功',
-    declarationDeleted: '申报删除成功'
+    declarationDeleted: '申报删除成功',
+    // 列表页面
+    listPage: {
+      searchPlaceholder: '请输入申报标题/编号',
+      download: '下载',
+      preview: '预览',
+      statusEdit: '修改状态',
+      loadError: '申报列表加载失败',
+      downloadSuccess: '下载已开始',
+      downloadError: '下载失败',
+      previewError: '预览失败',
+      statusUpdateSuccess: '状态更新成功',
+      statusUpdateError: '状态更新失败'
+    },
+    // 详情页面
+    detailPage: {
+      baseInfo: '基本信息',
+      attachments: '附件列表',
+      timeline: '工作流时间线',
+      result: '工作流状态',
+      loadError: '申报详情加载失败'
+    },
+    // 新建页面
+    createPage: {
+      selectWorkflow: '选择工作流',
+      upload: '上传申报文件',
+      analyze: '文档分析',
+      analyzeAgain: '重新分析',
+      submit: '提交申报',
+      uploadError: '文件上传失败',
+      analyzeError: '文档分析失败',
+      saveSuccess: '已保存',
+      saveError: '保存失败'
+    }
   },
 
   // 项目相关
@@ -128,7 +293,44 @@ export default {
     removeMember: '移除成员',
     projectCreated: '项目创建成功',
     projectUpdated: '项目更新成功',
-    projectDeleted: '项目删除成功'
+    projectDeleted: '项目删除成功',
+    // 列表页面
+    listPage: {
+      searchPlaceholder: '请输入项目名称/负责人',
+      deleteConfirm: '确定删除该项目吗？',
+      loadError: '项目列表加载失败',
+      deleteSuccess: '项目删除成功',
+      deleteError: '项目删除失败'
+    },
+    // 详情编辑页面
+    detailPage: {
+      basicInfo: '项目信息',
+      milestones: '里程碑',
+      files: '项目文件',
+      members: '项目成员',
+      addMilestone: '新增里程碑',
+      removeMilestone: '删除里程碑',
+      saveConfirm: '是否保存当前修改？',
+      saveSuccess: '保存成功',
+      saveError: '保存失败',
+      loadError: '项目详情加载失败',
+      uploadSuccess: '上传成功',
+      uploadError: '上传失败',
+      deleteFileConfirm: '确定删除该文件吗？',
+      previewError: '预览失败',
+      downloadError: '下载失败',
+      addMemberSuccess: '成员添加成功',
+      removeMemberSuccess: '成员移除成功'
+    },
+    // 进度页面
+    progressPage: {
+      stats: '进度统计',
+      completed: '已完成',
+      inProgress: '进行中',
+      notStarted: '未开始',
+      delayed: '已延期',
+      loadError: '项目进度加载失败'
+    }
   },
 
   // 报告相关
@@ -151,7 +353,44 @@ export default {
     generateReport: '生成报告',
     exportReport: '导出报告',
     reportGenerated: '报告生成成功',
-    reportExported: '报告导出成功'
+    reportExported: '报告导出成功',
+    // 列表页面
+    listPage: {
+      loadError: '报告列表加载失败',
+      previewError: '预览失败',
+      downloadError: '下载失败',
+      regenerate: '重新生成',
+      regenerateSuccess: '已提交重新生成',
+      regenerateError: '重新生成失败',
+      deleteConfirm: '确定删除该报告吗？',
+      deleteSuccess: '删除成功',
+      deleteError: '删除失败'
+    },
+    // 生成页面
+    generatePage: {
+      selectProject: '选择项目',
+      selectWorkflow: '选择流程',
+      selectTemplate: '选择模板',
+      generate: '生成',
+      save: '保存',
+      download: '下载',
+      loadProjectsError: '项目加载失败',
+      loadWorkflowsError: '流程加载失败',
+      loadTemplatesError: '模板加载失败',
+      generateSuccess: '生成任务已提交',
+      generateError: '生成失败',
+      saveSuccess: '保存成功',
+      saveError: '保存失败',
+      downloadError: '下载失败'
+    }
+  },
+
+  // 仪表板
+  dashboard: {
+    stats: '统计概览',
+    recentDeclarations: '最近申报',
+    projectProgress: '项目进度',
+    loadError: '仪表板数据加载失败'
   },
 
   // 知识库相关
@@ -181,16 +420,58 @@ export default {
 
   // AI助手相关
   ai: {
-    chat: 'AI助手',
-    newChat: '新建对话',
-    sendMessage: '发送消息',
-    inputPlaceholder: '请输入您的问题...',
-    thinking: 'AI正在思考...',
-    sources: '知识来源',
-    confidence: '置信度',
-    noConversation: '暂无对话记录',
-    conversationCreated: '对话创建成功',
-    messageSent: '消息发送成功'
+    chat: {
+      title: 'AI对话',
+      newChat: '新建对话',
+      clear: '清空',
+      settings: '设置',
+      user: '用户',
+      assistant: '助手',
+      welcome: '欢迎使用AI助手',
+      welcomeSubtitle: '输入问题或从下方选择示例问题开始',
+      inputPlaceholder: '请输入您的问题...',
+      inputTip: 'Enter发送，Shift+Enter换行',
+      thinking: 'AI正在思考...',
+      clearConfirm: '确定清空当前对话内容吗？',
+      responseError: '生成回答失败',
+      sendError: '发送消息失败',
+      cleared: '已清空',
+      attachmentComingSoon: '附件功能即将上线',
+      voiceComingSoon: '语音功能即将上线',
+      settingsComingSoon: '设置功能即将上线',
+      model: '模型',
+      copied: '已复制',
+      copyError: '复制失败'
+    },
+    knowledge: {
+      searchKb: '搜索知识库',
+      newKb: '新建知识库',
+      documents: '个文档',
+      aiAssistant: 'AI助手',
+      chatWelcome: '开始与AI对话',
+      chatHint: '在这里输入消息，或从左侧选择知识库',
+      chatPlaceholder: '结合知识库向AI提问...',
+      chatTip: 'Enter发送，Shift+Enter换行',
+      searchPlaceholder: '请输入搜索关键词',
+      searching: '正在搜索...',
+      noResults: '未找到相关结果',
+      tryDifferentKeywords: '尝试更换关键词或放宽筛选条件',
+      welcome: '欢迎使用知识库',
+      searchHint: '请输入关键词进行搜索',
+      createKbTitle: '请输入知识库名称',
+      newKbDesc: '新的知识库',
+      kbCreated: '知识库创建成功',
+      loadKbError: '知识库加载失败',
+      searchComplete: '搜索完成',
+      searchError: '搜索失败',
+      editKbTitle: '编辑知识库名称',
+      deleteKbConfirm: '确定删除该知识库吗？',
+      settingsComingSoon: '设置功能即将上线',
+      kbUpdated: '知识库更新成功',
+      kbDeleted: '知识库删除成功',
+      documentType: '文档类型',
+      timeRange: '时间范围'
+    }
   },
 
   // 系统管理相关
@@ -223,7 +504,62 @@ export default {
     userDeleted: '用户删除成功',
     roleCreated: '角色创建成功',
     roleUpdated: '角色更新成功',
-    roleDeleted: '角色删除成功'
+    roleDeleted: '角色删除成功',
+    // 用户管理页面
+    userPage: {
+      searchPlaceholder: '请输入用户名/邮箱',
+      statusAll: '全部',
+      createUser: '新增用户',
+      editUser: '编辑用户',
+      resetPassword: '重置密码',
+      toggleStatus: '启用/禁用',
+      deleteUser: '删除用户',
+      resetPasswordConfirm: '确定为该用户重置密码吗？',
+      resetPasswordSuccess: '重置密码成功',
+      resetPasswordError: '重置密码失败',
+      toggleSuccess: '状态更新成功',
+      toggleError: '状态更新失败',
+      deleteConfirm: '确定删除该用户吗？',
+      loadError: '用户列表加载失败',
+      submitSuccess: '保存成功',
+      submitError: '保存失败'
+    },
+    // 角色权限页面
+    rolePage: {
+      createRole: '新增角色',
+      editRole: '编辑角色',
+      deleteRole: '删除角色',
+      assignPermissions: '分配权限',
+      deleteConfirm: '确定删除该角色吗？',
+      loadRolesError: '角色列表加载失败',
+      loadPermissionsError: '权限树加载失败',
+      saveRoleSuccess: '角色保存成功',
+      saveRoleError: '角色保存失败',
+      savePermissionSuccess: '权限分配成功',
+      savePermissionError: '权限分配失败'
+    },
+    // 日志管理页面
+    logsPage: {
+      level: '日志级别',
+      export: '导出日志',
+      clear: '清空日志',
+      exportSuccess: '导出成功',
+      exportError: '导出失败',
+      clearConfirm: '确定清空所有日志吗？',
+      clearSuccess: '清空成功',
+      clearError: '清空失败',
+      loadError: '日志加载失败'
+    },
+    // 系统配置页面
+    configPage: {
+      basicSettings: '基础设置',
+      difySettings: 'Dify设置',
+      emailSettings: '邮箱设置',
+      uploadSettings: '上传设置',
+      securitySettings: '安全设置',
+      saveSuccess: '配置保存成功',
+      saveError: '配置保存失败'
+    }
   },
 
   // 文件相关
@@ -258,5 +594,42 @@ export default {
     light: '浅色主题',
     dark: '深色主题',
     switchTheme: '切换主题'
+  },
+
+  // 校验相关（与 validate.js 对应的常用提示）
+  validation: {
+    required: '该字段为必填项',
+    invalidEmail: '请输入有效的邮箱地址',
+    invalidPhone: '请输入有效的手机号',
+    invalidUrl: '请输入有效的链接地址',
+    invalidNumber: '请输入有效的数字',
+    positiveInteger: '请输入正整数',
+    chineseName: '请输入2-10位中文姓名',
+    passwordLength: '密码长度不符合要求',
+    passwordStrength: '密码需包含字母和数字',
+    idCard: '请输入有效的身份证号',
+    postalCode: '请输入6位邮政编码',
+    bankCard: '请输入16-19位银行卡号',
+    amount: '金额格式不正确，最多两位小数',
+    date: '日期格式应为YYYY-MM-DD',
+    time: '时间格式应为HH:mm:ss',
+    decimal: '请输入数字或小数',
+    age: '年龄范围应在1-120之间',
+    percentage: '百分比应在0-100之间',
+    projectName: '项目名称长度应在2-100之间',
+    budget: '预算金额需为非负数',
+    port: '端口号应在1-65535之间',
+    fileSizeMB: '文件大小超出限制',
+    roleName: '角色名称长度应在2-20之间',
+    systemName: '系统名称长度应在1-50之间',
+    systemDescription: '系统描述长度应在1-200之间',
+    apiUrl: 'API地址格式不正确',
+    smtpHost: 'SMTP主机格式不正确',
+    uploadPath: '上传路径格式不正确',
+    maxLoginAttempts: '最大登录尝试次数需在1-100之间',
+    sessionTimeout: '会话超时时间需在30-480分钟之间',
+    reportWordCount: '报告字数需在1000-50000之间',
+    researchFieldCount: '研究领域标签数量最多10个',
+    fileCount: '文件数量超过限制'
   }
 }
