@@ -1,0 +1,82 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sciz_platform
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: is_deleted
+      logic-not-delete-value: 0
+      logic-delete-value: 1
+
+swagger:
+  enabled: true
+
+kafka:
+  bootstrap-servers: localhost:9092
+  producer:
+    acks: 1
+    retries: 1
+    linger-ms: 0
+
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket: sciz-files
+
+dify:
+  api:
+    base-url: https://api.dify.ai/v1
+    api-key: YOUR_DEV_DIFY_KEY
+  http:
+    connect-timeout-ms: 5000
+    read-timeout-ms: 60000
+
+llm:
+  openai:
+    api-key: YOUR_DEV_LLM_KEY
+    base-url: https://api.openai.com/v1
+    model: gpt-4o-mini
+    timeout-seconds: 60
+
+server:
+  port: 8808
+
+sa-token:
+  token-name: Authorization
+  timeout: 2592000           # 30天
+  activity-timeout: -1
+  is-concurrent: true
+  is-share: true
+  token-style: uuid
+  is-log: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui/index.html
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 200MB
+
+logging:
+  level:
+    root: INFO

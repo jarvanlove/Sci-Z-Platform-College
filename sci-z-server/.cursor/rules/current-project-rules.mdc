@@ -1,6 +1,5 @@
 ---
-alwaysApply: true
-description: Sci-Z-Sever Agent、Background、Plan模式下规则
+alwaysApply: false
 ---
 
 # 技术回复规则
@@ -45,7 +44,7 @@ Java 专家
 
 * @author JiaWen.Wu
 * @className 当前类名
-* @date 当前时间(yyyy-MM-dd HH:mm)
+* @date 中国北京当前时间(yyyy-MM-dd HH:mm)
   \*/
   示例：
   /\*\*
@@ -72,7 +71,13 @@ Java 专家
 - @return 审批流程信息
   \*/
 
+- 所有实体类字段注释模板
+  /\*\*
+
+* 字段注释
+  \*/
+
 ### 4. 编码规范
 
 - 所有接口要使用统一返回结果 Result.java 以及 ResultCode.java 的枚举定义使用
--
+- 日志打印 必须以 String.format %s 占位符 方式 打印详细日志

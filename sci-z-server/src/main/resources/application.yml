@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: sci-z-server
+  profiles:
+    active: dev
+
+logging:
+  config: classpath:logback-spring.xml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

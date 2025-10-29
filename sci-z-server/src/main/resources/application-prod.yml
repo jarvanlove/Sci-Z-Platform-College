@@ -1,0 +1,75 @@
+spring:
+  config:
+    import: optional:classpath:config/production.env.properties
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sciz_platform
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 8
+      connection-timeout: 20000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: 0
+
+server:
+  port: 8808
+
+logging:
+  level:
+    root: INFO
+  file:
+    name: logs/app.log
+
+kafka:
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka1:9092,kafka2:9092}
+  producer:
+    acks: all
+    retries: 3
+    linger-ms: 10
+
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://minio:9000}
+  access-key: ${MINIO_AK}
+  secret-key: ${MINIO_SK}
+  bucket: ${MINIO_BUCKET:sciz-files}
+
+dify:
+  api:
+    base-url: https://api.dify.ai/v1
+    api-key: ${DIFY_API_KEY}
+  http:
+    connect-timeout-ms: 3000
+    read-timeout-ms: 60000
+
+llm:
+  openai:
+    api-key: ${LLM_API_KEY}
+    base-url: ${LLM_BASE_URL:https://api.openai.com/v1}
+    model: ${LLM_MODEL:gpt-4o-mini}
+    timeout-seconds: 60
+
+sa-token:
+  token-name: Authorization
+  timeout: ${SA_TOKEN_TIMEOUT:2592000}
+  activity-timeout: -1
+  is-concurrent: true
+  is-share: true
+  token-style: uuid
+  is-log: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui/index.html
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:500MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:500MB}
