@@ -12,7 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
  * 文档上传请求DTO
  * 对应Python中的data参数
  * 
- * @author jarvanlove
+ * @author shihang.shang
  * @since 
  */
 @Data

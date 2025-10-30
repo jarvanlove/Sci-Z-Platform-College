@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
  * Dify API 配置类
  * 用于配置 Dify API 的基础信息
  * 
- * @author jarvanlove
+ * @author shihang.shang
  * @since 2024-10-22
  */
 @Data
@@ -20,9 +20,14 @@ public class DifyConfig {
      */
     private String baseUrl;
     /**
-     * API Key
+     * API Key (知识库)
      */
     private String apiKey;
+    
+    /**
+     * 工作流 API Key
+     */
+    private String apiWorkflowKey;
     /**
      * 请求超时时间（毫秒）
      */

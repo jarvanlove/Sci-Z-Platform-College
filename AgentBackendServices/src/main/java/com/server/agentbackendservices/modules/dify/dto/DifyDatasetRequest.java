@@ -11,14 +11,14 @@ import jakarta.validation.constraints.NotBlank;
  * Dify 数据集请求DTO
  * 根据 Dify API 文档设计
  * 
- * @author jarvanlove
+ * @author shihang.shang
  * @since 2024-10-22
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DifyDatasetRequest {
+public class DifyDatasetRequest extends BaseDifyRequest {
     
     /**
      * 数据集名称

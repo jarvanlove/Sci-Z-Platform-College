@@ -28,25 +28,25 @@ public abstract class BaseEntity implements Serializable {
      * 创建时间
      */
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    private LocalDateTime createdTime;
 
     /**
      * 更新时间
      */
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    @TableField( fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedTime;
 
     /**
      * 创建人
      */
-    @TableField(fill = FieldFill.INSERT)
-    private String createBy;
+    @TableField(value = "created_by", fill = FieldFill.INSERT)
+    private String createdBy;
 
     /**
      * 更新人
      */
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private String updateBy;
+    @TableField(value = "updated_by", fill = FieldFill.INSERT_UPDATE)
+    private String updatedBy;
 
     /**
      * 逻辑删除标识
@@ -58,8 +58,8 @@ public abstract class BaseEntity implements Serializable {
     /**
      * 版本号（乐观锁）
      */
-    @Version
-    private Integer version;
+//    @Version
+//    private Integer version;
 
     // 查询条件字段（不映射到数据库）
     @TableField(exist = false)

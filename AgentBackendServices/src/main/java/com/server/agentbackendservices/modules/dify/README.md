@@ -50,17 +50,173 @@ dify/
 /api/dify
 ```
 
-### 接口列表
+### 通用规则
+- 非上传接口：`application/json`，请求体包含 `BaseDifyRequest` 或其子类（统一包含 userId、resourceId、keyType）。
+- 上传接口：`multipart/form-data`，使用表单字段传递 `file`、`userId`、`resourceId`、`keyType`。
 
-| 方法 | 路径 | 说明 | 参数 |
-|------|------|------|------|
-| GET | `/datasets` | 获取数据集列表 | page, limit |
-| POST | `/datasets` | 创建数据集 | DifyDatasetRequest |
-| GET | `/datasets/{datasetId}` | 获取数据集详情 | datasetId |
-| PUT | `/datasets/{datasetId}` | 更新数据集 | datasetId, DifyDatasetRequest |
-| DELETE | `/datasets/{datasetId}` | 删除数据集 | datasetId |
-| POST | `/datasets/{datasetId}/retrieve` | 检索知识库 | datasetId, DifyRetrieveRequest |
-| POST | `/datasets/{datasetId}/document/upload` | 上传文档 | datasetId, file |
+---
+
+### 数据集 APIs
+
+#### 获取数据集列表
+- 路由：`POST /api/dify/datasets/list?page=1&limit=10`
+- 请求体：`BaseDifyRequest`
+```bash
+curl -X POST "http://localhost:8081/api/dify/datasets/list?page=1&limit=10" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"knowledge_base_001",
+    "keyType":"dataset"
+  }'
+```
+
+#### 创建数据集
+- 路由：`POST /api/dify/datasets`
+- 请求体：`DifyDatasetRequest`
+```bash
+curl -X POST "http://localhost:8081/api/dify/datasets" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"knowledge_base_001",
+    "keyType":"dataset",
+    "name":"测试数据集",
+    "description":"这是一个测试数据集",
+    "permission":"only_me",
+    "indexing_technique":"high_quality"
+  }'
+```
+
+#### 获取数据集详情
+- 路由：`POST /api/dify/datasets/{datasetId}`
+- 请求体：`BaseDifyRequest`
+```bash
+curl -X POST "http://localhost:8081/api/dify/datasets/dataset_123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"knowledge_base_001",
+    "keyType":"dataset"
+  }'
+```
+
+#### 更新数据集
+- 路由：`PUT /api/dify/datasets/{datasetId}`
+- 请求体：`DifyDatasetRequest`
+```bash
+curl -X PUT "http://localhost:8081/api/dify/datasets/dataset_123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"knowledge_base_001",
+    "keyType":"dataset",
+    "name":"测试数据集-更新",
+    "description":"更新描述"
+  }'
+```
+
+#### 删除数据集
+- 路由：`POST /api/dify/datasets/{datasetId}/delete`
+- 请求体：`BaseDifyRequest`
+```bash
+curl -X POST "http://localhost:8081/api/dify/datasets/dataset_123/delete" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"knowledge_base_001",
+    "keyType":"dataset"
+  }'
+```
+
+#### 检索知识库
+- 路由：`POST /api/dify/datasets/{datasetId}/retrieve`
+- 请求体：`DifyRetrieveRequest`
+```bash
+curl -X POST "http://localhost:8081/api/dify/datasets/dataset_123/retrieve" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"knowledge_base_001",
+    "keyType":"dataset",
+    "query":"工业互联网的核心挑战是什么？"
+  }'
+```
+
+#### 上传文档到数据集（multipart/form-data）
+- 路由：`POST /api/dify/datasets/{datasetId}/document/upload`
+- 表单字段：`file`、`userId`、`resourceId`、`keyType`
+```bash
+curl -X POST "http://localhost:8081/api/dify/datasets/dataset_123/document/upload" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@/absolute/path/to/file.pdf" \
+  -F "userId=admin" \
+  -F "resourceId=knowledge_base_001" \
+  -F "keyType=dataset"
+```
+
+---
+
+### 工作流 APIs
+
+#### 执行工作流
+- 路由：`POST /api/dify/workflows/run`
+- 请求体：`DifyWorkflowRequest`
+```bash
+curl -X POST "http://localhost:8081/api/dify/workflows/run" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"workflow_001",
+    "keyType":"workflow",
+    "inputs": { "technology_report": "请总结这段文字：..." },
+    "responseMode":"blocking",
+    "user":"workflow_user_001"
+  }'
+```
+
+#### 获取工作流运行状态
+- 路由：`POST /api/dify/workflows/run/status`
+- 请求体：`DifyWorkflowStatusRequest`
+```bash
+curl -X POST "http://localhost:8081/api/dify/workflows/run/status" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"workflow_001",
+    "keyType":"workflow",
+    "workflowRunId":"3c90c3cc-0d44-4b50-8888-8dd25736052a"
+  }'
+```
+
+#### 获取工作流日志
+- 路由：`POST /api/dify/workflows/logs`
+- 请求体：`DifyWorkflowLogsRequest`
+```bash
+curl -X POST "http://localhost:8081/api/dify/workflows/logs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"workflow_001",
+    "keyType":"workflow",
+    "page":1,
+    "limit":20
+  }'
+```
+
+---
+
+### 通用文件上传（multipart/form-data）
+- 路由：`POST /api/dify/files/upload`
+- 表单字段：`file`、`userId`、`resourceId`、`keyType`
+```bash
+curl -X POST "http://localhost:8081/api/dify/files/upload" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@/absolute/path/to/file.pdf" \
+  -F "userId=admin" \
+  -F "resourceId=workflow_001" \
+  -F "keyType=workflow"
+```
 
 ## ⚙️ 配置说明
 
@@ -106,119 +262,13 @@ dify:
 ```bash
 # 环境变量示例
 DIFY_BASE_URL=http://192.168.1.203/v1
-DIFY_API_KEY=dataset-MwOxGbIDhZmg6bUdHEid0rhX
+#DIFY_API_KEY=dataset-MwOxGbIDhZmg6bUdHEid0rhX
 DIFY_TIMEOUT=30000
 DIFY_CONNECT_TIMEOUT=30000
 DIFY_RETRY_COUNT=3
 DIFY_ENABLE_RETRY=true
 ```
 
-## 📝 使用示例
-
-### 1. 获取数据集列表
-
-```bash
-GET /api/dify/datasets?page=1&limit=10
-```
-
-**响应示例：**
-```json
-{
-  "data": [
-    {
-      "id": "dataset-123",
-      "name": "知识库1",
-      "description": "测试知识库",
-      "created_at": "2024-10-24T10:00:00Z"
-    }
-  ],
-  "total": 1,
-  "page": 1,
-  "limit": 10
-}
-```
-
-### 2. 创建数据集
-
-```bash
-POST /api/dify/datasets
-Content-Type: application/json
-
-{
-  "name": "新知识库",
-  "description": "这是一个新的知识库",
-  "permission": "only_me"
-}
-```
-
-### 3. 上传文档
-
-```bash
-POST /api/dify/datasets/{datasetId}/document/upload
-Content-Type: multipart/form-data
-
-file: [选择文件]
-```
-
-**支持的文件格式：**
-- `.txt` - 文本文件
-- `.pdf` - PDF文档
-- `.doc/.docx` - Word文档
-- `.md` - Markdown文件
-- `.csv` - CSV数据文件
-- `.json` - JSON数据文件
-
-### 4. 检索知识库
-
-```bash
-POST /api/dify/datasets/{datasetId}/retrieve
-Content-Type: application/json
-
-{
-  "query": "人工智能"
-}
-```
-
-**响应示例：**
-```json
-{
-  "query": {
-    "content": "人工智能",
-    "top_k": 3
-  },
-  "records": [
-    {
-      "segment": {
-        "content": "人工智能是计算机科学的一个分支...",
-        "word_count": 150
-      },
-      "score": 0.95
-    }
-  ]
-}
-```
-
-## 🔧 技术特性
-
-### 1. 配置化管理
-- 所有配置项都通过 YAML 文件管理
-- 支持环境变量覆盖
-- 类型安全的配置类
-
-### 2. 错误处理
-- 统一的异常处理机制
-- 直接返回 Dify API 错误信息
-- 详细的日志记录
-
-### 3. 文件管理
-- 本地文件存储
-- 文件大小和格式验证
-- 自动创建上传目录
-
-### 4. HTTP 客户端
-- 统一的 HTTP 请求封装
-- 自动添加认证头
-- 支持多种请求方法
 
 ## 🛠️ 开发指南
 

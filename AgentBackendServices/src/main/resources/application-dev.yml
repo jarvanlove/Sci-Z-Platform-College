@@ -88,7 +88,8 @@ mybatis-plus:
 # Dify API 配置
 dify:
   base-url: http://192.168.1.203/v1
-  api-key:  dataset-MwOxGbIDhZmg6bUdHEid0rhX
+  api-key: dataset-MwOxGbIDhZmg6bUdHEid0rhX
+  api-workflow-key: app-TsSdGbD50r8fDt1shM3RBSMi
   timeout: 30000
   connect-timeout: 30000
   retry-count: 3
@@ -115,7 +116,6 @@ dify:
     dir: D:/uploads/dify/
     max-file-size: 52428800  # 50MB
     allowed-extensions: .txt,.pdf,.doc,.docx,.md,.csv,.json
-
 # 日志配置
 logging:
   level:
@@ -129,4 +129,3 @@ logging:
     rollingpolicy:
       max-file-size: 10MB
       max-history: 30
-

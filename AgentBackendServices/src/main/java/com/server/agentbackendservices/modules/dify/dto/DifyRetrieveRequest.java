@@ -12,15 +12,14 @@ import jakarta.validation.constraints.NotBlank;
  * Dify 知识库检索请求 DTO
  * 用于封装检索知识库的请求参数
  *
- * @author jarvanlove
+ * @author shihang.shang
  * @since 2024-10-24
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DifyRetrieveRequest {
-    
+public class DifyRetrieveRequest extends BaseDifyRequest {
     /**
      * 检索关键词
      */

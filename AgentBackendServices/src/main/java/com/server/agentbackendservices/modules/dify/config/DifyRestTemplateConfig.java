@@ -12,7 +12,7 @@ import org.springframework.web.client.RestTemplate;
  * Dify RestTemplate 配置类
  * 配置 HTTP 客户端的超时和连接参数
  * 
- * @author jarvanlove
+ * @author shihang.shang
  * @since 2024-10-22
  */
 @Configuration

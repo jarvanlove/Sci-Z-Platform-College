@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
  * Dify 文档处理配置类
  * 用于配置文档上传时的处理参数
  *
- * @author jarvanlove
+ * @author shihang.shang
  * @since 2024-10-24
  */
 @Data

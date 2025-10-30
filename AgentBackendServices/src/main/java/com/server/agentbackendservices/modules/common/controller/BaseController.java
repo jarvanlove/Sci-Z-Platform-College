@@ -9,6 +9,7 @@ import com.server.agentbackendservices.modules.common.service.BaseServiceImpl;
 import com.server.agentbackendservices.modules.common.vo.ResultVO;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -17,8 +18,9 @@ import java.util.List;
 @SuppressWarnings("all")
 @Tag(name = "base", description = "base相关的API")
 public abstract class BaseController<M extends MyBaseMapper<T>,T extends BaseEntity> {
+
     @Autowired
-    BaseServiceImpl service;
+    BaseServiceImpl<M,T> service;
 
     @PostMapping("/list")
     @Operation(summary = "获取列表", description = "获取列表")
