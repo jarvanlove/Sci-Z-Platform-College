@@ -55,4 +55,52 @@ public class ProjectController {
         // TODO: 实现项目删除逻辑
         return Result.success();
     }
+
+    @Operation(summary = "获取项目成员", description = "根据项目ID获取成员列表")
+    @GetMapping("/{id}/members")
+    public Result<Object> getMembers(@PathVariable Long id) {
+        return Result.success();
+    }
+
+    @Operation(summary = "添加项目成员", description = "向项目添加成员")
+    @PostMapping("/{id}/members")
+    public Result<Void> addMember(@PathVariable Long id, @RequestBody Object request) {
+        return Result.success();
+    }
+
+    @Operation(summary = "移除项目成员", description = "从项目移除成员")
+    @DeleteMapping("/{id}/members/{memberId}")
+    public Result<Void> removeMember(@PathVariable Long id, @PathVariable Long memberId) {
+        return Result.success();
+    }
+
+    @Operation(summary = "获取项目进度", description = "获取项目进度记录")
+    @GetMapping("/{id}/progress")
+    public Result<Object> getProgress(@PathVariable Long id) {
+        return Result.success();
+    }
+
+    @Operation(summary = "新增项目进度", description = "添加一条项目进度记录")
+    @PostMapping("/{id}/progress")
+    public Result<Void> addProgress(@PathVariable Long id, @RequestBody Object request) {
+        return Result.success();
+    }
+
+    @Operation(summary = "上传项目文档", description = "上传与项目相关的文档")
+    @PostMapping("/{id}/documents/upload")
+    public Result<Object> uploadDocument(@PathVariable Long id, @RequestParam("files") Object files) {
+        return Result.success();
+    }
+
+    @Operation(summary = "项目文档列表", description = "查询项目的文档列表")
+    @GetMapping("/{id}/documents")
+    public Result<Object> listDocuments(@PathVariable Long id) {
+        return Result.success();
+    }
+
+    @Operation(summary = "知识库搜索", description = "在项目关联的知识库中搜索")
+    @PostMapping("/{id}/knowledge/search")
+    public Result<Object> knowledgeSearch(@PathVariable Long id, @RequestBody Object request) {
+        return Result.success();
+    }
 }

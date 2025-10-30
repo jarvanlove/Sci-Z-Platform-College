@@ -14,8 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 项目服务实现类
- * 集成领域事件发布
+ * 项目应用服务实现类
  *
  * @author JiaWen.Wu
  * @className ProjectServiceImpl
@@ -45,7 +44,7 @@ public class ProjectServiceImpl implements ProjectService {
             // 2. 发布项目创建事件
             ProjectCreatedEvent event = new ProjectCreatedEvent(
                     String.valueOf(project.getId()),
-                    project.getProjectName(),
+                    project.getName(),
                     project.getDescription(),
                     "",
                     "",
@@ -60,7 +59,7 @@ public class ProjectServiceImpl implements ProjectService {
             ProjectInfoResp projectInfoResp = buildProjectInfoResp(project);
 
             log.info(String.format("项目创建成功: projectId=%s, projectName=%s",
-                    String.valueOf(project.getId()), project.getProjectName()));
+                    String.valueOf(project.getId()), project.getName()));
             return Result.success(projectInfoResp, "项目创建成功");
 
         } catch (Exception e) {
@@ -132,12 +131,12 @@ public class ProjectServiceImpl implements ProjectService {
     private Project createProjectEntity(ProjectCreateReq projectCreateReq) {
         Project project = new Project();
         project.setId(System.currentTimeMillis()); // 模拟ID生成
-        project.setProjectName(projectCreateReq.getProjectName());
+        project.setName(projectCreateReq.getProjectName());
         project.setDescription(projectCreateReq.getDescription());
         // project.setProjectType(projectCreateReq.getProjectType());
         // project.setCreatorId(1L); // 模拟创建者ID
         // project.setCreatorName("系统管理员"); // 模拟创建者名称
-        project.setStatus(ProjectStatus.IN_PROGRESS.getCode());
+        project.setStatus(ProjectStatus.IN_PROGRESS.getDescription());
         return project;
     }
 
@@ -147,7 +146,7 @@ public class ProjectServiceImpl implements ProjectService {
     private Project updateProjectEntity(Long projectId, ProjectCreateReq projectCreateReq) {
         Project project = new Project();
         project.setId(projectId);
-        project.setProjectName(projectCreateReq.getProjectName());
+        project.setName(projectCreateReq.getProjectName());
         project.setDescription(projectCreateReq.getDescription());
         // project.setProjectType(projectCreateReq.getProjectType());
         return project;
@@ -159,7 +158,7 @@ public class ProjectServiceImpl implements ProjectService {
     private ProjectInfoResp buildProjectInfoResp(Project project) {
         ProjectInfoResp projectInfoResp = new ProjectInfoResp();
         // projectInfoResp.setProjectId(project.getId());
-        projectInfoResp.setProjectName(project.getProjectName());
+        projectInfoResp.setProjectName(project.getName());
         projectInfoResp.setDescription(project.getDescription());
         // projectInfoResp.setProjectType(project.getProjectType());
         // projectInfoResp.setCreatorId(project.getCreatorId());

@@ -1,21 +1,55 @@
 package com.sciz.server.infrastructure.shared.event.log;
 
 import com.sciz.server.infrastructure.shared.event.DomainEvent;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
- * 用户登录日志事件
- * 对应表：sys_login_log
+ * 用户登录日志事件（用于异步落库 sys_login_log）
+ * 
+ * @author JiaWen.Wu
+ * @className LoginLoggedEvent
+ * @date 2025-10-29 14:00
  */
+@Getter
+@Setter
 public class LoginLoggedEvent extends DomainEvent {
 
+    /**
+     * 用户ID
+     */
     private Long userId;
+    /**
+     * 用户名
+     */
     private String username;
+    /**
+     * 登录IP
+     */
     private String loginIp;
+    /**
+     * 登录地点
+     */
     private String loginLocation;
+    /**
+     * 浏览器
+     */
     private String browser;
+    /**
+     * 操作系统
+     */
     private String os;
+    /**
+     * 登录状态（0失败 1成功）
+     */
     private Integer status;
+    /**
+     * 登录消息
+     */
     private String message;
+    /**
+     * 登录时间（字符串）
+     */
     private String loginTime;
 
     public LoginLoggedEvent() {
@@ -43,42 +77,6 @@ public class LoginLoggedEvent extends DomainEvent {
 
     @Override
     public String getAggregateType() {
-        return "User";
-    }
-
-    public Long getUserId() {
-        return userId;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getLoginIp() {
-        return loginIp;
-    }
-
-    public String getLoginLocation() {
-        return loginLocation;
-    }
-
-    public String getBrowser() {
-        return browser;
-    }
-
-    public String getOs() {
-        return os;
-    }
-
-    public Integer getStatus() {
-        return status;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public String getLoginTime() {
-        return loginTime;
+        return "LoginLog";
     }
 }

@@ -4,6 +4,10 @@ import com.sciz.server.domain.pojo.entity.log.SysLoginLog;
 
 /**
  * 登录日志仓储（领域层抽象）
+ * 
+ * @author JiaWen.Wu
+ * @className LoginLogRepo
+ * @date 2025-10-30 11:00
  */
 public interface LoginLogRepo {
 

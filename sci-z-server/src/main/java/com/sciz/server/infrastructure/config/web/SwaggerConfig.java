@@ -7,13 +7,12 @@ import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * @author JiaWen.Wu
- * @className SwaggerConfig
- * @date 2025-10-28 00:00
+ * Swagger 分组与基础配置（springdoc-openapi）
  */
 @Configuration
 public class SwaggerConfig {
@@ -21,7 +20,6 @@ public class SwaggerConfig {
         /**
          * OpenAPI 基础配置
          *
-         * @param
          * @return OpenAPI 文档对象
          */
         @Bean
@@ -40,5 +38,21 @@ public class SwaggerConfig {
                                                 new SecurityScheme().name("Authorization")
                                                                 .type(SecurityScheme.Type.HTTP).scheme("bearer")
                                                                 .bearerFormat("JWT")));
+        }
+
+        @Bean
+        public GroupedOpenApi iamAuthApi() {
+                return GroupedOpenApi.builder()
+                                .group("IAM-认证")
+                                .pathsToMatch("/api/auth/**")
+                                .build();
+        }
+
+        @Bean
+        public GroupedOpenApi iamSystemApi() {
+                return GroupedOpenApi.builder()
+                                .group("IAM-系统管理")
+                                .pathsToMatch("/api/system/**")
+                                .build();
         }
 }

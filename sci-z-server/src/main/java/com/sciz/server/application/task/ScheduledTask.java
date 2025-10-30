@@ -5,6 +5,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
+ * 定时任务
+ * 
  * @author JiaWen.Wu
  * @className ScheduledTask
  * @date 2025-10-29 10:00

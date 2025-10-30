@@ -5,6 +5,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 /**
+ * 异步任务
+ * 
  * @author JiaWen.Wu
  * @className AsyncTask
  * @date 2025-10-29 10:00

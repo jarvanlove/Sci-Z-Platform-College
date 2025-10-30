@@ -29,11 +29,11 @@ public class EventPublisher {
      */
     public void publish(DomainEvent event) {
         try {
-            log.debug("发布领域事件: {} - {}", event.getEventType(), event.getEventId());
+            log.debug(String.format("发布领域事件: %s - %s", event.getEventType(), event.getEventId()));
             applicationEventPublisher.publishEvent(event);
-            log.info("领域事件发布成功: {} - {}", event.getEventType(), event.getEventId());
+            log.info(String.format("领域事件发布成功: %s - %s", event.getEventType(), event.getEventId()));
         } catch (Exception e) {
-            log.error("领域事件发布失败: {} - {}", event.getEventType(), event.getEventId(), e);
+            log.error(String.format("领域事件发布失败: %s - %s", event.getEventType(), event.getEventId()), e);
             throw new RuntimeException("事件发布失败", e);
         }
     }
@@ -45,13 +45,13 @@ public class EventPublisher {
      */
     public void publishAsync(DomainEvent event) {
         try {
-            log.debug("异步发布领域事件: {} - {}", event.getEventType(), event.getEventId());
+            log.debug(String.format("异步发布领域事件: %s - %s", event.getEventType(), event.getEventId()));
             // 使用Spring的异步事件发布
             applicationEventPublisher.publishEvent(event);
-            log.info("领域事件异步发布成功: {} - {}", event.getEventType(), event.getEventId());
+            log.info(String.format("领域事件异步发布成功: %s - %s", event.getEventType(), event.getEventId()));
         } catch (Exception e) {
             // 异步发布失败不抛出异常，只记录日志
-            log.error("领域事件异步发布失败: {} - {}", event.getEventType(), event.getEventId(), e);
+            log.error(String.format("领域事件异步发布失败: %s - %s", event.getEventType(), event.getEventId()), e);
         }
     }
 }

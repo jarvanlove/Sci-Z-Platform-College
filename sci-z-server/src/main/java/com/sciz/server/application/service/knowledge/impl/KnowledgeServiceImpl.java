@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import com.sciz.server.application.service.knowledge.KnowledgeService;
 
 /**
+ * 知识库应用服务实现类
+ * 
  * @author JiaWen.Wu
  * @className KnowledgeServiceImpl
  * @date 2025-10-29 10:00

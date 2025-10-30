@@ -10,9 +10,9 @@ import lombok.Setter;
 
 /**
  * 系统操作日志实体
- * 对应表：sys_operation_log
+ * - 对应表：sys_operation_log
+ * - 记录系统操作信息
  *
- * 字段涵盖：用户信息、操作信息、请求/响应、客户端信息、状态与耗时
  *
  * @author JiaWen.Wu
  * @className SysOperationLog

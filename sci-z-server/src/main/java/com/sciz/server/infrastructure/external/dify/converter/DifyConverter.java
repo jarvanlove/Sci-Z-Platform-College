@@ -1,7 +1,7 @@
 package com.sciz.server.infrastructure.external.dify.converter;
 
-import com.sciz.server.domain.pojo.entity.ai.Conversation;
-import com.sciz.server.domain.pojo.entity.ai.Message;
+import com.sciz.server.domain.pojo.entity.ai.AiConversation;
+import com.sciz.server.domain.pojo.entity.ai.AiMessage;
 import com.sciz.server.infrastructure.external.dify.dto.request.DifyChatReq;
 import com.sciz.server.infrastructure.external.dify.dto.response.DifyChatResp;
 import org.springframework.stereotype.Component;
@@ -23,10 +23,10 @@ public class DifyConverter {
      * @param message      消息实体
      * @return Dify聊天请求
      */
-    public DifyChatReq toDifyChatReq(Conversation conversation, Message message) {
+    public DifyChatReq toDifyChatReq(AiConversation conversation, AiMessage message) {
         DifyChatReq req = new DifyChatReq();
         req.setUserId(String.valueOf(conversation.getUserId()));
-        req.setConversationId(conversation.getConversationId());
+        req.setConversationId(String.valueOf(conversation.getId()));
         req.setMessage(message.getContent());
         req.setAppId("default"); // 默认应用ID
         req.setStream(false);
@@ -41,13 +41,13 @@ public class DifyConverter {
      * @param conversationId 对话ID
      * @return 消息实体
      */
-    public Message toMessage(DifyChatResp resp, String conversationId) {
-        Message message = new Message();
-        message.setMessageId(resp.getMessageId());
-        message.setConversationId(conversationId);
+    public AiMessage toMessage(DifyChatResp resp, String conversationId) {
+        AiMessage message = new AiMessage();
+        // message.setMessageId(resp.getMessageId());
+        message.setConversationId(Long.parseLong(conversationId));
         message.setContent(resp.getAnswer());
         message.setRole("assistant");
-        message.setCreateTime(resp.getCreatedAt());
+        // message.setCreateTime(resp.getCreatedAt());
         return message;
     }
 }

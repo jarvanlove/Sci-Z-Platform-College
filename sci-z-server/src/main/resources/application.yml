@@ -1,14 +1,90 @@
-spring:
-  application:
-    name: sci-z-server
-  profiles:
-    active: dev
+# Spring 基础配置：应用名与默认激活的环境
+spring: # Spring 根配置
+  application: # 应用信息
+    name: sci-z-server # 应用名称（用于日志/监控展示）
+  profiles: # 环境配置
+    active: dev # 默认激活的环境：dev | prod
+  jackson: # 全局 JSON 序列化/反序列化配置（影响所有 @RestController 返回与请求解析）
+    date-format: yyyy-MM-dd HH:mm:ss # 日期时间统一格式
+    time-zone: GMT+8 # 时区（与前端、人类可读保持一致）
+    property-naming-strategy: LOWER_CAMEL_CASE # 属性命名策略（下划线->小驼峰的反序列化仍由 map-underscore-to-camel-case 处理）
+    serialization: # 序列化（对象->JSON）行为
+      indent-output: false # 是否美化输出（生产关闭）
+      fail-on-empty-beans: false # 空对象不抛异常
+    deserialization: # 反序列化（JSON->对象）行为
+      fail-on-unknown-properties: false # 忽略未知字段，提升兼容性
+      accept-empty-string-as-null-object: true # 空字符串按 null 处理
+    default-property-inclusion: non_null # 全局非空才输出，减少冗余字段
 
-logging:
-  config: classpath:logback-spring.xml
+# 统一服务端口（各环境一致）
+server: # 内置容器配置
+  port: 8808 # 启动端口
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
+# 日志配置：使用 Logback，并统一落盘位置与日志级别
+logging: # 日志总配置
+  config: classpath:logback-spring.xml # 指定使用 logback-spring.xml
+  level: # 日志级别配置
+    root: INFO # 根日志级别（INFO/DEBUG/WARN/ERROR）
+    com.sciz.server: INFO # 业务包默认级别（prod 建议 INFO）
+    org.springframework.web: INFO # Web 相关日志
+    com.baomidou.mybatisplus: INFO # MyBatis-Plus 日志
+    org.mybatis: INFO # MyBatis 日志
+  file: # 文件输出配置
+    name: logs/app.log # 日志文件路径
+  pattern: # 控制台与文件日志格式（依赖 logback）
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{50} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{50} - %msg%n"
+
+# OpenAPI/Swagger UI 配置
+springdoc: # SpringDoc(OpenAPI) 配置
+  api-docs:
+    enabled: true # 是否启用 API 文档生成
+    path: /v3/api-docs # OpenAPI 文档 JSON 路径
+  swagger-ui:
+    path: /swagger-ui.html # Swagger UI 访问路径
+    tags-sorter: alpha # 标签按字母排序
+    operations-sorter: alpha # 接口按方法名排序
+  packages-to-scan: com.sciz.server.interfaces.controller # 仅扫描该包下的 Controller
+
+# MyBatis-Plus 通用配置（所有环境共享），如需环境覆盖请在对应 profile 中追加
+mybatis-plus: # MyBatis-Plus 配置
+  configuration:
+    map-underscore-to-camel-case: true # 下划线转驼峰
+    cache-enabled: false # 关闭二级缓存
+    jdbc-type-for-null: "NULL" # 空值 JDBC 类型
+    call-setters-on-nulls: true # 空值也调用 setter
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl # 使用 Slf4j 打印 SQL
+    default-statement-timeout: 30 # SQL 超时时间（秒）
+    auto-mapping-behavior: FULL # 自动映射级别
+    auto-mapping-unknown-column-behavior: WARNING # 未知列映射告警
+    local-cache-scope: SESSION # 本地缓存作用域
+    lazy-loading-enabled: false # 关闭懒加载
+    use-column-label: true # 使用列标签
+    use-generated-keys: true # 启用主键生成
+    default-fetch-size: 100 # 默认抓取条数
+  global-config: # MP 全局配置
+    banner: false # 关闭启动 Banner
+    db-config: # 数据库相关全局项
+      logic-delete-field: is_deleted # 逻辑删除字段名
+      logic-not-delete-value: 0 # 未删除值
+      logic-delete-value: 1 # 已删除值
+  mapper-locations: classpath*:mapper/**/*.xml # XML 映射文件路径
+
+# Sa-Token 统一默认（环境差异通过 profile 覆盖）
+sa-token: # Sa-Token 身份认证配置
+  token-name: Authorization # Header 名称
+  token-prefix: "Bearer" # Token 前缀（如 Bearer）
+  timeout: 2592000 # 登录有效期（秒）
+  activity-timeout: -1 # 最低活跃频率（秒）；超时未访问将被冻结，-1 表示不限制
+  is-concurrent: true # 是否允许同账号多端并发登录
+  is-share: true # 在多人登录同一账号时是否共用一个 Token（true 共用，false 每次生成新 Token）
+  token-style: uuid # Token 生成风格
+  is-log: false # 是否打印 Sa-Token 日志
+  is-read-cookie: true # 从 Cookie 读取 Token
+  is-read-header: true # 从 Header 读取 Token
+  is-read-body: false # 从 Body 读取 Token
+  is-read-url: false # 是否从 URL 参数中读取 Token（安全起见默认关闭）
+  is-write-header: false # 是否回写 Token 到响应头
+  is-auto-renew: true # 是否在请求到达时自动续期（基于 timeout）
+  auto-renew-timeout: 1800 # 自动续期步长（秒），例如 30 分钟
+  is-renew-active-timeout: true # 每次请求是否续期 activity-timeout

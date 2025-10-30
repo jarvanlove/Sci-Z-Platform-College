@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import com.sciz.server.application.service.declaration.DeclarationService;
 
 /**
+ * 申报应用服务实现类
+ * 
  * @author JiaWen.Wu
  * @className DeclarationServiceImpl
  * @date 2025-10-29 10:00

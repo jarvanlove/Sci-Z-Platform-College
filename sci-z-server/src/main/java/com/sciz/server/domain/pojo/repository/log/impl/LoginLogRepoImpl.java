@@ -7,6 +7,10 @@ import org.springframework.stereotype.Repository;
 
 /**
  * 登录日志仓储实现
+ * 
+ * @author JiaWen.Wu
+ * @className LoginLogRepoImpl
+ * @date 2025-10-30 11:00
  */
 @Repository
 public class LoginLogRepoImpl implements LoginLogRepo {

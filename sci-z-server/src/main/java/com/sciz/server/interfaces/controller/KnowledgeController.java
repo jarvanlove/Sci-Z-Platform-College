@@ -55,4 +55,52 @@ public class KnowledgeController {
         // TODO: 实现知识库搜索逻辑
         return Result.success();
     }
+
+    @Operation(summary = "获取文件夹树", description = "获取知识库文件夹树")
+    @GetMapping("/{id}/folders")
+    public Result<Object> getFolderTree(@PathVariable Long id) {
+        return Result.success();
+    }
+
+    @Operation(summary = "创建文件夹", description = "在知识库创建文件夹")
+    @PostMapping("/{id}/folders")
+    public Result<Object> createFolder(@PathVariable Long id, @RequestBody Object request) {
+        return Result.success();
+    }
+
+    @Operation(summary = "更新文件夹", description = "更新文件夹信息")
+    @PutMapping("/folders/{folderId}")
+    public Result<Object> updateFolder(@PathVariable Long folderId, @RequestBody Object request) {
+        return Result.success();
+    }
+
+    @Operation(summary = "删除文件夹", description = "删除指定文件夹")
+    @DeleteMapping("/folders/{folderId}")
+    public Result<Void> deleteFolder(@PathVariable Long folderId) {
+        return Result.success();
+    }
+
+    @Operation(summary = "获取文件列表", description = "获取知识库文件列表")
+    @GetMapping("/{id}/files")
+    public Result<Object> listFiles(@PathVariable Long id) {
+        return Result.success();
+    }
+
+    @Operation(summary = "删除文件", description = "删除知识库文件")
+    @DeleteMapping("/files/{fileId}")
+    public Result<Void> deleteFile(@PathVariable Long fileId) {
+        return Result.success();
+    }
+
+    @Operation(summary = "重命名文件", description = "重命名知识库文件")
+    @PutMapping("/files/rename/{fileId}")
+    public Result<Void> renameFile(@PathVariable Long fileId, @RequestBody Object request) {
+        return Result.success();
+    }
+
+    @Operation(summary = "移动文件", description = "移动知识库文件")
+    @PutMapping("/files/move/{fileId}")
+    public Result<Void> moveFile(@PathVariable Long fileId, @RequestBody Object request) {
+        return Result.success();
+    }
 }

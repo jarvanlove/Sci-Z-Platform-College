@@ -10,9 +10,13 @@ import lombok.Setter;
 
 /**
  * 用户登录日志实体
- * 对应表：sys_login_log
  *
- * 字段涵盖：用户信息、客户端信息、登录状态与时间
+ * - 对应表：对应表：sys_login_log
+ * - 记录用户登录信息
+ *
+ * @author JiaWen.Wu
+ * @className SysLoginLog
+ * @date 2025-10-29 16:00
  */
 @Getter
 @Setter

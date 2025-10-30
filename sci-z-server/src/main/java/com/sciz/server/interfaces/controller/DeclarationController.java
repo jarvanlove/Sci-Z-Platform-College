@@ -55,4 +55,17 @@ public class DeclarationController {
         // TODO: 实现申报审核逻辑
         return Result.success();
     }
+
+    @Operation(summary = "申报详情-工作流状态", description = "查询申报工作流执行状态")
+    @GetMapping("/{id}/workflow/status")
+    public Result<Object> getWorkflowStatus(@PathVariable Long id) {
+        return Result.success();
+    }
+
+    @Operation(summary = "查询申报草稿", description = "查询我的申报草稿列表")
+    @GetMapping("/drafts")
+    public Result<Object> getDrafts(@RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return Result.success();
+    }
 }

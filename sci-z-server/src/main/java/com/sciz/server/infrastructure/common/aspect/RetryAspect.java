@@ -20,7 +20,7 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 @Slf4j
 @Aspect
-@Component
+@Component("customRetryAspect")
 public class RetryAspect {
 
     @Around("@annotation(com.sciz.server.infrastructure.common.annotation.Retry)")

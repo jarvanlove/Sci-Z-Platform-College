@@ -5,7 +5,7 @@ import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
 import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserInfoResp;
-import com.sciz.server.domain.pojo.entity.user.User;
+import com.sciz.server.domain.pojo.entity.user.SysUser;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
 import com.sciz.server.infrastructure.shared.event.user.UserLoginEvent;
 import com.sciz.server.infrastructure.shared.event.user.UserLogoutEvent;
@@ -19,8 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 /**
- * 用户服务实现类
- * 集成领域事件发布
+ * 用户应用服务实现类
  *
  * @author JiaWen.Wu
  * @className UserServiceImpl
@@ -44,7 +43,7 @@ public class UserServiceImpl implements UserService {
     public Result<UserInfoResp> register(RegisterReq registerReq) {
         try {
             // 1. 执行业务逻辑
-            User user = createUser(registerReq);
+            SysUser user = createUser(registerReq);
             // userRepository.save(user); // 保存用户
 
             // 2. 发布用户注册事件
@@ -73,7 +72,7 @@ public class UserServiceImpl implements UserService {
     public Result<LoginResp> login(LoginReq loginReq) {
         try {
             // 1. 执行业务逻辑
-            User user = authenticateUser(loginReq);
+            SysUser user = authenticateUser(loginReq);
             String token = generateToken(user);
 
             // 2. 发布用户登录事件
@@ -144,8 +143,8 @@ public class UserServiceImpl implements UserService {
     /**
      * 创建用户
      */
-    private User createUser(RegisterReq registerReq) {
-        User user = new User();
+    private SysUser createUser(RegisterReq registerReq) {
+        SysUser user = new SysUser();
         user.setUsername(registerReq.getUsername());
         user.setEmail(registerReq.getEmail());
         // 设置其他属性
@@ -155,9 +154,9 @@ public class UserServiceImpl implements UserService {
     /**
      * 验证用户
      */
-    private User authenticateUser(LoginReq loginReq) {
+    private SysUser authenticateUser(LoginReq loginReq) {
         // 实现用户验证逻辑
-        User user = new User();
+        SysUser user = new SysUser();
         user.setId(1L);
         user.setUsername(loginReq.getUsername());
         return user;
@@ -166,7 +165,7 @@ public class UserServiceImpl implements UserService {
     /**
      * 生成token
      */
-    private String generateToken(User user) {
+    private String generateToken(SysUser user) {
         // 实现token生成逻辑
         return "mock-token-" + user.getId();
     }

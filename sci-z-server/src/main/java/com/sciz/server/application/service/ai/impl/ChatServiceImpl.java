@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import com.sciz.server.application.service.ai.ChatService;
 
 /**
+ * AI 对话应用服务实现类
+ * 
  * @author JiaWen.Wu
  * @className ChatServiceImpl
  * @date 2025-10-29 10:00

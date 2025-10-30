@@ -6,8 +6,6 @@ import com.sciz.server.infrastructure.shared.event.log.OperationLoggedEvent;
 /**
  * 操作日志应用服务
  *
- * - 面向应用层暴露日志保存用例
- *
  * @author JiaWen.Wu
  * @className OperationLogService
  * @date 2025-10-29 16:35
