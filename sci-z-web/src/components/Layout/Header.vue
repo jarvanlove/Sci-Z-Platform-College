@@ -5,8 +5,10 @@
         type="text"
         class="sidebar-toggle"
         @click="toggleSidebar"
+        aria-label="toggle-sidebar"
       >
-        <el-icon><Expand v-if="sidebarCollapsed" /><Fold v-else /></el-icon>
+        <!-- 折叠时显示“菜单”图标（表示可展开）；展开时显示“折叠”图标（表示可收起） -->
+        <el-icon><Menu v-if="sidebarCollapsed" /><Fold v-else /></el-icon>
       </el-button>
       <h1>{{ $t('menu.dashboard') }}</h1>
     </div>

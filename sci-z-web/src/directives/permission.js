@@ -9,6 +9,10 @@
 
 import { useAuthStore } from '@/store/modules/auth'
 
+// 是否放开所有按钮权限（按钮以 'button:' 前缀约定）
+// 如需恢复按钮级控制，将其改为 false 即可
+const ALLOW_ALL_BUTTONS = true
+
 export const permission = {
   mounted(el, binding) {
     const { value } = binding
@@ -55,6 +59,9 @@ function checkPermission(permission, authStore) {
   }
   
   // 单个权限检查
+  if (ALLOW_ALL_BUTTONS && typeof permission === 'string' && permission.startsWith('button:')) {
+    return true
+  }
   return authStore.hasPermission(permission)
 }
 

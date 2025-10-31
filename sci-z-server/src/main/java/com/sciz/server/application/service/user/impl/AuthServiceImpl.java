@@ -5,6 +5,8 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.stp.SaLoginModel;
 import com.sciz.server.application.service.user.AuthService;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
+import com.sciz.server.domain.pojo.dto.response.user.LoginUserInfoResp;
+import com.sciz.server.domain.pojo.dto.response.user.LoginMenuResp;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
@@ -12,6 +14,7 @@ import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.infrastructure.shared.utils.RedisUtil;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
 import com.sciz.server.infrastructure.shared.event.log.LoginLoggedEvent;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -19,7 +22,12 @@ import org.mindrot.jbcrypt.BCrypt;
 
 /**
  * 认证应用服务实现
+ *
+ * @author JiaWen.Wu
+ * @className AuthServiceImpl
+ * @date 2025-10-30 11:10
  */
+@Slf4j
 @Service
 public class AuthServiceImpl implements AuthService {
 
@@ -42,6 +50,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public LoginResp login(String username, String rawPassword, Boolean rememberMe) {
         if (!StringUtils.hasText(username) || !StringUtils.hasText(rawPassword)) {
+            log.warn(String.format("login bad request, username=%s", username));
             throw new BusinessException(ResultCode.BAD_REQUEST);
         }
 
@@ -49,18 +58,22 @@ public class AuthServiceImpl implements AuthService {
         String lockKey = String.format(AUTH_LOCK_KEY, username);
         String locked = RedisUtil.get(stringRedisTemplate, lockKey);
         if (StringUtils.hasText(locked)) {
+            log.warn(String.format("login locked, username=%s", username));
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), String.format("账号已锁定，请稍后再试"));
         }
 
+        log.info(String.format("login start, username=%s", username));
         SysUser user = sysUserRepo.findByUsername(username);
         if (user == null || user.getStatus() != null && user.getStatus() == 0) {
             onFail(username);
+            log.warn(String.format("login user invalid, username=%s", username));
             throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), String.format("用户名或密码错误"));
         }
 
         boolean match = bcryptMatches(rawPassword, user.getPassword());
         if (!match) {
             onFail(username);
+            log.warn(String.format("login password mismatch, username=%s", username));
             throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), String.format("用户名或密码错误"));
         }
 
@@ -80,10 +93,30 @@ public class AuthServiceImpl implements AuthService {
         SaTokenInfo token = StpUtil.getTokenInfo();
 
         LoginResp resp = new LoginResp();
-        resp.setUserId(user.getId());
-        resp.setUsername(user.getUsername());
+        // token 信息
         resp.setToken(token.getTokenValue());
-        resp.setExpireTime(StpUtil.getTokenTimeout());
+        resp.setTokenType("Bearer");
+        resp.setExpiresIn(Math.max(StpUtil.getTokenTimeout(), 0));
+
+        // 用户信息
+        LoginUserInfoResp ui = new LoginUserInfoResp();
+        ui.setId(user.getId());
+        ui.setUsername(user.getUsername());
+        ui.setRealName(user.getRealName());
+        ui.setEmail(user.getEmail());
+        ui.setPhone(user.getPhone());
+        ui.setDepartment("");
+        // 角色装配建议接入权限服务后由其提供（此处不做硬编码）
+        ui.setRole(null);
+        ui.setStatus(user.getStatus() != null && user.getStatus() == 1 ? "active" : "disabled");
+        ui.setIndustry(user.getIndustryType());
+        ui.setAvatar(user.getAvatarUrl());
+        resp.setUserInfo(ui);
+
+        // 角色/权限/菜单（此处返回空集合，后续接入权限体系后由专用服务装配）
+        resp.setRoles(java.util.Collections.emptyList());
+        resp.setPermissions(java.util.Collections.emptyList());
+        resp.setMenus(java.util.Collections.emptyList());
 
         // 发布登录日志事件（异步）
         LoginLoggedEvent event = new LoginLoggedEvent();
@@ -92,6 +125,8 @@ public class AuthServiceImpl implements AuthService {
         event.setStatus(1);
         event.setMessage("login success");
         eventPublisher.publishAsync(event);
+
+        log.info(String.format("login success, userId=%s, username=%s", user.getId(), user.getUsername()));
 
         return resp;
     }
@@ -120,5 +155,6 @@ public class AuthServiceImpl implements AuthService {
             String lockKey = String.format(AUTH_LOCK_KEY, username);
             RedisUtil.set(stringRedisTemplate, lockKey, "1", java.time.Duration.ofSeconds(LOCK_SECONDS));
         }
+        log.warn(String.format("login failed, username=%s, count=%s", username, cnt));
     }
 }

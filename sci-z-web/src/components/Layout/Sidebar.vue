@@ -158,7 +158,7 @@ const filteredMenus = computed(() => {
       font-size: 14px !important;
       font-weight: 400 !important;
       color: #6b7280 !important;
-      padding: 0 20px 0 56px !important;
+      padding: 0 20px 0 44px !important;
       height: 40px !important;
       line-height: 40px !important;
       margin: 2px 8px !important;
@@ -175,6 +175,33 @@ const filteredMenus = computed(() => {
         color: #1e3a8a !important;
       }
       
+      &.is-active {
+        background-color: #1e3a8a !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        border-radius: 12px !important;
+        margin: 2px 8px !important;
+      }
+    }
+
+    /* 折叠后弹出层中的二级菜单项样式（与上面保持一致） */
+    :deep(.el-menu--popup .el-menu-item) {
+      font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+      font-size: 14px !important;
+      font-weight: 400 !important;
+      color: #6b7280 !important;
+      padding: 0 20px 0 44px !important;
+      height: 40px !important;
+      line-height: 40px !important;
+      margin: 2px 8px !important;
+      border-radius: 6px !important;
+      background-color: transparent !important;
+
+      &:hover {
+        background-color: #f0f9ff !important;
+        color: #1e3a8a !important;
+      }
+
       &.is-active {
         background-color: #1e3a8a !important;
         color: #ffffff !important;

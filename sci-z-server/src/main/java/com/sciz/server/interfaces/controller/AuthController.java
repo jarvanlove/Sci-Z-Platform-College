@@ -40,8 +40,8 @@ public class AuthController {
     @Operation(summary = "用户登录", description = "使用 Sa-Token 完成登录，返回 Token 信息")
     @PostMapping("/login")
     public Result<LoginResp> login(@RequestBody @Valid LoginReq req) {
-        LoginResp data = authService.login(req.getUsername(), req.getPassword(), req.getRememberMe());
-        return Result.success(data);
+        LoginResp resp = authService.login(req.getUsername(), req.getPassword(), req.getRememberMe());
+        return Result.success(resp);
     }
 
     @Operation(summary = "用户注册", description = "注册新用户（占位，后续接入业务校验与持久化）")

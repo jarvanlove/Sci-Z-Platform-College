@@ -140,10 +140,6 @@
     </dependency>
   </dependencies>
 
-  <!-- 提升 IDE 注解处理体验（生成 metadata），避免个别 IDE 无法解析 @ConfigurationProperties 提示） -->
-  <dependencyManagement>
-  </dependencyManagement>
-
   <build>
     <plugins>
       <plugin>

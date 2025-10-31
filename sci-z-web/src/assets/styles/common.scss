@@ -1,6 +1,7 @@
-@import './variables.scss';
-@import './mixins.scss';
-@import './design-system.scss';
+// 使用现代 Sass 语法替代已弃用的 @import
+@use './variables.scss' as *;
+@use './mixins.scss' as *;
+@use './design-system.scss' as *;
 
 // 全局样式
 * {

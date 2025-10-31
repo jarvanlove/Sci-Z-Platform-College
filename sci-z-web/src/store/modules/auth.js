@@ -122,41 +122,41 @@ export const useAuthStore = defineStore('auth', {
         const response = await login(loginForm)
         authLogger.debug('API返回的完整数据', response.data)
         
-        const { token, userInfo, permissions, roles } = response.data
+        // 方案一：从登录接口直接获取所有数据，包括 menus
+        const { token, userInfo, permissions, roles, menus } = response.data
         
         authLogger.debug('解构后的数据', { 
           hasToken: !!token, 
           hasUserInfo: !!userInfo, 
           permissionsCount: permissions?.length || 0, 
-          rolesCount: roles?.length || 0 
+          rolesCount: roles?.length || 0,
+          menusCount: menus?.length || 0 
         })
         
         this.token = token
         this.userInfo = userInfo
         this.permissions = permissions || []
         this.roles = roles || []
+        this.menus = menus || [] // 方案一：直接从登录接口获取菜单数据
         
         authLogger.debug('设置后的store状态', {
           hasToken: !!this.token,
           hasUserInfo: !!this.userInfo,
           permissionsCount: this.permissions?.length || 0,
-          rolesCount: this.roles?.length || 0
+          rolesCount: this.roles?.length || 0,
+          menusCount: this.menus?.length || 0
         })
         
         setToken(token)
         setUserInfo(userInfo)
         setPermissions(this.permissions)
         setRoles(this.roles)
-        
-        // 登录成功后获取菜单数据
-        await this.fetchMenus()
-        
-        // 保存菜单数据到localStorage
-        setMenus(this.menus)
+        setMenus(this.menus) // 保存菜单数据到localStorage
         
         authLogger.info('🎉 登录成功', { 
           permissions: this.permissions,
           roles: this.roles,
+          menusCount: this.menus?.length || 0,
           username: this.userInfo?.username
         })
         
@@ -166,6 +166,7 @@ export const useAuthStore = defineStore('auth', {
           console.log('👤 用户信息:', this.userInfo)
           console.log('🔑 权限列表:', this.permissions)
           console.log('👥 角色列表:', this.roles)
+          console.log('📋 菜单列表:', this.menus)
         }
         
         return response
@@ -185,21 +186,22 @@ export const useAuthStore = defineStore('auth', {
     async getUserInfo() {
       try {
         const response = await getUserInfo()
-        const { userInfo, permissions, roles } = response.data
+        // 方案一：如果 getUserInfo 接口也返回 menus，则直接获取
+        const { userInfo, permissions, roles, menus } = response.data
         
         this.userInfo = userInfo
         this.permissions = permissions || []
         this.roles = roles || []
         
+        // 如果接口返回了 menus，则使用接口返回的菜单；否则保持原有菜单不变
+        if (menus && menus.length > 0) {
+          this.menus = menus
+          setMenus(this.menus)
+        }
+        
         setUserInfo(userInfo)
         setPermissions(this.permissions)
         setRoles(this.roles)
-        
-        // 重新获取菜单
-        await this.fetchMenus()
-        
-        // 保存菜单数据到localStorage
-        setMenus(this.menus)
         
         return response
       } catch (error) {

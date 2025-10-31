@@ -86,8 +86,8 @@ public class UserServiceImpl implements UserService {
             // 3. 构建响应
             LoginResp loginResp = new LoginResp();
             loginResp.setToken(token);
-            loginResp.setUserId(user.getId());
-            loginResp.setUsername(user.getUsername());
+            // loginResp.setUserId(user.getId());
+            // loginResp.setUsername(user.getUsername());
 
             log.info(String.format("用户登录成功: %s", user.getUsername()));
             return Result.success(loginResp);

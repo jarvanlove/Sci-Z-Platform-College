@@ -26,10 +26,10 @@ public interface AuthConverter {
             return null;
         }
         LoginResp resp = new LoginResp();
-        resp.setUserId(user.getId());
-        resp.setUsername(user.getUsername());
-        resp.setToken(token);
-        resp.setExpireTime(expireTime);
+        //resp.setUserId(user.getId());
+        //resp.setUsername(user.getUsername());
+        //resp.setToken(token);
+        //resp.setExpireTime(expireTime);
         // 如需可扩展 realName、refreshToken 等，在此补充
         return resp;
     }

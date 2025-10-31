@@ -1,0 +1,44 @@
+{
+  "code": 200,
+  "message": "登录成功",
+  "data": {
+    "token": "satoken-xxxx",
+    "tokenType": "Bearer",
+    "expiresIn": 7200,
+    "userInfo": {
+      "id": 1,
+      "username": "admin",
+      "realName": "系统管理员",
+      "email": "admin@university.edu.cn",
+      "phone": "13800138000",
+      "department": "计算机科学学院",
+      "role": "admin",
+      "status": "active",
+      "industry": "education",
+      "avatar": ""
+    },
+    "roles": ["admin"],
+    "permissions": ["*"],
+    "menus": [
+      {"path":"/dashboard","title":"仪表板","icon":"Odometer","permission":"menu:dashboard:view"},
+      {"path":"declaration","title":"申报管理","icon":"Document","permission":"menu:declaration:list","children":[
+        {"path":"/declaration/list","title":"申报列表","icon":"List","permission":"menu:declaration:list"},
+        {"path":"/declaration/create","title":"新建申报","icon":"CirclePlus","permission":"menu:declaration:create"}]},
+      {"path":"project","title":"项目管理","icon":"Folder","permission":"menu:project:list","children":[
+        {"path":"/project/list","title":"项目列表","icon":"List","permission":"menu:project:list"}]},
+      {"path":"acceptance","title":"验收管理","icon":"Check","permission":"menu:report:list","children":[
+        {"path":"/report/list","title":"报告管理","icon":"List","permission":"menu:report:list"}]},
+      {"path":"ai","title":"AI助手","icon":"Monitor","permission":"menu:ai:chat","children":[
+        {"path":"/knowledge/list","title":"知识库","icon":"Reading","permission":"menu:knowledge:list"},
+        {"path":"/ai/chat","title":"AI对话","icon":"Avatar","permission":"menu:ai:chat"}]},
+      {"path":"user","title":"用户中心","icon":"User","permission":"menu:user:profile","children":[
+        {"path":"/user/profile","title":"个人信息","icon":"House","permission":"menu:user:profile"},
+        {"path":"/user/security","title":"安全设置","icon":"Lock","permission":"menu:user:security"}]},
+      {"path":"system","title":"系统管理","icon":"Setting","permission":"menu:system:user","children":[
+        {"path":"/system/user","title":"用户管理","icon":"User","permission":"menu:system:user:sub"},
+        {"path":"/system/role","title":"角色权限","icon":"Key","permission":"menu:system:role"},
+        {"path":"/system/config","title":"系统配置","icon":"Setting","permission":"menu:system:config"},
+        {"path":"/system/logs","title":"日志管理","icon":"Document","permission":"menu:system:logs"}]}
+    ]
+  }
+}

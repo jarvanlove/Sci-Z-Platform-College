@@ -75,7 +75,7 @@ sa-token: # Sa-Token 身份认证配置
   token-name: Authorization # Header 名称
   token-prefix: "Bearer" # Token 前缀（如 Bearer）
   timeout: 2592000 # 登录有效期（秒）
-  activity-timeout: -1 # 最低活跃频率（秒）；超时未访问将被冻结，-1 表示不限制
+  active-timeout: -1 # 最低活跃频率（秒）；超时未访问将被冻结，-1 表示不限制
   is-concurrent: true # 是否允许同账号多端并发登录
   is-share: true # 在多人登录同一账号时是否共用一个 Token（true 共用，false 每次生成新 Token）
   token-style: uuid # Token 生成风格
@@ -88,3 +88,4 @@ sa-token: # Sa-Token 身份认证配置
   is-auto-renew: true # 是否在请求到达时自动续期（基于 timeout）
   auto-renew-timeout: 1800 # 自动续期步长（秒），例如 30 分钟
   is-renew-active-timeout: true # 每次请求是否续期 activity-timeout
+

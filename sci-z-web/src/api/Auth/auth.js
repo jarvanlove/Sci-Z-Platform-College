@@ -12,6 +12,132 @@ import { LoginRequest, LoginResponse, RegisterRequest, ResetPasswordRequest } fr
  * @param {LoginRequest} data - 登录请求参数
  * @returns {Promise<LoginResponse>}
  */
+// 获取模拟菜单数据（与 store 中的菜单数据保持一致）
+const getMockMenus = () => {
+  return [
+    {
+      path: '/dashboard',
+      title: '仪表板',
+      icon: 'Odometer',
+      permission: 'menu:dashboard:view'
+    },
+    {
+      path: 'declaration',
+      title: '申报管理',
+      icon: 'Document',
+      permission: 'menu:declaration:list',
+      children: [
+        {
+          path: '/declaration/list',
+          title: '申报列表',
+          icon: 'List',
+          permission: 'menu:declaration:list'
+        }
+      ]
+    },
+    {
+      path: 'project',
+      title: '项目管理',
+      icon: 'Folder',
+      permission: 'menu:project:list',
+      children: [
+        {
+          path: '/project/list',
+          title: '项目列表',
+          icon: 'List',
+          permission: 'menu:project:list'
+        }
+      ]
+    },
+    {
+      path: 'acceptance',
+      title: '验收管理',
+      icon: 'Check',
+      permission: 'menu:report:list',
+      children: [
+        {
+          path: '/report/list',
+          title: '报告管理',
+          icon: 'List',
+          permission: 'menu:report:list'
+        }
+      ]
+    },
+    {
+      path: 'ai',
+      title: 'AI助手',
+      icon: 'Monitor',
+      permission: 'menu:ai:chat',
+      children: [
+        {
+          path: '/knowledge/list',
+          title: '知识库',
+          icon: 'Reading',
+          permission: 'menu:knowledge:list'
+        },
+        {
+          path: '/ai/chat',
+          title: 'AI对话',
+          icon: 'Avatar',
+          permission: 'menu:ai:chat'
+        }
+      ]
+    },
+    {
+      path: 'user',
+      title: '用户中心',
+      icon: 'User',
+      permission: 'menu:user:profile',
+      children: [
+        {
+          path: '/user/profile',
+          title: '个人信息',
+          icon: 'House',
+          permission: 'menu:user:profile'
+        },
+        {
+          path: '/user/security',
+          title: '安全设置',
+          icon: 'Lock',
+          permission: 'menu:user:security'
+        }
+      ]
+    },
+    {
+      path: 'system',
+      title: '系统管理',
+      icon: 'Setting',
+      permission: 'menu:system:user',
+      children: [
+        {
+          path: '/system/user',
+          title: '用户管理',
+          icon: 'User',
+          permission: 'menu:system:user'
+        },
+        {
+          path: '/system/role',
+          title: '角色权限',
+          icon: 'Key',
+          permission: 'menu:system:role'
+        },
+        {
+          path: '/system/config',
+          title: '系统配置',
+          icon: 'Setting',
+          permission: 'menu:system:config'
+        },
+        {
+          path: '/system/logs',
+          title: '日志管理',
+          icon: 'Document',
+          permission: 'menu:system:logs'
+        }
+      ]
+    }
+  ]
+}
+
 export const login = (data) => {
   // TODO: 后端开发完成后，移除模拟登录逻辑，直接调用真实接口
   // 当前使用模拟数据，支持 admin/admin 默认登录
@@ -32,7 +158,8 @@ export const login = (data) => {
           createTime: new Date().toISOString()
         },
         permissions: ['*'], // 管理员拥有所有权限
-        roles: ['admin']
+        roles: ['admin'],
+        menus: getMockMenus() // 方案一：登录接口返回菜单数据
       },
       code: 200,
       message: '登录成功'
@@ -73,7 +200,8 @@ export const login = (data) => {
           'button:knowledge:create',
           'data:own'
         ],
-        roles: ['user']
+        roles: ['user'],
+        menus: getMockMenus() // 方案一：登录接口返回菜单数据
       },
       code: 200,
       message: '登录成功'

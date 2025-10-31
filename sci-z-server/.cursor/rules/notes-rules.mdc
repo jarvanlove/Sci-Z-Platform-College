@@ -1,0 +1,43 @@
+---
+alwaysApply: true
+---
+
+### 1. 类名 方法名 模型字段 的注释模板
+
+- 类名注释模板
+  /\*\*
+
+* @author JiaWen.Wu
+* @className 当前类名
+* @date 中国北京当前时间(yyyy-MM-dd HH:mm)
+  \*/
+  示例：
+  /\*\*
+* @author JiaWen.Wu
+* @className SecondaryBusinessService
+* @date 2025-6-5 14:36
+  \*/
+
+- 方法名注释模板
+  /\*\*
+
+* 方法是做什么的
+*
+* @param 参数类型 参数描述
+* @return 返回结果
+  \*/
+
+示例：
+/\*\*
+
+- 获取审批流程
+-
+- @param jsonObject 请求参数
+- @return 审批流程信息
+  \*/
+
+- 所有实体类字段注释模板
+  /\*\*
+
+* 字段注释
+  \*/
