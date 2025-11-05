@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>新建项目 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.3.14/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3.2.47/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.3.14"></script>
+    <!-- Element Plus 中文本地化（修复 locale undefined 报错） -->
+    <script src="https://unpkg.com/element-plus@2.3.14/dist/locale/zh-cn.js"></script>
+    <script>
+      // 确保 Element Plus 中文本地化正确加载
+      window.ElementPlusLocaleZhCn = window.ElementPlusLocaleZhCn || {
+        name: "zh-cn",
+        el: {
+          datepicker: {
+            now: "此刻",
+            today: "今天",
+            cancel: "取消",
+            clear: "清空",
+            confirm: "确认",
+            selectDate: "选择日期",
+            selectTime: "选择时间",
+            startDate: "开始日期",
+            startTime: "开始时间",
+            endDate: "结束日期",
+            endTime: "结束时间",
+            prevYear: "前一年",
+            nextYear: "后一年",
+            prevMonth: "上个月",
+            nextMonth: "下个月",
+            year: "年",
+            month1: "1月",
+            month2: "2月",
+            month3: "3月",
+            month4: "4月",
+            month5: "5月",
+            month6: "6月",
+            month7: "7月",
+            month8: "8月",
+            month9: "9月",
+            month10: "10月",
+            month11: "11月",
+            month12: "12月",
+            weeks: {
+              sun: "日",
+              mon: "一",
+              tue: "二",
+              wed: "三",
+              thu: "四",
+              fri: "五",
+              sat: "六",
+            },
+            months: {
+              jan: "一月",
+              feb: "二月",
+              mar: "三月",
+              apr: "四月",
+              may: "五月",
+              jun: "六月",
+              jul: "七月",
+              aug: "八月",
+              sep: "九月",
+              oct: "十月",
+              nov: "十一月",
+              dec: "十二月",
+            },
+          },
+        },
+      };
+    </script>
+    <script src="https://unpkg.com/dayjs@1.11.10/locale/zh-cn.js"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .new-project-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+      }
+
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0;
+      }
+
+      .form-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+      }
+
+      .form-section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #e5e7eb;
+      }
+
+      .form-row {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .form-row .el-form-item {
+        flex: 1;
+        margin-bottom: 0;
+      }
+
+      .member-item {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 6px;
+        margin-bottom: 8px;
+      }
+
+      .member-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        margin-right: 12px;
+      }
+
+      .member-info {
+        flex: 1;
+      }
+
+      .member-name {
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 4px;
+      }
+
+      .member-id {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      .member-role {
+        margin-right: 12px;
+      }
+
+      .milestone-item {
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 12px;
+        background: #fafafa;
+      }
+
+      .milestone-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+
+      .milestone-title {
+        font-weight: 500;
+        color: #374151;
+      }
+
+      .milestone-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 12px;
+      }
+
+      .button-group {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      .search-results {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        background: #ffffff;
+        margin-top: 8px;
+      }
+
+      .search-result-item {
+        padding: 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #f3f4f6;
+      }
+
+      .search-result-item:hover {
+        background: #f8fafc;
+      }
+
+      .search-result-item:last-child {
+        border-bottom: none;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 20px;
+        color: #6b7280;
+      }
+
+      .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+      }
+
+      .empty-state-text {
+        font-size: 16px;
+        margin-bottom: 8px;
+      }
+
+      .empty-state-hint {
+        font-size: 14px;
+        color: #9ca3af;
+      }
+      /* 文档管理样式（与项目详情一致） */
+      .document-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .document-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 6px;
+      }
+      .document-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        background: #dbeafe;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #1e40af;
+      }
+      .document-info {
+        flex: 1;
+      }
+      .document-name {
+        font-size: 14px;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 2px;
+      }
+      .document-meta {
+        font-size: 12px;
+        color: #6b7280;
+      }
+      .document-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .upload-section {
+        margin-top: 12px;
+      }
+      .upload-area {
+        border: 2px dashed #d1d5db;
+        border-radius: 6px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+      }
+      .upload-area.dragover {
+        background: #f0f9ff;
+        border-color: #1e3a8a;
+      }
+      .upload-icon {
+        font-size: 24px;
+        color: #9ca3af;
+        margin-bottom: 8px;
+      }
+      .upload-text {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 4px;
+      }
+      .upload-hint {
+        font-size: 12px;
+        color: #9ca3af;
+      }
+
+      /* 弹窗内表单可读性（修复文字看不清的问题） + 与页面统一风格 */
+      .el-dialog {
+        font-family: inherit;
+        color: #1f2937;
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+      .el-dialog .el-dialog__title {
+        font-weight: 600;
+        color: #1e3a8a;
+        font-size: 18px;
+      }
+      .el-dialog .el-form-item__label {
+        color: #374151;
+        font-weight: 500;
+        font-size: 14px;
+      }
+      .el-dialog .el-input__inner,
+      .el-dialog input,
+      .el-dialog .el-textarea__inner,
+      .el-dialog .el-select .el-input__inner {
+        color: #1f2937;
+        font-size: 14px;
+      }
+      .el-dialog .el-input__inner::placeholder,
+      .el-dialog input::placeholder,
+      .el-dialog .el-textarea__inner::placeholder,
+      .el-dialog .el-select .el-input__inner::placeholder {
+        color: #9ca3af;
+        font-size: 14px;
+      }
+      .el-dialog .el-option {
+        color: #1f2937;
+        font-size: 14px;
+      }
+      .el-dialog .el-option:hover {
+        background-color: #f8fafc;
+        color: #1f2937;
+      }
+
+      /* 自定义弹窗样式 */
+      .el-message-box {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-message-box__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #1f2937 !important;
+        line-height: 1.5 !important;
+      }
+
+      .el-message-box__headerbtn {
+        top: 16px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-message-box__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-message-box__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__content {
+        padding: 20px 24px !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__message {
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: #374151 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .el-message-box__btns {
+        padding: 16px 24px 20px 24px !important;
+        background: #ffffff !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 12px !important;
+      }
+
+      .el-message-box__btns .el-button {
+        padding: 8px 20px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        border: 1px solid !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .el-message-box__btns .el-button--default {
+        background: #ffffff !important;
+        border-color: #d1d5db !important;
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__btns .el-button--default:hover {
+        background: #f9fafb !important;
+        border-color: #9ca3af !important;
+        color: #374151 !important;
+      }
+
+      .el-message-box__btns .el-button--primary {
+        background: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+        color: #ffffff !important;
+      }
+
+      .el-message-box__btns .el-button--primary:hover {
+        background: #1e40af !important;
+        border-color: #1e40af !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+      }
+
+      .el-message-box__btns .el-button--primary:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+      }
+
+      /* 警告类型弹窗的特殊样式 */
+      .el-message-box--warning .el-message-box__content {
+        position: relative;
+      }
+
+      .el-message-box--warning .el-message-box__message::before {
+        content: "⚠️";
+        font-size: 18px !important;
+        margin-right: 8px !important;
+        vertical-align: -0.15em !important;
+        display: inline-block !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="new-project-container">
+        <!-- 页面标题和返回 -->
+        <div class="page-header">
+          <div style="display: flex; align-items: center; gap: 16px">
+            <el-button @click="handleCancel">
+              <el-icon><ArrowLeft /></el-icon>
+              返回项目列表
+            </el-button>
+            <h1 class="page-title">新建项目</h1>
+          </div>
+        </div>
+
+        <!-- 新增里程碑对话框 -->
+        <el-dialog
+          v-model="showMilestoneDialog"
+          title="新增里程碑"
+          width="700px"
+          :close-on-click-modal="false"
+        >
+          <div class="form-row">
+            <el-form-item label="里程碑名称" style="flex: 1 1 100%">
+              <el-select
+                v-model="milestoneDraft.name"
+                placeholder="请选择里程碑名称"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="opt in milestoneOptions"
+                  :key="opt"
+                  :label="opt"
+                  :value="opt"
+                  :disabled="addedMilestoneNames && addedMilestoneNames.includes(opt)"
+                />
+              </el-select>
+            </el-form-item>
+          </div>
+          <div class="form-row">
+            <el-form-item label="开始时间" style="flex: 1">
+              <el-date-picker
+                v-model="milestoneDraft.startTime"
+                type="date"
+                placeholder="选择开始时间"
+                style="width: 100%"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+            <el-form-item label="结束时间" style="flex: 1">
+              <el-date-picker
+                v-model="milestoneDraft.endTime"
+                type="date"
+                placeholder="选择结束时间"
+                style="width: 100%"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+          </div>
+          <el-form-item label="描述">
+            <el-input
+              v-model="milestoneDraft.description"
+              type="textarea"
+              :rows="2"
+              placeholder="请输入里程碑描述"
+            />
+          </el-form-item>
+          <template #footer>
+            <el-button @click="closeMilestoneDialog">取消</el-button>
+            <el-button type="primary" @click="confirmAddMilestone"
+              >确定添加</el-button
+            >
+          </template>
+        </el-dialog>
+
+        <!-- 基本信息表单 -->
+        <div class="form-card">
+          <div class="form-section-title">基本信息</div>
+          <el-form
+            ref="projectFormRef"
+            :model="projectForm"
+            :rules="formRules"
+            label-width="120px"
+          >
+            <div class="form-row">
+              <el-form-item label="项目名称" prop="name">
+                <el-input
+                  v-model="projectForm.name"
+                  placeholder="请输入项目名称"
+                  clearable
+                />
+              </el-form-item>
+              <!-- 项目类型: 新建场景不需要，移除 -->
+            </div>
+
+            <el-form-item label="项目描述" prop="description">
+              <el-input
+                v-model="projectForm.description"
+                type="textarea"
+                :rows="4"
+                placeholder="请输入项目详细描述"
+              />
+            </el-form-item>
+
+            <div class="form-row">
+              <el-form-item label="项目负责人" prop="manager">
+                <el-select
+                  v-model="projectForm.manager"
+                  placeholder="请选择项目负责人"
+                  style="width: 100%"
+                >
+                  <el-option
+                    v-for="user in userList"
+                    :key="user.id"
+                    :label="user.name"
+                    :value="user.id"
+                  />
+                </el-select>
+              </el-form-item>
+              <!-- 项目级别: 新建场景不需要，移除 -->
+            </div>
+
+            <div class="form-row">
+              <el-form-item label="创建时间" prop="startTime">
+                <el-date-picker
+                  v-model="projectForm.startTime"
+                  type="date"
+                  placeholder="选择开始时间"
+                  style="width: 100%"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                />
+              </el-form-item>
+              <el-form-item label="预计完成时间" prop="endTime">
+                <el-date-picker
+                  v-model="projectForm.endTime"
+                  type="date"
+                  placeholder="选择完成时间"
+                  style="width: 100%"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                />
+              </el-form-item>
+            </div>
+
+            <div class="form-row">
+              <el-form-item label="项目预算" prop="budget">
+                <el-input-number
+                  v-model="projectForm.budget"
+                  :min="0"
+                  :precision="2"
+                  placeholder="请输入项目预算"
+                  style="width: 100%"
+                />
+                <span style="margin-left: 8px; color: #6b7280">元</span>
+              </el-form-item>
+            </div>
+          </el-form>
+        </div>
+
+        <!-- 成员选择 -->
+        <div class="form-card">
+          <div
+            class="form-section-title"
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <span>项目成员</span>
+            <el-button type="primary" size="small" @click="openMemberDialog">
+              <el-icon><Plus /></el-icon>
+              添加成员
+            </el-button>
+          </div>
+
+          <!-- 已选成员列表 -->
+          <div v-if="selectedMembers.length > 0">
+            <div
+              v-for="member in selectedMembers"
+              :key="member.id"
+              class="member-item"
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 16px;
+                background: #f8fafc;
+                border-radius: 8px;
+                margin-bottom: 12px;
+                border: 1px solid #e5e7eb;
+              "
+            >
+              <div
+                style="
+                  width: 48px;
+                  height: 48px;
+                  border-radius: 50%;
+                  background: #e5e7eb;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: #374151;
+                  font-weight: 500;
+                  font-size: 18px;
+                "
+              >
+                {{ member.name.charAt(0) }}
+              </div>
+              <div style="flex: 1">
+                <div
+                  style="
+                    font-weight: 500;
+                    color: #374151;
+                    font-size: 16px;
+                    margin-bottom: 4px;
+                  "
+                >
+                  {{ member.name }}
+                </div>
+                <div style="font-size: 12px; color: #6b7280">
+                  {{ getRoleText(member.role) }} · 加入时间: {{ getCurrentDate()
+                  }}
+                </div>
+              </div>
+              <el-button
+                type="danger"
+                size="small"
+                @click="handleRemoveMember(member.id)"
+              >
+                移除
+              </el-button>
+            </div>
+          </div>
+
+          <div v-else class="empty-state">
+            <div class="empty-state-icon">👥</div>
+            <div class="empty-state-text">暂无项目成员</div>
+            <div class="empty-state-hint">请搜索并添加项目成员</div>
+          </div>
+        </div>
+
+        <!-- 里程碑设置 -->
+        <div class="form-card">
+          <div
+            class="form-section-title"
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <span>项目里程碑</span>
+            <el-button type="primary" size="small" @click="openMilestoneDialog">
+              <el-icon><Plus /></el-icon>
+              添加里程碑
+            </el-button>
+          </div>
+
+          <!-- 空态提示：仅当没有里程碑时显示 -->
+          <div
+            v-if="milestones.length === 0"
+            class="empty-state"
+            style="padding: 20px 0"
+          >
+            <div class="empty-state-icon">🎯</div>
+            <div class="empty-state-text">暂无里程碑</div>
+            <div class="empty-state-hint">请添加项目里程碑</div>
+          </div>
+
+          <!-- 里程碑列表 -->
+          <div v-if="milestones.length > 0">
+            <div
+              v-for="(milestone, index) in milestones"
+              :key="index"
+              class="milestone-item"
+            >
+              <div class="milestone-header">
+                <span class="milestone-title">里程碑 {{ index + 1 }}</span>
+                <el-button
+                  type="danger"
+                  size="small"
+                  @click="handleRemoveMilestone(index)"
+                >
+                  删除
+                </el-button>
+              </div>
+              <div class="milestone-content">
+                <el-form-item label="里程碑名称">
+                  <el-input
+                    v-model="milestone.name"
+                    placeholder="请输入里程碑名称"
+                  />
+                </el-form-item>
+                <el-form-item label="开始时间">
+                  <el-date-picker
+                    v-model="milestone.startTime"
+                    type="date"
+                    placeholder="选择开始时间"
+                    style="width: 100%"
+                    format="YYYY-MM-DD"
+                    value-format="YYYY-MM-DD"
+                  />
+                </el-form-item>
+                <el-form-item label="结束时间">
+                  <el-date-picker
+                    v-model="milestone.endTime"
+                    type="date"
+                    placeholder="选择结束时间"
+                    style="width: 100%"
+                    format="YYYY-MM-DD"
+                    value-format="YYYY-MM-DD"
+                  />
+                </el-form-item>
+              </div>
+              <el-form-item label="描述">
+                <el-input
+                  v-model="milestone.description"
+                  type="textarea"
+                  :rows="2"
+                  placeholder="请输入里程碑描述"
+                />
+              </el-form-item>
+            </div>
+          </div>
+
+          <!-- 注意：避免重复显示空态，此处不再重复渲染 -->
+        </div>
+
+        <!-- 添加成员对话框 -->
+        <el-dialog
+          v-model="showMemberDialog"
+          title="添加成员"
+          width="600px"
+          :close-on-click-modal="false"
+        >
+          <el-input
+            v-model="memberSearchKeyword"
+            placeholder="搜索成员（姓名或学工号）"
+            clearable
+            @keyup.enter="handleMemberSearch"
+            @input="handleMemberSearch"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <div
+            v-if="memberSearchResults.length > 0"
+            class="search-results"
+            style="margin-top: 12px"
+          >
+            <div
+              v-for="user in memberSearchResults"
+              :key="user.id"
+              class="search-result-item"
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px;
+                border: 1px solid #e5e7eb;
+                border-radius: 6px;
+                margin-bottom: 8px;
+                background: #ffffff;
+              "
+            >
+              <div style="display: flex; align-items: center; gap: 12px">
+                <div
+                  style="
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    background: #f3f4f6;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #374151;
+                    font-weight: 500;
+                    font-size: 16px;
+                  "
+                >
+                  {{ user.name.charAt(0) }}
+                </div>
+                <div>
+                  <div
+                    style="
+                      font-weight: 500;
+                      color: #374151;
+                      font-size: 14px;
+                      margin-bottom: 4px;
+                    "
+                  >
+                    {{ user.name }}
+                  </div>
+                  <!-- <div style="font-size:12px;color:#6b7280;">工号: {{ user.id }}</div> -->
+                </div>
+              </div>
+              <el-button
+                type="primary"
+                size="small"
+                :disabled="selectedMembers.some(m=>m.id===user.id)"
+                @click="handleAddMember(user)"
+                style="min-width: 60px"
+              >
+                {{ selectedMembers.some(m=>m.id===user.id) ? '已添加' : '添加'
+                }}
+              </el-button>
+            </div>
+          </div>
+          <div v-else class="empty-state" style="padding: 20px 0">
+            <div class="empty-state-text">请输入关键词进行搜索</div>
+          </div>
+          <template #footer>
+            <el-button @click="closeMemberDialog">关闭</el-button>
+          </template>
+        </el-dialog>
+
+        <!-- 文档管理（新增时为空，上传后显示列表） -->
+        <div class="form-card">
+          <div class="form-section-title">文档管理</div>
+
+          <div v-if="documents.length > 0" class="document-list">
+            <div
+              v-for="doc in documents"
+              :key="doc.id"
+              class="document-item"
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px;
+                background: #f8fafc;
+                border-radius: 6px;
+                margin-bottom: 12px;
+              "
+            >
+              <div
+                style="
+                  width: 32px;
+                  height: 32px;
+                  border-radius: 4px;
+                  background: #dbeafe;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: #1e40af;
+                "
+              >
+                📄
+              </div>
+              <div style="flex: 1">
+                <div style="font-weight: 500; color: #374151">
+                  {{ doc.name }}
+                </div>
+                <div style="font-size: 12px; color: #6b7280">
+                  {{ doc.type }} · {{ doc.uploader }} · {{ doc.uploadTime }} ·
+                  {{ doc.size }}
+                </div>
+              </div>
+              <div>
+                <el-button size="small" @click="handlePreview(doc.id)"
+                  >预览</el-button
+                >
+                <el-button size="small" @click="handleDownload(doc.id)"
+                  >下载</el-button
+                >
+                <el-button
+                  size="small"
+                  type="danger"
+                  @click="handleDeleteDoc(doc.id)"
+                  >删除</el-button
+                >
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="empty-state">
+            <div class="empty-state-icon">📄</div>
+            <div class="empty-state-text">暂无文档</div>
+            <div class="empty-state-hint">上传项目相关文档</div>
+          </div>
+
+          <!-- 上传区域 -->
+          <div class="upload-section">
+            <div
+              class="upload-area"
+              @click="triggerUpload"
+              @dragover.prevent="handleDragOver"
+              @dragleave.prevent="handleDragLeave"
+              @drop.prevent="handleDrop"
+              :class="{ dragover: isDragOver }"
+            >
+              <div class="upload-icon">
+                <el-icon><Upload /></el-icon>
+              </div>
+              <div class="upload-text">点击上传或拖拽文件到此处</div>
+              <div class="upload-hint">
+                支持 PDF、DOC、DOCX、XLS、XLSX 等格式
+              </div>
+            </div>
+            <input
+              ref="fileInput"
+              type="file"
+              multiple
+              style="display: none"
+              @change="handleFileSelect"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+            />
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div
+          class="button-group"
+          style="
+            background: #fff;
+            position: sticky;
+            bottom: 0;
+            border-top: 1px solid #e5e7eb;
+            padding: 16px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+          "
+        >
+          <el-button @click="handleCancel">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="loading"
+            @click="handleSaveProject"
+          >
+            <el-icon><Check /></el-icon>
+            保存项目
+          </el-button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, computed, nextTick } = Vue;
+      const { ElMessage, ElMessageBox } = ElementPlus;
+
+      createApp({
+        setup() {
+          // 数据状态
+          const loading = ref(false);
+          const projectFormRef = ref(null);
+          const memberSearchKeyword = ref("");
+          const memberSearchResults = ref([]);
+          const showMemberDialog = ref(false);
+          const showMemberEditor = ref(false);
+
+          // 项目表单数据
+          const projectForm = reactive({
+            name: "",
+            description: "",
+            manager: "",
+            startTime: "",
+            endTime: "",
+            budget: 0,
+          });
+
+          // 表单验证规则
+          const formRules = {
+            name: [
+              { required: true, message: "请输入项目名称", trigger: "blur" },
+              {
+                min: 2,
+                max: 100,
+                message: "项目名称长度在2到100个字符",
+                trigger: "blur",
+              },
+            ],
+            description: [
+              { required: true, message: "请输入项目描述", trigger: "blur" },
+              {
+                min: 10,
+                max: 1000,
+                message: "项目描述长度在10到1000个字符",
+                trigger: "blur",
+              },
+            ],
+            manager: [
+              {
+                required: true,
+                message: "请选择项目负责人",
+                trigger: "change",
+              },
+            ],
+            startTime: [
+              { required: true, message: "请选择创建时间", trigger: "change" },
+            ],
+            endTime: [
+              {
+                required: true,
+                message: "请选择预计完成时间",
+                trigger: "change",
+              },
+            ],
+            budget: [
+              { required: true, message: "请输入项目预算", trigger: "blur" },
+              {
+                type: "number",
+                min: 0,
+                message: "项目预算必须大于等于0",
+                trigger: "blur",
+              },
+            ],
+          };
+
+          // 用户列表数据
+          const userList = ref([
+            { id: "1", name: "张教授", avatar: "../images/favicon.ico" },
+            { id: "2", name: "李博士", avatar: "../images/favicon.ico" },
+            { id: "3", name: "王教授", avatar: "../images/favicon.ico" },
+            { id: "4", name: "赵博士", avatar: "../images/favicon.ico" },
+            { id: "5", name: "陈教授", avatar: "../images/favicon.ico" },
+          ]);
+
+          // 已选成员列表
+          const selectedMembers = ref([]);
+
+          // 里程碑列表
+          const milestones = ref([]);
+          // 里程碑下拉选项（确保为响应式，避免渲染为空）
+          const milestoneOptions = ref([
+            "1.项目启动：建设方案通过审核并备案",
+            "2.任务分解与资源准备：项目任务书下达，资源配置完成，进入实施阶段",
+            "3.项目实施与过程管理：中期检查",
+            "4.成果整合与结题准备：结题验收",
+            "5.后续管理与成果转化：项目归档完成，成果转化",
+          ]);
+          const addedMilestoneNames = computed(() => {
+            if (!milestones.value || !Array.isArray(milestones.value)) {
+              return [];
+            }
+            return milestones.value
+              .map((m) => m.name)
+              .filter((name) => name && name.trim());
+          });
+          const showMilestoneDialog = ref(false);
+          const milestoneDraft = ref({
+            name: "",
+            startTime: "",
+            endTime: "",
+            description: "",
+          });
+          const documents = ref([]);
+          const isDragOver = ref(false);
+          const fileInput = ref(null);
+
+          // 成员搜索处理
+          const handleMemberSearch = () => {
+            if (!memberSearchKeyword.value.trim()) {
+              memberSearchResults.value = [];
+              return;
+            }
+
+            // 模拟搜索API
+            const keyword = memberSearchKeyword.value.toLowerCase();
+            memberSearchResults.value = userList.value.filter(
+              (user) =>
+                user.name.toLowerCase().includes(keyword) ||
+                user.id.toLowerCase().includes(keyword)
+            );
+          };
+
+          // 添加成员
+          const handleAddMember = (user) => {
+            // 检查是否已经添加
+            const exists = selectedMembers.value.find(
+              (member) => member.id === user.id
+            );
+            if (exists) {
+              ElMessage.warning("该成员已经添加");
+              return;
+            }
+
+            // 添加到已选列表
+            selectedMembers.value.push({
+              id: user.id,
+              name: user.name,
+              avatar: user.avatar,
+              role: "member",
+            });
+
+            // 清空搜索
+            memberSearchKeyword.value = "";
+            memberSearchResults.value = [];
+
+            // 显示成功消息，并在成员列表中显示添加状态
+            ElMessage.success(`已添加成员：${user.name}`);
+
+            // 延迟关闭对话框，让用户看到添加效果
+            setTimeout(() => {
+              showMemberDialog.value = false;
+            }, 1000);
+          };
+
+          // 移除成员
+          const handleRemoveMember = (memberId) => {
+            const index = selectedMembers.value.findIndex(
+              (member) => member.id === memberId
+            );
+            if (index > -1) {
+              const memberName = selectedMembers.value[index].name;
+              selectedMembers.value.splice(index, 1);
+              ElMessage.success(`已移除成员：${memberName}`);
+            }
+          };
+
+          // 添加里程碑
+          const openMilestoneDialog = () => {
+            milestoneDraft.value = {
+              name: "",
+              startTime: "",
+              endTime: "",
+              description: "",
+            };
+            showMilestoneDialog.value = true;
+          };
+
+          const closeMilestoneDialog = () => {
+            showMilestoneDialog.value = false;
+          };
+
+          const confirmAddMilestone = () => {
+            const d = milestoneDraft.value;
+            if (!d.name.trim()) {
+              ElMessage.warning("请输入里程碑名称");
+              return;
+            }
+            if (addedMilestoneNames.value.includes(d.name.trim())) {
+              ElMessage.warning("该里程碑已添加");
+              return;
+            }
+            if (!d.startTime || !d.endTime) {
+              ElMessage.warning("请选择开始时间和结束时间");
+              return;
+            }
+            if (new Date(d.startTime) >= new Date(d.endTime)) {
+              ElMessage.warning("结束时间必须晚于开始时间");
+              return;
+            }
+            milestones.value.push({
+              name: d.name.trim(),
+              startTime: d.startTime,
+              endTime: d.endTime,
+              description: d.description || "",
+            });
+            showMilestoneDialog.value = false;
+            ElMessage.success("已添加里程碑");
+          };
+
+          // 移除里程碑
+          const handleRemoveMilestone = (index) => {
+            milestones.value.splice(index, 1);
+          };
+
+          // 表单验证
+          const validateForm = async () => {
+            try {
+              await projectFormRef.value.validate();
+
+              // 验证时间逻辑
+              if (projectForm.startTime && projectForm.endTime) {
+                const startDate = new Date(projectForm.startTime);
+                const endDate = new Date(projectForm.endTime);
+                if (startDate >= endDate) {
+                  ElMessage.error("预计完成时间必须晚于开始时间");
+                  return false;
+                }
+              }
+
+              // 验证里程碑
+              for (let i = 0; i < milestones.value.length; i++) {
+                const milestone = milestones.value[i];
+                if (!milestone.name.trim()) {
+                  ElMessage.error(`第${i + 1}个里程碑名称不能为空`);
+                  return false;
+                }
+                if (milestone.startTime && milestone.endTime) {
+                  const startDate = new Date(milestone.startTime);
+                  const endDate = new Date(milestone.endTime);
+                  if (startDate >= endDate) {
+                    ElMessage.error(
+                      `第${i + 1}个里程碑结束时间必须晚于开始时间`
+                    );
+                    return false;
+                  }
+                }
+              }
+
+              return true;
+            } catch (error) {
+              ElMessage.error("请完善表单信息");
+              return false;
+            }
+          };
+
+          const openMemberDialog = () => {
+            memberSearchKeyword.value = "";
+            memberSearchResults.value = [];
+            showMemberDialog.value = true;
+          };
+          const closeMemberDialog = () => {
+            showMemberDialog.value = false;
+          };
+
+          // 保存项目
+          const handleSaveProject = async () => {
+            const isValid = await validateForm();
+            if (!isValid) return;
+
+            try {
+              loading.value = true;
+
+              // 模拟API调用
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+
+              // 构造项目数据
+              const projectData = {
+                ...projectForm,
+                members: selectedMembers.value,
+                milestones: milestones.value,
+                documents: documents.value,
+              };
+
+              console.log("保存项目数据:", projectData);
+
+              ElMessage.success("项目创建成功！");
+
+              // 跳转到项目列表页面
+              if (window.parent !== window) {
+                window.parent.postMessage(
+                  {
+                    type: "navigate",
+                    path: "project/list",
+                  },
+                  "*"
+                );
+              } else {
+                window.location.href = "项目列表.html";
+              }
+            } catch (error) {
+              ElMessage.error("项目创建失败，请重试");
+            } finally {
+              loading.value = false;
+            }
+          };
+
+          // 文档上传/预览/删除 交互
+          const triggerUpload = () =>
+            fileInput.value && fileInput.value.click();
+          const handleFileSelect = (e) => {
+            const files = e.target.files || [];
+            if (!files.length) return;
+            for (const f of files) {
+              documents.value.push({
+                id: Date.now() + Math.random(),
+                name: f.name,
+                type: (f.name.split(".").pop() || "file").toUpperCase(),
+                uploader: "当前用户",
+                uploadTime: new Date().toISOString().split("T")[0],
+                size: Math.ceil(f.size / 1024) + "KB",
+              });
+            }
+            ElMessage.success("文件已添加至列表");
+          };
+          const handleDragOver = () => (isDragOver.value = true);
+          const handleDragLeave = () => (isDragOver.value = false);
+          const handleDrop = (e) => {
+            e.preventDefault();
+            isDragOver.value = false;
+            const files = e.dataTransfer?.files || [];
+            if (files.length) handleFileSelect({ target: { files } });
+          };
+          const handlePreview = (id) => ElMessage.info(`预览文档: ${id}`);
+          const handleDownload = (id) => ElMessage.info(`下载文档: ${id}`);
+          const handleDeleteDoc = (id) => {
+            const idx = documents.value.findIndex((d) => d.id === id);
+            if (idx > -1) {
+              documents.value.splice(idx, 1);
+              ElMessage.success("已删除文档");
+            }
+          };
+
+          // 获取角色文本
+          const getRoleText = (role) => {
+            const roleMap = {
+              manager: "项目负责人",
+              core: "核心成员",
+              member: "普通成员",
+            };
+            return roleMap[role] || "普通成员";
+          };
+
+          // 获取当前日期
+          const getCurrentDate = () => {
+            return new Date().toISOString().split("T")[0];
+          };
+
+          // 取消创建
+          const handleCancel = () => {
+            ElMessageBox.confirm(
+              "确定要取消创建项目吗？未保存的数据将丢失。",
+              "确认取消",
+              {
+                confirmButtonText: "确定",
+                cancelButtonText: "继续编辑",
+                type: "warning",
+              }
+            )
+              .then(() => {
+                // 跳转到项目列表页面
+                if (window.parent !== window) {
+                  window.parent.postMessage(
+                    {
+                      type: "navigate",
+                      path: "project/list",
+                    },
+                    "*"
+                  );
+                } else {
+                  window.location.href = "项目列表.html";
+                }
+              })
+              .catch(() => {
+                // 用户取消，继续编辑
+              });
+          };
+
+          // 初始化默认值
+          const initDefaultValues = () => {
+            const today = new Date();
+            const threeMonthsLater = new Date();
+            threeMonthsLater.setMonth(today.getMonth() + 3);
+
+            projectForm.startTime = today.toISOString().split("T")[0];
+            projectForm.endTime = threeMonthsLater.toISOString().split("T")[0];
+            projectForm.manager = userList.value[0].id; // 默认选择第一个用户
+          };
+
+          // 组件挂载时初始化
+          nextTick(() => {
+            initDefaultValues();
+          });
+
+          return {
+            loading,
+            projectFormRef,
+            projectForm,
+            formRules,
+            userList,
+            selectedMembers,
+            milestones,
+            milestoneOptions,
+            addedMilestoneNames,
+            showMilestoneDialog,
+            milestoneDraft,
+            memberSearchKeyword,
+            memberSearchResults,
+            showMemberDialog,
+            openMemberDialog,
+            closeMemberDialog,
+            openMilestoneDialog,
+            closeMilestoneDialog,
+            confirmAddMilestone,
+            handleMemberSearch,
+            handleAddMember,
+            handleRemoveMember,
+            handleRemoveMilestone,
+            documents,
+            isDragOver,
+            fileInput,
+            triggerUpload,
+            handleFileSelect,
+            handleDragOver,
+            handleDragLeave,
+            handleDrop,
+            handlePreview,
+            handleDownload,
+            handleDeleteDoc,
+            handleSaveProject,
+            handleCancel,
+            getRoleText,
+            getCurrentDate,
+          };
+        },
+      })
+        .use(ElementPlus, {
+          locale: window.ElementPlusLocaleZhCn || {
+            name: "zh-cn",
+            el: {
+              datepicker: {
+                now: "此刻",
+                today: "今天",
+                cancel: "取消",
+                clear: "清空",
+                confirm: "确认",
+                selectDate: "选择日期",
+                selectTime: "选择时间",
+                startDate: "开始日期",
+                startTime: "开始时间",
+                endDate: "结束日期",
+                endTime: "结束时间",
+                prevYear: "前一年",
+                nextYear: "后一年",
+                prevMonth: "上个月",
+                nextMonth: "下个月",
+                year: "年",
+                month1: "1月",
+                month2: "2月",
+                month3: "3月",
+                month4: "4月",
+                month5: "5月",
+                month6: "6月",
+                month7: "7月",
+                month8: "8月",
+                month9: "9月",
+                month10: "10月",
+                month11: "11月",
+                month12: "12月",
+                weeks: {
+                  sun: "日",
+                  mon: "一",
+                  tue: "二",
+                  wed: "三",
+                  thu: "四",
+                  fri: "五",
+                  sat: "六",
+                },
+                months: {
+                  jan: "一月",
+                  feb: "二月",
+                  mar: "三月",
+                  apr: "四月",
+                  may: "五月",
+                  jun: "六月",
+                  jul: "七月",
+                  aug: "八月",
+                  sep: "九月",
+                  oct: "十月",
+                  nov: "十一月",
+                  dec: "十二月",
+                },
+              },
+            },
+          },
+        })
+        .mount("#app");
+    </script>
+  </body>
+</html>

@@ -1,0 +1,80 @@
+# 应用基础配置
+spring:
+  application:
+    name: AgentBackendServices
+  profiles:
+    active: dev  # 默认激活开发环境
+
+# 服务器配置
+server:
+  port: 8081
+#  servlet:
+#    context-path: /api
+
+# 通用配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+# 日志配置
+logging:
+  level:
+    com.server.agentbackendservices: DEBUG
+
+# Swagger/OpenAPI 配置
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+  show-actuator: true
+
+# Sa-Token 配置
+sa-token:
+  # token 名称（同时也是 cookie 名称）
+  token-name: satoken
+  # token 有效期（单位：秒）默认 30 天，-1 代表永不过期
+  timeout: -1
+  # token 临时有效期（指定时间内无操作就视为 token 过期） 单位：秒
+  activity-timeout: -1
+  # 是否允许同一账号并发登录（为 true 时允许一起登录，为 false 时新登录挤掉旧登录）
+  is-concurrent: true
+  # 在多人登录同一账号时，是否共用一个 token （为 true 时所有登录共用一个 token，为 false 时每次登录新建一个 token）
+  is-share: false
+  # token 风格（默认可取值：uuid、simple-uuid、random-32、random-64、random-128、tik）
+  token-style: uuid
+  # 是否输出操作日志
+  is-log: false
+  # 是否从 cookie 中读取 token
+  is-read-cookie: true
+  # 是否从 header 中读取 token
+  is-read-header: true
+  # 是否从 请求体 中读取 token
+  is-read-body: true
+  # 是否在登录后将 Token 写入到响应头
+  is-write-header: true
+  # 是否在登录后将 Token 写入到响应体
+  is-write-body: true
+  # 是否在登录后将 Token 写入到 Cookie
+  is-write-cookie: true
+  # 配置 Sa-Token 单独使用的 Redis 连接
+  alone-redis:
+    # Redis 数据库索引
+    database: 1
+    # Redis 服务器地址
+    host: localhost
+    # Redis 服务器连接端口
+    port: 6379
+    # Redis 服务器连接密码（默认为空）
+    password: 
+    # 连接超时时间
+    timeout: 10s

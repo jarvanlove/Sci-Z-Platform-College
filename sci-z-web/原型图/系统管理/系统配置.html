@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>系统配置 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.3.14/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3.2.47/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.3.14"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.iife.js"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .config-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+      }
+
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0;
+      }
+
+      .content-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+      }
+
+      /* 标签页样式 */
+      .el-tabs__item {
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        color: #6b7280 !important;
+      }
+
+      .el-tabs__item.is-active {
+        color: #1e3a8a !important;
+      }
+
+      .el-tabs__active-bar {
+        background-color: #1e3a8a !important;
+      }
+
+      /* 配置表单样式 */
+      .config-form {
+        margin-top: 20px;
+        max-width: 800px;
+      }
+
+      .config-form .el-form-item {
+        margin-bottom: 24px;
+      }
+
+      .config-form .el-form-item__label {
+        font-weight: 500;
+        color: #374151;
+      }
+
+      .config-section {
+        margin-bottom: 32px;
+      }
+
+      .config-section-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #e5e7eb;
+      }
+
+      /* 按钮区域 */
+      .action-bar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+        margin-top: 32px;
+      }
+
+      /* 统一弹窗样式 - 圆角设计 */
+      .el-dialog {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-dialog__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-dialog__title {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #1f2937 !important;
+      }
+
+      .el-dialog__headerbtn {
+        top: 20px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-dialog__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-dialog__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-dialog__body {
+        padding: 20px 24px !important;
+      }
+
+      .el-dialog__footer {
+        padding: 16px 24px 20px 24px !important;
+        border-top: 1px solid #f0f0f0 !important;
+      }
+
+      /* 统一 MessageBox 样式 */
+      .el-message-box {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-message-box__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #1f2937 !important;
+        line-height: 1.5 !important;
+      }
+
+      .el-message-box__headerbtn {
+        top: 16px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-message-box__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-message-box__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__content {
+        padding: 20px 24px !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__message {
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: #374151 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .el-message-box__btns {
+        padding: 16px 24px 20px 24px !important;
+        background: #ffffff !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 12px !important;
+      }
+
+      /* 现代化按钮样式 */
+      .el-message-box__btns .el-button,
+      .el-dialog__footer .el-button {
+        padding: 8px 20px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        border: 1px solid !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .el-message-box__btns .el-button--default,
+      .el-dialog__footer .el-button--default {
+        background: #ffffff !important;
+        border-color: #d1d5db !important;
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__btns .el-button--default:hover,
+      .el-dialog__footer .el-button--default:hover {
+        background: #f9fafb !important;
+        border-color: #9ca3af !important;
+        color: #374151 !important;
+      }
+
+      .el-message-box__btns .el-button--primary,
+      .el-dialog__footer .el-button--primary {
+        background: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+        color: #ffffff !important;
+      }
+
+      .el-message-box__btns .el-button--primary:hover,
+      .el-dialog__footer .el-button--primary:hover {
+        background: #1e40af !important;
+        border-color: #1e40af !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+      }
+
+      .el-message-box__btns .el-button--primary:active,
+      .el-dialog__footer .el-button--primary:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+      }
+
+      /* 警告类型弹窗的特殊样式 */
+      .el-message-box--warning .el-message-box__content {
+        position: relative;
+      }
+
+      .el-message-box--warning .el-message-box__message::before {
+        content: "⚠️";
+        font-size: 18px !important;
+        margin-right: 8px !important;
+        vertical-align: -0.15em !important;
+        display: inline-block !important;
+      }
+
+      /* 帮助文本 */
+      .help-text {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-top: 4px;
+        line-height: 1.5;
+      }
+
+      /* 标签输入 */
+      .tag-input-wrapper {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px;
+        border: 1px solid #dcdfe6;
+        border-radius: 4px;
+        min-height: 40px;
+      }
+
+      .tag-input-wrapper:hover {
+        border-color: #c0c4cc;
+      }
+
+      .tag-input-wrapper:focus-within {
+        border-color: #1e3a8a;
+      }
+
+      .format-tag {
+        padding: 4px 12px;
+        background: #e5e7eb;
+        border-radius: 12px;
+        font-size: 12px;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .format-tag .close-icon {
+        cursor: pointer;
+        color: #9ca3af;
+      }
+
+      .format-tag .close-icon:hover {
+        color: #dc2626;
+      }
+
+      .tag-input {
+        flex: 1;
+        min-width: 100px;
+        border: none;
+        outline: none;
+        font-size: 14px;
+        padding: 4px 8px;
+      }
+
+      /* 统一颜色 - 与保存按钮一致 #1e3a8a */
+      /* Switch 开关颜色 */
+      .el-switch.is-checked .el-switch__core {
+        background-color: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+      }
+
+      /* Radio 单选框颜色 */
+      .el-radio__input.is-checked .el-radio__inner {
+        background-color: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+      }
+
+      .el-radio__input.is-checked + .el-radio__label {
+        color: #1e3a8a !important;
+      }
+
+      /* Checkbox 复选框颜色 */
+      .el-checkbox__input.is-checked .el-checkbox__inner {
+        background-color: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+      }
+
+      .el-checkbox__input.is-checked + .el-checkbox__label {
+        color: #1e3a8a !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="config-container">
+        <!-- 页面头部 -->
+        <div class="page-header">
+          <h1 class="page-title">系统配置</h1>
+        </div>
+
+        <!-- 内容卡片 -->
+        <div class="content-card">
+          <el-tabs v-model="activeTab">
+            <!-- 基本配置 -->
+            <el-tab-pane label="基本配置" name="basic">
+              <div class="config-form">
+                <div class="config-section">
+                  <div class="config-section-title">行业配置</div>
+                  <el-form
+                    :model="industryConfig"
+                    :rules="industryRules"
+                    ref="industryFormRef"
+                    label-width="120px"
+                    class="config-form"
+                  >
+                    <el-form-item label="当前行业" prop="industryType">
+                      <el-select
+                        v-model="industryConfig.industryType"
+                        placeholder="请选择行业类型"
+                        style="width: 300px"
+                        @change="handleIndustryChange"
+                      >
+                        <el-option label="教育行业" value="education" />
+                        <el-option label="医疗行业" value="medical" />
+                        <el-option label="电力行业" value="power" />
+                      </el-select>
+                    </el-form-item>
+
+                    <el-form-item label="部门标签" prop="departmentLabel">
+                      <el-input
+                        v-model="industryConfig.departmentLabel"
+                        placeholder="请输入部门标签"
+                        style="width: 300px"
+                      />
+                    </el-form-item>
+
+                    <el-form-item label="角色标签" prop="roleLabel">
+                      <el-input
+                        v-model="industryConfig.roleLabel"
+                        placeholder="请输入角色标签"
+                        style="width: 300px"
+                      />
+                    </el-form-item>
+
+                    <el-form-item label="员工ID标签" prop="employeeIdLabel">
+                      <el-input
+                        v-model="industryConfig.employeeIdLabel"
+                        placeholder="请输入员工ID标签"
+                        style="width: 300px"
+                      />
+                    </el-form-item>
+                  </el-form>
+                </div>
+
+                <div class="config-section">
+                  <div class="config-section-title">系统信息</div>
+                  <el-form
+                    :model="basicConfig"
+                    :rules="basicRules"
+                    ref="basicFormRef"
+                    label-width="140px"
+                  >
+                    <el-form-item label="系统名称" prop="systemName">
+                      <el-input
+                        v-model="basicConfig.systemName"
+                        placeholder="请输入系统名称"
+                      />
+                      <div class="help-text">系统在各页面头部显示的名称</div>
+                    </el-form-item>
+
+                    <el-form-item label="系统描述" prop="systemDescription">
+                      <el-input
+                        v-model="basicConfig.systemDescription"
+                        type="textarea"
+                        :rows="3"
+                        placeholder="请输入系统描述"
+                      />
+                    </el-form-item>
+
+                    <el-form-item label="系统版本" prop="systemVersion">
+                      <el-input
+                        v-model="basicConfig.systemVersion"
+                        placeholder="请输入系统版本号，如：v1.0.0"
+                      />
+                    </el-form-item>
+
+                    <el-form-item label="联系邮箱" prop="contactEmail">
+                      <el-input
+                        v-model="basicConfig.contactEmail"
+                        placeholder="请输入联系邮箱"
+                        type="email"
+                      />
+                    </el-form-item>
+
+                    <el-form-item label="联系电话" prop="contactPhone">
+                      <el-input
+                        v-model="basicConfig.contactPhone"
+                        placeholder="请输入联系电话"
+                      />
+                    </el-form-item>
+                  </el-form>
+                </div>
+
+                <div class="action-bar">
+                  <el-button @click="handleReset('basic')">重置</el-button>
+                  <el-button
+                    type="primary"
+                    @click="handleSave('basic')"
+                    :loading="saving"
+                  >
+                    保存配置
+                  </el-button>
+                </div>
+              </div>
+            </el-tab-pane>
+
+            <!-- Dify 配置 -->
+            <el-tab-pane label="Dify配置" name="dify">
+              <div class="config-form">
+                <div class="config-section">
+                  <div class="config-section-title">Dify 服务配置</div>
+                  <el-form
+                    :model="difyConfig"
+                    :rules="difyRules"
+                    ref="difyFormRef"
+                    label-width="140px"
+                  >
+                    <el-form-item label="Dify API 地址" prop="apiUrl">
+                      <el-input
+                        v-model="difyConfig.apiUrl"
+                        placeholder="请输入 Dify API 地址，如：https://api.dify.ai"
+                      />
+                      <div class="help-text">Dify 服务的 API 基础地址</div>
+                    </el-form-item>
+
+                    <el-form-item label="API Key" prop="apiKey">
+                      <el-input
+                        v-model="difyConfig.apiKey"
+                        type="password"
+                        placeholder="请输入 Dify API Key"
+                        show-password
+                      />
+                      <div class="help-text">用于身份验证的 API 密钥</div>
+                    </el-form-item>
+
+                    <el-form-item label="工作流 ID" prop="workflowId">
+                      <el-input
+                        v-model="difyConfig.workflowId"
+                        placeholder="请输入工作流 ID"
+                      />
+                      <div class="help-text">报告生成使用的工作流标识</div>
+                    </el-form-item>
+
+                    <el-form-item label="连接超时时间" prop="timeout">
+                      <el-input
+                        v-model.number="difyConfig.timeout"
+                        type="number"
+                      >
+                        <template #append>秒</template>
+                      </el-input>
+                      <div class="help-text">API 请求的超时时间</div>
+                    </el-form-item>
+
+                    <el-form-item label="工作流名称" prop="workflowName">
+                      <el-input
+                        v-model="difyConfig.workflowName"
+                        placeholder="请输入工作流名称"
+                      />
+                      <div class="help-text">工作流的显示名称</div>
+                    </el-form-item>
+
+                    <el-form-item label="工作流描述" prop="workflowDescription">
+                      <el-input
+                        v-model="difyConfig.workflowDescription"
+                        type="textarea"
+                        :rows="3"
+                        placeholder="请输入工作流描述"
+                      />
+                      <div class="help-text">描述该工作流的功能和用途</div>
+                    </el-form-item>
+
+                    <el-form-item label="启用调试模式" prop="enableDebug">
+                      <el-switch v-model="difyConfig.enableDebug" />
+                      <div class="help-text">
+                        开启后会记录详细的 API 调用日志
+                      </div>
+                    </el-form-item>
+                  </el-form>
+                </div>
+
+                <div class="action-bar">
+                  <el-button @click="handleReset('dify')">重置</el-button>
+                  <el-button
+                    type="primary"
+                    @click="handleSave('dify')"
+                    :loading="saving"
+                  >
+                    保存配置
+                  </el-button>
+                </div>
+              </div>
+            </el-tab-pane>
+
+            <!-- 邮件配置 -->
+            <el-tab-pane label="邮件配置" name="email">
+              <div class="config-form">
+                <div class="config-section">
+                  <div class="config-section-title">SMTP 服务器配置</div>
+                  <el-form
+                    :model="emailConfig"
+                    :rules="emailRules"
+                    ref="emailFormRef"
+                    label-width="140px"
+                  >
+                    <el-form-item label="SMTP 服务器" prop="smtpHost">
+                      <el-input
+                        v-model="emailConfig.smtpHost"
+                        placeholder="如：smtp.qq.com"
+                      />
+                    </el-form-item>
+
+                    <el-form-item label="SMTP 端口" prop="smtpPort">
+                      <el-input
+                        v-model.number="emailConfig.smtpPort"
+                        placeholder="如：465 或 587"
+                        type="number"
+                      />
+                      <div class="help-text">
+                        SSL 通常使用 465，TLS 通常使用 587
+                      </div>
+                    </el-form-item>
+
+                    <el-form-item label="发送邮箱" prop="fromEmail">
+                      <el-input
+                        v-model="emailConfig.fromEmail"
+                        placeholder="请输入发送方邮箱"
+                        type="email"
+                      />
+                    </el-form-item>
+
+                    <el-form-item label="邮箱密码" prop="emailPassword">
+                      <el-input
+                        v-model="emailConfig.emailPassword"
+                        type="password"
+                        placeholder="请输入邮箱授权码或密码"
+                        show-password
+                      />
+                      <div class="help-text">
+                        QQ 邮箱等需要使用授权码而非邮箱密码
+                      </div>
+                    </el-form-item>
+
+                    <el-form-item label="启用 SSL" prop="enableSSL">
+                      <el-switch v-model="emailConfig.enableSSL" />
+                    </el-form-item>
+                  </el-form>
+                </div>
+
+                <div class="action-bar">
+                  <el-button @click="handleReset('email')">重置</el-button>
+                  <el-button @click="handleTestEmail" :loading="testingEmail">
+                    测试邮件
+                  </el-button>
+                  <el-button
+                    type="primary"
+                    @click="handleSave('email')"
+                    :loading="saving"
+                  >
+                    保存配置
+                  </el-button>
+                </div>
+              </div>
+            </el-tab-pane>
+
+            <!-- 文件配置 -->
+            <el-tab-pane label="文件配置" name="file">
+              <div class="config-form">
+                <div class="config-section">
+                  <div class="config-section-title">文件上传设置</div>
+                  <el-form
+                    :model="fileConfig"
+                    :rules="fileRules"
+                    ref="fileFormRef"
+                    label-width="140px"
+                  >
+                    <el-form-item label="上传路径" prop="uploadPath">
+                      <el-input
+                        v-model="fileConfig.uploadPath"
+                        placeholder="如：/uploads"
+                      />
+                      <div class="help-text">文件上传的存储路径</div>
+                    </el-form-item>
+
+                    <el-form-item label="文件大小限制" prop="maxFileSize">
+                      <el-input
+                        v-model.number="fileConfig.maxFileSize"
+                        type="number"
+                      >
+                        <template #append>MB</template>
+                      </el-input>
+                      <div class="help-text">单个文件上传的最大大小限制</div>
+                    </el-form-item>
+
+                    <el-form-item label="允许格式" prop="allowedFormats">
+                      <div class="tag-input-wrapper">
+                        <span
+                          class="format-tag"
+                          v-for="format in fileConfig.allowedFormats"
+                          :key="format"
+                        >
+                          {{ format }}
+                          <span
+                            class="close-icon"
+                            @click="removeFormat(format)"
+                          >
+                            ✕
+                          </span>
+                        </span>
+                        <input
+                          class="tag-input"
+                          v-model="newFormat"
+                          @keydown.enter.prevent="addFormat"
+                          placeholder="输入格式后按回车添加"
+                        />
+                      </div>
+                      <div class="help-text">
+                        允许上传的文件格式，按回车添加
+                      </div>
+                    </el-form-item>
+
+                    <el-form-item label="存储方式" prop="storageType">
+                      <el-radio-group v-model="fileConfig.storageType">
+                        <el-radio label="local">本地存储</el-radio>
+                        <el-radio label="cloud">云存储</el-radio>
+                      </el-radio-group>
+                    </el-form-item>
+                  </el-form>
+                </div>
+
+                <div class="action-bar">
+                  <el-button @click="handleReset('file')">重置</el-button>
+                  <el-button
+                    type="primary"
+                    @click="handleSave('file')"
+                    :loading="saving"
+                  >
+                    保存配置
+                  </el-button>
+                </div>
+              </div>
+            </el-tab-pane>
+
+            <!-- 安全配置 -->
+            <el-tab-pane label="安全配置" name="security">
+              <div class="config-form">
+                <div class="config-section">
+                  <div class="config-section-title">安全策略</div>
+                  <el-form
+                    :model="securityConfig"
+                    :rules="securityRules"
+                    ref="securityFormRef"
+                    label-width="140px"
+                  >
+                    <el-form-item label="登录失败次数" prop="maxLoginAttempts">
+                      <el-input
+                        v-model.number="securityConfig.maxLoginAttempts"
+                        type="number"
+                      >
+                        <template #append>次</template>
+                      </el-input>
+                      <div class="help-text">超过此次数将锁定账户一段时间</div>
+                    </el-form-item>
+
+                    <el-form-item label="密码最小长度" prop="minPasswordLength">
+                      <el-input
+                        v-model.number="securityConfig.minPasswordLength"
+                        type="number"
+                      >
+                        <template #append>位</template>
+                      </el-input>
+                    </el-form-item>
+
+                    <el-form-item label="密码复杂度" prop="passwordComplexity">
+                      <el-checkbox-group
+                        v-model="securityConfig.passwordComplexity"
+                      >
+                        <el-checkbox label="uppercase">
+                          包含大写字母
+                        </el-checkbox>
+                        <el-checkbox label="lowercase">
+                          包含小写字母
+                        </el-checkbox>
+                        <el-checkbox label="number">包含数字</el-checkbox>
+                        <el-checkbox label="special">
+                          包含特殊字符
+                        </el-checkbox>
+                      </el-checkbox-group>
+                    </el-form-item>
+
+                    <el-form-item label="会话超时时间" prop="sessionTimeout">
+                      <el-input
+                        v-model.number="securityConfig.sessionTimeout"
+                        type="number"
+                      >
+                        <template #append>分钟</template>
+                      </el-input>
+                      <div class="help-text">
+                        用户无操作后自动退出登录的时间
+                      </div>
+                    </el-form-item>
+                  </el-form>
+                </div>
+
+                <div class="action-bar">
+                  <el-button @click="handleReset('security')">重置</el-button>
+                  <el-button
+                    type="primary"
+                    @click="handleSave('security')"
+                    :loading="saving"
+                  >
+                    保存配置
+                  </el-button>
+                </div>
+              </div>
+            </el-tab-pane>
+          </el-tabs>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, onMounted } = Vue;
+      const { ElMessage, ElMessageBox } = ElementPlus;
+
+      const app = createApp({
+        setup() {
+          const basicFormRef = ref();
+          const industryFormRef = ref();
+          const difyFormRef = ref();
+          const emailFormRef = ref();
+          const fileFormRef = ref();
+          const securityFormRef = ref();
+
+          const activeTab = ref("basic");
+          const saving = ref(false);
+          const testingEmail = ref(false);
+          const newFormat = ref("");
+
+          // 行业配置
+          const industryConfig = reactive({
+            industryType: "education",
+            industryName: "教育行业",
+            departmentLabel: "所属院系",
+            roleLabel: "角色",
+            employeeIdLabel: "学工号",
+          });
+
+          // 行业配置验证规则
+          const industryRules = {
+            industryType: [
+              { required: true, message: "请选择行业类型", trigger: "change" },
+            ],
+            departmentLabel: [
+              { required: true, message: "请输入部门标签", trigger: "blur" },
+            ],
+            roleLabel: [
+              { required: true, message: "请输入角色标签", trigger: "blur" },
+            ],
+            employeeIdLabel: [
+              { required: true, message: "请输入员工ID标签", trigger: "blur" },
+            ],
+          };
+
+          // 基本配置
+          const basicConfig = reactive({
+            systemName: "高校科研项目管理平台",
+            systemDescription: "面向高校的科研项目全生命周期管理平台",
+            systemVersion: "v1.0.0",
+            contactEmail: "support@university.edu.cn",
+            contactPhone: "010-12345678",
+          });
+
+          const basicRules = {
+            systemName: [
+              { required: true, message: "请输入系统名称", trigger: "blur" },
+            ],
+            contactEmail: [
+              { required: true, message: "请输入联系邮箱", trigger: "blur" },
+              {
+                type: "email",
+                message: "请输入正确的邮箱格式",
+                trigger: "blur",
+              },
+            ],
+          };
+
+          // Dify 配置
+          const difyConfig = reactive({
+            apiUrl: "https://api.dify.ai",
+            apiKey: "",
+            workflowId: "",
+            timeout: 60,
+            workflowName: "",
+            workflowDescription: "",
+            enableDebug: false,
+          });
+
+          const difyRules = {
+            apiUrl: [
+              {
+                required: true,
+                message: "请输入 Dify API 地址",
+                trigger: "blur",
+              },
+            ],
+            apiKey: [
+              { required: true, message: "请输入 API Key", trigger: "blur" },
+            ],
+            workflowId: [
+              { required: true, message: "请输入工作流 ID", trigger: "blur" },
+            ],
+            timeout: [
+              { required: true, message: "请输入超时时间", trigger: "blur" },
+              { type: "number", message: "必须为数字", trigger: "blur" },
+            ],
+            workflowName: [
+              { required: true, message: "请输入工作流名称", trigger: "blur" },
+            ],
+            workflowDescription: [
+              { required: true, message: "请输入工作流描述", trigger: "blur" },
+            ],
+          };
+
+          // 邮件配置
+          const emailConfig = reactive({
+            smtpHost: "smtp.qq.com",
+            smtpPort: 465,
+            fromEmail: "noreply@university.edu.cn",
+            emailPassword: "",
+            enableSSL: true,
+          });
+
+          const emailRules = {
+            smtpHost: [
+              {
+                required: true,
+                message: "请输入 SMTP 服务器",
+                trigger: "blur",
+              },
+            ],
+            smtpPort: [
+              { required: true, message: "请输入 SMTP 端口", trigger: "blur" },
+              { type: "number", message: "端口必须为数字", trigger: "blur" },
+            ],
+            fromEmail: [
+              { required: true, message: "请输入发送邮箱", trigger: "blur" },
+              {
+                type: "email",
+                message: "请输入正确的邮箱格式",
+                trigger: "blur",
+              },
+            ],
+            emailPassword: [
+              { required: true, message: "请输入邮箱密码", trigger: "blur" },
+            ],
+          };
+
+          // 文件配置
+          const fileConfig = reactive({
+            uploadPath: "/uploads",
+            maxFileSize: 10,
+            allowedFormats: ["pdf", "doc", "docx", "xls", "xlsx", "png", "jpg"],
+            storageType: "local",
+          });
+
+          const fileRules = {
+            uploadPath: [
+              { required: true, message: "请输入上传路径", trigger: "blur" },
+            ],
+            maxFileSize: [
+              {
+                required: true,
+                message: "请输入文件大小限制",
+                trigger: "blur",
+              },
+              { type: "number", message: "必须为数字", trigger: "blur" },
+            ],
+          };
+
+          // 安全配置
+          const securityConfig = reactive({
+            maxLoginAttempts: 5,
+            minPasswordLength: 8,
+            passwordComplexity: ["uppercase", "lowercase", "number"],
+            sessionTimeout: 30,
+          });
+
+          const securityRules = {
+            maxLoginAttempts: [
+              {
+                required: true,
+                message: "请输入登录失败次数",
+                trigger: "blur",
+              },
+              { type: "number", message: "必须为数字", trigger: "blur" },
+            ],
+            minPasswordLength: [
+              {
+                required: true,
+                message: "请输入密码最小长度",
+                trigger: "blur",
+              },
+              { type: "number", message: "必须为数字", trigger: "blur" },
+            ],
+            sessionTimeout: [
+              {
+                required: true,
+                message: "请输入会话超时时间",
+                trigger: "blur",
+              },
+              { type: "number", message: "必须为数字", trigger: "blur" },
+            ],
+          };
+
+          // 添加格式
+          const addFormat = () => {
+            if (newFormat.value.trim()) {
+              const format = newFormat.value.trim().toLowerCase();
+              if (!fileConfig.allowedFormats.includes(format)) {
+                fileConfig.allowedFormats.push(format);
+              }
+              newFormat.value = "";
+            }
+          };
+
+          // 移除格式
+          const removeFormat = (format) => {
+            const index = fileConfig.allowedFormats.indexOf(format);
+            if (index > -1) {
+              fileConfig.allowedFormats.splice(index, 1);
+            }
+          };
+
+          // 行业切换处理
+          const handleIndustryChange = (industryType) => {
+            const industryMap = {
+              education: {
+                industryName: "教育行业",
+                departmentLabel: "所属院系",
+                roleLabel: "角色",
+                employeeIdLabel: "学工号",
+              },
+              medical: {
+                industryName: "医疗行业",
+                departmentLabel: "所属科室",
+                roleLabel: "职务",
+                employeeIdLabel: "工号",
+              },
+              power: {
+                industryName: "电力行业",
+                departmentLabel: "所属部门",
+                roleLabel: "岗位",
+                employeeIdLabel: "员工号",
+              },
+            };
+
+            const config = industryMap[industryType];
+            if (config) {
+              industryConfig.industryName = config.industryName;
+              industryConfig.departmentLabel = config.departmentLabel;
+              industryConfig.roleLabel = config.roleLabel;
+              industryConfig.employeeIdLabel = config.employeeIdLabel;
+            }
+          };
+
+          // 保存配置
+          const handleSave = async (type) => {
+            try {
+              let formRef;
+              switch (type) {
+                case "basic":
+                  // 验证行业配置和基本配置
+                  await industryFormRef.value.validate();
+                  formRef = basicFormRef.value;
+                  break;
+                case "dify":
+                  formRef = difyFormRef.value;
+                  break;
+                case "email":
+                  formRef = emailFormRef.value;
+                  break;
+                case "file":
+                  formRef = fileFormRef.value;
+                  break;
+                case "security":
+                  formRef = securityFormRef.value;
+                  break;
+              }
+
+              await formRef.validate();
+              saving.value = true;
+
+              // 模拟保存
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
+              ElMessage.success("配置保存成功");
+              saving.value = false;
+            } catch (error) {
+              saving.value = false;
+              if (error !== "cancel") {
+                ElMessage.error("请完善配置信息");
+              }
+            }
+          };
+
+          // 重置配置
+          const handleReset = async (type) => {
+            try {
+              await ElMessageBox.confirm(
+                "确定要重置当前配置吗?所有未保存的更改将丢失。",
+                "重置配置",
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+
+              // 模拟重置
+              ElMessage.success("配置已重置");
+            } catch (error) {
+              // 用户取消
+            }
+          };
+
+          // 测试邮件
+          const handleTestEmail = async () => {
+            try {
+              await emailFormRef.value.validate();
+              testingEmail.value = true;
+
+              // 模拟测试
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+
+              ElMessage.success("测试邮件发送成功，请查收");
+              testingEmail.value = false;
+            } catch (error) {
+              testingEmail.value = false;
+              if (error !== "cancel") {
+                ElMessage.error("请完善邮件配置");
+              }
+            }
+          };
+
+          return {
+            basicFormRef,
+            industryFormRef,
+            difyFormRef,
+            emailFormRef,
+            fileFormRef,
+            securityFormRef,
+            activeTab,
+            saving,
+            testingEmail,
+            newFormat,
+            industryConfig,
+            industryRules,
+            basicConfig,
+            basicRules,
+            difyConfig,
+            difyRules,
+            emailConfig,
+            emailRules,
+            fileConfig,
+            fileRules,
+            securityConfig,
+            securityRules,
+            addFormat,
+            removeFormat,
+            handleSave,
+            handleReset,
+            handleTestEmail,
+            handleIndustryChange,
+          };
+        },
+      });
+
+      // 注册 Element Plus Icons
+      for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+        app.component(key, component);
+      }
+
+      // 配置 Element Plus 中文
+      app.use(ElementPlus, {
+        locale: {
+          name: "zh-cn",
+          el: {
+            datepicker: {
+              now: "此刻",
+              today: "今天",
+              cancel: "取消",
+              clear: "清空",
+              confirm: "确认",
+            },
+          },
+        },
+      });
+
+      app.mount("#app");
+    </script>
+  </body>
+</html>

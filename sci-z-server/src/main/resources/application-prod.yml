@@ -1,0 +1,73 @@
+# 生产环境：通过 spring.config.import 引入类路径下的占位符属性文件
+spring: # Spring 生产环境配置
+  config:
+    import: optional:classpath:config/production.env.properties # 生产占位符属性
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sciz_platform # 数据库 URL（建议改为生产地址）
+    username: ${DB_USERNAME:postgres} # 数据库用户名（支持环境变量覆盖）
+    password: ${DB_PASSWORD:password} # 数据库密码（支持环境变量覆盖）
+    driver-class-name: org.postgresql.Driver # PostgreSQL 驱动
+    hikari:
+      maximum-pool-size: 30 # 最大连接数（生产更大）
+      minimum-idle: 8 # 最小空闲连接数
+      connection-timeout: 20000 # 获取连接超时时间(ms)
+      idle-timeout: 600000 # 空闲连接存活时长(ms)
+      max-lifetime: 1800000 # 连接最大存活时长(ms)
+  redis:
+    host: ${REDIS_HOST:localhost} # Redis 主机
+    port: ${REDIS_PORT:6379} # Redis 端口
+    password: ${REDIS_PASSWORD:} # Redis 密码
+    database: 0 # 使用的数据库索引
+    timeout: ${REDIS_TIMEOUT:10000ms} # 连接与命令超时
+    lettuce:
+      pool:
+        max-active: ${REDIS_POOL_MAX_ACTIVE:8} # 最大连接数
+        max-wait: ${REDIS_POOL_MAX_WAIT:-1ms} # 最大等待时间
+        max-idle: ${REDIS_POOL_MAX_IDLE:8} # 最大空闲连接
+        min-idle: ${REDIS_POOL_MIN_IDLE:0} # 最小空闲连接
+  servlet:
+    multipart:
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:500MB} # 单文件最大大小
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:500MB} # 单次请求总大小
+
+# 生产 Kafka：默认从环境变量读取集群地址
+kafka: # Kafka 生产环境配置
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka1:9092,kafka2:9092}
+  producer:
+    acks: all # 最强一致性
+    retries: 3 # 重试次数
+    linger-ms: 10 # 聚合延迟(ms)
+
+# MinIO：从环境变量读取 endpoint/ak/sk/bucket
+minio: # MinIO 生产环境配置
+  endpoint: ${MINIO_ENDPOINT:http://minio:9000}
+  access-key: ${MINIO_AK}
+  secret-key: ${MINIO_SK}
+  bucket: ${MINIO_BUCKET:sciz-files}
+
+# Dify：生产密钥请使用环境变量/密钥管理注入
+dify: # Dify 生产环境配置
+  api:
+    base-url: https://api.dify.ai/v1 # Dify API 网关
+    api-key: ${DIFY_API_KEY} # 生产密钥（请从环境注入）
+  http:
+    connect-timeout-ms: 3000 # 连接超时(ms)
+    read-timeout-ms: 60000 # 读超时(ms)
+
+# LLM：OpenAI 兼容，建议用环境变量提供密钥与模型
+llm: # LLM(OpenAI) 生产环境配置
+  openai:
+    api-key: ${LLM_API_KEY} # OpenAI API Key（环境注入）
+    base-url: ${LLM_BASE_URL:https://api.openai.com/v1} # OpenAI Base URL
+    model: ${LLM_MODEL:gpt-4o-mini} # 默认模型（可覆盖）
+    timeout-seconds: 60 # 接口超时(s)
+
+# Actuator（prod）：最小暴露，仅 health、info；健康详情不展示
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never

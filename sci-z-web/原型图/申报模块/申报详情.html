@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>申报详情 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.4.4/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.4.4"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .declaration-detail-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+      }
+
+      .page-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .back-button {
+        margin-right: 12px;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0;
+      }
+
+      .detail-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+        margin-bottom: 20px;
+      }
+
+      .card-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .info-item {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .info-label {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 4px;
+        font-weight: 500;
+      }
+
+      .info-value {
+        font-size: 16px;
+        color: #374151;
+        font-weight: 500;
+      }
+
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .status-submitting {
+        background-color: #fef3c7;
+        color: #f59e0b;
+      }
+
+      .status-success {
+        background-color: #dcfce7;
+        color: #16a34a;
+      }
+
+      .status-failed {
+        background-color: #fee2e2;
+        color: #dc2626;
+      }
+
+      .field-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .field-tag {
+        background: #e0e7ff;
+        color: #1e3a8a;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .research-direction {
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 16px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #374151;
+        white-space: pre-wrap;
+      }
+
+      /* 工作流状态样式 */
+      .workflow-container {
+        margin-top: 16px;
+      }
+
+      .workflow-status {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+      }
+
+      .workflow-icon {
+        font-size: 20px;
+      }
+
+      .workflow-info {
+        flex: 1;
+      }
+
+      .workflow-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 4px;
+      }
+
+      .workflow-description {
+        font-size: 14px;
+        color: #6b7280;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 6px;
+        background: #e5e7eb;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 8px;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #1e3a8a, #0ea5e9);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
+
+      .workflow-timeline {
+        margin-top: 16px;
+      }
+
+      .timeline-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 8px 0;
+        position: relative;
+      }
+
+      .timeline-item:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        left: 8px;
+        top: 32px;
+        bottom: -8px;
+        width: 2px;
+        background: #e5e7eb;
+      }
+
+      .timeline-icon {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: #ffffff;
+        z-index: 1;
+        position: relative;
+      }
+
+      .timeline-icon.pending {
+        background: #e5e7eb;
+        color: #6b7280;
+      }
+
+      .timeline-icon.processing {
+        background: #f59e0b;
+        animation: pulse 2s infinite;
+      }
+
+      .timeline-icon.completed {
+        background: #16a34a;
+      }
+
+      .timeline-icon.failed {
+        background: #dc2626;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .timeline-content {
+        flex: 1;
+      }
+
+      .timeline-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 2px;
+      }
+
+      .timeline-time {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      /* 结果展示样式 */
+      .result-container {
+        margin-top: 16px;
+      }
+
+      .result-success {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 6px;
+        padding: 16px;
+      }
+
+      .result-failed {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 6px;
+        padding: 16px;
+      }
+
+      .result-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .result-success .result-title {
+        color: #16a34a;
+      }
+
+      .result-failed .result-title {
+        color: #dc2626;
+      }
+
+      .result-content {
+        font-size: 14px;
+        color: #374151;
+        line-height: 1.6;
+      }
+
+      .project-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: #1e3a8a;
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      .project-link:hover {
+        text-decoration: underline;
+      }
+
+      /* 操作按钮样式 */
+      .action-buttons {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      .action-buttons .el-button {
+        padding: 10px 20px;
+      }
+
+      /* 错误信息样式 */
+      .error-details {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 8px;
+        font-family: monospace;
+        font-size: 12px;
+        color: #dc2626;
+        white-space: pre-wrap;
+      }
+
+      /* 响应式设计 */
+      @media (max-width: 768px) {
+        .info-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .action-buttons {
+          flex-direction: column;
+        }
+      }
+
+      /* 自定义弹窗样式 */
+      .el-message-box {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-message-box__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #1f2937 !important;
+        line-height: 1.5 !important;
+      }
+
+      .el-message-box__headerbtn {
+        top: 16px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-message-box__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-message-box__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__content {
+        padding: 20px 24px !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__message {
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: #374151 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .el-message-box__btns {
+        padding: 16px 24px 20px 24px !important;
+        background: #ffffff !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 12px !important;
+      }
+
+      .el-message-box__btns .el-button {
+        padding: 8px 20px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        border: 1px solid !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .el-message-box__btns .el-button--default {
+        background: #ffffff !important;
+        border-color: #d1d5db !important;
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__btns .el-button--default:hover {
+        background: #f9fafb !important;
+        border-color: #9ca3af !important;
+        color: #374151 !important;
+      }
+
+      .el-message-box__btns .el-button--primary {
+        background: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+        color: #ffffff !important;
+      }
+
+      .el-message-box__btns .el-button--primary:hover {
+        background: #1e40af !important;
+        border-color: #1e40af !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+      }
+
+      .el-message-box__btns .el-button--primary:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+      }
+
+      /* 警告类型弹窗的特殊样式 */
+      .el-message-box--warning .el-message-box__content {
+        position: relative;
+      }
+
+      .el-message-box--warning .el-message-box__message::before {
+        content: "⚠️";
+        font-size: 18px !important;
+        margin-right: 8px !important;
+        vertical-align: -0.15em !important;
+        display: inline-block !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="declaration-detail-container">
+        <!-- 页面标题和返回按钮 -->
+        <div class="page-header">
+          <el-button class="back-button" @click="handleBack" :icon="ArrowLeft">
+            返回列表
+          </el-button>
+          <h1 class="page-title">申报详情</h1>
+        </div>
+
+        <!-- 基本信息 -->
+        <div class="detail-card">
+          <div class="card-title">基本信息</div>
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="info-label">申报编号</div>
+              <div class="info-value">{{ declaration.number }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">申报人</div>
+              <div class="info-value">{{ declaration.applicant }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">课题发布部门</div>
+              <div class="info-value">{{ declaration.department }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">项目负责人</div>
+              <div class="info-value">{{ declaration.projectLeader }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">红头文件发布时间</div>
+              <div class="info-value">
+                {{ formatDate(declaration.documentPublishTime) }}
+              </div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">项目开始时间</div>
+              <div class="info-value">
+                {{ formatDate(declaration.projectStartTime) }}
+              </div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">项目结束时间</div>
+              <div class="info-value">
+                {{ formatDate(declaration.projectEndTime) }}
+              </div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">申报时间</div>
+              <div class="info-value">{{ declaration.submitTime }}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">当前状态</div>
+              <div class="info-value">
+                <span
+                  class="status-badge"
+                  :class="`status-${declaration.statusType}`"
+                >
+                  {{ declaration.status }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 研究信息 -->
+        <div class="detail-card">
+          <div class="card-title">研究信息</div>
+          <div class="info-item" style="margin-bottom: 16px">
+            <div class="info-label">研究方向</div>
+            <div class="research-direction">{{ declaration.direction }}</div>
+          </div>
+          <div class="info-item" style="margin-bottom: 16px">
+            <div class="info-label">研究课题</div>
+            <div class="research-direction">{{ declaration.topic }}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">研究领域</div>
+            <div class="field-tags">
+              <span
+                v-for="field in declaration.fields"
+                :key="field"
+                class="field-tag"
+              >
+                {{ field }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 工作流状态 -->
+        <div class="detail-card">
+          <div class="card-title">处理状态</div>
+          <div class="workflow-container">
+            <div class="workflow-status">
+              <div class="workflow-icon" :class="workflowStatus.type">
+                {{ workflowStatus.icon }}
+              </div>
+              <div class="workflow-info">
+                <div class="workflow-title">{{ workflowStatus.title }}</div>
+                <div class="workflow-description">
+                  {{ workflowStatus.description }}
+                </div>
+                <div v-if="workflowStatus.showProgress" class="progress-bar">
+                  <div
+                    class="progress-fill"
+                    :style="{ width: workflowStatus.progress + '%' }"
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 时间线 -->
+            <div v-if="workflowTimeline.length > 0" class="workflow-timeline">
+              <div
+                v-for="item in workflowTimeline"
+                :key="item.id"
+                class="timeline-item"
+              >
+                <div class="timeline-icon" :class="item.status">
+                  {{ item.icon }}
+                </div>
+                <div class="timeline-content">
+                  <div class="timeline-title">{{ item.title }}</div>
+                  <div class="timeline-time">{{ item.time }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 结果展示 -->
+            <div v-if="workflowResult" class="result-container">
+              <div
+                class="result-success"
+                v-if="declaration.statusType === 'success'"
+              >
+                <div class="result-title">
+                  <el-icon><Check /></el-icon>
+                  申报处理成功
+                </div>
+                <div class="result-content">
+                  <p>
+                    <strong>项目 ID:</strong> {{ workflowResult.projectId }}
+                  </p>
+                  <p>
+                    <strong>项目名称:</strong> {{ workflowResult.projectName }}
+                  </p>
+                  <p>
+                    <strong>项目描述:</strong> {{
+                    workflowResult.projectDescription }}
+                  </p>
+                  <p>
+                    <a class="project-link" href="#" @click="handleViewProject">
+                      <el-icon><View /></el-icon>
+                      查看项目详情
+                    </a>
+                  </p>
+                </div>
+              </div>
+
+              <div
+                class="result-failed"
+                v-else-if="declaration.statusType === 'failed'"
+              >
+                <div class="result-title">
+                  <el-icon><Close /></el-icon>
+                  申报处理失败
+                </div>
+                <div class="result-content">
+                  <p>
+                    <strong>失败原因:</strong> {{ workflowResult.errorMessage }}
+                  </p>
+                  <p>
+                    <strong>建议操作:</strong> {{ workflowResult.suggestion }}
+                  </p>
+                  <div v-if="workflowResult.errorDetails" class="error-details">
+                    {{ workflowResult.errorDetails }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <!-- <div class="detail-card">
+          <div class="action-buttons">
+            <el-button
+              v-if="declaration.statusType === 'failed'"
+              type="info"
+              @click="handleRedeclare"
+            >
+              <el-icon><Refresh /></el-icon>
+              重新申报
+            </el-button>
+            <el-button
+              v-if="declaration.statusType === 'success'"
+              type="primary"
+              @click="handleViewProject"
+            >
+              <el-icon><View /></el-icon>
+              查看项目
+            </el-button>
+          </div>
+        </div> -->
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, computed, onMounted } = Vue;
+      const { ElMessage, ElMessageBox } = ElementPlus;
+
+      createApp({
+        setup() {
+          // 申报数据
+          const declaration = ref({
+            id: 1,
+            number: "SB2024001",
+            applicant: "张教授",
+            department: "科委", // 课题发布部门
+            projectLeader: "张教授", // 项目负责人
+            documentPublishTime: "2024-01-10", // 红头文件发布时间
+            projectStartTime: "2024-02-01", // 项目开始时间
+            projectEndTime: "2024-12-31", // 项目结束时间
+            direction:
+              "基于深度学习的智能制造关键技术研究，重点围绕工业互联网、智能传感器、机器视觉等核心技术，推动制造业数字化转型升级。通过构建智能制造平台，实现生产过程的智能化监控、预测性维护和质量优化控制。",
+            topic: "面向智能制造的多模态数据融合与决策优化技术研究", // 研究课题
+            fields: [
+              "人工智能",
+              "智能制造",
+              "机器学习",
+              "工业互联网",
+              "数据融合",
+            ],
+            submitTime: "2024-01-15",
+            status: "申报中",
+            statusType: "submitting",
+          });
+
+          // 工作流时间线
+          const workflowTimeline = ref([
+            {
+              id: 1,
+              title: "申报提交",
+              time: "2024-01-15 14:30:25",
+              status: "completed",
+              icon: "✓",
+            },
+            {
+              id: 2,
+              title: "工作流启动",
+              time: "2024-01-15 14:30:28",
+              status: "completed",
+              icon: "✓",
+            },
+            {
+              id: 3,
+              title: "AI 内容分析",
+              time: "2024-01-15 14:31:15",
+              status: "completed",
+              icon: "✓",
+            },
+            {
+              id: 4,
+              title: "项目信息生成",
+              time: "2024-01-15 14:32:45",
+              status: "completed",
+              icon: "✓",
+            },
+            {
+              id: 5,
+              title: "数据库存储",
+              time: "2024-01-15 14:33:00",
+              status: "completed",
+              icon: "✓",
+            },
+            {
+              id: 6,
+              title: "申报书生成",
+              time: "2024-01-15 14:33:30",
+              status: "completed",
+              icon: "✓",
+            },
+          ]);
+
+          // 工作流结果
+          const workflowResult = ref(null);
+
+          // 工作流状态
+          const workflowStatus = computed(() => {
+            const status = declaration.value.statusType;
+
+            switch (status) {
+              case "submitting":
+                return {
+                  type: "processing",
+                  icon: "⏳",
+                  title: "处理中",
+                  description: "正在处理您的申报，请稍候...",
+                  showProgress: true,
+                  progress: 65,
+                };
+              case "success":
+                return {
+                  type: "completed",
+                  icon: "✓",
+                  title: "处理完成",
+                  description: "申报已成功处理，项目已创建",
+                  showProgress: false,
+                  progress: 100,
+                };
+              case "failed":
+                return {
+                  type: "failed",
+                  icon: "✗",
+                  title: "处理失败",
+                  description: "申报处理过程中出现错误",
+                  showProgress: false,
+                  progress: 0,
+                };
+              default:
+                return {
+                  type: "pending",
+                  icon: "?",
+                  title: "未知状态",
+                  description: "状态信息异常",
+                  showProgress: false,
+                  progress: 0,
+                };
+            }
+          });
+
+          // 加载申报详情
+          const loadDeclarationDetail = async () => {
+            try {
+              // 模拟API调用
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
+              // 模拟成功结果
+              if (declaration.value.statusType === "success") {
+                workflowResult.value = {
+                  projectId: "PRJ_20240115_001",
+                  projectName: "AI教育应用研究项目",
+                  projectDescription:
+                    "基于人工智能技术的个性化教育系统研发项目，专注于学生行为分析和智能推荐算法优化。",
+                };
+              }
+
+              // 模拟失败结果
+              if (declaration.value.statusType === "failed") {
+                workflowResult.value = {
+                  errorMessage: "AI内容分析阶段超时，无法完成项目信息生成",
+                  suggestion:
+                    "请检查研究方向描述是否过于复杂，建议简化后重新申报",
+                  errorDetails:
+                    "Error: AI Analysis Timeout\nCode: AI_TIMEOUT_001\nTime: 2024-01-15 14:32:45\nDetails: The AI model took longer than expected to process the research direction content. This may be due to the complexity or length of the input text.",
+                };
+              }
+            } catch (error) {
+              ElMessage.error("加载申报详情失败");
+            }
+          };
+
+          // 事件处理
+          const handleBack = () => {
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "declaration/list",
+                },
+                "*"
+              );
+            } else {
+              window.location.href = "申报列表.html";
+            }
+          };
+
+          const handleRedeclare = () => {
+            ElMessage.info("跳转到重新申报页面");
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "declaration/create",
+                },
+                "*"
+              );
+            } else {
+              window.location.href = "新建申报.html";
+            }
+          };
+
+          const handleViewProject = () => {
+            ElMessage.info("跳转到项目详情页面");
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "project/detail",
+                },
+                "*"
+              );
+            } else {
+              window.location.href = "../项目模块/项目详情.html";
+            }
+          };
+
+          // 日期格式化函数
+          const formatDate = (dateString) => {
+            if (!dateString) return "";
+            // 直接返回 YYYY-MM-DD 格式，与申报时间保持一致
+            return dateString;
+          };
+
+          // 组件挂载时加载数据
+          onMounted(() => {
+            loadDeclarationDetail();
+          });
+
+          return {
+            declaration,
+            workflowTimeline,
+            workflowResult,
+            workflowStatus,
+            formatDate,
+            handleBack,
+            handleRedeclare,
+            handleViewProject,
+          };
+        },
+      })
+        .use(ElementPlus)
+        .mount("#app");
+    </script>
+  </body>
+</html>

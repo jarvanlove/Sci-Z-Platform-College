@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>用户管理 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.3.14/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3.2.47/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.3.14"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.iife.js"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .user-management-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+      }
+
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0;
+      }
+
+      .content-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+      }
+
+      /* 筛选区域 */
+      .filter-section {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      /* 角色和状态标签 */
+      .role-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .role-admin {
+        background: #fee2e2;
+        color: #dc2626;
+      }
+
+      .role-teacher {
+        background: #dbeafe;
+        color: #1e3a8a;
+      }
+
+      .role-student {
+        background: #dbeafe;
+        color: #2563eb;
+      }
+
+      .status-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .status-normal {
+        background: #dcfce7;
+        color: #16a34a;
+      }
+
+      .status-disabled {
+        background: #fee2e2;
+        color: #dc2626;
+      }
+
+      /* Loading 样式 */
+      .loading-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        color: #6b7280;
+        font-size: 14px;
+        gap: 12px;
+      }
+
+      .loading-container .el-icon {
+        font-size: 24px;
+      }
+
+      /* 表格样式 */
+      .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        margin-top: 20px;
+      }
+
+      .native-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #ffffff;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .native-table thead {
+        background: #f8fafc;
+      }
+
+      .native-table th {
+        padding: 14px 16px;
+        text-align: left;
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 2px solid #e5e7eb;
+        white-space: nowrap;
+      }
+
+      .native-table tbody tr {
+        transition: background-color 0.2s;
+      }
+
+      .native-table tbody tr:nth-child(even) {
+        background: #f9fafb;
+      }
+
+      .native-table tbody tr:hover {
+        background: #f0f9ff;
+      }
+
+      .native-table td {
+        padding: 12px 16px;
+        font-size: 14px;
+        color: #4b5563;
+        border-bottom: 1px solid #e5e7eb;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .native-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      /* 操作按钮 */
+      .action-btns {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .action-btn {
+        padding: 5px 12px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: none;
+        white-space: nowrap;
+      }
+
+      .btn-primary {
+        color: #1e3a8a;
+        border-color: #1e3a8a;
+      }
+
+      .btn-primary:hover {
+        background: #1e3a8a;
+        color: #ffffff;
+      }
+
+      .btn-warning {
+        color: #f59e0b;
+        border-color: #f59e0b;
+      }
+
+      .btn-warning:hover {
+        background: #f59e0b;
+        color: #ffffff;
+      }
+
+      .btn-info {
+        color: #6b7280;
+        border-color: #6b7280;
+      }
+
+      .btn-info:hover {
+        background: #6b7280;
+        color: #ffffff;
+      }
+
+      .btn-success {
+        color: #16a34a;
+        border-color: #16a34a;
+      }
+
+      .btn-success:hover {
+        background: #16a34a;
+        color: #ffffff;
+      }
+
+      .btn-danger {
+        color: #dc2626;
+        border-color: #dc2626;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+        color: #ffffff;
+      }
+
+      /* 统一弹窗样式 - 圆角设计 */
+      .el-dialog {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-dialog__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-dialog__title {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #1e3a8a !important;
+      }
+
+      .el-dialog__headerbtn {
+        top: 20px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-dialog__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-dialog__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-dialog__body {
+        padding: 20px 24px !important;
+      }
+
+      .el-dialog__footer {
+        padding: 16px 24px 20px 24px !important;
+        border-top: 1px solid #f0f0f0 !important;
+      }
+
+      /* 统一 MessageBox 样式 */
+      .el-message-box {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-message-box__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #1e3a8a !important;
+        line-height: 1.5 !important;
+      }
+
+      .el-message-box__headerbtn {
+        top: 16px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-message-box__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-message-box__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__content {
+        padding: 20px 24px !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__message {
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: #374151 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .el-message-box__btns {
+        padding: 16px 24px 20px 24px !important;
+        background: #ffffff !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 12px !important;
+      }
+
+      /* 现代化按钮样式 */
+      .el-message-box__btns .el-button,
+      .el-dialog__footer .el-button {
+        padding: 8px 20px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        border: 1px solid !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .el-message-box__btns .el-button--default,
+      .el-dialog__footer .el-button--default {
+        background: #ffffff !important;
+        border-color: #d1d5db !important;
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__btns .el-button--default:hover,
+      .el-dialog__footer .el-button--default:hover {
+        background: #f9fafb !important;
+        border-color: #9ca3af !important;
+        color: #374151 !important;
+      }
+
+      .el-message-box__btns .el-button--primary,
+      .el-dialog__footer .el-button--primary {
+        background: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+        color: #ffffff !important;
+      }
+
+      .el-message-box__btns .el-button--primary:hover,
+      .el-dialog__footer .el-button--primary:hover {
+        background: #1e40af !important;
+        border-color: #1e40af !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+      }
+
+      .el-message-box__btns .el-button--primary:active,
+      .el-dialog__footer .el-button--primary:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+      }
+
+      /* 警告类型弹窗的特殊样式 */
+      .el-message-box--warning .el-message-box__content {
+        position: relative;
+      }
+
+      .el-message-box--warning .el-message-box__message::before {
+        content: "⚠️";
+        font-size: 18px !important;
+        margin-right: 8px !important;
+        vertical-align: -0.15em !important;
+        display: inline-block !important;
+      }
+
+      /* 表单样式 */
+      .user-form .el-form-item {
+        margin-bottom: 20px;
+      }
+
+      .user-form .el-form-item__label {
+        font-weight: 500;
+        color: #374151;
+      }
+
+      /* 角色单选框选中颜色 */
+      .user-form .el-radio__input.is-checked .el-radio__inner {
+        background-color: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+      }
+
+      .user-form .el-radio__input.is-checked + .el-radio__label {
+        color: #1e3a8a !important;
+      }
+
+      .form-section-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 20px 0 16px 0;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .form-section-title:first-child {
+        margin-top: 0;
+      }
+
+      /* 分页容器 */
+      .pagination-wrapper {
+        margin-top: 20px;
+        display: flex;
+        justify-content: flex-end;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="user-management-container">
+        <!-- 页面头部 -->
+        <div class="page-header">
+          <h1 class="page-title">用户管理</h1>
+          <el-button type="primary" @click="handleAdd">
+            <!-- <el-icon><Plus /></el-icon> -->
+            新建用户
+          </el-button>
+        </div>
+
+        <!-- 内容卡片 -->
+        <div class="content-card">
+          <!-- 筛选区域 -->
+          <div class="filter-section">
+            <el-input
+              v-model="searchForm.keyword"
+              :placeholder="`请输入用户名、姓名或${industryConfig.employeeIdLabel}`"
+              clearable
+              style="width: 300px"
+              @clear="handleSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span style="color: #6b7280; font-size: 14px; white-space: nowrap"
+                >角色</span
+              >
+              <el-select
+                v-model="searchForm.role"
+                placeholder="全部"
+                style="width: 150px"
+                @change="handleRoleChange"
+              >
+                <el-option label="全部" value="all"></el-option>
+                <el-option label="管理员" value="admin"></el-option>
+                <el-option label="教师" value="teacher"></el-option>
+                <el-option label="学生" value="student"></el-option>
+              </el-select>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span style="color: #6b7280; font-size: 14px; white-space: nowrap"
+                >状态</span
+              >
+              <el-select
+                v-model="searchForm.status"
+                placeholder="全部"
+                style="width: 150px"
+                @change="handleStatusChange"
+              >
+                <el-option label="全部" value="all"></el-option>
+                <el-option label="正常" value="normal"></el-option>
+                <el-option label="禁用" value="disabled"></el-option>
+              </el-select>
+            </div>
+
+            <el-button type="primary" @click="handleSearch"> 搜索 </el-button>
+
+            <el-button @click="handleReset"> 重置 </el-button>
+          </div>
+
+          <!-- 用户列表表格 -->
+          <div v-if="loading" class="loading-container">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>加载中...</span>
+          </div>
+
+          <!-- 原生HTML表格 -->
+          <div v-else class="table-wrapper">
+            <table class="native-table">
+              <thead>
+                <tr>
+                  <th style="width: 120px">用户名</th>
+                  <th style="width: 100px">真实姓名</th>
+                  <th style="width: 120px">
+                    {{ industryConfig.employeeIdLabel }}
+                  </th>
+                  <th style="width: 200px">邮箱</th>
+                  <th style="width: 150px">
+                    {{ industryConfig.departmentLabel }}
+                  </th>
+                  <th style="width: 120px">{{ industryConfig.roleLabel }}</th>
+                  <th style="width: 100px">状态</th>
+                  <th style="width: 280px">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="user in filteredUsers" :key="user.id">
+                  <td>{{ user.username }}</td>
+                  <td>{{ user.realName }}</td>
+                  <td>{{ user.employeeId }}</td>
+                  <td :title="user.email">{{ user.email }}</td>
+                  <td>{{ user.department }}</td>
+                  <td>
+                    <span class="role-tag" :class="getRoleClass(user.role)">
+                      {{ getRoleText(user.role) }}
+                    </span>
+                  </td>
+                  <td>
+                    <span
+                      class="status-tag"
+                      :class="getStatusClass(user.status)"
+                    >
+                      {{ getStatusText(user.status) }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="action-btns">
+                      <button
+                        class="action-btn btn-primary"
+                        @click="handleEdit(user)"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        class="action-btn btn-warning"
+                        @click="handleResetPassword(user)"
+                      >
+                        重置密码
+                      </button>
+                      <button
+                        :class="['action-btn', user.status === 'normal' ? 'btn-info' : 'btn-success']"
+                        @click="handleToggleStatus(user)"
+                      >
+                        {{ user.status === "normal" ? "禁用" : "启用" }}
+                      </button>
+                      <button
+                        class="action-btn btn-danger"
+                        @click="handleDelete(user)"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页 -->
+          <div v-if="users.length > 0" class="pagination-container">
+            <!-- 通用分页组件 -->
+            <div id="pagination-component"></div>
+          </div>
+        </div>
+
+        <!-- 新建/编辑用户对话框 -->
+        <el-dialog
+          v-model="showUserDialog"
+          :title="editMode ? '编辑用户' : '新建用户'"
+          width="600px"
+          @close="handleDialogClose"
+        >
+          <el-form
+            :model="userForm"
+            :rules="userRules"
+            ref="userFormRef"
+            label-width="100px"
+            class="user-form"
+          >
+            <div class="form-section-title">基本信息</div>
+
+            <el-form-item label="用户名" prop="username">
+              <el-input
+                v-model="userForm.username"
+                placeholder="请输入用户名"
+                :disabled="editMode"
+              />
+            </el-form-item>
+
+            <el-form-item label="真实姓名" prop="realName">
+              <el-input
+                v-model="userForm.realName"
+                placeholder="请输入真实姓名"
+              />
+            </el-form-item>
+
+            <el-form-item
+              :label="industryConfig.employeeIdLabel"
+              prop="employeeId"
+            >
+              <el-input
+                v-model="userForm.employeeId"
+                :placeholder="`请输入${industryConfig.employeeIdLabel}`"
+              />
+            </el-form-item>
+
+            <el-form-item label="邮箱" prop="email">
+              <el-input
+                v-model="userForm.email"
+                placeholder="请输入邮箱"
+                type="email"
+              />
+            </el-form-item>
+
+            <el-form-item label="手机号" prop="phone">
+              <el-input
+                v-model="userForm.phone"
+                placeholder="请输入手机号"
+                maxlength="11"
+              />
+            </el-form-item>
+
+            <el-form-item
+              :label="industryConfig.departmentLabel"
+              prop="department"
+            >
+              <el-select
+                v-model="userForm.department"
+                :placeholder="`请选择${industryConfig.departmentLabel}`"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="dept in departments"
+                  :key="dept.value"
+                  :label="dept.label"
+                  :value="dept.value"
+                />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item :label="industryConfig.roleLabel" prop="role">
+              <el-radio-group v-model="userForm.role">
+                <el-radio
+                  v-for="role in roles"
+                  :key="role.value"
+                  :label="role.value"
+                  >{{ role.label }}</el-radio
+                >
+              </el-radio-group>
+            </el-form-item>
+
+            <div class="form-section-title" v-if="!editMode">密码设置</div>
+
+            <el-form-item label="初始密码" prop="password" v-if="!editMode">
+              <el-input
+                v-model="userForm.password"
+                type="password"
+                placeholder="请输入初始密码"
+                show-password
+              />
+            </el-form-item>
+
+            <el-form-item
+              label="确认密码"
+              prop="confirmPassword"
+              v-if="!editMode"
+            >
+              <el-input
+                v-model="userForm.confirmPassword"
+                type="password"
+                placeholder="请再次输入密码"
+                show-password
+              />
+            </el-form-item>
+          </el-form>
+
+          <template #footer>
+            <el-button @click="showUserDialog = false">取消</el-button>
+            <el-button type="primary" @click="handleSubmit" :loading="saving">
+              确定
+            </el-button>
+          </template>
+        </el-dialog>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, computed, onMounted } = Vue;
+      const { ElMessage, ElMessageBox } = ElementPlus;
+      const { Plus, Search } = ElementPlusIconsVue;
+
+      const app = createApp({
+        components: {
+          Plus,
+          Search,
+        },
+        setup() {
+          const userFormRef = ref();
+          const loading = ref(false);
+          const saving = ref(false);
+          const showUserDialog = ref(false);
+          const editMode = ref(false);
+
+          // 行业配置
+          const industryConfig = ref({
+            industryType: "education",
+            industryName: "教育行业",
+            departmentLabel: "所属院系",
+            roleLabel: "角色",
+            employeeIdLabel: "学工号",
+          });
+
+          // 搜索表单
+          const searchForm = reactive({
+            keyword: "",
+            role: "all",
+            status: "all",
+          });
+
+          // 分页
+          const pagination = reactive({
+            current: 1,
+            size: 10,
+            total: 0,
+          });
+
+          // 部门列表 - 动态加载
+          const departments = ref([]);
+
+          // 角色列表 - 动态加载
+          const roles = ref([]);
+
+          // 加载行业配置
+          const loadIndustryConfig = async () => {
+            try {
+              const response = await fetch("/api/industry-config/current");
+              const data = await response.json();
+              industryConfig.value = data;
+            } catch (error) {
+              console.log("使用默认教育行业配置");
+            }
+          };
+
+          // 加载部门列表
+          const loadDepartments = async () => {
+            try {
+              const response = await fetch(
+                `/api/departments?industry=${industryConfig.value.industryType}`
+              );
+              const data = await response.json();
+              departments.value = data;
+            } catch (error) {
+              // 使用默认教育行业数据
+              departments.value = [
+                { label: "计算机科学学院", value: "computer" },
+                { label: "人工智能学院", value: "ai" },
+                { label: "软件学院", value: "software" },
+                { label: "信息工程学院", value: "information" },
+              ];
+            }
+          };
+
+          // 加载角色列表
+          const loadRoles = async () => {
+            try {
+              const response = await fetch(
+                `/api/roles?industry=${industryConfig.value.industryType}`
+              );
+              const data = await response.json();
+              roles.value = data;
+            } catch (error) {
+              // 使用默认教育行业数据
+              roles.value = [
+                { label: "管理员", value: "admin" },
+                { label: "教师", value: "teacher" },
+                { label: "学生", value: "student" },
+              ];
+            }
+          };
+
+          // 用户列表数据
+          const users = ref([
+            {
+              id: 1,
+              username: "admin",
+              realName: "管理员",
+              employeeId: "A001",
+              email: "admin@university.edu.cn",
+              phone: "13800138001",
+              department: "计算机科学学院",
+              role: "admin",
+              status: "normal",
+            },
+            {
+              id: 2,
+              username: "zhang_prof",
+              realName: "张教授",
+              employeeId: "T001",
+              email: "zhang.prof@university.edu.cn",
+              phone: "13800138002",
+              department: "人工智能学院",
+              role: "teacher",
+              status: "normal",
+            },
+            {
+              id: 3,
+              username: "li_student",
+              realName: "李同学",
+              employeeId: "S2021001",
+              email: "li.student@university.edu.cn",
+              phone: "13800138003",
+              department: "软件学院",
+              role: "student",
+              status: "normal",
+            },
+            {
+              id: 4,
+              username: "wang_prof",
+              realName: "王教授",
+              employeeId: "T002",
+              email: "wang.prof@university.edu.cn",
+              phone: "13800138004",
+              department: "计算机科学学院",
+              role: "teacher",
+              status: "disabled",
+            },
+            {
+              id: 5,
+              username: "zhao_student",
+              realName: "赵同学",
+              employeeId: "S2021002",
+              email: "zhao.student@university.edu.cn",
+              phone: "13800138005",
+              department: "信息工程学院",
+              role: "student",
+              status: "normal",
+            },
+          ]);
+
+          // 用户表单
+          const userForm = reactive({
+            id: null,
+            username: "",
+            realName: "",
+            employeeId: "",
+            email: "",
+            phone: "",
+            department: "",
+            role: "",
+            password: "",
+            confirmPassword: "",
+          });
+
+          // 表单验证规则
+          const userRules = {
+            username: [
+              { required: true, message: "请输入用户名", trigger: "blur" },
+            ],
+            realName: [
+              { required: true, message: "请输入真实姓名", trigger: "blur" },
+            ],
+            employeeId: [
+              {
+                required: true,
+                message: `请输入${industryConfig.value.employeeIdLabel}`,
+                trigger: "blur",
+              },
+            ],
+            email: [
+              { required: true, message: "请输入邮箱", trigger: "blur" },
+              {
+                type: "email",
+                message: "请输入正确的邮箱格式",
+                trigger: "blur",
+              },
+            ],
+            phone: [
+              { required: true, message: "请输入手机号", trigger: "blur" },
+              {
+                pattern: /^1[3-9]\d{9}$/,
+                message: "请输入正确的手机号格式",
+                trigger: "blur",
+              },
+            ],
+            department: [
+              {
+                required: true,
+                message: `请选择${industryConfig.value.departmentLabel}`,
+                trigger: "change",
+              },
+            ],
+            role: [
+              {
+                required: true,
+                message: `请选择${industryConfig.value.roleLabel}`,
+                trigger: "change",
+              },
+            ],
+            password: [
+              { required: true, message: "请输入初始密码", trigger: "blur" },
+              { min: 8, message: "密码长度至少为8位", trigger: "blur" },
+            ],
+            confirmPassword: [
+              { required: true, message: "请再次输入密码", trigger: "blur" },
+              {
+                validator: (rule, value, callback) => {
+                  if (value !== userForm.password) {
+                    callback(new Error("两次输入的密码不一致"));
+                  } else {
+                    callback();
+                  }
+                },
+                trigger: "blur",
+              },
+            ],
+          };
+
+          // 所有用户数据(包括筛选后的)
+          const allFilteredUsers = computed(() => {
+            let filtered = [...users.value];
+
+            // 关键词筛选
+            if (searchForm.keyword) {
+              const keyword = searchForm.keyword.toLowerCase();
+              filtered = filtered.filter(
+                (user) =>
+                  user.username.toLowerCase().includes(keyword) ||
+                  user.realName.toLowerCase().includes(keyword) ||
+                  user.employeeId.toLowerCase().includes(keyword)
+              );
+            }
+
+            // 角色筛选
+            if (searchForm.role && searchForm.role !== "all") {
+              filtered = filtered.filter(
+                (user) => user.role === searchForm.role
+              );
+            }
+
+            // 状态筛选
+            if (searchForm.status && searchForm.status !== "all") {
+              filtered = filtered.filter(
+                (user) => user.status === searchForm.status
+              );
+            }
+
+            pagination.total = filtered.length;
+            return filtered;
+          });
+
+          // 分页后的用户列表
+          const filteredUsers = computed(() => {
+            const start = (pagination.current - 1) * pagination.size;
+            const end = start + pagination.size;
+            return allFilteredUsers.value.slice(start, end);
+          });
+
+          // 获取角色样式类
+          const getRoleClass = (role) => {
+            return `role-${role}`;
+          };
+
+          // 获取角色文本
+          const getRoleText = (role) => {
+            const roleMap = {
+              admin: "管理员",
+              teacher: "教师",
+              student: "学生",
+            };
+            return roleMap[role] || role;
+          };
+
+          // 获取状态样式类
+          const getStatusClass = (status) => {
+            return `status-${status}`;
+          };
+
+          // 获取状态文本
+          const getStatusText = (status) => {
+            const statusMap = {
+              normal: "正常",
+              disabled: "禁用",
+            };
+            return statusMap[status] || status;
+          };
+
+          // 搜索
+          const handleSearch = () => {
+            pagination.current = 1;
+            ElMessage.success("搜索完成");
+            Vue.nextTick(() => {
+              initPagination();
+            });
+          };
+
+          // 重置
+          const handleReset = () => {
+            searchForm.keyword = "";
+            searchForm.role = "all";
+            searchForm.status = "all";
+            pagination.current = 1;
+            ElMessage.success("重置完成");
+            Vue.nextTick(() => {
+              initPagination();
+            });
+          };
+
+          // 角色变化
+          const handleRoleChange = () => {
+            pagination.current = 1;
+            Vue.nextTick(() => {
+              initPagination();
+            });
+          };
+
+          // 状态变化
+          const handleStatusChange = () => {
+            pagination.current = 1;
+            Vue.nextTick(() => {
+              initPagination();
+            });
+          };
+
+          // 新建用户
+          const handleAdd = () => {
+            editMode.value = false;
+            resetForm();
+            showUserDialog.value = true;
+          };
+
+          // 编辑用户
+          const handleEdit = (user) => {
+            editMode.value = true;
+            Object.assign(userForm, { ...user });
+            showUserDialog.value = true;
+          };
+
+          // 重置密码
+          const handleResetPassword = async (user) => {
+            try {
+              await ElMessageBox.confirm(
+                `确定要重置用户 "${user.realName}" 的密码吗？`,
+                "重置密码",
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+              ElMessage.success("密码重置成功");
+            } catch (error) {
+              // 用户取消
+            }
+          };
+
+          // 切换用户状态
+          const handleToggleStatus = async (user) => {
+            const action = user.status === "normal" ? "禁用" : "启用";
+            try {
+              await ElMessageBox.confirm(
+                `确定要${action}用户 "${user.realName}" 吗？`,
+                `${action}用户`,
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+              user.status = user.status === "normal" ? "disabled" : "normal";
+              ElMessage.success(`${action}成功`);
+            } catch (error) {
+              // 用户取消
+            }
+          };
+
+          // 删除用户
+          const handleDelete = async (user) => {
+            try {
+              await ElMessageBox.confirm(
+                `确定要删除用户 "${user.realName}" 吗？此操作不可恢复。`,
+                "删除用户",
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+              const index = users.value.findIndex((u) => u.id === user.id);
+              if (index > -1) {
+                users.value.splice(index, 1);
+              }
+              ElMessage.success("删除成功");
+            } catch (error) {
+              // 用户取消
+            }
+          };
+
+          // 提交表单
+          const handleSubmit = async () => {
+            try {
+              await userFormRef.value.validate();
+              saving.value = true;
+
+              // 模拟保存
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
+              if (editMode.value) {
+                // 编辑模式
+                const index = users.value.findIndex(
+                  (u) => u.id === userForm.id
+                );
+                if (index > -1) {
+                  Object.assign(users.value[index], { ...userForm });
+                }
+                ElMessage.success("用户信息更新成功");
+              } else {
+                // 新建模式
+                users.value.push({
+                  ...userForm,
+                  id: Date.now(),
+                  status: "normal",
+                });
+                ElMessage.success("用户创建成功");
+              }
+
+              saving.value = false;
+              showUserDialog.value = false;
+            } catch (error) {
+              saving.value = false;
+              if (error !== "cancel") {
+                ElMessage.error("请完善表单信息");
+              }
+            }
+          };
+
+          // 重置表单
+          const resetForm = () => {
+            Object.assign(userForm, {
+              id: null,
+              username: "",
+              realName: "",
+              employeeId: "",
+              email: "",
+              phone: "",
+              department: "",
+              role: "",
+              password: "",
+              confirmPassword: "",
+            });
+            if (userFormRef.value) {
+              userFormRef.value.resetFields();
+            }
+          };
+
+          // 对话框关闭
+          const handleDialogClose = () => {
+            resetForm();
+          };
+
+          // 初始化分页组件
+          const initPagination = () => {
+            const paginationContainer = document.getElementById(
+              "pagination-component"
+            );
+            if (paginationContainer) {
+              // 创建分页组件HTML
+              const paginationHTML = `
+                <div class="pagination-container">
+                  <!-- 分页信息 -->
+                  <div class="pagination-info">
+                    共 ${pagination.total} 条记录
+                  </div>
+
+                  <!-- 每页显示数量选择器 -->
+                  <div class="page-size-selector">
+                    每页显示
+                    <select id="page-size-select">
+                      <option value="10" ${
+                        pagination.size === 10 ? "selected" : ""
+                      }>10 条</option>
+                      <option value="20" ${
+                        pagination.size === 20 ? "selected" : ""
+                      }>20 条</option>
+                      <option value="50" ${
+                        pagination.size === 50 ? "selected" : ""
+                      }>50 条</option>
+                    </select>
+                  </div>
+
+                  <!-- 分页控制器 -->
+                  <div class="pagination-controls">
+                    <!-- 上一页按钮 -->
+                    <a href="javascript:void(0)" class="page-btn ${
+                      pagination.current === 1 ? "disabled" : ""
+                    }" id="prev-btn">
+                      上一页
+                    </a>
+
+                    <!-- 页码按钮 -->
+                    <div class="page-nav" id="page-nav">
+                      ${generatePageButtons()}
+                    </div>
+
+                    <!-- 下一页按钮 -->
+                    <a href="javascript:void(0)" class="page-btn ${
+                      pagination.current ===
+                      Math.ceil(pagination.total / pagination.size)
+                        ? "disabled"
+                        : ""
+                    }" id="next-btn">
+                      下一页
+                    </a>
+                  </div>
+
+                  <!-- 快速跳转 -->
+                  <div class="page-jumper">
+                    跳至
+                    <input type="number" id="jump-input" value="${
+                      pagination.current
+                    }" min="1" max="${Math.ceil(
+                pagination.total / pagination.size
+              )}">
+                    页
+                    <button class="jump-btn" id="jump-btn">确定</button>
+                  </div>
+                </div>
+              `;
+
+              paginationContainer.innerHTML = paginationHTML;
+
+              // 绑定事件
+              bindPaginationEvents();
+            }
+          };
+
+          // 生成页码按钮
+          const generatePageButtons = () => {
+            const totalPages = Math.ceil(pagination.total / pagination.size);
+            const current = pagination.current;
+            const pagerCount = 7; // 显示的页码数量
+
+            let buttons = "";
+
+            if (totalPages <= pagerCount) {
+              // 总页数小于等于显示数量，显示所有页码
+              for (let i = 1; i <= totalPages; i++) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  i === current ? "active" : ""
+                }" data-page="${i}">${i}</a>`;
+              }
+            } else {
+              // 计算中间页码范围
+              const half = Math.floor(pagerCount / 2);
+              let start = Math.max(1, current - half);
+              let end = Math.min(totalPages, start + pagerCount - 1);
+
+              // 调整起始位置
+              if (end - start + 1 < pagerCount) {
+                start = Math.max(1, end - pagerCount + 1);
+              }
+
+              // 第一页
+              if (start > 1) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  1 === current ? "active" : ""
+                }" data-page="1">1</a>`;
+                if (start > 2) {
+                  buttons += '<span class="page-ellipsis">...</span>';
+                }
+              }
+
+              // 中间页码
+              for (let i = start; i <= end; i++) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  i === current ? "active" : ""
+                }" data-page="${i}">${i}</a>`;
+              }
+
+              // 最后一页
+              if (end < totalPages) {
+                if (end < totalPages - 1) {
+                  buttons += '<span class="page-ellipsis">...</span>';
+                }
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  totalPages === current ? "active" : ""
+                }" data-page="${totalPages}">${totalPages}</a>`;
+              }
+            }
+
+            return buttons;
+          };
+
+          // 绑定分页事件
+          const bindPaginationEvents = () => {
+            // 每页显示数量变化
+            const pageSizeSelect = document.getElementById("page-size-select");
+            if (pageSizeSelect) {
+              pageSizeSelect.addEventListener("change", (e) => {
+                pagination.size = parseInt(e.target.value);
+                pagination.current = 1;
+                initPagination();
+              });
+            }
+
+            // 上一页
+            const prevBtn = document.getElementById("prev-btn");
+            if (prevBtn) {
+              prevBtn.addEventListener("click", () => {
+                if (pagination.current > 1) {
+                  pagination.current--;
+                  initPagination();
+                }
+              });
+            }
+
+            // 下一页
+            const nextBtn = document.getElementById("next-btn");
+            if (nextBtn) {
+              nextBtn.addEventListener("click", () => {
+                const totalPages = Math.ceil(
+                  pagination.total / pagination.size
+                );
+                if (pagination.current < totalPages) {
+                  pagination.current++;
+                  initPagination();
+                }
+              });
+            }
+
+            // 页码点击
+            const pageNav = document.getElementById("page-nav");
+            if (pageNav) {
+              pageNav.addEventListener("click", (e) => {
+                if (
+                  e.target.classList.contains("page-btn") &&
+                  !e.target.classList.contains("active")
+                ) {
+                  const page = parseInt(e.target.getAttribute("data-page"));
+                  if (page && page !== pagination.current) {
+                    pagination.current = page;
+                    initPagination();
+                  }
+                }
+              });
+            }
+
+            // 快速跳转
+            const jumpBtn = document.getElementById("jump-btn");
+            const jumpInput = document.getElementById("jump-input");
+            if (jumpBtn && jumpInput) {
+              const handleJump = () => {
+                const page = parseInt(jumpInput.value);
+                const totalPages = Math.ceil(
+                  pagination.total / pagination.size
+                );
+                if (
+                  page &&
+                  page >= 1 &&
+                  page <= totalPages &&
+                  page !== pagination.current
+                ) {
+                  pagination.current = page;
+                  initPagination();
+                } else {
+                  jumpInput.value = pagination.current;
+                }
+              };
+
+              jumpBtn.addEventListener("click", handleJump);
+              jumpInput.addEventListener("keyup", (e) => {
+                if (e.key === "Enter") {
+                  handleJump();
+                }
+              });
+            }
+          };
+
+          onMounted(async () => {
+            // 加载行业配置
+            await loadIndustryConfig();
+            // 加载部门列表
+            await loadDepartments();
+            // 加载角色列表
+            await loadRoles();
+
+            pagination.total = users.value.length;
+            setTimeout(() => {
+              initPagination();
+            }, 100);
+          });
+
+          return {
+            userFormRef,
+            loading,
+            saving,
+            showUserDialog,
+            editMode,
+            industryConfig,
+            departments,
+            roles,
+            searchForm,
+            pagination,
+            users,
+            userForm,
+            userRules,
+            filteredUsers,
+            getRoleClass,
+            getRoleText,
+            getStatusClass,
+            getStatusText,
+            handleSearch,
+            handleReset,
+            handleRoleChange,
+            handleStatusChange,
+            handleAdd,
+            handleEdit,
+            handleResetPassword,
+            handleToggleStatus,
+            handleDelete,
+            handleSubmit,
+            handleDialogClose,
+            loadIndustryConfig,
+            loadDepartments,
+            loadRoles,
+          };
+        },
+      });
+
+      // 注册 Element Plus Icons
+      for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+        app.component(key, component);
+      }
+
+      // 配置 Element Plus 中文
+      app.use(ElementPlus, {
+        locale: {
+          name: "zh-cn",
+          el: {
+            datepicker: {
+              now: "此刻",
+              today: "今天",
+              cancel: "取消",
+              clear: "清空",
+              confirm: "确认",
+            },
+          },
+        },
+      });
+
+      app.mount("#app");
+    </script>
+  </body>
+</html>

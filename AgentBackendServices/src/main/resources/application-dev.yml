@@ -1,0 +1,131 @@
+# 开发环境配置
+spring:
+  # 数据源配置
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sci_z_platform_dev
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  # Redis 配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      database: 0
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 0
+
+  # RabbitMQ 配置
+  rabbitmq:
+    host: 192.168.1.203
+    port: 5672
+    username: admin
+    password: admin
+    virtual-host: /
+    connection-timeout: 15000
+    listener:
+      simple:
+        acknowledge-mode: manual
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000
+
+  # 开发工具配置
+  devtools:
+    restart:
+      enabled: true
+      additional-paths: src/main/java
+    livereload:
+      enabled: true
+      port: 35729
+
+# MyBatis Plus 配置
+mybatis-plus:
+  # 配置扫描通用枚举
+  type-enums-package: com.server.agentbackendservices.enums
+  # 配置mapper xml文件的路径
+  mapper-locations: classpath:mapper/*.xml
+  # 配置MyBatis数据返回类型别名（默认别名是类名）
+  type-aliases-package: com.server.agentbackendservices.entity
+  # 全局配置
+  global-config:
+    # 数据库相关配置
+    db-config:
+      # 主键类型  AUTO:"数据库ID自增", INPUT:"用户输入ID", ID_WORKER:"全局唯一ID (数字类型唯一ID)", UUID:"全局唯一ID UUID";
+      id-type: AUTO
+      # 字段策略 IGNORED:"忽略判断", NOT_NULL:"非 NULL 判断"), NOT_EMPTY:"非空判断"
+      field-strategy: NOT_NULL
+      # 驼峰下划线转换
+      column-underline: true
+      # 逻辑删除配置
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+    # 是否控制台 print mybatis-plus 的 LOGO
+    banner: true
+  # 原生配置
+  configuration:
+    # 是否开启自动驼峰命名规则映射:从数据库列名到Java属性驼峰命名的类似映射
+    map-underscore-to-camel-case: true
+    # 如果查询结果中包含空值的列，则 MyBatis 在映射的时候，不会映射这个字段
+    call-setters-on-nulls: true
+    # 这个配置会将执行的sql打印出来，在开发或测试的时候可以用
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# Dify API 配置
+dify:
+  base-url: http://192.168.1.203/v1
+  api-key: dataset-MwOxGbIDhZmg6bUdHEid0rhX
+  api-workflow-key: app-TsSdGbD50r8fDt1shM3RBSMi
+  timeout: 30000
+  connect-timeout: 30000
+  retry-count: 3
+  enable-retry: true
+  
+  # 文档上传默认配置
+  document:
+    indexing-technique: high_quality
+    doc-form: text_model
+    doc-language: Chinese
+    embedding-model: text-embedding-v3
+    embedding-model-provider: tongyi
+    retrieval-model:
+      search-method: hybrid_search
+      reranking-enable: false
+      top-k: 3
+      score-threshold-enabled: false
+      score-threshold: 0.5
+    process-rule:
+      mode: automatic
+  
+  # 文件上传配置
+  upload:
+    dir: D:/uploads/dify/
+    max-file-size: 52428800  # 50MB
+    allowed-extensions: .txt,.pdf,.doc,.docx,.md,.csv,.json
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.server.agentbackendservices: DEBUG
+    org.springframework.web: DEBUG
+    org.mybatis: DEBUG
+  file:
+    name: logs/agent-backend-dev.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30

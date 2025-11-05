@@ -1,0 +1,4 @@
+这是一个测试文件，用于测试 Dify 文件上传功能。
+文件内容包含中文和英文。
+This is a test file for Dify file upload functionality.
+File content includes both Chinese and English text.
