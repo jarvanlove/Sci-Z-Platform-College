@@ -18,4 +18,12 @@ public interface SysConfigRepo {
      * @return 生成的主键ID
      */
     Long save(SysConfig entity);
+
+    /**
+     * 根据配置键查询配置
+     *
+     * @param configKey String 配置键
+     * @return SysConfig 配置实体（可能为 null）
+     */
+    SysConfig findByKey(String configKey);
 }

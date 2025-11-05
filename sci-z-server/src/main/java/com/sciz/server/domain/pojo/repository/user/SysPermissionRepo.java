@@ -1,6 +1,7 @@
 package com.sciz.server.domain.pojo.repository.user;
 
 import com.sciz.server.domain.pojo.entity.user.SysPermission;
+import java.util.List;
 
 /**
  * 权限仓储（领域层抽象）
@@ -18,4 +19,12 @@ public interface SysPermissionRepo {
      * @return 生成的主键ID
      */
     Long save(SysPermission entity);
+
+    /**
+     * 批量按ID查询权限
+     *
+     * @param ids List<Long> 权限ID集合
+     * @return List<SysPermission> 权限集合
+     */
+    List<SysPermission> findByIds(List<Long> ids);
 }

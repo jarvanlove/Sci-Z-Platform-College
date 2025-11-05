@@ -11,24 +11,54 @@ import lombok.Data;
  */
 @Data
 public class LoginUserInfoResp {
-    /** 用户ID */
+
+    /**
+     * 用户ID
+     */
     private Long id;
-    /** 用户名 */
+
+    /**
+     * 用户名
+     */
     private String username;
-    /** 真实姓名 */
+
+    /**
+     * 真实姓名
+     */
     private String realName;
-    /** 邮箱 */
+
+    /**
+     * 邮箱
+     */
     private String email;
-    /** 手机号 */
+
+    /**
+     * 手机号
+     */
     private String phone;
-    /** 部门/院系/科室 */
+
+    /**
+     * 部门/院系/科室
+     */
     private String department;
-    /** 角色编码（主角色） */
+
+    /**
+     * 角色编码（主角色）
+     */
     private String role;
-    /** 状态：active/disabled 等 */
+
+    /**
+     * 状态：active/disabled 等
+     */
     private String status;
-    /** 行业类型：education/medical/power */
+
+    /**
+     * 行业类型：education/medical/power
+     */
     private String industry;
-    /** 头像URL */
+
+    /**
+     * 头像URL
+     */
     private String avatar;
 }

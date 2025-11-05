@@ -4,16 +4,19 @@ import cn.dev33.satoken.stp.SaTokenInfo;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.stp.SaLoginModel;
 import com.sciz.server.application.service.user.AuthService;
+import com.sciz.server.application.service.user.PermissionService;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginUserInfoResp;
-import com.sciz.server.domain.pojo.dto.response.user.LoginMenuResp;
+import com.sciz.server.domain.pojo.entity.user.SysDepartment;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
+import com.sciz.server.domain.pojo.repository.user.SysDepartmentRepo;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.infrastructure.shared.utils.RedisUtil;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
 import com.sciz.server.infrastructure.shared.event.log.LoginLoggedEvent;
+import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -39,14 +42,31 @@ public class AuthServiceImpl implements AuthService {
     private final SysUserRepo sysUserRepo;
     private final StringRedisTemplate stringRedisTemplate;
     private final EventPublisher eventPublisher;
+    private final PermissionService permissionService;
+    private final IndustryConfigCache industryConfigCache;
+    private final SysDepartmentRepo sysDepartmentRepo;
 
     public AuthServiceImpl(SysUserRepo sysUserRepo, StringRedisTemplate stringRedisTemplate,
-            EventPublisher eventPublisher) {
+            EventPublisher eventPublisher,
+            com.sciz.server.application.service.user.PermissionService permissionService,
+            IndustryConfigCache industryConfigCache,
+            SysDepartmentRepo sysDepartmentRepo) {
         this.sysUserRepo = sysUserRepo;
         this.stringRedisTemplate = stringRedisTemplate;
         this.eventPublisher = eventPublisher;
+        this.permissionService = permissionService;
+        this.industryConfigCache = industryConfigCache;
+        this.sysDepartmentRepo = sysDepartmentRepo;
     }
 
+    /**
+     * 用户登录（账号锁定校验 → 用户有效性校验 → 密码校验 → 清理失败计数 → Sa-Token 登录 → 组装返回 → 发布事件）
+     *
+     * @param username    String 用户名
+     * @param rawPassword String 明文密码
+     * @param rememberMe  Boolean 记住我（持久化 Cookie 与较长超时）
+     * @return LoginResp 登录返回（包含 token、用户信息、角色/权限/菜单）
+     */
     @Override
     public LoginResp login(String username, String rawPassword, Boolean rememberMe) {
         if (!StringUtils.hasText(username) || !StringUtils.hasText(rawPassword)) {
@@ -59,7 +79,7 @@ public class AuthServiceImpl implements AuthService {
         String locked = RedisUtil.get(stringRedisTemplate, lockKey);
         if (StringUtils.hasText(locked)) {
             log.warn(String.format("login locked, username=%s", username));
-            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), String.format("账号已锁定，请稍后再试"));
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "账号已锁定，请稍后再试");
         }
 
         log.info(String.format("login start, username=%s", username));
@@ -67,14 +87,14 @@ public class AuthServiceImpl implements AuthService {
         if (user == null || user.getStatus() != null && user.getStatus() == 0) {
             onFail(username);
             log.warn(String.format("login user invalid, username=%s", username));
-            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), String.format("用户名或密码错误"));
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "用户名或密码错误");
         }
 
         boolean match = bcryptMatches(rawPassword, user.getPassword());
         if (!match) {
             onFail(username);
             log.warn(String.format("login password mismatch, username=%s", username));
-            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), String.format("用户名或密码错误"));
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "用户名或密码错误");
         }
 
         // 成功：清理失败计数
@@ -98,25 +118,31 @@ public class AuthServiceImpl implements AuthService {
         resp.setTokenType("Bearer");
         resp.setExpiresIn(Math.max(StpUtil.getTokenTimeout(), 0));
 
-        // 用户信息
+        // 用户信息（根据部门ID解析为名称；行业从缓存获取）
         LoginUserInfoResp ui = new LoginUserInfoResp();
         ui.setId(user.getId());
         ui.setUsername(user.getUsername());
         ui.setRealName(user.getRealName());
         ui.setEmail(user.getEmail());
         ui.setPhone(user.getPhone());
-        ui.setDepartment("");
+        if (user.getDepartmentId() != null) {
+            SysDepartment dept = sysDepartmentRepo.findById(user.getDepartmentId());
+            ui.setDepartment(dept != null ? dept.getDepartmentName() : "");
+        } else {
+            ui.setDepartment("");
+        }
         // 角色装配建议接入权限服务后由其提供（此处不做硬编码）
         ui.setRole(null);
         ui.setStatus(user.getStatus() != null && user.getStatus() == 1 ? "active" : "disabled");
-        ui.setIndustry(user.getIndustryType());
+        ui.setIndustry(industryConfigCache.get().getType());
         ui.setAvatar(user.getAvatarUrl());
         resp.setUserInfo(ui);
 
-        // 角色/权限/菜单（此处返回空集合，后续接入权限体系后由专用服务装配）
-        resp.setRoles(java.util.Collections.emptyList());
-        resp.setPermissions(java.util.Collections.emptyList());
-        resp.setMenus(java.util.Collections.emptyList());
+        // 角色/权限/菜单（应用服务装配，后续可替换为专用权限子系统）
+        String industryType = industryConfigCache.get().getType();
+        resp.setRoles(permissionService.findRoleCodes(user.getId(), industryType));
+        resp.setPermissions(permissionService.findPermissionCodes(user.getId(), industryType));
+        resp.setMenus(permissionService.buildMenus(user.getId(), industryType));
 
         // 发布登录日志事件（异步）
         LoginLoggedEvent event = new LoginLoggedEvent();
@@ -131,6 +157,13 @@ public class AuthServiceImpl implements AuthService {
         return resp;
     }
 
+    /**
+     * 校验明文密码与 bcrypt 哈希是否匹配
+     *
+     * @param raw  String 明文密码
+     * @param hash String bcrypt 哈希
+     * @return boolean 是否匹配
+     */
     public static boolean bcryptMatches(String raw, String hash) {
         try {
             return BCrypt.checkpw(raw, hash);
@@ -139,6 +172,11 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    /**
+     * 登录失败计数与锁定处理
+     *
+     * @param username String 用户名
+     */
     private void onFail(String username) {
         String failKey = String.format(AUTH_FAIL_KEY, username);
         Long cnt = 1L;

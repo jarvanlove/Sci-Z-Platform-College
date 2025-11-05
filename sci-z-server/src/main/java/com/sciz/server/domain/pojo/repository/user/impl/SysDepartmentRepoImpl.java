@@ -26,4 +26,9 @@ public class SysDepartmentRepoImpl implements SysDepartmentRepo {
         int rows = mapper.insert(entity);
         return rows > 0 ? entity.getId() : null;
     }
+
+    @Override
+    public SysDepartment findById(Long id) {
+        return mapper.selectById(id);
+    }
 }

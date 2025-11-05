@@ -1,5 +1,6 @@
 package com.sciz.server.domain.pojo.repository.user.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.sciz.server.domain.pojo.entity.user.SysConfig;
 import com.sciz.server.domain.pojo.mapper.user.SysConfigMapper;
 import com.sciz.server.domain.pojo.repository.user.SysConfigRepo;
@@ -25,5 +26,12 @@ public class SysConfigRepoImpl implements SysConfigRepo {
     public Long save(SysConfig entity) {
         int rows = mapper.insert(entity);
         return rows > 0 ? entity.getId() : null;
+    }
+
+    @Override
+    public SysConfig findByKey(String configKey) {
+        return mapper.selectOne(new QueryWrapper<SysConfig>()
+                .eq("config_key", configKey)
+                .last("limit 1"));
     }
 }

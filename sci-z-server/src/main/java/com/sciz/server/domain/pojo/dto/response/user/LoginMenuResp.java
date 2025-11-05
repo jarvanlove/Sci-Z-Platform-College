@@ -12,14 +12,29 @@ import java.util.List;
  */
 @Data
 public class LoginMenuResp {
-    /** 路由路径 */
+
+    /**
+     * 路由路径
+     */
     private String path;
-    /** 菜单标题 */
+
+    /**
+     * 菜单标题
+     */
     private String title;
-    /** 图标名称 */
+
+    /**
+     * 图标名称
+     */
     private String icon;
-    /** 菜单/按钮绑定的权限码 */
+
+    /**
+     * 菜单/按钮绑定的权限码
+     */
     private String permission;
-    /** 子菜单 */
+
+    /**
+     * 子菜单
+     */
     private List<LoginMenuResp> children;
 }

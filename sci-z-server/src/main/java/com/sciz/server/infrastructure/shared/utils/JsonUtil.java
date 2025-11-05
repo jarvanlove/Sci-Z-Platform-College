@@ -36,7 +36,7 @@ public class JsonUtil {
         try {
             return OBJECT_MAPPER.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
-            log.error("对象转JSON失败", e);
+            log.error(String.format("对象转JSON失败, error=%s", e.getMessage()), e);
             return null;
         }
     }
@@ -53,7 +53,7 @@ public class JsonUtil {
         try {
             return OBJECT_MAPPER.readValue(json, clazz);
         } catch (JsonProcessingException e) {
-            log.error("JSON转对象失败", e);
+            log.error(String.format("JSON转对象失败, error=%s", e.getMessage()), e);
             return null;
         }
     }
@@ -71,7 +71,7 @@ public class JsonUtil {
             return OBJECT_MAPPER.readValue(json,
                     OBJECT_MAPPER.getTypeFactory().constructCollectionType(List.class, clazz));
         } catch (JsonProcessingException e) {
-            log.error("JSON转对象列表失败", e);
+            log.error(String.format("JSON转对象列表失败, error=%s", e.getMessage()), e);
             return null;
         }
     }
@@ -87,7 +87,7 @@ public class JsonUtil {
             return OBJECT_MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {
             });
         } catch (JsonProcessingException e) {
-            log.error("JSON转Map失败", e);
+            log.error(String.format("JSON转Map失败, error=%s", e.getMessage()), e);
             return null;
         }
     }
@@ -103,7 +103,7 @@ public class JsonUtil {
             return OBJECT_MAPPER.convertValue(obj, new TypeReference<Map<String, Object>>() {
             });
         } catch (Exception e) {
-            log.error("对象转Map失败", e);
+            log.error(String.format("对象转Map失败, error=%s", e.getMessage()), e);
             return null;
         }
     }
@@ -119,7 +119,7 @@ public class JsonUtil {
             Object obj = OBJECT_MAPPER.readValue(json, Object.class);
             return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
         } catch (JsonProcessingException e) {
-            log.error("格式化JSON失败", e);
+            log.error(String.format("格式化JSON失败, error=%s", e.getMessage()), e);
             return json;
         }
     }

@@ -2,82 +2,536 @@
 alwaysApply: false
 ---
 
-# 技术回复规则
+# Sci-Z Server 项目开发规则
 
-## 角色定位
+## 一、DDD 分层架构
 
-Java 专家
+**分层结构**:
 
-## 前置条件(必须要满足，不能缺少一条)
+```
+interfaces/          → controller, converter
+application/        → service (接口 + impl)
+domain/pojo/        → entity, mapper, repository, dto/request|response
+infrastructure/      → config, shared, external, common
+```
 
-- 严格按照 Java21 语法进行编码
-- 编码要符合当前项目的类名/方法名命名规范、日志打印规范、通用工具调用规范等
-- 每次回复之前都要将你理解的需求向我描述一遍，我确认后才可以进行编码
-- 编码要联系上下文来理解需求并编写代码，其中更改、增加、删除某个地方，必须要将所涉及到的后端代码、配置等一并更新，不可以只修改某一处导致服务异常、文件无法找到、甚至不能启动等
-- 不能随意或乱删除任何文件
-- 要注意代码之间关联性
-- 每次回复我的答案时，你需要检查一下是否有内容未编写，比如：找不到某个文件，那么你就要根据当前代码实现联系上下文，在对应的地方去创建文件并编码
-- 编码要考虑通用性、扩展性、性能、并发、日志打印、必要的代码注释
-- 文档以 md 格式生成且要包含目录方便快速定位（文档中必要的说明可以使用 mermaid 不同的语法）
+**依赖方向**: `interfaces` → `application` → `domain` ← `infrastructure`
 
-## 回复规范
+**各层职责**:
 
-### 1. 理解需求
+- **Controller**: 入参校验(@Valid)、鉴权注解、调用 Service、返回 Result<resp>
+- **Converter**: MapStruct 转换，只做 req↔entity↔resp 转换
+- **Service**: 事务(@Transactional)、业务编排、发布事件
+- **Repository**: 组合 Mapper 实现数据访问，禁止业务逻辑
+- **Entity**: 继承 BaseEntity，与表字段一一对应
 
-- 仔细分析用户提出的问题或需求
-- 识别核心技术点和关键问题
-- 考虑前后端交互的完整流程
+## 二、命名规范
 
-### 2. 回复结构
+**文件命名**:
 
-- 回复结果始终为中文
-- 显示当前回复使用的模型信息
-- 列出一个执行计划 然后依次执行
-- 每次回复之前都要将你理解的需求向我描述一遍，我确认后才可以进行编码
-- 提供清晰的解决方案
-- 简明扼要地总结问题
+- Entity: `Xxx.java` (如 `SysUser.java`)
+- Mapper: `XxxMapper.java`
+- Repository: `XxxRepo.java` + `XxxRepoImpl.java`
+- Service: `XxxService.java` + `XxxServiceImpl.java`
+- Controller: `XxxController.java`
+- Converter: `XxxConverter.java`
+- Request: `XxxCreateReq.java`, `XxxUpdateReq.java`, `XxxQueryReq.java`
+- Response: `XxxResp.java`, `XxxDetailResp.java`, `XxxPageResp.java`
+- Event: `XxxCreatedEvent.java`, `XxxUpdatedEvent.java`, `XxxDeletedEvent.java`
+- Handler: `XxxEventHandler.java`
 
-### 3. 类名 方法名 模型字段 的注释模板
+**方法命名**:
 
-- 类名注释模板
-  /\*\*
+- Controller: `createXxx`, `updateXxx`, `deleteXxx`, `getXxxDetail`, `listXxx`, `pageXxx`
+- Service: `create`, `update`, `deleteById`, `findDetail`, `list`, `page`
+- Repository: `save`, `update`, `deleteById`, `findById`, `findByCondition`, `pageByCondition`
+- Converter: `toEntity(req)`, `toResp(entity)`, `toRespList(list)`, `updateEntity(@MappingTarget, req)`
 
-* @author JiaWen.Wu
-* @className 当前类名
-* @date 中国北京当前时间(yyyy-MM-dd HH:mm)
-  \*/
-  示例：
-  /\*\*
-* @author JiaWen.Wu
-* @className SecondaryBusinessService
-* @date 2025-6-5 14:36
-  \*/
+## 三、注释模板
 
-- 方法名注释模板
-  /\*\*
+**类注释**:
 
-* 方法是做什么的
-*
-* @param 参数类型 参数描述
-* @return 返回结果
-  \*/
+```java
+/**
+ * 类功能描述
+ *
+ * @author JiaWen.Wu
+ * @className 当前类名
+ * @date 中国北京当前时间(yyyy-MM-dd HH:mm)
+ */
+```
 
-示例：
-/\*\*
+**方法注释**:
 
-- 获取审批流程
--
-- @param jsonObject 请求参数
-- @return 审批流程信息
-  \*/
+```java
+/**
+ * 方法是做什么的
+ *
+ * @param 参数类型 参数描述
+ * @return 返回结果
+ */
+```
 
-- 所有实体类字段注释模板
-  /\*\*
+**字段注释**:
 
-* 字段注释
-  \*/
+```java
+/**
+ * 字段注释
+ */
+```
 
-### 4. 编码规范
+## 四、开发规范
 
-- 所有接口要使用统一返回结果 Result.java 以及 ResultCode.java 的枚举定义使用
-- 日志打印 必须以 String.format %s 占位符 方式 打印详细日志
+**日志**: 统一使用 `String.format("%s", ...)` 占位符
+
+```java
+log.info(String.format("创建用户: userId=%s, username=%s", userId, username));
+log.error(String.format("创建用户失败: err=%s", e.getMessage()), e);
+```
+
+**异常**: 仅抛 `BusinessException(ResultCode.X)`
+
+```java
+throw new BusinessException(ResultCode.USER_NOT_FOUND);
+throw new BusinessException(ResultCode.USER_NOT_FOUND, "用户不存在: " + userId);
+```
+
+**返回**: Controller 返回`Result<T>`，Service 返回领域对象
+
+```java
+// Controller
+return Result.success(resp);
+
+// Service
+public XxxResp create(XxxCreateReq req) { return resp; }
+```
+
+**事务**: Service 写操作加`@Transactional(rollbackFor = Exception.class)`
+
+## 五、实现顺序
+
+1. Entity → 继承 BaseEntity，与表字段一一对应
+2. Mapper → 继承 BaseMapper<Xxx>
+3. Repository → 接口+实现(组合 Mapper)
+4. DTO → request(CreateReq/UpdateReq/QueryReq) + response(Resp/DetailResp/PageResp)
+5. Converter → MapStruct(componentModel="spring")
+6. Service → 接口+实现(事务、编排、发布事件)
+7. Controller → 入参校验、鉴权、调用 Service、返回 Result
+8. Event & Handler → (按需)发布事件、创建 Handler 处理
+
+## 六、代码模板
+
+### Entity
+
+```java
+package com.sciz.server.domain.pojo.entity.xxx;
+
+import com.sciz.server.domain.pojo.entity.BaseEntity;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * Xxx 实体类
+ *
+ * @author JiaWen.Wu
+ * @className Xxx
+ * @date 2025-01-XX 14:30
+ */
+@Getter
+@Setter
+@TableName("xxx_table")
+public class Xxx extends BaseEntity {
+    /**
+     * 主键ID
+     */
+    private Long id;
+    /**
+     * 名称
+     */
+    private String name;
+}
+```
+
+### Mapper
+
+```java
+package com.sciz.server.domain.pojo.mapper.xxx;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.sciz.server.domain.pojo.entity.xxx.Xxx;
+
+/**
+ * Xxx Mapper
+ *
+ * @author JiaWen.Wu
+ * @className XxxMapper
+ * @date 2025-01-XX 14:30
+ */
+public interface XxxMapper extends BaseMapper<Xxx> {
+}
+```
+
+### Repository 接口
+
+```java
+package com.sciz.server.domain.pojo.repository.xxx;
+
+import com.sciz.server.domain.pojo.entity.xxx.Xxx;
+
+/**
+ * Xxx 仓储接口
+ *
+ * @author JiaWen.Wu
+ * @className XxxRepo
+ * @date 2025-01-XX 14:30
+ */
+public interface XxxRepo {
+    /**
+     * 保存
+     *
+     * @param entity 实体
+     * @return 主键ID
+     */
+    Long save(Xxx entity);
+
+    /**
+     * 根据ID查询
+     *
+     * @param id 主键ID
+     * @return 实体
+     */
+    Xxx findById(Long id);
+}
+```
+
+### Repository 实现
+
+```java
+package com.sciz.server.domain.pojo.repository.xxx.impl;
+
+import com.sciz.server.domain.pojo.entity.xxx.Xxx;
+import com.sciz.server.domain.pojo.mapper.xxx.XxxMapper;
+import com.sciz.server.domain.pojo.repository.xxx.XxxRepo;
+import org.springframework.stereotype.Repository;
+
+/**
+ * Xxx 仓储实现
+ *
+ * @author JiaWen.Wu
+ * @className XxxRepoImpl
+ * @date 2025-01-XX 14:30
+ */
+@Repository
+public class XxxRepoImpl implements XxxRepo {
+    private final XxxMapper mapper;
+
+    public XxxRepoImpl(XxxMapper mapper) {
+        this.mapper = mapper;
+    }
+
+    @Override
+    public Long save(Xxx entity) {
+        int rows = mapper.insert(entity);
+        return rows > 0 ? entity.getId() : null;
+    }
+
+    @Override
+    public Xxx findById(Long id) {
+        return mapper.selectById(id);
+    }
+}
+```
+
+### Request DTO
+
+```java
+package com.sciz.server.domain.pojo.dto.request.xxx;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * Xxx 创建请求
+ *
+ * @author JiaWen.Wu
+ * @className XxxCreateReq
+ * @date 2025-01-XX 14:30
+ */
+@Getter
+@Setter
+public class XxxCreateReq {
+    /**
+     * 名称
+     */
+    @NotBlank(message = "名称不能为空")
+    private String name;
+}
+```
+
+### Response DTO
+
+```java
+package com.sciz.server.domain.pojo.dto.response.xxx;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * Xxx 响应
+ *
+ * @author JiaWen.Wu
+ * @className XxxResp
+ * @date 2025-01-XX 14:30
+ */
+@Getter
+@Setter
+public class XxxResp {
+    /**
+     * 主键ID
+     */
+    private Long id;
+    /**
+     * 名称
+     */
+    private String name;
+}
+```
+
+### Converter
+
+```java
+package com.sciz.server.interfaces.converter;
+
+import com.sciz.server.domain.pojo.dto.request.xxx.XxxCreateReq;
+import com.sciz.server.domain.pojo.dto.response.xxx.XxxResp;
+import com.sciz.server.domain.pojo.entity.xxx.Xxx;
+import org.mapstruct.Mapper;
+import org.mapstruct.MappingTarget;
+
+/**
+ * Xxx 转换器
+ *
+ * @author JiaWen.Wu
+ * @className XxxConverter
+ * @date 2025-01-XX 14:30
+ */
+@Mapper(componentModel = "spring")
+public interface XxxConverter {
+    /**
+     * req → entity
+     */
+    Xxx toEntity(XxxCreateReq req);
+
+    /**
+     * entity → resp
+     */
+    XxxResp toResp(Xxx entity);
+}
+```
+
+### Service 接口
+
+```java
+package com.sciz.server.application.service.xxx;
+
+import com.sciz.server.domain.pojo.dto.request.xxx.XxxCreateReq;
+import com.sciz.server.domain.pojo.dto.response.xxx.XxxResp;
+
+/**
+ * Xxx 应用服务接口
+ *
+ * @author JiaWen.Wu
+ * @className XxxService
+ * @date 2025-01-XX 14:30
+ */
+public interface XxxService {
+    /**
+     * 创建
+     *
+     * @param req 创建请求
+     * @return 响应
+     */
+    XxxResp create(XxxCreateReq req);
+}
+```
+
+### Service 实现
+
+```java
+package com.sciz.server.application.service.xxx.impl;
+
+import com.sciz.server.application.service.xxx.XxxService;
+import com.sciz.server.domain.pojo.dto.request.xxx.XxxCreateReq;
+import com.sciz.server.domain.pojo.dto.response.xxx.XxxResp;
+import com.sciz.server.domain.pojo.entity.xxx.Xxx;
+import com.sciz.server.domain.pojo.repository.xxx.XxxRepo;
+import com.sciz.server.infrastructure.shared.event.EventPublisher;
+import com.sciz.server.infrastructure.shared.exception.BusinessException;
+import com.sciz.server.infrastructure.shared.result.ResultCode;
+import com.sciz.server.interfaces.converter.XxxConverter;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Xxx 应用服务实现类
+ *
+ * @author JiaWen.Wu
+ * @className XxxServiceImpl
+ * @date 2025-01-XX 14:30
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class XxxServiceImpl implements XxxService {
+    private final XxxRepo xxxRepo;
+    private final XxxConverter xxxConverter;
+    private final EventPublisher eventPublisher;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public XxxResp create(XxxCreateReq req) {
+        log.info(String.format("创建Xxx: name=%s", req.getName()));
+
+        // 1. 转换为实体
+        Xxx entity = xxxConverter.toEntity(req);
+
+        // 2. 保存
+        Long id = xxxRepo.save(entity);
+        if (id == null) {
+            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+        }
+
+        // 3. 发布事件（按需）
+        // XxxCreatedEvent event = new XxxCreatedEvent(id, entity.getName());
+        // eventPublisher.publish(event);
+
+        // 4. 转换为响应
+        XxxResp resp = xxxConverter.toResp(entity);
+
+        log.info(String.format("创建Xxx成功: id=%s", id));
+        return resp;
+    }
+}
+```
+
+### Controller
+
+```java
+package com.sciz.server.interfaces.controller;
+
+import com.sciz.server.application.service.xxx.XxxService;
+import com.sciz.server.domain.pojo.dto.request.xxx.XxxCreateReq;
+import com.sciz.server.domain.pojo.dto.response.xxx.XxxResp;
+import com.sciz.server.infrastructure.shared.result.Result;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * Xxx 控制器
+ *
+ * @author JiaWen.Wu
+ * @className XxxController
+ * @date 2025-01-XX 14:30
+ */
+@RestController
+@RequestMapping("/api/xxx")
+@Tag(name = "模块 - Xxx", description = "Xxx 管理")
+@RequiredArgsConstructor
+public class XxxController {
+    private final XxxService xxxService;
+
+    @PostMapping
+    @Operation(summary = "创建Xxx", description = "创建Xxx")
+    // @SaCheckPermission("api:module:xxx:create")
+    public Result<XxxResp> createXxx(@Valid @RequestBody XxxCreateReq req) {
+        XxxResp resp = xxxService.create(req);
+        return Result.success(resp);
+    }
+}
+```
+
+## 七、事件处理（按需）
+
+### Event
+
+```java
+package com.sciz.server.infrastructure.shared.event.xxx;
+
+import com.sciz.server.infrastructure.shared.event.DomainEvent;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * Xxx 创建事件
+ *
+ * @author JiaWen.Wu
+ * @className XxxCreatedEvent
+ * @date 2025-01-XX 14:30
+ */
+@Getter
+@Setter
+public class XxxCreatedEvent extends DomainEvent {
+    private Long xxxId;
+    private String name;
+
+    public XxxCreatedEvent(Long xxxId, String name) {
+        super();
+        this.xxxId = xxxId;
+        this.name = name;
+    }
+
+    @Override
+    public String getAggregateId() {
+        return String.valueOf(xxxId);
+    }
+
+    @Override
+    public String getAggregateType() {
+        return "Xxx";
+    }
+}
+```
+
+### Handler
+
+```java
+package com.sciz.server.infrastructure.shared.handler.xxx;
+
+import com.sciz.server.infrastructure.shared.event.xxx.XxxCreatedEvent;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
+
+/**
+ * Xxx 事件处理器
+ *
+ * @author JiaWen.Wu
+ * @className XxxEventHandler
+ * @date 2025-01-XX 14:30
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class XxxEventHandler {
+    @EventListener
+    @Async
+    public void handleXxxCreated(XxxCreatedEvent event) {
+        try {
+            log.info(String.format("处理Xxx创建事件: xxxId=%s, name=%s", event.getXxxId(), event.getName()));
+            // 调用应用服务入库或联动
+            log.info(String.format("Xxx创建事件处理完成: xxxId=%s", event.getXxxId()));
+        } catch (Exception e) {
+            log.error(String.format("Xxx创建事件处理失败: xxxId=%s, err=%s", event.getXxxId(), e.getMessage()), e);
+        }
+    }
+}
+```

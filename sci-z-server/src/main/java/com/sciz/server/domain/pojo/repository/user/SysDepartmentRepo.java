@@ -18,4 +18,12 @@ public interface SysDepartmentRepo {
      * @return 生成的主键ID
      */
     Long save(SysDepartment entity);
+
+    /**
+     * 根据ID查询部门
+     *
+     * @param id Long 部门ID
+     * @return SysDepartment 部门实体（可能为 null）
+     */
+    SysDepartment findById(Long id);
 }

@@ -679,24 +679,20 @@
           // 申报数据
           const declaration = ref({
             id: 1,
-            number: "SB2024001",
+            number: "SK20251032101",
             applicant: "张教授",
-            department: "科委", // 课题发布部门
+            department: "国自然-青年基金", // 课题发布部门
             projectLeader: "张教授", // 项目负责人
-            documentPublishTime: "2024-01-10", // 红头文件发布时间
-            projectStartTime: "2024-02-01", // 项目开始时间
-            projectEndTime: "2024-12-31", // 项目结束时间
-            direction:
-              "基于深度学习的智能制造关键技术研究，重点围绕工业互联网、智能传感器、机器视觉等核心技术，推动制造业数字化转型升级。通过构建智能制造平台，实现生产过程的智能化监控、预测性维护和质量优化控制。",
-            topic: "面向智能制造的多模态数据融合与决策优化技术研究", // 研究课题
+            documentPublishTime: "2025-09-30", // 红头文件发布时间
+            projectStartTime: "2025-11-01", // 项目开始时间
+            projectEndTime: "2026-10-31", // 项目结束时间
+            direction: "科学家智能体前沿技术研究",
+            topic: "具身智能体操作系统与工具链技术", // 研究课题
             fields: [
               "人工智能",
-              "智能制造",
-              "机器学习",
-              "工业互联网",
-              "数据融合",
+              "前沿技术研究与应用",
             ],
-            submitTime: "2024-01-15",
+            submitTime: "2025-11-03",
             status: "申报中",
             statusType: "submitting",
           });
@@ -706,42 +702,42 @@
             {
               id: 1,
               title: "申报提交",
-              time: "2024-01-15 14:30:25",
+              time: "2025-11-15 15:27:25",
               status: "completed",
               icon: "✓",
             },
             {
               id: 2,
               title: "工作流启动",
-              time: "2024-01-15 14:30:28",
+              time: "2025-11-15 15:27:28",
               status: "completed",
               icon: "✓",
             },
             {
               id: 3,
               title: "AI 内容分析",
-              time: "2024-01-15 14:31:15",
+              time: "2025-11-15 15:28:15",
               status: "completed",
               icon: "✓",
             },
             {
               id: 4,
               title: "项目信息生成",
-              time: "2024-01-15 14:32:45",
+              time: "2025-11-15 15:28:45",
               status: "completed",
               icon: "✓",
             },
             {
               id: 5,
               title: "数据库存储",
-              time: "2024-01-15 14:33:00",
+              time: "2025-11-15 15:29:00",
               status: "completed",
               icon: "✓",
             },
             {
               id: 6,
               title: "申报书生成",
-              time: "2024-01-15 14:33:30",
+              time: "2025-11-03 15:29:30",
               status: "completed",
               icon: "✓",
             },
@@ -750,19 +746,64 @@
           // 工作流结果
           const workflowResult = ref(null);
 
+          // 计算进度条进度（根据时间线步骤完成情况）
+          const calculateProgress = computed(() => {
+            if (!workflowTimeline.value || workflowTimeline.value.length === 0) {
+              return 0;
+            }
+
+            const totalSteps = workflowTimeline.value.length;
+            const completedSteps = workflowTimeline.value.filter(
+              (item) => item.status === "completed"
+            ).length;
+            
+            // 计算进度百分比
+            return Math.round((completedSteps / totalSteps) * 100);
+          });
+
           // 工作流状态
           const workflowStatus = computed(() => {
             const status = declaration.value.statusType;
+            
+            // 根据时间线计算进度
+            const progress = calculateProgress.value;
+            const allCompleted = progress === 100;
+            const hasProcessing = workflowTimeline.value.some(
+              (item) => item.status === "processing"
+            );
 
             switch (status) {
               case "submitting":
+                // 如果所有步骤都完成了，但状态还是submitting，可能是在最后一步
+                if (allCompleted) {
+                  return {
+                    type: "processing",
+                    icon: "⏳",
+                    title: "处理中",
+                    description: "正在处理您的申报，请稍候...",
+                    showProgress: true,
+                    progress: 100,
+                  };
+                }
+                // 有正在处理的步骤
+                if (hasProcessing) {
+                  return {
+                    type: "processing",
+                    icon: "⏳",
+                    title: "处理中",
+                    description: "正在处理您的申报，请稍候...",
+                    showProgress: true,
+                    progress: progress,
+                  };
+                }
+                // 没有正在处理的步骤，显示当前进度
                 return {
                   type: "processing",
                   icon: "⏳",
                   title: "处理中",
                   description: "正在处理您的申报，请稍候...",
                   showProgress: true,
-                  progress: 65,
+                  progress: progress,
                 };
               case "success":
                 return {
@@ -770,17 +811,18 @@
                   icon: "✓",
                   title: "处理完成",
                   description: "申报已成功处理，项目已创建",
-                  showProgress: false,
+                  showProgress: true,
                   progress: 100,
                 };
               case "failed":
+                // 失败时显示已完成的进度
                 return {
                   type: "failed",
                   icon: "✗",
                   title: "处理失败",
                   description: "申报处理过程中出现错误",
-                  showProgress: false,
-                  progress: 0,
+                  showProgress: true,
+                  progress: progress,
                 };
               default:
                 return {
@@ -788,8 +830,8 @@
                   icon: "?",
                   title: "未知状态",
                   description: "状态信息异常",
-                  showProgress: false,
-                  progress: 0,
+                  showProgress: true,
+                  progress: progress,
                 };
             }
           });
@@ -817,7 +859,7 @@
                   suggestion:
                     "请检查研究方向描述是否过于复杂，建议简化后重新申报",
                   errorDetails:
-                    "Error: AI Analysis Timeout\nCode: AI_TIMEOUT_001\nTime: 2024-01-15 14:32:45\nDetails: The AI model took longer than expected to process the research direction content. This may be due to the complexity or length of the input text.",
+                    "Error: AI Analysis Timeout\nCode: AI_TIMEOUT_001\nTime: 2025-11-03 14:32:45\nDetails: The AI model took longer than expected to process the research direction content. This may be due to the complexity or length of the input text.",
                 };
               }
             } catch (error) {

@@ -1,9 +1,8 @@
 package com.sciz.server.infrastructure.config.cache;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sciz.server.domain.pojo.entity.user.SysConfig;
-import com.sciz.server.domain.pojo.mapper.user.SysConfigMapper;
+import com.sciz.server.domain.pojo.repository.user.SysConfigRepo;
 import com.sciz.server.infrastructure.shared.utils.RedisUtil;
 import lombok.Data;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -38,12 +37,12 @@ public class IndustryConfigCache {
     private static final String K_LABEL_ROLE = "label.role";
     private static final String K_LABEL_EMP = "label.employee_id";
 
-    private final SysConfigMapper sysConfigMapper;
+    private final SysConfigRepo sysConfigRepo;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public IndustryConfigCache(SysConfigMapper sysConfigMapper, StringRedisTemplate redis) {
-        this.sysConfigMapper = sysConfigMapper;
+    public IndustryConfigCache(SysConfigRepo sysConfigRepo, StringRedisTemplate redis) {
+        this.sysConfigRepo = sysConfigRepo;
         this.redis = redis;
     }
 
@@ -98,9 +97,7 @@ public class IndustryConfigCache {
     private IndustryView loadFromDb() {
         Map<String, String> kv = new HashMap<>();
         for (String k : new String[] { K_TYPE, K_NAME, K_LABEL_DEPT, K_LABEL_ROLE, K_LABEL_EMP }) {
-            SysConfig cfg = sysConfigMapper.selectOne(new QueryWrapper<SysConfig>()
-                    .eq("config_key", k)
-                    .last("limit 1"));
+            SysConfig cfg = sysConfigRepo.findByKey(k);
             if (cfg != null && cfg.getConfigValue() != null) {
                 kv.put(k, cfg.getConfigValue());
             }

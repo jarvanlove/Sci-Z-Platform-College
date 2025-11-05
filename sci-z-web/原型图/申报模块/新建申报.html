@@ -723,6 +723,9 @@
                       <el-icon><MagicStick /></el-icon>
                       AI 分析结果
                     </div>
+                    <p v-if="analysisResult.researchField && analysisResult.researchField.length > 0">
+                      <strong>研究领域：</strong>{{ analysisResult.researchField.join('、') }}
+                    </p>
                     <p>
                       <strong>研究方向：</strong>{{
                       analysisResult.researchDirection }}
@@ -823,6 +826,64 @@
                 </div>
               </div>
 
+              <!-- 研究领域 -->
+              <div class="form-group">
+                <div class="group-title">
+                  研究领域 <span style="color: #dc2626">*</span>
+                </div>
+                <div class="form-item">
+                  <div class="tag-input-container" ref="tagInputRef">
+                    <div
+                      v-for="(tag, index) in form.researchField"
+                      :key="index"
+                      class="tag-item"
+                    >
+                      {{ tag }}
+                      <span class="tag-remove" @click="removeTag(index)">
+                        ×
+                      </span>
+                    </div>
+                    <input
+                      v-model="tagInput"
+                      class="tag-input"
+                      placeholder="请输入研究领域，回车添加"
+                      @keydown.enter="addTag"
+                      @keydown.backspace="handleBackspace"
+                      @input="handleTagInput"
+                      ref="tagInputElementRef"
+                    />
+                    <div
+                      v-if="showSuggestions && suggestions.length > 0"
+                      class="suggestions"
+                    >
+                      <div
+                        v-for="suggestion in suggestions"
+                        :key="suggestion"
+                        class="suggestion-item"
+                        @click="selectSuggestion(suggestion)"
+                      >
+                        {{ suggestion }}
+                      </div>
+                    </div>
+                  </div>
+                  <div style="margin-top: 8px; font-size: 12px; color: #6b7280">
+                    已选择 {{ form.researchField.length }} / 10 个领域
+                  </div>
+                  <div
+                    v-if="analysisResult && uploadStatus === 'success' && analysisResult.researchField"
+                    style="margin-top: 4px; font-size: 12px; color: #16a34a"
+                  >
+                    ✨ 此字段已由AI自动填充，您可以根据需要进行修改
+                  </div>
+                  <div v-if="formErrors.researchField" class="error-message">
+                    {{ formErrors.researchField }}
+                  </div>
+                  <div v-if="formSuccess.researchField" class="success-icon">
+                    ✓ 研究领域选择完成
+                  </div>
+                </div>
+              </div>
+
               <!-- 研究信息 -->
               <div class="form-group">
                 <div class="group-title">研究信息</div>
@@ -867,58 +928,6 @@
                       ✨ 此字段已由AI自动填充，您可以根据需要进行修改
                     </div>
                   </el-form-item>
-                </div>
-              </div>
-
-              <!-- 研究领域 -->
-              <div class="form-group">
-                <div class="group-title">
-                  研究领域 <span style="color: #dc2626">*</span>
-                </div>
-                <div class="form-item">
-                  <div class="tag-input-container" ref="tagInputRef">
-                    <div
-                      v-for="(tag, index) in form.researchField"
-                      :key="index"
-                      class="tag-item"
-                    >
-                      {{ tag }}
-                      <span class="tag-remove" @click="removeTag(index)">
-                        ×
-                      </span>
-                    </div>
-                    <input
-                      v-model="tagInput"
-                      class="tag-input"
-                      placeholder="请输入研究领域，回车添加"
-                      @keydown.enter="addTag"
-                      @keydown.backspace="handleBackspace"
-                      @input="handleTagInput"
-                      ref="tagInputElementRef"
-                    />
-                    <div
-                      v-if="showSuggestions && suggestions.length > 0"
-                      class="suggestions"
-                    >
-                      <div
-                        v-for="suggestion in suggestions"
-                        :key="suggestion"
-                        class="suggestion-item"
-                        @click="selectSuggestion(suggestion)"
-                      >
-                        {{ suggestion }}
-                      </div>
-                    </div>
-                  </div>
-                  <div style="margin-top: 8px; font-size: 12px; color: #6b7280">
-                    已选择 {{ form.researchField.length }} / 10 个领域
-                  </div>
-                  <div v-if="formErrors.researchField" class="error-message">
-                    {{ formErrors.researchField }}
-                  </div>
-                  <div v-if="formSuccess.researchField" class="success-icon">
-                    ✓ 研究领域选择完成
-                  </div>
                 </div>
               </div>
 
@@ -987,28 +996,12 @@
             </el-form>
           </div>
 
-          <!-- 自动保存指示器 -->
-          <div
-            v-if="autoSaveStatus !== 'idle'"
-            class="auto-save-indicator"
-            :class="autoSaveStatus"
-          >
-            <span v-if="autoSaveStatus === 'saving'">
-              <el-icon><Loading /></el-icon>
-              正在保存草稿...
-            </span>
-            <span v-if="autoSaveStatus === 'saved'">
-              <el-icon><Check /></el-icon>
-              草稿已保存
-            </span>
-          </div>
         </div>
       </el-config-provider>
     </div>
 
     <script>
-      const { createApp, ref, reactive, computed, onMounted, onUnmounted } =
-        Vue;
+      const { createApp, ref, reactive, computed, onMounted } = Vue;
       const { ElMessage, ElMessageBox, ElConfigProvider } = ElementPlus;
       const zhCn = ElementPlusLocaleZhCn;
 
@@ -1250,10 +1243,6 @@
           const analysisResult = ref(null);
           const uploadProgress = ref(0);
 
-          // 自动保存
-          const autoSaveStatus = ref("idle");
-          let autoSaveTimer = null;
-
           // 文件上传处理
           const handleFileUpload = async (file) => {
             try {
@@ -1287,9 +1276,9 @@
 
               // 模拟分析结果
               const mockResult = {
-                researchDirection:
-                  "基于深度学习的智能制造关键技术研究，重点围绕工业互联网、智能传感器、机器视觉等核心技术，推动制造业数字化转型升级。",
-                researchTopic: "面向智能制造的多模态数据融合与决策优化技术研究",
+                researchDirection: "科学家智能体前沿技术研究",
+                researchTopic: "具身智能体操作系统与工具链技术",
+                researchField: ["人工智能", "前沿技术研究与应用"],
               };
 
               analysisResult.value = mockResult;
@@ -1297,6 +1286,18 @@
               // 自动填充表单
               form.researchDirection = mockResult.researchDirection;
               form.researchTopic = mockResult.researchTopic;
+              
+              // 自动填充研究领域（合并到现有字段中，不覆盖用户已添加的）
+              if (mockResult.researchField && mockResult.researchField.length > 0) {
+                mockResult.researchField.forEach((field) => {
+                  if (
+                    !form.researchField.includes(field) &&
+                    form.researchField.length < 10
+                  ) {
+                    form.researchField.push(field);
+                  }
+                });
+              }
 
               uploadStatus.value = "success";
               ElMessage.success("红头文件分析完成，已自动填充相关字段");
@@ -1369,19 +1370,16 @@
             ) {
               form.researchField.push(value);
               tagInput.value = "";
-              triggerAutoSave();
             }
           };
 
           const removeTag = (index) => {
             form.researchField.splice(index, 1);
-            triggerAutoSave();
           };
 
           const handleBackspace = () => {
             if (tagInput.value === "" && form.researchField.length > 0) {
               form.researchField.pop();
-              triggerAutoSave();
             }
           };
 
@@ -1407,33 +1405,6 @@
               form.researchField.push(suggestion);
               tagInput.value = "";
               showSuggestions.value = false;
-              triggerAutoSave();
-            }
-          };
-
-          // 自动保存
-          const triggerAutoSave = () => {
-            if (autoSaveTimer) {
-              clearTimeout(autoSaveTimer);
-            }
-            autoSaveTimer = setTimeout(() => {
-              saveDraft();
-            }, 30000); // 30秒后自动保存
-          };
-
-          const saveDraft = async () => {
-            try {
-              autoSaveStatus.value = "saving";
-              // 模拟保存草稿
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-              localStorage.setItem("declaration_draft", JSON.stringify(form));
-              autoSaveStatus.value = "saved";
-              setTimeout(() => {
-                autoSaveStatus.value = "idle";
-              }, 2000);
-            } catch (error) {
-              console.error("保存草稿失败:", error);
-              autoSaveStatus.value = "idle";
             }
           };
 
@@ -1462,9 +1433,6 @@
               await new Promise((resolve) => setTimeout(resolve, 2000));
 
               ElMessage.success("申报提交成功！正在处理中...");
-
-              // 清除草稿
-              clearDraft();
 
               // 跳转到申报详情页面
               setTimeout(() => {
@@ -1517,58 +1485,13 @@
               });
           };
 
-          // 清理草稿
-          const clearDraft = () => {
-            try {
-              localStorage.removeItem("declaration_draft");
-              // 清空表单
-              Object.keys(form).forEach((key) => {
-                if (Array.isArray(form[key])) {
-                  form[key] = [];
-                } else {
-                  form[key] = "";
-                }
-              });
-              // 清空验证状态
-              Object.keys(formErrors).forEach((key) => {
-                formErrors[key] = "";
-              });
-              Object.keys(formSuccess).forEach((key) => {
-                formSuccess[key] = false;
-              });
-            } catch (error) {
-              console.error("清理草稿失败:", error);
-            }
-          };
-
-          // 加载草稿
-          const loadDraft = () => {
-            try {
-              const draft = localStorage.getItem("declaration_draft");
-              if (draft) {
-                const draftData = JSON.parse(draft);
-                // 加载所有表单字段
-                Object.keys(form).forEach((key) => {
-                  if (draftData[key] !== undefined) {
-                    form[key] = draftData[key];
-                  }
-                });
-                ElMessage.info("已加载草稿内容");
-              }
-            } catch (error) {
-              console.error("加载草稿失败:", error);
-            }
-          };
-
           // 生命周期
           onMounted(() => {
-            loadDraft();
-            triggerAutoSave();
-          });
-
-          onUnmounted(() => {
-            if (autoSaveTimer) {
-              clearTimeout(autoSaveTimer);
+            // 页面初始化时确保清理可能存在的旧数据
+            try {
+              localStorage.removeItem("declaration_draft");
+            } catch (error) {
+              // 忽略清理错误
             }
           });
 
@@ -1585,7 +1508,6 @@
             charCount,
             formErrors,
             formSuccess,
-            autoSaveStatus,
             uploadStatus,
             analysisResult,
             uploadProgress,
@@ -1610,7 +1532,6 @@
             validateForm,
             handleSubmit,
             handleBack,
-            clearDraft,
           };
         },
       })

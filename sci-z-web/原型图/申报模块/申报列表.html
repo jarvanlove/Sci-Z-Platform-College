@@ -791,100 +791,100 @@
               declarations.value = [
                 {
                   id: 1,
-                  number: "SB2024001",
+                  number: "SK20251032101",
                   applicant: "张教授",
-                  direction: "人工智能在教育领域的应用研究",
-                  topic: "基于深度学习的个性化学习系统研究",
-                  fields: ["人工智能", "教育技术", "机器学习"],
-                  submitTime: "2024-01-15",
-                  status: "申报中",
-                  statusType: "submitting",
+                  direction: "科学家智能体前沿技术研究",
+                  topic: "具身智能体操作系统与工具链技术",
+                  fields: ["人工智能", "前沿技术研究与应用"],
+                  submitTime: "2025-11-03",
+                  status: "申报成功",
+                  statusType: "success",
                 },
                 {
                   id: 2,
-                  number: "SB2024002",
+                  number: "SK20251032102",
                   applicant: "李博士",
                   direction: "区块链技术在供应链管理中的应用",
                   topic: "面向供应链透明度的区块链溯源技术研究",
                   fields: ["区块链", "供应链", "分布式系统"],
-                  submitTime: "2024-01-14",
+                  submitTime: "2025-01-14",
                   status: "申报成功",
                   statusType: "success",
                 },
                 {
                   id: 3,
-                  number: "SB2024003",
+                  number: "SK20251032103",
                   applicant: "王研究员",
                   direction: "量子计算算法优化研究",
                   topic: "量子近似优化算法的改进与应用",
                   fields: ["量子计算", "算法优化", "物理"],
-                  submitTime: "2024-01-13",
+                  submitTime: "2025-01-13",
                   status: "申报失败",
                   statusType: "failed",
                 },
                 {
                   id: 4,
-                  number: "SB2024004",
+                  number: "SK20251032104",
                   applicant: "刘教授",
                   direction: "生物信息学数据分析方法研究",
                   topic: "多组学数据整合分析新方法研究",
                   fields: ["生物信息学", "数据分析", "统计学"],
-                  submitTime: "2024-01-12",
+                  submitTime: "2025-01-12",
                   status: "申报成功",
                   statusType: "success",
                 },
                 {
                   id: 5,
-                  number: "SB2024005",
+                  number: "SK20251032105",
                   applicant: "陈博士",
                   direction: "物联网安全防护技术研究",
                   topic: "轻量级物联网设备安全认证机制研究",
                   fields: ["物联网", "网络安全", "加密技术"],
-                  submitTime: "2024-01-11",
+                  submitTime: "2025-01-11",
                   status: "申报失败",
                   statusType: "failed",
                 },
                 {
                   id: 6,
-                  number: "SB2024006",
+                  number: "SK20251032106",
                   applicant: "赵教授",
                   direction: "机器学习在医疗诊断中的应用",
                   topic: "基于联邦学习的医疗影像诊断系统",
                   fields: ["机器学习", "医疗诊断", "深度学习"],
-                  submitTime: "2024-01-10",
+                  submitTime: "2025-01-10",
                   status: "申报中",
                   statusType: "submitting",
                 },
                 {
                   id: 7,
-                  number: "SB2024007",
+                  number: "SK20251032107",
                   applicant: "孙研究员",
                   direction: "新材料设计与性能预测",
                   topic: "机器学习辅助的高性能复合材料设计",
                   fields: ["材料科学", "计算化学", "机器学习"],
-                  submitTime: "2024-01-09",
+                  submitTime: "2025-01-09",
                   status: "申报成功",
                   statusType: "success",
                 },
                 {
                   id: 8,
-                  number: "SB2024008",
+                  number: "SK20251032108",
                   applicant: "周博士",
                   direction: "可再生能源系统优化",
                   topic: "风光储一体化系统智能调度策略研究",
                   fields: ["可再生能源", "系统优化", "能源工程"],
-                  submitTime: "2024-01-08",
+                  submitTime: "2025-01-08",
                   status: "申报失败",
                   statusType: "failed",
                 },
                 {
                   id: 9,
-                  number: "SB2024009",
+                  number: "SK20251032109",
                   applicant: "吴教授",
                   direction: "数字孪生技术在智能制造中的应用",
                   topic: "制造设备数字孪生建模与预测维护",
                   fields: ["数字孪生", "智能制造", "工业4.0"],
-                  submitTime: "2024-01-07",
+                  submitTime: "2025-01-07",
                   status: "申报中",
                   statusType: "submitting",
                 },
@@ -958,8 +958,23 @@
             }
           };
 
+          // 下载链接（本地静态文件，位于当前原型目录下）
+          const downloadUrl = "./智能体申报书.docx";
+          const enableLocalMockDownload = false;
+          const localMockFileName = "智能体申报书.docx";
+
+          // 创建隐藏的本地文件选择器（仅在本地模拟模式下使用）
+          let localFileInput = null;
+          if (!localFileInput) {
+            localFileInput = document.createElement("input");
+            localFileInput.type = "file";
+            localFileInput.accept = ".doc,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword";
+            localFileInput.style.display = "none";
+            document.body.appendChild(localFileInput);
+          }
+
           // 下载处理
-          const handleDownload = (command) => {
+          const handleDownload = async (command) => {
             const { id, format } = command;
             const formatNames = {
               pdf: "PDF",
@@ -967,40 +982,95 @@
               markdown: "Markdown",
             };
 
-            ElMessage.success(
+            ElMessage.info(
               `正在下载申报文档 (ID: ${id}, 格式: ${formatNames[format]})`
             );
 
-            // 模拟下载过程
-            setTimeout(() => {
-              // 创建一个虚拟的下载链接
-              const link = document.createElement("a");
-              link.href = "#"; // 实际应用中这里应该是真实的文件URL
-              link.download = `申报文档_${id}.${
-                format === "word" ? "docx" : format
-              }`;
+            try {
+              // 若开启本地模拟，走本地选择器；默认关闭
+              if (enableLocalMockDownload) {
+                await new Promise((resolve) => {
+                  localFileInput.value = "";
+                  const onChange = async () => {
+                    localFileInput.removeEventListener("change", onChange);
+                    const file = localFileInput.files && localFileInput.files[0];
+                    if (!file) { resolve(); return; }
+                    const arrayBuffer = await file.arrayBuffer();
+                    const blob = new Blob([arrayBuffer], { type: file.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = localMockFileName || file.name || `申报书_${id}.docx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+                    resolve();
+                  };
+                  localFileInput.addEventListener("change", onChange);
+                  localFileInput.click();
+                });
+                return;
+              }
 
-              // 模拟文件内容（实际应用中应该从服务器获取）
-              const blob = new Blob(
-                [`申报文档内容 - ID: ${id}, 格式: ${formatNames[format]}`],
-                {
-                  type:
-                    format === "pdf"
-                      ? "application/pdf"
-                      : format === "word"
-                      ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      : "text/markdown",
-                }
-              );
+              // 1) 优先使用直链下载（最接近“读地址并下载”的行为）
+              try {
+                const direct = document.createElement("a");
+                direct.href = downloadUrl;
+                // 指定下载文件名
+                direct.download = "智能体申报书.docx";
+                direct.target = "_blank";
+                document.body.appendChild(direct);
+                direct.click();
+                document.body.removeChild(direct);
+                ElMessage.success("已开始直链下载");
+                return;
+              } catch (_) {
+                // 忽略，进入 fetch 回退
+              }
 
-              link.href = URL.createObjectURL(blob);
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              URL.revokeObjectURL(link.href);
+              // 2) 回退：使用fetch获取二进制再触发下载（可能受CORS限制）
+              const fileExtensions = {
+                pdf: "pdf",
+                word: "docx",
+                markdown: "md",
+              };
+              const fileExtension = fileExtensions[format] || "docx";
 
+              const response = await fetch(downloadUrl);
+              if (!response.ok) {
+                throw new Error(`下载失败: ${response.status} ${response.statusText}`);
+              }
+
+              const blob = await response.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              const downloadLink = document.createElement("a");
+              downloadLink.href = blobUrl;
+              downloadLink.download = `申报书_${id}.${fileExtension}`;
+              document.body.appendChild(downloadLink);
+              downloadLink.click();
+              document.body.removeChild(downloadLink);
+              setTimeout(() => { URL.revokeObjectURL(blobUrl); }, 100);
               ElMessage.success(`${formatNames[format]}格式文档下载完成`);
-            }, 1000);
+            } catch (error) {
+              console.error("下载错误:", error);
+              ElMessage.error(`下载失败: ${error.message}`);
+              
+              // 3) 最后再尝试一次直链（某些浏览器策略差异）
+              try {
+                const fileExtensions = { pdf: "pdf", word: "docx", markdown: "md" };
+                const link = document.createElement("a");
+                link.href = downloadUrl;
+                link.download = `申报书_${id}.${fileExtensions[format] || "docx"}`;
+                link.target = "_blank";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                ElMessage.info("已尝试使用备用直链方式");
+              } catch (fallbackError) {
+                console.error("备用直链也失败:", fallbackError);
+              }
+            }
           };
 
           // 预览处理
@@ -1009,7 +1079,7 @@
 
             // 模拟预览功能
             ElMessageBox.alert(
-              `这里将显示申报文档的预览内容。\n\n申报编号：SB2024${String(
+              `这里将显示申报文档的预览内容。\n\n申报编号：SB2025${String(
                 id
               ).padStart(
                 3,
