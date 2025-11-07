@@ -47,6 +47,16 @@ infrastructure/      → config, shared, external, common
 - Repository: `save`, `update`, `deleteById`, `findById`, `findByCondition`, `pageByCondition`
 - Converter: `toEntity(req)`, `toResp(entity)`, `toRespList(list)`, `updateEntity(@MappingTarget, req)`
 
+**变量命名**:
+
+- 统一使用驼峰命名（camelCase），禁止使用单字母变量名（如 `a`, `b`, `c`）
+- 变量名要有意义，能清晰表达其用途
+- 局部变量：`userId`, `userName`, `createTime`
+- 循环变量：`item`, `user`, `index`（允许简短的循环变量，但要有意义）
+- 布尔变量：`isDeleted`, `hasPermission`, `canEdit`
+- 集合变量：`userList`, `userIdSet`, `userMap`
+- 临时变量：避免使用 `temp`, `tmp`, `data` 等无意义名称，应使用具体含义的名称
+
 ## 三、注释模板
 
 **类注释**:
@@ -57,9 +67,11 @@ infrastructure/      → config, shared, external, common
  *
  * @author JiaWen.Wu
  * @className 当前类名
- * @date 中国北京当前时间(yyyy-MM-dd HH:mm)
+ * @date 中国北京当前时间 (yyyy-MM-dd HH:mm)
  */
 ```
+
+**注意**: `@date` 字段需要手动填写创建该文件时的北京时间（格式：yyyy-MM-dd HH:mm），不能自动生成。
 
 **方法注释**:
 
@@ -107,6 +119,15 @@ public XxxResp create(XxxCreateReq req) { return resp; }
 ```
 
 **事务**: Service 写操作加`@Transactional(rollbackFor = Exception.class)`
+
+**Java 版本**: 使用 Java 21 语法及新特性处理代码，保证代码的性能和扩展性
+
+- 优先使用 Java 21 新特性：Record、Pattern Matching、Text Blocks、Sealed Classes 等
+- 使用 `var` 关键字简化局部变量声明（当类型明显时）
+- 使用 Stream API 和 Optional 处理集合和空值
+- 使用现代日期时间 API（`java.time` 包）
+- 合理使用并发工具类（`CompletableFuture`、`Virtual Thread` 等）
+- 避免使用过时的 API 和废弃的方法
 
 ## 五、实现顺序
 
@@ -210,6 +231,8 @@ public interface XxxRepo {
 ```java
 package com.sciz.server.domain.pojo.repository.xxx.impl;
 
+import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
+import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
 import com.sciz.server.domain.pojo.entity.xxx.Xxx;
 import com.sciz.server.domain.pojo.mapper.xxx.XxxMapper;
 import com.sciz.server.domain.pojo.repository.xxx.XxxRepo;
@@ -232,16 +255,60 @@ public class XxxRepoImpl implements XxxRepo {
 
     @Override
     public Long save(Xxx entity) {
+        // 新增：直接使用 mapper.insert 方法
         int rows = mapper.insert(entity);
         return rows > 0 ? entity.getId() : null;
     }
 
     @Override
+    public boolean updateById(Xxx entity) {
+        // 更新：使用 mapper.updateById 方法（根据ID更新）
+        return mapper.updateById(entity) > 0;
+    }
+
+    /**
+     * 根据条件更新指定字段
+     *
+     * @param id 主键ID
+     * @param name 名称
+     * @return 是否更新成功
+     */
+    public boolean updateNameById(Long id, String name) {
+        // 更新指定字段：使用 LambdaUpdateChainWrapper
+        return new LambdaUpdateChainWrapper<>(mapper)
+                .eq(Xxx::getId, id)
+                .set(Xxx::getName, name)
+                .update();
+    }
+
+    @Override
     public Xxx findById(Long id) {
-        return mapper.selectById(id);
+        // 查询：使用 LambdaQueryChainWrapper
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(Xxx::getId, id)
+                .eq(Xxx::getIsDeleted, 0)
+                .one();
+    }
+
+    @Override
+    public boolean deleteById(Long id) {
+        // 软删除（相当于更新）：使用 LambdaUpdateChainWrapper
+        return new LambdaUpdateChainWrapper<>(mapper)
+                .eq(Xxx::getId, id)
+                .set(Xxx::getIsDeleted, 1)
+                .update();
     }
 }
 ```
+
+**说明**:
+
+- **查询操作**：使用 `LambdaQueryChainWrapper`，支持链式调用，类型安全
+- **新增操作**：直接使用 `mapper.insert(entity)`，简单高效
+- **更新操作**：
+  - 根据 ID 更新整个实体：使用 `mapper.updateById(entity)`
+  - 根据条件更新指定字段：使用 `LambdaUpdateChainWrapper` 的 `.set()` 方法
+- **删除操作**：软删除实际上是通过更新 `is_deleted` 字段实现，使用 `LambdaUpdateChainWrapper` 的 `.set()` 方法
 
 ### Request DTO
 

@@ -21,6 +21,12 @@ public class SysUserProfileRepoImpl implements SysUserProfileRepo {
         this.mapper = mapper;
     }
 
+    /**
+     * 保存用户档案
+     *
+     * @param entity SysUserProfile 用户档案实体
+     * @return Long 主键ID
+     */
     @Override
     public Long save(SysUserProfile entity) {
         int rows = mapper.insert(entity);

@@ -1,9 +1,10 @@
 package com.sciz.server.domain.pojo.repository.user.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.sciz.server.domain.pojo.entity.user.SysUserRole;
 import com.sciz.server.domain.pojo.mapper.user.SysUserRoleMapper;
 import com.sciz.server.domain.pojo.repository.user.SysUserRoleRepo;
+import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -24,16 +25,29 @@ public class SysUserRoleRepoImpl implements SysUserRoleRepo {
         this.mapper = mapper;
     }
 
+    /**
+     * 保存用户角色关联
+     *
+     * @param entity SysUserRole 用户角色实体
+     * @return Long 主键ID
+     */
     @Override
     public Long save(SysUserRole entity) {
         int rows = mapper.insert(entity);
         return rows > 0 ? entity.getId() : null;
     }
 
+    /**
+     * 查询未删除的用户角色关联
+     *
+     * @param userId Long 用户ID
+     * @return List<SysUserRole> 用户角色列表
+     */
     @Override
     public List<SysUserRole> findNotDeletedByUserId(Long userId) {
-        return mapper.selectList(new QueryWrapper<SysUserRole>()
-                .eq("user_id", userId)
-                .eq("is_deleted", 0));
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysUserRole::getUserId, userId)
+                .eq(SysUserRole::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .list();
     }
 }

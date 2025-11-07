@@ -10,7 +10,7 @@
 /**
  * API 基础路径
  */
-export const API_BASE_URL = '/api'
+export const API_BASE_URL = '/sciz'
 
 /**
  * API 版本
@@ -23,16 +23,16 @@ export const API_VERSION = 'v1'
 
 export const AUTH_API = {
   BASE_PATH: `${API_BASE_URL}/auth`,
-  LOGIN: `${API_BASE_URL}/auth/login`,
-  REGISTER: `${API_BASE_URL}/auth/register`,
-  RESET_PASSWORD: `${API_BASE_URL}/auth/reset-password`,
-  CAPTCHA: `${API_BASE_URL}/auth/captcha`,
-  SEND_EMAIL_CODE: `${API_BASE_URL}/auth/send-email-code`,
-  REFRESH_TOKEN: `${API_BASE_URL}/auth/refresh`,
-  USER_INFO: `${API_BASE_URL}/auth/user-info`,
-  PERMISSIONS: `${API_BASE_URL}/auth/permissions`,  // 获取用户权限列表
-  MENUS: `${API_BASE_URL}/auth/menus`,              // 获取用户菜单列表
-  LOGOUT: `${API_BASE_URL}/auth/logout`
+  LOGIN: `${API_BASE_URL}/${API_VERSION}/auth/login`,
+  REGISTER: `${API_BASE_URL}/${API_VERSION}/auth/register`,
+  RESET_PASSWORD: `${API_BASE_URL}/${API_VERSION}/auth/reset-password`,
+  CAPTCHA: `${API_BASE_URL}/${API_VERSION}/auth/captcha`,
+  SEND_EMAIL_CODE: `${API_BASE_URL}/${API_VERSION}/auth/send-email-code`,
+  REFRESH_TOKEN: `${API_BASE_URL}/${API_VERSION}/auth/refresh`,
+  USER_INFO: `${API_BASE_URL}/${API_VERSION}/auth/user-info`,
+  PERMISSIONS: `${API_BASE_URL}/${API_VERSION}/auth/permissions`,  // 获取用户权限列表
+  MENUS: `${API_BASE_URL}/${API_VERSION}/auth/menus`,              // 获取用户菜单列表
+  LOGOUT: `${API_BASE_URL}/${API_VERSION}/auth/logout`
 }
 
 // ================================
@@ -41,12 +41,12 @@ export const AUTH_API = {
 
 export const DECLARATION_API = {
   BASE_PATH: `${API_BASE_URL}/declaration`,
-  LIST: `${API_BASE_URL}/declaration/list`,
-  CREATE: `${API_BASE_URL}/declaration`,
-  DETAIL: (id) => `${API_BASE_URL}/declaration/${id}`,
-  UPDATE: (id) => `${API_BASE_URL}/declaration/${id}`,
-  DELETE: (id) => `${API_BASE_URL}/declaration/${id}`,
-  SUBMIT: (id) => `${API_BASE_URL}/declaration/${id}/submit`
+  LIST: `${API_BASE_URL}/${API_VERSION}/declaration/list`,
+  CREATE: `${API_BASE_URL}/${API_VERSION}/declaration`,
+  DETAIL: (id) => `${API_BASE_URL}/${API_VERSION}/declaration/${id}`,
+  UPDATE: (id) => `${API_BASE_URL}/${API_VERSION}/declaration/${id}`,
+  DELETE: (id) => `${API_BASE_URL}/${API_VERSION}/declaration/${id}`,
+  SUBMIT: (id) => `${API_BASE_URL}/${API_VERSION}/declaration/${id}/submit`
 }
 
 // ================================

@@ -6,11 +6,17 @@ import cn.dev33.satoken.stp.StpUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.sciz.server.infrastructure.shared.result.ResultCode;
+
 /**
  * Sa-Token 基础安全配置
  *
- * 放行：认证接口、静态/Swagger 资源
- * 其余：默认需要登录
+ * 放行：登录、注册、重置密码、静态资源、Swagger 文档
+ * 其余：默认需要登录（包括 logout、refresh-token、profile 等）
+ *
+ * @author JiaWen.Wu
+ * @className SecurityConfig
+ * @date 2025-11-07 11:30
  */
 @Configuration
 public class SecurityConfig {
@@ -19,13 +25,19 @@ public class SecurityConfig {
     public SaServletFilter saServletFilter() {
         return new SaServletFilter()
                 .addInclude("/**")
-                .addExclude("/api/auth/**")
+                // 认证相关接口：只放行真正不需要 token 的接口
+                .addExclude("/api/auth/login") // 登录
+                .addExclude("/api/auth/register") // 注册
+                .addExclude("/api/auth/reset-password") // 重置密码
+                .addExclude("/api/auth/captcha") // 获取验证码
+                // 静态资源和文档
                 .addExclude("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**")
                 .addExclude("/webjars/**", "/static/**", "/favicon.ico")
+                // 其他所有接口都需要登录
                 .setAuth(obj -> SaRouter.match("/**").check(r -> StpUtil.checkLogin()))
                 .setError(e -> {
                     // 统一未登录响应
-                    return "NOT_LOGIN";
+                    return ResultCode.UNAUTHORIZED;
                 });
     }
 }

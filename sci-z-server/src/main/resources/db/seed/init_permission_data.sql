@@ -103,10 +103,16 @@ UNION ALL
 SELECT (SELECT id FROM sys_permission WHERE permission_code='menu:system:logs' AND industry_type=i.industry_type), '日志-导出按钮', 'button:log:export', 2, i.industry_type, 2, 1 FROM industries i;
 
 -- 5) 用户（仅默认 education 行业创建示例账户，避免 username 唯一索引冲突）
-INSERT INTO sys_user (username, password, real_name, email, industry_type, status, is_deleted, created_time)
+-- 注意：employee_id 用于标识用户在行业内的唯一身份（学工号/工号/员工号），与 industry_type 组合唯一
+-- department_id 用于关联用户所属部门，管理员归属到系统管理部
+INSERT INTO sys_user (username, password, real_name, email, employee_id, department_id, industry_type, status, is_deleted, created_time)
 VALUES
-  ('admin', 'admin', '系统管理员', 'admin@example.com', 'education', 1, 0, CURRENT_TIMESTAMP),
-  ('user',  'user',  '普通用户',   'user@example.com',  'education', 1, 0, CURRENT_TIMESTAMP);
+  ('admin', 'admin', '系统管理员', 'admin@example.com', 'ADMIN001', 
+   (SELECT id FROM sys_department WHERE department_code = 'SYSTEM_ADMIN' AND industry_type = 'education' AND is_deleted = 0), 
+   'education', 1, 0, CURRENT_TIMESTAMP),
+  ('user',  'user',  '普通用户',   'user@example.com', 'USER001',
+   (SELECT id FROM sys_department WHERE department_code = 'CS' AND industry_type = 'education' AND is_deleted = 0),
+   'education', 1, 0, CURRENT_TIMESTAMP);
 
 -- 6) 用户-角色 绑定（education 行业）
 INSERT INTO sys_user_role (user_id, role_id, is_deleted, created_time)

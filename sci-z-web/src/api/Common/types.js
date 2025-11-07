@@ -76,6 +76,16 @@ export const ResetPasswordRequest = {
   newPassword: String
 }
 
+/**
+ * 验证码响应数据
+ * 根据后端 CaptchaResp 定义
+ */
+export const CaptchaResponse = {
+  captchaKey: String,      // 验证码唯一标识(UUID)，前端在登录时需要携带此 key
+  captchaImage: String,     // 验证码图片(Base64 编码)，格式: data:image/png;base64,iVBORw0KGgo...
+  expiresIn: Number         // 验证码过期时间(秒)
+}
+
 // ================================
 // 3. 核心业务类型（只定义稳定字段）
 // ================================
@@ -234,6 +244,13 @@ export default {
   // 基础类型
   BaseResponse,
   PageResponse,
+  
+  // 认证相关类型
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
+  ResetPasswordRequest,
+  CaptchaResponse,
   
   // 核心业务类型
   User,

@@ -82,13 +82,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { BaseButton } from '@/components/Common'
 import { getCaptcha } from '@/api/Auth'
 import { useAuthStore } from '@/store/modules/auth'
+import { getLastUsername } from '@/utils/auth'
+import { createLogger } from '@/utils/simpleLogger'
+
+// 创建日志器
+const authLogger = createLogger('LoginForm')
 
 // 定义事件
 const emit = defineEmits(['login-success', 'forgot-password'])
@@ -107,6 +112,7 @@ const loading = ref(false)
 // 验证码相关
 const showCaptcha = ref(false)
 const captchaUrl = ref('')
+const captchaKey = ref('') // 验证码唯一标识，登录时需要传递
 const loginFailCount = ref(0)
 
 // 表单数据
@@ -114,6 +120,7 @@ const loginForm = reactive({
   username: '',
   password: '',
   captcha: '',
+  captchaId: '', // 验证码ID，对应后端的 captchaKey
   rememberMe: false
 })
 
@@ -149,6 +156,7 @@ const handleLogin = async () => {
       username: loginForm.username,
       password: loginForm.password,
       captcha: loginForm.captcha,
+      captchaId: captchaKey.value, // 传递验证码唯一标识
       rememberMe: loginForm.rememberMe
     })
 
@@ -163,7 +171,7 @@ const handleLogin = async () => {
     loginFailCount.value++
     
     // 失败3次后显示验证码
-    if (loginFailCount.value >= 3) {
+    if (loginFailCount.value >= 5) {
       showCaptcha.value = true
       await refreshCaptcha()
     }
@@ -187,15 +195,37 @@ const handleForgotPassword = () => {
 const refreshCaptcha = async () => {
   try {
     const response = await getCaptcha()
-    captchaUrl.value = response.data.captchaUrl
+    // 根据后端 CaptchaResp 定义，使用 captchaImage 和 captchaKey
+    captchaUrl.value = response.data.captchaImage || response.data.captchaUrl // 兼容两种字段名
+    captchaKey.value = response.data.captchaKey || ''
   } catch (error) {
     // 验证码获取失败，静默处理
   }
 }
 
+// 处理键盘事件（Enter 键提交登录）
+const handleKeyDown = (event) => {
+  if (event.key === 'Enter' && isFormValid.value && !loading.value) {
+    handleLogin()
+  }
+}
+
 // 组件挂载时初始化
 onMounted(() => {
-  // 可以在这里添加一些初始化逻辑
+  // 💾 自动填充上次登录的用户名（提升用户体验）
+  const lastUsername = getLastUsername()
+  if (lastUsername) {
+    loginForm.username = lastUsername
+    authLogger.info('已自动填充上次登录的用户名', { username: lastUsername })
+  }
+  
+  // 为表单添加键盘事件监听
+  document.addEventListener('keydown', handleKeyDown)
+})
+
+// 组件卸载时清理事件监听
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeyDown)
 })
 </script>
 

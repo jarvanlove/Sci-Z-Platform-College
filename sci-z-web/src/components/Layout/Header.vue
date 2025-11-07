@@ -55,7 +55,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAppStore } from '@/store/modules/app'
 import { useAuthStore } from '@/store/modules/auth'
 import LanguageSwitcher from '@/components/Common/LanguageSwitcher.vue'
@@ -102,11 +102,44 @@ const handleUserCommand = (command) => {
 }
 
 // 退出登录
-const handleLogout = () => {
-  const authStore = useAuthStore()
-  authStore.logout()
-  ElMessage.success(t('auth.logoutSuccess'))
-  router.push('/login')
+const handleLogout = async () => {
+  try {
+    // 确认退出
+    await ElMessageBox.confirm(
+      t('auth.logoutConfirm'),
+      t('common.tips'),
+      {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
+        type: 'warning'
+      }
+    )
+    
+    const authStore = useAuthStore()
+    
+    // 调用退出接口并清理本地数据
+    await authStore.logout()
+    
+    // 显示退出成功消息
+    ElMessage.success(t('auth.logoutSuccess'))
+    
+    // 跳转到登录页
+    await router.push('/login')
+    
+    // 开发环境日志
+    if (import.meta.env.DEV) {
+      console.log('✅ 用户已退出登录')
+    }
+  } catch (error) {
+    // 用户取消退出
+    if (error === 'cancel') {
+      return
+    }
+    
+    // 退出失败处理
+    console.error('退出登录失败:', error)
+    ElMessage.error(t('auth.logoutFailed') || '退出登录失败，请重试')
+  }
 }
 </script>
 

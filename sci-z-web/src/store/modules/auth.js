@@ -1,13 +1,10 @@
 import { defineStore } from 'pinia'
 import { login, logout, getUserInfo } from '@/api/Auth'
-import { getToken, setToken, removeToken, getUserInfo as getLocalUserInfo, setUserInfo, removeUserInfo, getPermissions, setPermissions, removePermissions, getRoles, setRoles, removeRoles, getMenus, setMenus, removeMenus } from '@/utils/auth'
+import { getToken, setToken, removeToken, getUserInfo as getLocalUserInfo, setUserInfo, removeUserInfo, getPermissions, setPermissions, removePermissions, getRoles, setRoles, removeRoles, getMenus, setMenus, removeMenus, saveLastUsername } from '@/utils/auth'
 import { createLogger } from '@/utils/simpleLogger'
 
 // 创建认证模块日志器
 const authLogger = createLogger('Auth')
-
-// TODO: 后端开发完成后，取消注释以下导入
-// import { getPermissions, getMenus } from '@/api/Auth'
 
 export const useAuthStore = defineStore('auth', {
   state: () => {
@@ -17,54 +14,13 @@ export const useAuthStore = defineStore('auth', {
     let roles = getRoles()
     let menus = getMenus()
     
-    // 如果用户已登录但没有权限数据，根据用户角色初始化权限
-    if (token && userInfo && (!permissions || permissions.length === 0)) {
-      authLogger.info('检测到已登录用户但权限数据为空，根据角色初始化权限')
-      const userRole = userInfo.role || 'user'
-      
-      if (userRole === 'admin') {
-        permissions = ['*'] // 管理员拥有所有权限
-        roles = ['admin']
-        // 保存到localStorage
-        setPermissions(permissions)
-        setRoles(roles)
-        authLogger.debug('已为admin用户初始化权限', { permissions })
-      } else {
-        // 为普通用户初始化基础权限
-        permissions = [
-          'menu:dashboard:view',
-          'menu:declaration:list',
-          'menu:declaration:create',
-          'menu:declaration:detail',
-          'menu:project:list',
-          'menu:project:detail',
-          'menu:project:progress',
-          'menu:report:list',
-          'menu:report:generate',
-          'menu:knowledge:list',
-          'menu:knowledge:detail',
-          'menu:ai:chat',
-          'menu:user:profile',
-          'menu:user:security',
-          'button:declaration:create',
-          'button:project:create',
-          'button:report:generate',
-          'button:knowledge:create',
-          'data:own'
-        ]
-        roles = ['user']
-        setPermissions(permissions)
-        setRoles(roles)
-        authLogger.debug('已为普通用户初始化权限', { permissions })
-      }
-    }
-    
-    // 如果用户已登录但没有菜单数据，初始化菜单
-    if (token && userInfo && (!menus || menus.length === 0)) {
-      authLogger.info('检测到已登录用户但菜单数据为空，初始化菜单')
-      // 使用临时的菜单数据，稍后在fetchMenus中会重新设置
-      menus = []
-      authLogger.debug('菜单数据将在fetchMenus中初始化')
+    // 如果用户已登录但权限数据为空，说明 localStorage 数据不完整，需要重新登录
+    if (token && userInfo && (!permissions || permissions.length === 0 || !menus || menus.length === 0)) {
+      authLogger.warn('检测到已登录但权限或菜单数据为空，数据可能已损坏，建议重新登录')
+      // 不使用模拟数据，保持空数组，让用户重新登录
+      permissions = permissions || []
+      roles = roles || []
+      menus = menus || []
     }
     
     authLogger.debug('Store初始化完成', {
@@ -123,14 +79,15 @@ export const useAuthStore = defineStore('auth', {
         authLogger.debug('API返回的完整数据', response.data)
         
         // 方案一：从登录接口直接获取所有数据，包括 menus
-        const { token, userInfo, permissions, roles, menus } = response.data
+        const { token, userInfo, permissions, roles, menus, rememberMe } = response.data
         
         authLogger.debug('解构后的数据', { 
           hasToken: !!token, 
           hasUserInfo: !!userInfo, 
           permissionsCount: permissions?.length || 0, 
           rolesCount: roles?.length || 0,
-          menusCount: menus?.length || 0 
+          menusCount: menus?.length || 0,
+          rememberMe: rememberMe
         })
         
         this.token = token
@@ -147,17 +104,29 @@ export const useAuthStore = defineStore('auth', {
           menusCount: this.menus?.length || 0
         })
         
-        setToken(token)
+        // 🔑 核心：根据"记住我"选项存储 token
+        // rememberMe = true: 存储到 localStorage（持久化，浏览器关闭后依然保留）
+        // rememberMe = false: 存储到 sessionStorage（会话，浏览器关闭后清除）
+        const shouldRemember = rememberMe || loginForm.rememberMe || false
+        setToken(token, shouldRemember)
+        
+        // 保存用户信息和权限数据（始终使用 localStorage）
         setUserInfo(userInfo)
         setPermissions(this.permissions)
         setRoles(this.roles)
-        setMenus(this.menus) // 保存菜单数据到localStorage
+        setMenus(this.menus)
+        
+        // 💾 保存上次登录的用户名（用于退出登录后自动填充）
+        if (userInfo?.username) {
+          saveLastUsername(userInfo.username)
+        }
         
         authLogger.info('🎉 登录成功', { 
           permissions: this.permissions,
           roles: this.roles,
           menusCount: this.menus?.length || 0,
-          username: this.userInfo?.username
+          username: this.userInfo?.username,
+          rememberMe: shouldRemember
         })
         
         // 在开发环境中显示登录成功信息
@@ -167,6 +136,7 @@ export const useAuthStore = defineStore('auth', {
           console.log('🔑 权限列表:', this.permissions)
           console.log('👥 角色列表:', this.roles)
           console.log('📋 菜单列表:', this.menus)
+          console.log('💾 记住我:', shouldRemember ? 'localStorage (持久化)' : 'sessionStorage (会话)')
         }
         
         return response
@@ -209,41 +179,6 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    // 获取权限列表
-    async fetchPermissions() {
-      try {
-        // TODO: 后端开发完成后，取消注释以下代码
-        // const response = await getPermissions()
-        // this.permissions = response.data || []
-        // console.log('权限数据获取成功:', this.permissions)
-        
-        // 当前使用模拟数据
-        this.permissions = this.getMockPermissions()
-        authLogger.debug('使用模拟权限数据', { permissions: this.permissions })
-      } catch (error) {
-        authLogger.error('获取权限失败', { error: error.message })
-        // 如果接口失败，使用模拟数据
-        this.permissions = this.getMockPermissions()
-      }
-    },
-
-    // 获取菜单列表
-    async fetchMenus() {
-      try {
-        // TODO: 后端开发完成后，取消注释以下代码
-        // const response = await getMenus()
-        // this.menus = response.data || []
-        // console.log('菜单数据获取成功:', this.menus)
-        
-        // 当前使用模拟数据
-        this.menus = this.getMockMenus()
-        authLogger.debug('使用模拟菜单数据', { menusCount: this.menus?.length || 0 })
-      } catch (error) {
-        authLogger.error('获取菜单失败', { error: error.message })
-        // 如果接口失败，使用模拟数据
-        this.menus = this.getMockMenus()
-      }
-    },
 
     // 退出登录
     async logout() {
@@ -283,176 +218,30 @@ export const useAuthStore = defineStore('auth', {
       removeMenus()
     },
 
-    // ================================
-    // 模拟数据方法（后端开发完成后删除）
-    // ================================
-    
-    // 获取模拟权限数据
-    getMockPermissions() {
-      const userRole = this.userInfo?.role || 'user'
-      
-      const mockPermissions = {
-        admin: [
-          '*', // 超级管理员拥有所有权限
-        ],
-        user: [
-          'menu:dashboard:view',
-          'menu:declaration:list',
-          'menu:declaration:create',
-          'menu:declaration:detail',
-          'menu:project:list',
-          'menu:project:detail',
-          'menu:project:progress',
-          'menu:report:list',
-          'menu:report:generate',
-          'menu:knowledge:list',
-          'menu:knowledge:detail',
-          'menu:ai:chat',
-          'menu:user:profile',
-          'menu:user:security',
-          'menu:system:user',
-          'menu:system:role',
-          'menu:system:config',
-          'menu:system:logs',
-          'button:declaration:create',
-          'button:project:create',
-          'button:report:generate',
-          'button:knowledge:create',
-          'data:own'
-        ],
-        guest: [
-          'menu:dashboard:view',
-          'data:public'
-        ]
-      }
-      
-      return mockPermissions[userRole] || mockPermissions.user
-    },
-
-    // 获取模拟菜单数据
-    getMockMenus() {
-      return [
-        {
-          path: '/dashboard',
-          title: '仪表板',
-          icon: 'Odometer',
-          permission: 'menu:dashboard:view'
-        },
-        {
-          path: 'declaration',
-          title: '申报管理',
-          icon: 'Document',
-          permission: 'menu:declaration:list',
-          children: [
-            {
-              path: '/declaration/list',
-              title: '申报列表',
-              icon: 'List',
-              permission: 'menu:declaration:list'
-            }
-          ]
-        },
-        {
-          path: 'project',
-          title: '项目管理',
-          icon: 'Folder',
-          permission: 'menu:project:list',
-          children: [
-            {
-              path: '/project/list',
-              title: '项目列表',
-              icon: 'List',
-              permission: 'menu:project:list'
-            }
-          ]
-        },
-        {
-          path: 'acceptance',
-          title: '验收管理',
-          icon: 'Check',
-          permission: 'menu:report:list',
-          children: [
-            {
-              path: '/report/list',
-              title: '报告管理',
-              icon: 'List',
-              permission: 'menu:report:list'
-            }
-          ]
-        },
-        {
-          path: 'ai',
-          title: 'AI助手',
-          icon: 'Monitor',
-          permission: 'menu:ai:chat',
-          children: [
-            {
-              path: '/knowledge/list',
-              title: '知识库',
-              icon: 'Reading',
-              permission: 'menu:knowledge:list'
-            },
-            {
-              path: '/ai/chat',
-              title: 'AI对话',
-              icon: 'Avatar',
-              permission: 'menu:ai:chat'
-            }
-          ]
-        },
-        {
-          path: 'user',
-          title: '用户中心',
-          icon: 'User',
-          permission: 'menu:user:profile',
-          children: [
-            {
-              path: '/user/profile',
-              title: '个人信息',
-              icon: 'House',
-              permission: 'menu:user:profile'
-            },
-            {
-              path: '/user/security',
-              title: '安全设置',
-              icon: 'Lock',
-              permission: 'menu:user:security'
-            }
-          ]
-        },
-        {
-          path: 'system',
-          title: '系统管理',
-          icon: 'Setting',
-          permission: 'menu:system:user',
-          children: [
-            {
-              path: '/system/user',
-              title: '用户管理',
-              icon: 'User',
-              permission: 'menu:system:user'
-            },
-            {
-              path: '/system/role',
-              title: '角色权限',
-              icon: 'Key',
-              permission: 'menu:system:role'
-            },
-            {
-              path: '/system/config',
-              title: '系统配置',
-              icon: 'Setting',
-              permission: 'menu:system:config'
-            },
-            {
-              path: '/system/logs',
-              title: '日志管理',
-              icon: 'Document',
-              permission: 'menu:system:logs'
-            }
-          ]
+    // 初始化权限（登录成功后调用）
+    async initPermissions() {
+      try {
+        authLogger.info('开始初始化权限', {
+          permissionsCount: this.permissions?.length || 0,
+          menusCount: this.menus?.length || 0
+        })
+        
+        // 权限数据已在登录时获取，这里只做验证
+        if (!this.permissions || this.permissions.length === 0) {
+          authLogger.warn('权限数据为空，尝试重新获取用户信息')
+          await this.getUserInfo()
         }
-      ]
+        
+        authLogger.info('权限初始化完成', {
+          permissionsCount: this.permissions?.length || 0,
+          menusCount: this.menus?.length || 0
+        })
+        
+        return true
+      } catch (error) {
+        authLogger.error('权限初始化失败', { error: error.message })
+        throw error
+      }
     }
   }
 })

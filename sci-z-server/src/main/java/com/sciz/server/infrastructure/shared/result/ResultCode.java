@@ -113,6 +113,21 @@ public enum ResultCode {
      */
     USER_PERMISSION_DENIED(2006, "用户权限不足"),
 
+    /**
+     * 登录成功
+     */
+    USER_LOGIN_SUCCESS(2100, "登录成功"),
+
+    /**
+     * 注册成功
+     */
+    USER_REGISTER_SUCCESS(2101, "注册成功"),
+
+    /**
+     * 退出成功
+     */
+    USER_LOGOUT_SUCCESS(2102, "退出成功"),
+
     // ==================== 项目相关错误码 (3000-3999) ====================
     /**
      * 项目不存在
@@ -134,6 +149,26 @@ public enum ResultCode {
      */
     PROJECT_PERMISSION_DENIED(3004, "项目权限不足"),
 
+    /**
+     * 项目创建成功
+     */
+    PROJECT_CREATE_SUCCESS(3100, "项目创建成功"),
+
+    /**
+     * 项目更新成功
+     */
+    PROJECT_UPDATE_SUCCESS(3101, "项目更新成功"),
+
+    /**
+     * 项目删除成功
+     */
+    PROJECT_DELETE_SUCCESS(3102, "项目删除成功"),
+
+    /**
+     * 项目状态更新成功
+     */
+    PROJECT_STATUS_UPDATE_SUCCESS(3103, "项目状态更新成功"),
+
     // ==================== 申报相关错误码 (4000-4999) ====================
     /**
      * 申报不存在
@@ -150,79 +185,228 @@ public enum ResultCode {
      */
     DECLARATION_PERMISSION_DENIED(4003, "申报权限不足"),
 
-    // ==================== 文件相关错误码 (5000-5999) ====================
+    /**
+     * 申报提交成功
+     */
+    DECLARATION_SUBMIT_SUCCESS(4100, "申报提交成功"),
+
+    /**
+     * 申报更新成功
+     */
+    DECLARATION_UPDATE_SUCCESS(4101, "申报更新成功"),
+
+    /**
+     * 申报删除成功
+     */
+    DECLARATION_DELETE_SUCCESS(4102, "申报删除成功"),
+
+    /**
+     * 申报审批成功
+     */
+    DECLARATION_APPROVE_SUCCESS(4103, "申报审批成功"),
+
+    /**
+     * 申报驳回成功
+     */
+    DECLARATION_REJECT_SUCCESS(4104, "申报驳回成功"),
+
+    // ==================== 报告相关错误码 (5000-5999) ====================
+    /**
+     * 报告不存在
+     */
+    REPORT_NOT_FOUND(5001, "报告不存在"),
+
+    /**
+     * 报告生成成功
+     */
+    REPORT_GENERATE_SUCCESS(5100, "报告生成成功"),
+
+    /**
+     * 报告更新成功
+     */
+    REPORT_UPDATE_SUCCESS(5101, "报告更新成功"),
+
+    /**
+     * 报告删除成功
+     */
+    REPORT_DELETE_SUCCESS(5102, "报告删除成功"),
+
+    // ==================== 知识库相关错误码 (6000-6999) ====================
+    /**
+     * 知识库不存在
+     */
+    KNOWLEDGE_NOT_FOUND(6001, "知识库不存在"),
+
+    /**
+     * 知识库创建成功
+     */
+    KNOWLEDGE_CREATE_SUCCESS(6100, "知识库创建成功"),
+
+    /**
+     * 知识库更新成功
+     */
+    KNOWLEDGE_UPDATE_SUCCESS(6101, "知识库更新成功"),
+
+    /**
+     * 知识库删除成功
+     */
+    KNOWLEDGE_DELETE_SUCCESS(6102, "知识库删除成功"),
+
+    /**
+     * 知识库文件上传成功
+     */
+    KNOWLEDGE_FILE_UPLOAD_SUCCESS(6103, "文件上传成功"),
+
+    /**
+     * 知识库文件删除成功
+     */
+    KNOWLEDGE_FILE_DELETE_SUCCESS(6104, "文件删除成功"),
+
+    // ==================== 对话相关错误码 (7000-7999) ====================
+    /**
+     * 对话不存在
+     */
+    CONVERSATION_NOT_FOUND(7001, "对话不存在"),
+
+    /**
+     * 对话创建成功
+     */
+    CONVERSATION_CREATE_SUCCESS(7100, "对话创建成功"),
+
+    /**
+     * 对话更新成功
+     */
+    CONVERSATION_UPDATE_SUCCESS(7101, "对话更新成功"),
+
+    /**
+     * 对话删除成功
+     */
+    CONVERSATION_DELETE_SUCCESS(7102, "对话删除成功"),
+
+    /**
+     * 消息发送成功
+     */
+    MESSAGE_SEND_SUCCESS(7103, "消息发送成功"),
+
+    // ==================== 文件相关错误码 (8000-8999) ====================
     /**
      * 文件不存在
      */
-    FILE_NOT_FOUND(5001, "文件不存在"),
+    FILE_NOT_FOUND(8001, "文件不存在"),
 
     /**
      * 文件上传失败
      */
-    FILE_UPLOAD_FAILED(5002, "文件上传失败"),
+    FILE_UPLOAD_FAILED(8002, "文件上传失败"),
 
     /**
      * 文件下载失败
      */
-    FILE_DOWNLOAD_FAILED(5003, "文件下载失败"),
+    FILE_DOWNLOAD_FAILED(8003, "文件下载失败"),
 
     /**
      * 文件类型不支持
      */
-    FILE_TYPE_NOT_SUPPORTED(5004, "文件类型不支持"),
+    FILE_TYPE_NOT_SUPPORTED(8004, "文件类型不支持"),
 
     /**
      * 文件大小超出限制
      */
-    FILE_SIZE_EXCEEDED(5005, "文件大小超出限制"),
+    FILE_SIZE_EXCEEDED(8005, "文件大小超出限制"),
 
-    // ==================== 外部服务相关错误码 (6000-6999) ====================
+    /**
+     * 文件上传成功
+     */
+    FILE_UPLOAD_SUCCESS(8100, "文件上传成功"),
+
+    /**
+     * 文件下载成功
+     */
+    FILE_DOWNLOAD_SUCCESS(8101, "文件下载成功"),
+
+    /**
+     * 文件删除成功
+     */
+    FILE_DELETE_SUCCESS(8102, "文件删除成功"),
+
+    // ==================== 验证相关错误码 (9000-9999) ====================
+    /**
+     * 需要验证码
+     */
+    CAPTCHA_REQUIRED(9000, "需要验证码"),
+
+    /**
+     * 验证码错误
+     */
+    CAPTCHA_ERROR(9001, "验证码错误"),
+
+    /**
+     * 验证码无效
+     */
+    CAPTCHA_INVALID(9001, "验证码无效"),
+
+    /**
+     * 验证码已过期
+     */
+    CAPTCHA_EXPIRED(9002, "验证码已过期"),
+
+    /**
+     * 令牌已过期
+     */
+    TOKEN_EXPIRED(9003, "令牌已过期"),
+
+    /**
+     * 令牌无效
+     */
+    TOKEN_INVALID(9004, "令牌无效"),
+
+    // ==================== 外部服务相关错误码 (10000-10999) ====================
     /**
      * 外部服务调用失败
      */
-    EXTERNAL_SERVICE_ERROR(6001, "外部服务调用失败"),
+    EXTERNAL_SERVICE_ERROR(10001, "外部服务调用失败"),
 
     /**
      * 外部服务超时
      */
-    EXTERNAL_SERVICE_TIMEOUT(6002, "外部服务超时"),
+    EXTERNAL_SERVICE_TIMEOUT(10002, "外部服务超时"),
 
     /**
      * 外部服务不可用
      */
-    EXTERNAL_SERVICE_UNAVAILABLE(6003, "外部服务不可用"),
+    EXTERNAL_SERVICE_UNAVAILABLE(10003, "外部服务不可用"),
 
-    // ==================== 缓存相关错误码 (7000-7999) ====================
+    // ==================== 缓存相关错误码 (11000-11999) ====================
     /**
      * 缓存操作失败
      */
-    CACHE_OPERATION_FAILED(7001, "缓存操作失败"),
+    CACHE_OPERATION_FAILED(11001, "缓存操作失败"),
 
     /**
      * 缓存连接失败
      */
-    CACHE_CONNECTION_FAILED(7002, "缓存连接失败"),
+    CACHE_CONNECTION_FAILED(11002, "缓存连接失败"),
 
-    // ==================== 数据库相关错误码 (8000-8999) ====================
+    // ==================== 数据库相关错误码 (12000-12999) ====================
     /**
      * 数据库操作失败
      */
-    DATABASE_OPERATION_FAILED(8001, "数据库操作失败"),
+    DATABASE_OPERATION_FAILED(12001, "数据库操作失败"),
 
     /**
      * 数据库连接失败
      */
-    DATABASE_CONNECTION_FAILED(8002, "数据库连接失败"),
+    DATABASE_CONNECTION_FAILED(12002, "数据库连接失败"),
 
     /**
      * 数据重复
      */
-    DATABASE_DUPLICATE_KEY(8003, "数据重复"),
+    DATABASE_DUPLICATE_KEY(12003, "数据重复"),
 
     /**
      * 数据约束违反
      */
-    DATABASE_CONSTRAINT_VIOLATION(8004, "数据约束违反");
+    DATABASE_CONSTRAINT_VIOLATION(12004, "数据约束违反");
 
     private final int code;
     private final String message;

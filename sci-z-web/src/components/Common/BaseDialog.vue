@@ -149,4 +149,161 @@ watch(visible, (newVal) => {
     }
   }
 }
+
+// 覆盖 Element Plus Dialog 默认样式
+:deep(.el-dialog) {
+  // 弹窗圆角
+  border-radius: 10px !important;
+  overflow: hidden;
+  
+  // 标题样式
+  .el-dialog__header {
+    padding: 20px 20px 10px;
+    
+    .el-dialog__title {
+      color: #1E3A8A !important;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    // 关闭按钮
+    .el-dialog__headerbtn {
+      .el-dialog__close {
+        color: #909399;
+        font-size: 18px;
+        
+        &:hover {
+          color: #1E3A8A;
+        }
+      }
+    }
+  }
+  
+  // 内容区域
+  .el-dialog__body {
+    padding: 20px;
+    color: var(--text);
+  }
+  
+  // 底部按钮区域
+  .el-dialog__footer {
+    padding: 10px 20px 20px;
+    
+    // 按钮样式
+    .el-button {
+      border-radius: 6px !important;
+      padding: 8px 20px;
+      font-size: 14px;
+      
+      // 取消按钮
+      &--default {
+        color: #606266;
+        border-color: #DCDFE6;
+        background-color: #FFFFFF;
+        
+        &:hover {
+          color: #1E3A8A;
+          border-color: #1E3A8A;
+          background-color: #F5F7FA;
+        }
+      }
+      
+      // 确认按钮
+      &--primary {
+        background-color: #1E3A8A !important;
+        border-color: #1E3A8A !important;
+        color: #FFFFFF !important;
+        
+        &:hover {
+          background-color: #2952B8 !important;
+          border-color: #2952B8 !important;
+        }
+        
+        &:active {
+          background-color: #17306D !important;
+          border-color: #17306D !important;
+        }
+      }
+    }
+  }
+}
+
+// MessageBox 样式覆盖（用于 ElMessageBox.confirm 等）
+:deep(.el-message-box) {
+  // 弹窗圆角
+  border-radius: 10px !important;
+  overflow: hidden;
+  
+  // 标题样式
+  .el-message-box__header {
+    padding-top: 20px;
+    
+    .el-message-box__title {
+      color: #1E3A8A !important;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    // 关闭按钮
+    .el-message-box__headerbtn {
+      .el-message-box__close {
+        color: #909399;
+        
+        &:hover {
+          color: #1E3A8A;
+        }
+      }
+    }
+  }
+  
+  // 内容区域
+  .el-message-box__content {
+    padding: 20px;
+    
+    .el-message-box__message {
+      color: var(--text);
+    }
+  }
+  
+  // 底部按钮
+  .el-message-box__btns {
+    padding: 10px 20px 20px;
+    
+    .el-button {
+      border-radius: 6px !important;
+      padding: 8px 20px;
+      font-size: 14px;
+      
+      // 取消按钮
+      &--default {
+        color: #606266;
+        border-color: #DCDFE6;
+        background-color: #FFFFFF;
+        
+        &:hover {
+          color: #1E3A8A;
+          border-color: #1E3A8A;
+          background-color: #F5F7FA;
+        }
+      }
+      
+      // 确认按钮
+      &--primary {
+        background-color: #1E3A8A !important;
+        border-color: #1E3A8A !important;
+        color: #FFFFFF !important;
+        
+        &:hover {
+          background-color: #2952B8 !important;
+          border-color: #2952B8 !important;
+        }
+        
+        &:active {
+          background-color: #17306D !important;
+          border-color: #17306D !important;
+        }
+      }
+    }
+  }
+}
 </style>

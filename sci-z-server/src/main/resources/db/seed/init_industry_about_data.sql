@@ -54,6 +54,9 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_department WHERE department_code = 'RESEARCH
 INSERT INTO sys_department (parent_id, department_name, department_code, industry_type, level, sort_order, status)
 SELECT 0, '财务处', 'FINANCE', 'education', 1, 10, 1
 WHERE NOT EXISTS (SELECT 1 FROM sys_department WHERE department_code = 'FINANCE' AND industry_type = 'education');
+INSERT INTO sys_department (parent_id, department_name, department_code, industry_type, level, sort_order, status)
+SELECT 0, '系统管理部', 'SYSTEM_ADMIN', 'education', 1, 11, 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_department WHERE department_code = 'SYSTEM_ADMIN' AND industry_type = 'education');
 
 -- 医疗
 INSERT INTO sys_department (parent_id, department_name, department_code, industry_type, level, sort_order, status)

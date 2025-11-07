@@ -48,7 +48,7 @@ public class LoginUserInfoResp {
     private String role;
 
     /**
-     * 状态：active/disabled 等
+     * 状态：enable/disabled
      */
     private String status;
 

@@ -47,4 +47,11 @@ public class LoginResp {
      * 菜单集合
      */
     private List<LoginMenuResp> menus;
+
+    /**
+     * 记住我标记
+     * true: 长期有效（7天）
+     * false: 会话有效（2小时）
+     */
+    private Boolean rememberMe;
 }

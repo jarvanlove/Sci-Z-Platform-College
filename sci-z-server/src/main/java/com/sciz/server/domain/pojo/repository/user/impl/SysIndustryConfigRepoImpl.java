@@ -21,6 +21,12 @@ public class SysIndustryConfigRepoImpl implements SysIndustryConfigRepo {
         this.mapper = mapper;
     }
 
+    /**
+     * 保存行业配置
+     *
+     * @param entity SysIndustryConfig 行业配置实体
+     * @return Long 主键ID
+     */
     @Override
     public Long save(SysIndustryConfig entity) {
         int rows = mapper.insert(entity);

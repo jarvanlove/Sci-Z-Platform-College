@@ -10,15 +10,20 @@ import com.sciz.server.domain.pojo.repository.user.SysPermissionRepo;
 import com.sciz.server.domain.pojo.repository.user.SysRolePermissionRepo;
 import com.sciz.server.domain.pojo.repository.user.SysRoleRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRoleRepo;
+import com.sciz.server.infrastructure.shared.constant.CacheConstant;
+import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
+import com.sciz.server.infrastructure.shared.enums.PermissionType;
 import com.sciz.server.infrastructure.shared.utils.RedisUtil;
 import com.sciz.server.infrastructure.shared.utils.JsonUtil;
+
+import java.time.Duration;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 用户权限聚合查询实现
@@ -37,9 +42,6 @@ public class PermissionServiceImpl implements PermissionService {
     private final SysPermissionRepo permissionRepo;
     private final StringRedisTemplate redis;
 
-    private static final String KEY_NS = "sciz:auth:perm";
-    private static final long TTL_SECONDS = 30L * 60L; // 30分钟
-
     public PermissionServiceImpl(SysUserRoleRepo userRoleRepo,
             SysRoleRepo roleRepo,
             SysRolePermissionRepo rolePermissionRepo,
@@ -52,7 +54,6 @@ public class PermissionServiceImpl implements PermissionService {
         this.redis = redis;
     }
 
-    @Override
     /**
      * 查询用户角色编码集合（含行业过滤与缓存）
      *
@@ -60,34 +61,37 @@ public class PermissionServiceImpl implements PermissionService {
      * @param industryType String 行业类型
      * @return List<String> 角色编码集合
      */
+    @Override
     public List<String> findRoleCodes(Long userId, String industryType) {
-        String cacheKey = String.format("%s:%s:%s:roles", KEY_NS, userId, safe(industryType));
-        String cached = RedisUtil.get(redis, cacheKey);
+        // 1. 检查缓存
+        var cacheKey = buildCacheKey(userId, industryType, "roles");
+        var cached = RedisUtil.get(redis, cacheKey);
         if (cached != null) {
             return parseList(cached);
         }
-        List<SysUserRole> urs = userRoleRepo.findNotDeletedByUserId(userId);
-        if (CollectionUtils.isEmpty(urs)) {
-            RedisUtil.set(redis, cacheKey, toCsv(Collections.emptyList()), java.time.Duration.ofSeconds(TTL_SECONDS));
+
+        // 2. 查询用户角色关联
+        var userRoles = userRoleRepo.findNotDeletedByUserId(userId);
+        if (CollectionUtils.isEmpty(userRoles)) {
+            cacheEmptyResult(cacheKey);
             return Collections.emptyList();
         }
-        List<Long> roleIds = urs.stream().map(SysUserRole::getRoleId).distinct().toList();
+
+        // 3. 提取角色ID列表
+        var roleIds = extractRoleIds(userRoles);
         if (CollectionUtils.isEmpty(roleIds)) {
             return Collections.emptyList();
         }
-        List<SysRole> roles = roleRepo.findByIds(roleIds);
-        List<String> list = roles.stream()
-                .filter(r -> r.getIsDeleted() == null || r.getIsDeleted() == 0)
-                .filter(r -> industryType == null || industryType.equals(r.getIndustryType()))
-                .map(SysRole::getRoleCode)
-                .filter(Objects::nonNull)
-                .distinct()
-                .collect(Collectors.toList());
-        RedisUtil.set(redis, cacheKey, toCsv(list), java.time.Duration.ofSeconds(TTL_SECONDS));
-        return list;
+
+        // 4. 查询角色并过滤
+        var roles = roleRepo.findByIds(roleIds);
+        var roleCodes = filterAndMapRoleCodes(roles, industryType);
+
+        // 5. 缓存结果
+        cacheResult(cacheKey, toCsv(roleCodes));
+        return roleCodes;
     }
 
-    @Override
     /**
      * 查询用户权限码集合（含行业过滤与缓存）
      *
@@ -95,37 +99,37 @@ public class PermissionServiceImpl implements PermissionService {
      * @param industryType String 行业类型
      * @return List<String> 权限码集合
      */
+    @Override
     public List<String> findPermissionCodes(Long userId, String industryType) {
-        String cacheKey = String.format("%s:%s:%s:permissions", KEY_NS, userId, safe(industryType));
-        String cached = RedisUtil.get(redis, cacheKey);
+        // 1. 检查缓存
+        var cacheKey = buildCacheKey(userId, industryType, "permissions");
+        var cached = RedisUtil.get(redis, cacheKey);
         if (cached != null) {
             return parseList(cached);
         }
-        List<Long> roleIds = userRoleRepo.findNotDeletedByUserId(userId)
-                .stream().map(SysUserRole::getRoleId).distinct().toList();
+
+        // 2. 查询用户角色ID列表
+        var roleIds = findUserRoleIds(userId);
         if (CollectionUtils.isEmpty(roleIds)) {
-            RedisUtil.set(redis, cacheKey, toCsv(Collections.emptyList()), java.time.Duration.ofSeconds(TTL_SECONDS));
+            cacheEmptyResult(cacheKey);
             return Collections.emptyList();
         }
 
-        List<Long> permIds = rolePermissionRepo.findNotDeletedByRoleIds(roleIds)
-                .stream().map(SysRolePermission::getPermissionId).distinct().toList();
-        if (CollectionUtils.isEmpty(permIds))
+        // 3. 查询角色权限ID列表
+        var permIds = findRolePermissionIds(roleIds);
+        if (CollectionUtils.isEmpty(permIds)) {
             return Collections.emptyList();
+        }
 
-        List<SysPermission> perms = permissionRepo.findByIds(permIds);
-        List<String> list = perms.stream()
-                .filter(p -> p.getIsDeleted() == null || p.getIsDeleted() == 0)
-                .filter(p -> industryType == null || industryType.equals(p.getIndustryType()))
-                .map(SysPermission::getPermissionCode)
-                .filter(Objects::nonNull)
-                .distinct()
-                .collect(Collectors.toList());
-        RedisUtil.set(redis, cacheKey, toCsv(list), java.time.Duration.ofSeconds(TTL_SECONDS));
-        return list;
+        // 4. 查询权限并过滤
+        var perms = permissionRepo.findByIds(permIds);
+        var permissionCodes = filterAndMapPermissionCodes(perms, industryType);
+
+        // 5. 缓存结果
+        cacheResult(cacheKey, toCsv(permissionCodes));
+        return permissionCodes;
     }
 
-    @Override
     /**
      * 组装用户菜单树（基于菜单型权限，含行业过滤与缓存）
      *
@@ -133,36 +137,52 @@ public class PermissionServiceImpl implements PermissionService {
      * @param industryType String 行业类型
      * @return List<LoginMenuResp> 菜单树
      */
+    @Override
     public List<LoginMenuResp> buildMenus(Long userId, String industryType) {
-        String cacheKey = String.format("%s:%s:%s:menus", KEY_NS, userId, safe(industryType));
-        String cached = RedisUtil.get(redis, cacheKey);
+        // 1. 检查缓存
+        var cacheKey = buildCacheKey(userId, industryType, "menus");
+        var cached = RedisUtil.get(redis, cacheKey);
         if (cached != null) {
             return JsonUtil.fromJsonList(cached, LoginMenuResp.class);
         }
-        // 复用上面取到的 permIds 构建菜单（permission_type = 1）
-        List<Long> roleIds = userRoleRepo.findNotDeletedByUserId(userId)
-                .stream().map(SysUserRole::getRoleId).distinct().toList();
+
+        // 2. 查询用户角色ID列表
+        var roleIds = findUserRoleIds(userId);
         if (CollectionUtils.isEmpty(roleIds)) {
-            RedisUtil.set(redis, cacheKey, JsonUtil.toJson(Collections.emptyList()),
-                    java.time.Duration.ofSeconds(TTL_SECONDS));
+            var emptyMenus = Collections.<LoginMenuResp>emptyList();
+            RedisUtil.set(redis, cacheKey, JsonUtil.toJson(emptyMenus),
+                    Duration.ofSeconds(CacheConstant.PERMISSION_CACHE_EXPIRE));
+            return emptyMenus;
+        }
+
+        // 3. 查询角色权限ID列表
+        var permIds = findRolePermissionIds(roleIds);
+        if (CollectionUtils.isEmpty(permIds)) {
             return Collections.emptyList();
         }
 
-        List<Long> permIds = rolePermissionRepo.findNotDeletedByRoleIds(roleIds)
-                .stream().map(SysRolePermission::getPermissionId).distinct().toList();
-        if (CollectionUtils.isEmpty(permIds))
-            return Collections.emptyList();
+        // 4. 查询菜单类型的权限
+        var perms = permissionRepo.findByIds(permIds);
+        var menuPerms = filterMenuPermissions(perms, industryType);
 
-        List<SysPermission> perms = permissionRepo.findByIds(permIds);
-        List<SysPermission> menuPerms = perms.stream()
-                .filter(p -> p.getIsDeleted() == null || p.getIsDeleted() == 0)
-                .filter(p -> industryType == null || industryType.equals(p.getIndustryType()))
-                .filter(p -> p.getPermissionType() != null && p.getPermissionType() == 1)
-                .collect(Collectors.toList());
-
-        List<LoginMenuResp> menus = buildMenuTree(menuPerms);
-        RedisUtil.set(redis, cacheKey, JsonUtil.toJson(menus), java.time.Duration.ofSeconds(TTL_SECONDS));
+        // 5. 构建菜单树并缓存
+        var menus = buildMenuTree(menuPerms);
+        RedisUtil.set(redis, cacheKey, JsonUtil.toJson(menus),
+                Duration.ofSeconds(CacheConstant.PERMISSION_CACHE_EXPIRE));
         return menus;
+    }
+
+    /**
+     * 获取用户主要角色编码（第一个角色）
+     *
+     * @param userId       Long 用户ID
+     * @param industryType String 行业类型
+     * @return String 主要角色编码，如果没有角色则返回 null
+     */
+    @Override
+    public String getPrimaryRoleCode(Long userId, String industryType) {
+        var roleCodes = findRoleCodes(userId, industryType);
+        return roleCodes.isEmpty() ? null : roleCodes.get(0);
     }
 
     /**
@@ -170,59 +190,228 @@ public class PermissionServiceImpl implements PermissionService {
      *
      * @param userId       Long 用户ID
      * @param industryType String 行业类型
-     * @return void
      */
     @Override
     public void refreshUserAuthCache(Long userId, String industryType) {
-        RedisUtil.delete(redis, String.format("%s:%s:%s:roles", KEY_NS, userId, safe(industryType)));
-        RedisUtil.delete(redis, String.format("%s:%s:%s:permissions", KEY_NS, userId, safe(industryType)));
-        RedisUtil.delete(redis, String.format("%s:%s:%s:menus", KEY_NS, userId, safe(industryType)));
+        RedisUtil.delete(redis, buildCacheKey(userId, industryType, "roles"));
+        RedisUtil.delete(redis, buildCacheKey(userId, industryType, "permissions"));
+        RedisUtil.delete(redis, buildCacheKey(userId, industryType, "menus"));
     }
 
+    // ==================== 私有辅助方法 ====================
+
+    /**
+     * 构建缓存键
+     *
+     * @param userId       用户ID
+     * @param industryType 行业类型
+     * @param type         缓存类型（roles/permissions/menus）
+     * @return 缓存键
+     */
+    private String buildCacheKey(Long userId, String industryType, String type) {
+        return String.format("%s:%s:%s:%s",
+                CacheConstant.PERMISSION_CACHE_NAMESPACE, userId, safe(industryType), type);
+    }
+
+    /**
+     * 缓存空结果
+     *
+     * @param cacheKey 缓存键
+     */
+    private void cacheEmptyResult(String cacheKey) {
+        RedisUtil.set(redis, cacheKey, toCsv(Collections.emptyList()),
+                Duration.ofSeconds(CacheConstant.PERMISSION_CACHE_EXPIRE));
+    }
+
+    /**
+     * 缓存结果
+     *
+     * @param cacheKey 缓存键
+     * @param value    缓存值
+     */
+    private void cacheResult(String cacheKey, String value) {
+        RedisUtil.set(redis, cacheKey, value,
+                Duration.ofSeconds(CacheConstant.PERMISSION_CACHE_EXPIRE));
+    }
+
+    /**
+     * 查询用户角色ID列表
+     *
+     * @param userId 用户ID
+     * @return 角色ID列表
+     */
+    private List<Long> findUserRoleIds(Long userId) {
+        return userRoleRepo.findNotDeletedByUserId(userId)
+                .stream()
+                .map(SysUserRole::getRoleId)
+                .distinct()
+                .toList();
+    }
+
+    /**
+     * 提取角色ID列表
+     *
+     * @param userRoles 用户角色关联列表
+     * @return 角色ID列表
+     */
+    private List<Long> extractRoleIds(List<SysUserRole> userRoles) {
+        return userRoles.stream()
+                .map(SysUserRole::getRoleId)
+                .distinct()
+                .toList();
+    }
+
+    /**
+     * 查询角色权限ID列表
+     *
+     * @param roleIds 角色ID列表
+     * @return 权限ID列表
+     */
+    private List<Long> findRolePermissionIds(List<Long> roleIds) {
+        return rolePermissionRepo.findNotDeletedByRoleIds(roleIds)
+                .stream()
+                .map(SysRolePermission::getPermissionId)
+                .distinct()
+                .toList();
+    }
+
+    /**
+     * 过滤并映射角色编码
+     *
+     * @param roles        角色列表
+     * @param industryType 行业类型
+     * @return 角色编码列表
+     */
+    private List<String> filterAndMapRoleCodes(List<SysRole> roles, String industryType) {
+        return roles.stream()
+                .filter(role -> role.getIsDeleted() == null
+                        || DeleteStatus.NOT_DELETED.getCode().equals(role.getIsDeleted()))
+                .filter(role -> industryType == null || industryType.equals(role.getIndustryType()))
+                .map(SysRole::getRoleCode)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    /**
+     * 过滤并映射权限编码
+     *
+     * @param perms        权限列表
+     * @param industryType 行业类型
+     * @return 权限编码列表
+     */
+    private List<String> filterAndMapPermissionCodes(List<SysPermission> perms, String industryType) {
+        return perms.stream()
+                .filter(perm -> perm.getIsDeleted() == null
+                        || DeleteStatus.NOT_DELETED.getCode().equals(perm.getIsDeleted()))
+                .filter(perm -> industryType == null || industryType.equals(perm.getIndustryType()))
+                .map(SysPermission::getPermissionCode)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    /**
+     * 过滤菜单类型的权限
+     *
+     * @param perms        权限列表
+     * @param industryType 行业类型
+     * @return 菜单权限列表
+     */
+    private List<SysPermission> filterMenuPermissions(List<SysPermission> perms, String industryType) {
+        return perms.stream()
+                .filter(perm -> perm.getIsDeleted() == null
+                        || DeleteStatus.NOT_DELETED.getCode().equals(perm.getIsDeleted()))
+                .filter(perm -> industryType == null || industryType.equals(perm.getIndustryType()))
+                .filter(perm -> perm.getPermissionType() != null
+                        && PermissionType.MENU.getCode().equals(perm.getPermissionType()))
+                .toList();
+    }
+
+    /**
+     * 构建菜单树形结构
+     *
+     * @param menuPerms 菜单权限列表
+     * @return 菜单树
+     */
     private List<LoginMenuResp> buildMenuTree(List<SysPermission> menuPerms) {
-        Map<Long, LoginMenuResp> id2node = new HashMap<>();
-        List<LoginMenuResp> roots = new ArrayList<>();
-        for (SysPermission p : menuPerms) {
-            LoginMenuResp node = toNode(p);
-            id2node.put(p.getId(), node);
+        var idToNode = new HashMap<Long, LoginMenuResp>();
+        var roots = new ArrayList<LoginMenuResp>();
+
+        // 第一遍：构建所有节点
+        for (var perm : menuPerms) {
+            var node = toNode(perm);
+            idToNode.put(perm.getId(), node);
         }
-        for (SysPermission p : menuPerms) {
-            Long pid = p.getParentId();
-            LoginMenuResp node = id2node.get(p.getId());
-            if (pid == null || pid == 0 || !id2node.containsKey(pid)) {
+
+        // 第二遍：构建树形结构
+        for (var perm : menuPerms) {
+            var parentId = perm.getParentId();
+            var node = idToNode.get(perm.getId());
+            if (parentId == null || parentId == 0 || !idToNode.containsKey(parentId)) {
                 roots.add(node);
             } else {
-                LoginMenuResp parent = id2node.get(pid);
-                if (parent.getChildren() == null)
+                var parent = idToNode.get(parentId);
+                if (parent.getChildren() == null) {
                     parent.setChildren(new ArrayList<>());
+                }
                 parent.getChildren().add(node);
             }
         }
         return roots;
     }
 
-    private LoginMenuResp toNode(SysPermission p) {
-        LoginMenuResp n = new LoginMenuResp();
-        n.setPath(p.getPath());
-        n.setTitle(p.getPermissionName());
-        n.setIcon(p.getIcon());
-        n.setPermission(p.getPermissionCode());
-        return n;
+    /**
+     * 将权限实体转换为菜单节点
+     *
+     * @param perm 权限实体
+     * @return 菜单节点
+     */
+    private LoginMenuResp toNode(SysPermission perm) {
+        var node = new LoginMenuResp();
+        node.setPath(perm.getPath());
+        node.setTitle(perm.getPermissionName());
+        node.setIcon(perm.getIcon());
+        node.setPermission(perm.getPermissionCode());
+        return node;
     }
 
-    private String safe(String s) {
-        return s == null ? "" : s;
+    /**
+     * 安全字符串处理（null 转为空字符串）
+     *
+     * @param str 字符串
+     * @return 非 null 的字符串
+     */
+    private String safe(String str) {
+        return str == null ? "" : str;
     }
 
+    /**
+     * 解析 CSV 字符串为列表
+     *
+     * @param csv CSV 字符串
+     * @return 字符串列表
+     */
     private List<String> parseList(String csv) {
-        if (csv == null || csv.isEmpty())
+        if (csv == null || csv.isEmpty()) {
             return Collections.emptyList();
-        return Arrays.stream(csv.split(",")).filter(it -> !it.isEmpty()).distinct().toList();
+        }
+        return Arrays.stream(csv.split(","))
+                .filter(item -> !item.isEmpty())
+                .distinct()
+                .toList();
     }
 
+    /**
+     * 将列表转换为 CSV 字符串
+     *
+     * @param list 字符串列表
+     * @return CSV 字符串
+     */
     private String toCsv(List<String> list) {
-        if (list == null || list.isEmpty())
+        if (list == null || list.isEmpty()) {
             return "";
+        }
         return String.join(",", list);
     }
 

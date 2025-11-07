@@ -146,6 +146,7 @@ const canSendEmailCode = computed(() => {
 const resetForm = reactive({
   email: '',
   captcha: '',
+  captchaId: '', // 验证码ID，对应后端的 captchaKey
   emailCode: '',
   newPassword: '',
   confirmPassword: ''
@@ -203,6 +204,7 @@ const handleReset = async () => {
     const response = await resetPassword({
       email: resetForm.email,
       captcha: resetForm.captcha,
+      captchaId: resetForm.captchaId, // 传递验证码唯一标识
       emailCode: resetForm.emailCode,
       newPassword: resetForm.newPassword
     })
@@ -270,7 +272,9 @@ const sendEmailCode = async () => {
 const refreshCaptcha = async () => {
   try {
     const response = await getCaptcha()
-    captchaUrl.value = response.data.captchaUrl
+    // 根据后端 CaptchaResp 定义，使用 captchaImage 和 captchaKey
+    captchaUrl.value = response.data.captchaImage || response.data.captchaUrl // 兼容两种字段名
+    resetForm.captchaId = response.data.captchaKey || ''
   } catch (error) {
     console.error('获取验证码失败:', error)
   }

@@ -26,4 +26,20 @@ public interface SysUserRepo {
      * @return SysUser 或 null
      */
     SysUser findByUsername(String username);
+
+    /**
+     * 根据ID查询用户
+     *
+     * @param id 用户ID
+     * @return SysUser 或 null
+     */
+    SysUser findById(Long id);
+
+    /**
+     * 更新用户
+     *
+     * @param entity SysUser 实体
+     * @return 是否更新成功
+     */
+    boolean updateById(SysUser entity);
 }

@@ -53,7 +53,7 @@ mybatis-plus: # MyBatis-Plus 配置
     cache-enabled: false # 关闭二级缓存
     jdbc-type-for-null: "NULL" # 空值 JDBC 类型
     call-setters-on-nulls: true # 空值也调用 setter
-    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl # 使用 Slf4j 打印 SQL
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 使用 Slf4j 打印 SQL
     default-statement-timeout: 30 # SQL 超时时间（秒）
     auto-mapping-behavior: FULL # 自动映射级别
     auto-mapping-unknown-column-behavior: WARNING # 未知列映射告警

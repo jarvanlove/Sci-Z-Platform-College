@@ -148,6 +148,7 @@ const registerForm = reactive({
   password: '',
   confirmPassword: '',
   captcha: '',
+  captchaId: '', // 验证码ID，对应后端的 captchaKey
   agreement: false
 })
 
@@ -219,7 +220,8 @@ const handleRegister = async () => {
       username: registerForm.username,
       email: registerForm.email,
       password: registerForm.password,
-      captcha: registerForm.captcha
+      captcha: registerForm.captcha,
+      captchaId: registerForm.captchaId // 传递验证码唯一标识
     })
 
     // 注册成功
@@ -266,7 +268,9 @@ const showPrivacyPolicy = () => {
 const refreshCaptcha = async () => {
   try {
     const response = await getCaptcha()
-    captchaUrl.value = response.data.captchaUrl
+    // 根据后端 CaptchaResp 定义，使用 captchaImage 和 captchaKey
+    captchaUrl.value = response.data.captchaImage || response.data.captchaUrl // 兼容两种字段名
+    registerForm.captchaId = response.data.captchaKey || ''
   } catch (error) {
     console.error('获取验证码失败:', error)
   }

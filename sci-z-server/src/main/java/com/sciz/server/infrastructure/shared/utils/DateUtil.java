@@ -7,16 +7,25 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.time.ZoneId;
 import java.util.Date;
 
 /**
  * 日期时间工具类
+ * 基于 Java 21 的 java.time API，提供常用的日期时间操作方法
  *
  * @author JiaWen.Wu
- * @className DateUtils
+ * @className DateUtil
  * @date 2025-10-29 10:30
  */
-public class DateUtil {
+public final class DateUtil {
+
+    /**
+     * 私有构造方法，防止实例化
+     */
+    private DateUtil() {
+        throw new UnsupportedOperationException("Utility class");
+    }
 
     /**
      * 默认日期时间格式化器
@@ -322,6 +331,6 @@ public class DateUtil {
      * @return 日期时间
      */
     public static LocalDateTime fromDate(Date date) {
-        return date.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime();
+        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
     }
 }

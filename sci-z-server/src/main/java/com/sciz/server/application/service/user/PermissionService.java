@@ -47,7 +47,15 @@ public interface PermissionService {
      *
      * @param userId       Long 用户ID
      * @param industryType String 行业类型
-     * @return void
      */
     void refreshUserAuthCache(Long userId, String industryType);
+
+    /**
+     * 获取用户主要角色编码（第一个角色）
+     *
+     * @param userId       Long 用户ID
+     * @param industryType String 行业类型
+     * @return String 主要角色编码，如果没有角色则返回 null
+     */
+    String getPrimaryRoleCode(Long userId, String industryType);
 }

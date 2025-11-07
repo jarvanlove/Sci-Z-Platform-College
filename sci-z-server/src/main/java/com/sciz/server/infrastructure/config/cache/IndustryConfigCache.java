@@ -1,16 +1,16 @@
 package com.sciz.server.infrastructure.config.cache;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sciz.server.domain.pojo.entity.user.SysConfig;
 import com.sciz.server.domain.pojo.repository.user.SysConfigRepo;
+import com.sciz.server.infrastructure.shared.constant.CacheConstant;
 import com.sciz.server.infrastructure.shared.utils.RedisUtil;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 行业配置提供器
@@ -22,20 +22,9 @@ import java.util.Map;
  * @className IndustryConfigCache
  * @date 2025-10-31 10:30
  */
+@Slf4j
 @Component
 public class IndustryConfigCache {
-
-    // 命名空间
-    public static final String KEY_NAMESPACE = "sciz:cfg:industry";
-    // 当前行业整体配置
-    public static final String KEY_CURRENT = KEY_NAMESPACE + ":current";
-
-    // 这些是我们关心的配置键
-    private static final String K_TYPE = "current_industry_type";
-    private static final String K_NAME = "current_industry_name";
-    private static final String K_LABEL_DEPT = "label.department";
-    private static final String K_LABEL_ROLE = "label.role";
-    private static final String K_LABEL_EMP = "label.employee_id";
 
     private final SysConfigRepo sysConfigRepo;
     private final StringRedisTemplate redis;
@@ -52,15 +41,18 @@ public class IndustryConfigCache {
      * @return IndustryView 行业视图
      */
     public IndustryView get() {
-        String json = RedisUtil.get(redis, KEY_CURRENT);
+        var json = RedisUtil.get(redis, CacheConstant.INDUSTRY_CONFIG_CURRENT_KEY);
         if (json != null) {
             try {
                 return objectMapper.readValue(json, IndustryView.class);
-            } catch (Exception ignore) {
-                // 解析异常则回源
+            } catch (Exception e) {
+                log.warn(String.format("解析行业配置缓存失败，将从数据库重新加载: err=%s", e.getMessage()));
+                // 解析异常则回源 DB
             }
         }
-        IndustryView view = loadFromDb();
+
+        // 从数据库加载并缓存
+        var view = loadFromDb();
         cache(view);
         return view;
     }
@@ -78,14 +70,15 @@ public class IndustryConfigCache {
      * 将行业视图写入 Redis 缓存
      *
      * @param view IndustryView 行业视图
-     * @return void
      */
     private void cache(IndustryView view) {
         try {
-            String json = objectMapper.writeValueAsString(view);
-            // TTL 一天；若需要常驻可将 ttl 置为 null
-            RedisUtil.set(redis, KEY_CURRENT, json, Duration.ofDays(1));
-        } catch (Exception ignore) {
+            var json = objectMapper.writeValueAsString(view);
+            RedisUtil.set(redis, CacheConstant.INDUSTRY_CONFIG_CURRENT_KEY, json,
+                    Duration.ofSeconds(CacheConstant.INDUSTRY_CONFIG_CACHE_EXPIRE));
+            log.info(String.format("行业配置已缓存: type=%s, name=%s", view.getType(), view.getName()));
+        } catch (Exception e) {
+            log.error(String.format("缓存行业配置失败: err=%s", e.getMessage()), e);
         }
     }
 
@@ -95,19 +88,30 @@ public class IndustryConfigCache {
      * @return IndustryView 行业视图
      */
     private IndustryView loadFromDb() {
-        Map<String, String> kv = new HashMap<>();
-        for (String k : new String[] { K_TYPE, K_NAME, K_LABEL_DEPT, K_LABEL_ROLE, K_LABEL_EMP }) {
-            SysConfig cfg = sysConfigRepo.findByKey(k);
-            if (cfg != null && cfg.getConfigValue() != null) {
-                kv.put(k, cfg.getConfigValue());
+        var configKeys = new String[] {
+                CacheConstant.CONFIG_KEY_INDUSTRY_TYPE,
+                CacheConstant.CONFIG_KEY_INDUSTRY_NAME,
+                CacheConstant.CONFIG_KEY_LABEL_DEPT,
+                CacheConstant.CONFIG_KEY_LABEL_ROLE,
+                CacheConstant.CONFIG_KEY_LABEL_EMP
+        };
+
+        var configMap = new HashMap<String, String>();
+        for (var key : configKeys) {
+            var config = sysConfigRepo.findByKey(key);
+            if (config != null && config.getConfigValue() != null) {
+                configMap.put(key, config.getConfigValue());
             }
         }
-        IndustryView view = new IndustryView();
-        view.setType(kv.getOrDefault(K_TYPE, "education"));
-        view.setName(kv.getOrDefault(K_NAME, "教育行业"));
-        view.setDepartmentLabel(kv.getOrDefault(K_LABEL_DEPT, "院系"));
-        view.setRoleLabel(kv.getOrDefault(K_LABEL_ROLE, "角色"));
-        view.setEmployeeIdLabel(kv.getOrDefault(K_LABEL_EMP, "学工号"));
+
+        var view = new IndustryView();
+        view.setType(configMap.getOrDefault(CacheConstant.CONFIG_KEY_INDUSTRY_TYPE, "education"));
+        view.setName(configMap.getOrDefault(CacheConstant.CONFIG_KEY_INDUSTRY_NAME, "教育行业"));
+        view.setDepartmentLabel(configMap.getOrDefault(CacheConstant.CONFIG_KEY_LABEL_DEPT, "院系"));
+        view.setRoleLabel(configMap.getOrDefault(CacheConstant.CONFIG_KEY_LABEL_ROLE, "角色"));
+        view.setEmployeeIdLabel(configMap.getOrDefault(CacheConstant.CONFIG_KEY_LABEL_EMP, "学工号"));
+
+        log.info(String.format("从数据库加载行业配置成功: type=%s, name=%s", view.getType(), view.getName()));
         return view;
     }
 

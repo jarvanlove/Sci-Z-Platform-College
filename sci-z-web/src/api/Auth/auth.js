@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 import { AUTH_API, HTTP_METHODS } from '../Common/constants'
-import { LoginRequest, LoginResponse, RegisterRequest, ResetPasswordRequest } from '../Common/types'
+import { LoginRequest, LoginResponse, RegisterRequest, ResetPasswordRequest, CaptchaResponse } from '../Common/types'
 
 /**
  * 认证模块 API 接口
@@ -12,218 +12,20 @@ import { LoginRequest, LoginResponse, RegisterRequest, ResetPasswordRequest } fr
  * @param {LoginRequest} data - 登录请求参数
  * @returns {Promise<LoginResponse>}
  */
-// 获取模拟菜单数据（与 store 中的菜单数据保持一致）
-const getMockMenus = () => {
-  return [
-    {
-      path: '/dashboard',
-      title: '仪表板',
-      icon: 'Odometer',
-      permission: 'menu:dashboard:view'
-    },
-    {
-      path: 'declaration',
-      title: '申报管理',
-      icon: 'Document',
-      permission: 'menu:declaration:list',
-      children: [
-        {
-          path: '/declaration/list',
-          title: '申报列表',
-          icon: 'List',
-          permission: 'menu:declaration:list'
-        }
-      ]
-    },
-    {
-      path: 'project',
-      title: '项目管理',
-      icon: 'Folder',
-      permission: 'menu:project:list',
-      children: [
-        {
-          path: '/project/list',
-          title: '项目列表',
-          icon: 'List',
-          permission: 'menu:project:list'
-        }
-      ]
-    },
-    {
-      path: 'acceptance',
-      title: '验收管理',
-      icon: 'Check',
-      permission: 'menu:report:list',
-      children: [
-        {
-          path: '/report/list',
-          title: '报告管理',
-          icon: 'List',
-          permission: 'menu:report:list'
-        }
-      ]
-    },
-    {
-      path: 'ai',
-      title: 'AI助手',
-      icon: 'Monitor',
-      permission: 'menu:ai:chat',
-      children: [
-        {
-          path: '/knowledge/list',
-          title: '知识库',
-          icon: 'Reading',
-          permission: 'menu:knowledge:list'
-        },
-        {
-          path: '/ai/chat',
-          title: 'AI对话',
-          icon: 'Avatar',
-          permission: 'menu:ai:chat'
-        }
-      ]
-    },
-    {
-      path: 'user',
-      title: '用户中心',
-      icon: 'User',
-      permission: 'menu:user:profile',
-      children: [
-        {
-          path: '/user/profile',
-          title: '个人信息',
-          icon: 'House',
-          permission: 'menu:user:profile'
-        },
-        {
-          path: '/user/security',
-          title: '安全设置',
-          icon: 'Lock',
-          permission: 'menu:user:security'
-        }
-      ]
-    },
-    {
-      path: 'system',
-      title: '系统管理',
-      icon: 'Setting',
-      permission: 'menu:system:user',
-      children: [
-        {
-          path: '/system/user',
-          title: '用户管理',
-          icon: 'User',
-          permission: 'menu:system:user'
-        },
-        {
-          path: '/system/role',
-          title: '角色权限',
-          icon: 'Key',
-          permission: 'menu:system:role'
-        },
-        {
-          path: '/system/config',
-          title: '系统配置',
-          icon: 'Setting',
-          permission: 'menu:system:config'
-        },
-        {
-          path: '/system/logs',
-          title: '日志管理',
-          icon: 'Document',
-          permission: 'menu:system:logs'
-        }
-      ]
-    }
-  ]
-}
 
 export const login = (data) => {
-  // TODO: 后端开发完成后，移除模拟登录逻辑，直接调用真实接口
-  // 当前使用模拟数据，支持 admin/admin 默认登录
-  
-  // 模拟登录逻辑
-  if (data.username === 'admin' && (data.password === 'admin' || data.password === 'admin123')) {
-    return Promise.resolve({
-      data: {
-        token: 'mock-admin-token-' + Date.now(),
-        userInfo: {
-          id: 1,
-          username: 'admin',
-          nickname: '系统管理员',
-          email: 'admin@example.com',
-          avatar: '',
-          role: 'admin',
-          status: 'active',
-          createTime: new Date().toISOString()
-        },
-        permissions: ['*'], // 管理员拥有所有权限
-        roles: ['admin'],
-        menus: getMockMenus() // 方案一：登录接口返回菜单数据
-      },
-      code: 200,
-      message: '登录成功'
-    })
-  }
-  
-  // 普通用户登录
-  if (data.username === 'user' && data.password === 'user') {
-    return Promise.resolve({
-      data: {
-        token: 'mock-user-token-' + Date.now(),
-        userInfo: {
-          id: 2,
-          username: 'user',
-          nickname: '普通用户',
-          email: 'user@example.com',
-          avatar: '',
-          role: 'user',
-          status: 'active',
-          createTime: new Date().toISOString()
-        },
-        permissions: [
-          'menu:dashboard:view',
-          'menu:declaration:view',
-          'menu:declaration:create',
-          'menu:project:view',
-          'menu:project:create',
-          'menu:report:view',
-          'menu:report:generate',
-          'menu:knowledge:view',
-          'menu:knowledge:create',
-          'menu:ai:view',
-          'menu:user:profile',
-          'menu:user:security',
-          'button:declaration:create',
-          'button:project:create',
-          'button:report:generate',
-          'button:knowledge:create',
-          'data:own'
-        ],
-        roles: ['user'],
-        menus: getMockMenus() // 方案一：登录接口返回菜单数据
-      },
-      code: 200,
-      message: '登录成功'
-    })
-  }
-  
-  // 其他情况返回错误
-  return Promise.reject({
-    response: {
-      data: {
-        code: 401,
-        message: '用户名或密码错误'
-      }
-    }
+  /**
+   * 登录接口
+   * 后端接口：POST /auth/login
+   * 入参：{ username, password, rememberMe, captcha }
+   * 出参：{ token, tokenType, expiresIn, userInfo, roles, permissions, menus }
+   * 说明：采用方案一，登录接口一次性返回所有初始化数据（包括菜单）
+   */
+  return request({
+    url: AUTH_API.LOGIN,
+    method: HTTP_METHODS.POST,
+    data
   })
-  
-  // 后端开发完成后的真实接口调用
-  // return request({
-  //   url: AUTH_API.LOGIN,
-  //   method: HTTP_METHODS.POST,
-  //   data
-  // })
 }
 
 /**
@@ -254,7 +56,20 @@ export const resetPassword = (data) => {
 
 /**
  * 获取验证码
- * @returns {Promise<ApiResponse>}
+ * @returns {Promise<ApiResponse<CaptchaResponse>>}
+ * 
+ * 后端接口：GET /auth/captcha
+ * 
+ * 返回参数（根据后端 CaptchaResp 定义）：
+ * - captchaKey: String - 验证码唯一标识(UUID)，前端在登录时需要携带此 key
+ * - captchaImage: String - 验证码图片(Base64 编码)，格式: data:image/png;base64,iVBORw0KGgo...
+ * - expiresIn: Number - 验证码过期时间(秒)
+ * 
+ * 使用示例：
+ * const response = await getCaptcha()
+ * const { captchaKey, captchaImage, expiresIn } = response.data
+ * // captchaImage 可以直接作为 img 标签的 src 使用
+ * // 登录时需要将 captchaKey 作为 captchaId 参数传递
  */
 export const getCaptcha = () => {
   return request({
@@ -294,25 +109,15 @@ export const refreshToken = () => {
  * @returns {Promise<ApiResponse>}
  */
 export const getUserInfo = () => {
-  // TODO: 后端开发完成后，取消注释以下代码，移除模拟逻辑
-  // return request({
-  //   url: AUTH_API.USER_INFO,
-  //   method: HTTP_METHODS.GET
-  // })
-  
-  // 当前使用模拟数据，从localStorage获取用户信息
-  const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}')
-  const permissions = JSON.parse(localStorage.getItem('permissions') || '[]')
-  const roles = JSON.parse(localStorage.getItem('roles') || '[]')
-  
-  return Promise.resolve({
-    data: {
-      userInfo,
-      permissions,
-      roles
-    },
-    code: 200,
-    message: '获取用户信息成功'
+  /**
+   * 获取用户信息接口（可选）
+   * 后端接口：GET /auth/user-info
+   * 出参：与登录接口相同的结构（userInfo, roles, permissions, menus）
+   * 说明：用于会话恢复时重新获取用户初始化数据
+   */
+  return request({
+    url: AUTH_API.USER_INFO,
+    method: HTTP_METHODS.GET
   })
 }
 
@@ -343,18 +148,13 @@ export const getMenus = () => {
  * @returns {Promise<ApiResponse>}
  */
 export const logout = () => {
-  // TODO: 后端开发完成后，取消注释以下代码，移除模拟逻辑
-  // return request({
-  //   url: AUTH_API.LOGOUT,
-  //   method: HTTP_METHODS.POST
-  // })
-  
-  // 当前使用模拟数据，模拟退出登录成功
-  return Promise.resolve({
-    data: {
-      message: '退出登录成功'
-    },
-    code: 200,
-    message: '退出登录成功'
+  /**
+   * 退出登录接口
+   * 后端接口：POST /auth/logout
+   * 说明：清除服务端 Sa-Token 会话
+   */
+  return request({
+    url: AUTH_API.LOGOUT,
+    method: HTTP_METHODS.POST
   })
 }

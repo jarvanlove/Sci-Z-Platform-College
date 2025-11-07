@@ -26,6 +26,7 @@
     <lombok.version>1.18.30</lombok.version>
     <langchain4j.version>0.34.0</langchain4j.version>
     <jbcrypt.version>0.4</jbcrypt.version>
+    <ip2region.version>2.7.0</ip2region.version>
   </properties>
 
   <dependencies>
@@ -123,6 +124,13 @@
       <groupId>org.mindrot</groupId>
       <artifactId>jbcrypt</artifactId>
       <version>${jbcrypt.version}</version>
+    </dependency>
+
+    <!-- IP地址解析库 ip2region -->
+    <dependency>
+      <groupId>org.lionsoul</groupId>
+      <artifactId>ip2region</artifactId>
+      <version>${ip2region.version}</version>
     </dependency>
 
     <!-- 测试 -->

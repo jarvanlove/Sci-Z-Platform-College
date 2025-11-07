@@ -54,11 +54,31 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 
 // 处理登录成功
-const handleLoginSuccess = (userData) => {
-  ElMessage.success(t('auth.loginSuccess'))
-  
-  // 跳转到仪表板
-  router.push('/dashboard')
+const handleLoginSuccess = async (userData) => {
+  try {
+    // 显示登录成功消息
+    ElMessage.success(t('auth.loginSuccess'))
+    
+    // 等待权限初始化完成
+    await authStore.initPermissions()
+    
+    // 判断跳转目标页面
+    const redirect = router.currentRoute.value.query.redirect
+    const targetPath = redirect && redirect !== '/login' ? redirect : '/dashboard'
+    
+    // 跳转到目标页面
+    await router.push(targetPath)
+    
+    // 打印调试信息（开发环境）
+    if (import.meta.env.DEV) {
+      console.log('✅ 登录成功，已跳转到:', targetPath)
+      console.log('📊 用户权限:', authStore.permissions)
+      console.log('📋 用户菜单:', authStore.menus)
+    }
+  } catch (error) {
+    console.error('登录后处理失败:', error)
+    ElMessage.error('登录成功但初始化失败，请刷新页面')
+  }
 }
 
 // 处理忘记密码

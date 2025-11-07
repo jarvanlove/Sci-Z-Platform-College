@@ -9,6 +9,10 @@ import org.springframework.stereotype.Service;
 
 /**
  * 登录日志应用服务实现
+ *
+ * @author JiaWen.Wu
+ * @className LoginLogServiceImpl
+ * @date 2025-11-07 17:50
  */
 @Slf4j
 @Service
@@ -34,8 +38,8 @@ public class LoginLogServiceImpl implements LoginLogService {
         entity.setLoginTime(event.getLoginTime());
 
         Long id = save(entity);
-        log.info(String.format("[LoginLogService] saved loginLog id=%s user=%s status=%s",
-                String.valueOf(id), entity.getUsername(), String.valueOf(entity.getStatus())));
+        log.info(String.format("[LoginLogService] saved loginLog: id=%s, username=%s, status=%s",
+                id, entity.getUsername(), entity.getStatus()));
         return id;
     }
 

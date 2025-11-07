@@ -1,8 +1,8 @@
 spring: # Spring 开发环境配置
   datasource:
-    url: jdbc:postgresql://localhost:5432/sciz_platform # 本地数据库 URL
+    url: jdbc:postgresql://localhost:5432/postgres?currentSchema=sci-z-college # 本地数据库 URL
     username: postgres # 本地数据库用户名
-    password: postgres # 本地数据库密码
+    password: root # 本地数据库密码
     driver-class-name: org.postgresql.Driver # PostgreSQL 驱动
     hikari:
       maximum-pool-size: 10 # 最大连接数
