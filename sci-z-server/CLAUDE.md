@@ -995,6 +995,25 @@ public class XxxResp {
 
 ### Converter
 
+#### 接口层（`interfaces/converter`）规范
+
+- 统一使用 **MapStruct**（`@Mapper(componentModel = "spring")`），仅承担 **DTO ↔ 领域实体/响应对象** 的字段映射，严禁包含业务逻辑、校验、数据库访问。
+- 命名规则沿用 `XxxConverter`，所在包固定为 `com.sciz.server.interfaces.converter`。
+- 方法命名遵循 `toEntity(...)`、`toResp(...)`、`toLoginUserInfoResp(...)` 等语义化名称；若需要组合数据，可在 Service 中调用转换器生成基础对象后再补充业务字段。
+- 当字段无法直接映射时使用 `@Mapping` 标明忽略或自定义来源，保持 MapStruct 生成代码可读、可维护。
+- 转换器实例通过构造器注入到应用服务（`application/service`）或控制层，禁止在 Controller 中手写 `new XxxResp()` 等重复赋值。
+- 根据业务需要提供单向或双向映射方法：例如请求 DTO → 领域实体（创建、更新场景），实体 → 响应 DTO（查询、返回场景）；无需刻意补齐未使用的方向。
+
+#### 外部接口（`infrastructure/external/**/converter`）规范
+
+- 作用：对接三方系统时，将第三方请求/响应转换为项目内部的 **领域命令 / DTO**，或将内部对象转换回三方协议格式，实现 **边界解耦**。
+- 命名与目录：按照外部系统划分包路径（如 `infrastructure.external.dify.converter`），转换器命名为 `XxxExternalConverter` 或具备语义的名称。
+- 转换策略：
+  - **入站**：三方请求 → 外部 DTO → 转换器 → 内部 DTO/命令 → 应用服务；
+  - **出站**：应用服务返回内部 DTO/领域对象 → 转换器 → 三方响应模型 → 外部系统。
+- 外部转换器同样推荐使用 MapStruct，如需进行格式化/枚举映射等，保持逻辑纯粹（无资源访问）；必要的异常映射在应用服务或外部适配层处理。
+- 应用服务层只依赖内部 DTO，所有与第三方格式的细节均在 `infrastructure.external` 层完成，确保领域模型不被外部字段污染。
+
 ```java
 package com.sciz.server.interfaces.converter;
 

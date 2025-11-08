@@ -1,10 +1,12 @@
 package com.sciz.server.domain.pojo.repository.user.impl;
 
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
+import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
 import com.sciz.server.domain.pojo.entity.user.SysUserRole;
 import com.sciz.server.domain.pojo.mapper.user.SysUserRoleMapper;
 import com.sciz.server.domain.pojo.repository.user.SysUserRoleRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
+import java.time.LocalDateTime;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -49,5 +51,36 @@ public class SysUserRoleRepoImpl implements SysUserRoleRepo {
                 .eq(SysUserRole::getUserId, userId)
                 .eq(SysUserRole::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
                 .list();
+    }
+
+    /**
+     * 按角色查询未删除的用户角色关系
+     *
+     * @param roleId Long 角色ID
+     * @return List<SysUserRole> 用户角色列表
+     */
+    @Override
+    public List<SysUserRole> findNotDeletedByRoleId(Long roleId) {
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysUserRole::getRoleId, roleId)
+                .eq(SysUserRole::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .list();
+    }
+
+    /**
+     * 根据ID列表标记删除
+     *
+     * @param ids List<Long> 主键ID列表
+     */
+    @Override
+    public void markDeletedByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        new LambdaUpdateChainWrapper<>(mapper)
+                .in(SysUserRole::getId, ids)
+                .set(SysUserRole::getIsDeleted, DeleteStatus.DELETED.getCode())
+                .set(SysUserRole::getUpdatedTime, LocalDateTime.now())
+                .update();
     }
 }

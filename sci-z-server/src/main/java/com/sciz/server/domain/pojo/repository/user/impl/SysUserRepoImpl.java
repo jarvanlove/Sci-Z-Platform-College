@@ -1,7 +1,6 @@
 package com.sciz.server.domain.pojo.repository.user.impl;
 
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
-import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
 import com.sciz.server.domain.pojo.mapper.user.SysUserMapper;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
@@ -46,6 +45,34 @@ public class SysUserRepoImpl implements SysUserRepo {
     public SysUser findByUsername(String username) {
         return new LambdaQueryChainWrapper<>(mapper)
                 .eq(SysUser::getUsername, username)
+                .eq(SysUser::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .one();
+    }
+
+    /**
+     * 根据邮箱查询用户
+     *
+     * @param email String 邮箱
+     * @return SysUser 用户实体或 null
+     */
+    @Override
+    public SysUser findByEmail(String email) {
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysUser::getEmail, email)
+                .eq(SysUser::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .one();
+    }
+
+    /**
+     * 根据手机号查询用户
+     *
+     * @param phone String 手机号
+     * @return SysUser 用户实体或 null
+     */
+    @Override
+    public SysUser findByPhone(String phone) {
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysUser::getPhone, phone)
                 .eq(SysUser::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
                 .one();
     }

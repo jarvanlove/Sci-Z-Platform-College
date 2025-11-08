@@ -28,6 +28,22 @@ public interface SysUserRepo {
     SysUser findByUsername(String username);
 
     /**
+     * 按邮箱查询
+     *
+     * @param email 邮箱
+     * @return SysUser 或 null
+     */
+    SysUser findByEmail(String email);
+
+    /**
+     * 按手机号查询
+     *
+     * @param phone 手机号
+     * @return SysUser 或 null
+     */
+    SysUser findByPhone(String phone);
+
+    /**
      * 根据ID查询用户
      *
      * @param id 用户ID

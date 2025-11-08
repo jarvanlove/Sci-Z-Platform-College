@@ -47,11 +47,13 @@ import { ElMessage } from 'element-plus'
 import { BaseCard, BaseScrollbar } from '@/components/Common'
 import { LoginForm } from '@/components/Business/Auth'
 import { useAuthStore } from '@/store/modules/auth'
+import { useIndustryStore } from '@/store/modules/industry'
 
 // 路由和国际化
 const router = useRouter()
 const { t } = useI18n()
 const authStore = useAuthStore()
+const industryStore = useIndustryStore()
 
 // 处理登录成功
 const handleLoginSuccess = async (userData) => {
@@ -59,8 +61,11 @@ const handleLoginSuccess = async (userData) => {
     // 显示登录成功消息
     ElMessage.success(t('auth.loginSuccess'))
     
-    // 等待权限初始化完成
-    await authStore.initPermissions()
+    // 等待权限初始化完成，并预热行业配置
+    await Promise.all([
+      authStore.initPermissions(),
+      industryStore.fetchIndustryConfig()
+    ])
     
     // 判断跳转目标页面
     const redirect = router.currentRoute.value.query.redirect

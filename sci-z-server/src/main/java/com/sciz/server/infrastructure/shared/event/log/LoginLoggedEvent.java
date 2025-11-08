@@ -1,6 +1,8 @@
 package com.sciz.server.infrastructure.shared.event.log;
 
 import com.sciz.server.infrastructure.shared.event.DomainEvent;
+import java.time.LocalDateTime;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -48,16 +50,16 @@ public class LoginLoggedEvent extends DomainEvent {
      */
     private String message;
     /**
-     * 登录时间（字符串）
+     * 登录时间
      */
-    private String loginTime;
+    private LocalDateTime loginTime;
 
     public LoginLoggedEvent() {
         super();
     }
 
     public LoginLoggedEvent(Long userId, String username, String loginIp, String loginLocation,
-            String browser, String os, Integer status, String message, String loginTime) {
+            String browser, String os, Integer status, String message, LocalDateTime loginTime) {
         super();
         this.userId = userId;
         this.username = username;

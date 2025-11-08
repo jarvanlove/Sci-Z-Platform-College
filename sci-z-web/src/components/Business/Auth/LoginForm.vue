@@ -120,7 +120,6 @@ const loginForm = reactive({
   username: '',
   password: '',
   captcha: '',
-  captchaId: '', // 验证码ID，对应后端的 captchaKey
   rememberMe: false
 })
 
@@ -156,7 +155,7 @@ const handleLogin = async () => {
       username: loginForm.username,
       password: loginForm.password,
       captcha: loginForm.captcha,
-      captchaId: captchaKey.value, // 传递验证码唯一标识
+      captchaKey: captchaKey.value, // 传递验证码唯一标识
       rememberMe: loginForm.rememberMe
     })
 
@@ -171,7 +170,7 @@ const handleLogin = async () => {
     loginFailCount.value++
     
     // 失败3次后显示验证码
-    if (loginFailCount.value >= 5) {
+    if (loginFailCount.value >= 3) {
       showCaptcha.value = true
       await refreshCaptcha()
     }

@@ -1,11 +1,23 @@
 package com.sciz.server.interfaces.converter;
 
-import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
+import cn.dev33.satoken.stp.SaTokenInfo;
+import com.sciz.server.domain.pojo.dto.response.user.LoginMenuResp;
+import com.sciz.server.domain.pojo.dto.response.user.LoginUserInfoResp;
 import com.sciz.server.domain.pojo.dto.response.user.ProfileResp;
+import com.sciz.server.domain.pojo.dto.response.user.RefreshTokenResp;
+import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 /**
+ * 认证模块 DTO ↔ 实体转换器
+ *
+ * 负责接口层请求/响应与领域实体之间的映射，避免在 Controller / Service 中编写重复的赋值逻辑。
+ *
  * @author JiaWen.Wu
  * @className AuthConverter
  * @date 2025-10-30 00:00
@@ -14,44 +26,78 @@ import org.mapstruct.Mapper;
 public interface AuthConverter {
 
     /**
-     * 构造登录返回模型
+     * SysUser → LoginUserInfoResp
      *
-     * @param user       SysUser 登录用户
-     * @param token      String 访问令牌
-     * @param expireTime Long 过期秒数
-     * @return LoginResp 登录响应
+     * @param user SysUser 实体
+     * @return LoginUserInfoResp 基础用户信息响应
      */
-    default LoginResp toLoginResp(SysUser user, String token, Long expireTime) {
-        if (user == null) {
-            return null;
-        }
-        LoginResp resp = new LoginResp();
-        //resp.setUserId(user.getId());
-        //resp.setUsername(user.getUsername());
-        //resp.setToken(token);
-        //resp.setExpireTime(expireTime);
-        // 如需可扩展 realName、refreshToken 等，在此补充
-        return resp;
+    @Mapping(target = "department", ignore = true)
+    @Mapping(target = "role", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "industry", ignore = true)
+    @Mapping(target = "avatar", ignore = true)
+    LoginUserInfoResp toLoginUserInfoResp(SysUser user);
+
+    /**
+     * SysUser → RegisterResp
+     *
+     * @param user SysUser 实体
+     * @return RegisterResp 注册响应
+     */
+    @Mapping(target = "userId", source = "id")
+    RegisterResp toRegisterResp(SysUser user);
+
+    /**
+     * 组装 ProfileResp
+     *
+     * @param user            SysUser 实体
+     * @param tokenInfo       SaTokenInfo token信息
+     * @param userInfo        LoginUserInfoResp 用户基础信息
+     * @param roleCodes       List<String> 角色编码集合
+     * @param permissionCodes List<String> 权限编码集合
+     * @param menus           List<LoginMenuResp> 菜单集合
+     * @param tokenTimeout    Long token剩余秒数
+     * @return ProfileResp 档案响应
+     */
+    default ProfileResp toProfileResp(SysUser user,
+            SaTokenInfo tokenInfo,
+            LoginUserInfoResp userInfo,
+            List<String> roleCodes,
+            List<String> permissionCodes,
+            List<LoginMenuResp> menus,
+            Long tokenTimeout) {
+        var safeRoles = roleCodes == null ? List.<String>of() : List.copyOf(roleCodes);
+        var safePermissions = permissionCodes == null ? List.<String>of() : List.copyOf(permissionCodes);
+        var safeMenus = menus == null ? List.<LoginMenuResp>of() : List.copyOf(menus);
+        return new ProfileResp(
+                user.getId(),
+                Objects.requireNonNull(tokenInfo).getTokenName(),
+                tokenInfo.getTokenValue(),
+                tokenTimeout,
+                userInfo,
+                safeRoles,
+                safePermissions,
+                safeMenus);
     }
 
     /**
-     * 构造个人信息返回模型
+     * 组装刷新 Token 响应
      *
-     * @param userId       Long 用户ID
-     * @param username     String 用户名
-     * @param tokenName    String Token 名称
-     * @param tokenValue   String Token 值
-     * @param tokenTimeout Long Token 剩余秒数
-     * @return ProfileResp 个人信息响应
+     * @param loginId   String 登录ID
+     * @param tokenInfo SaTokenInfo token信息
+     * @param expiresIn Long 剩余秒
+     * @param expiresAt LocalDateTime 过期时间
+     * @return RefreshTokenResp 刷新结果
      */
-    default ProfileResp toProfileResp(Long userId, String username, String tokenName, String tokenValue,
-            Long tokenTimeout) {
-        ProfileResp resp = new ProfileResp();
-        resp.setUserId(userId);
-        resp.setUsername(username);
-        resp.setTokenName(tokenName);
-        resp.setTokenValue(tokenValue);
-        resp.setTokenTimeout(tokenTimeout);
-        return resp;
+    default RefreshTokenResp toRefreshTokenResp(String loginId,
+            SaTokenInfo tokenInfo,
+            Long expiresIn,
+            LocalDateTime expiresAt) {
+        return new RefreshTokenResp(
+                loginId,
+                Objects.requireNonNull(tokenInfo).getTokenName(),
+                tokenInfo.getTokenValue(),
+                expiresIn,
+                expiresAt);
     }
 }

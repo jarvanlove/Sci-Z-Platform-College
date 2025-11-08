@@ -4,7 +4,6 @@ import com.sciz.server.application.service.log.LoginLogService;
 import com.sciz.server.application.service.user.LoginLogAndStatsService;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
-import com.sciz.server.infrastructure.shared.constant.SystemConstant;
 import com.sciz.server.infrastructure.shared.enums.LoginStatus;
 import com.sciz.server.infrastructure.shared.event.log.LoginLoggedEvent;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 /**
  * 登录日志和统计服务实现类
@@ -68,8 +66,7 @@ public class LoginLogAndStatsServiceImpl implements LoginLogAndStatsService {
         }
         user.setLoginCount(currentCount + 1);
 
-        // 解析登录时间字符串为 LocalDateTime
-        LocalDateTime loginTime = parseLoginTime(event.getLoginTime());
+        LocalDateTime loginTime = event.getLoginTime() != null ? event.getLoginTime() : LocalDateTime.now();
         user.setLastLoginTime(loginTime);
         user.setLastLoginIp(event.getLoginIp());
 
@@ -83,30 +80,4 @@ public class LoginLogAndStatsServiceImpl implements LoginLogAndStatsService {
         }
     }
 
-    /**
-     * 解析登录时间字符串为 LocalDateTime
-     *
-     * @param loginTimeStr 登录时间字符串（格式：yyyy-MM-dd HH:mm:ss）
-     * @return LocalDateTime
-     */
-    private LocalDateTime parseLoginTime(String loginTimeStr) {
-        if (loginTimeStr == null || loginTimeStr.isEmpty()) {
-            return LocalDateTime.now();
-        }
-
-        try {
-            // 尝试解析标准格式：yyyy-MM-dd HH:mm:ss
-            if (loginTimeStr.contains(" ")) {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern(SystemConstant.DATE_TIME_FORMAT);
-                return LocalDateTime.parse(loginTimeStr, formatter);
-            } else {
-                // 如果只有日期，补充时间
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern(SystemConstant.DATE_FORMAT);
-                return java.time.LocalDate.parse(loginTimeStr, formatter).atStartOfDay();
-            }
-        } catch (Exception e) {
-            log.warn(String.format("解析登录时间失败，使用当前时间: loginTime=%s, error=%s", loginTimeStr, e.getMessage()));
-            return LocalDateTime.now();
-        }
-    }
 }

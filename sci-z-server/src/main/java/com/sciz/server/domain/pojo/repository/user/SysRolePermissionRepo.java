@@ -28,4 +28,19 @@ public interface SysRolePermissionRepo {
      * @return List<SysRolePermission> 关系集合
      */
     List<SysRolePermission> findNotDeletedByRoleIds(List<Long> roleIds);
+
+    /**
+     * 查询指定角色未删除的权限关系
+     *
+     * @param roleId Long 角色ID
+     * @return List<SysRolePermission> 角色权限列表
+     */
+    List<SysRolePermission> findNotDeletedByRoleId(Long roleId);
+
+    /**
+     * 根据ID集合标记删除
+     *
+     * @param ids List<Long> 主键ID集合
+     */
+    void markDeletedByIds(List<Long> ids);
 }

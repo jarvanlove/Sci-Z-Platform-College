@@ -5,11 +5,13 @@ import { createLogger } from './simpleLogger'
 
 // 创建请求模块日志器
 const requestLogger = createLogger('Request')
+// 请求超时时间(5分钟)
+const REQUEST_TIMEOUT = 300000
 
 // 创建axios实例
 const service = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 10000
+  timeout: REQUEST_TIMEOUT
 })
 
 // 请求拦截器
@@ -74,7 +76,11 @@ service.interceptors.response.use(
           ElMessage.error(data?.message || '请求失败')
       }
     } else {
-      ElMessage.error('网络错误，请检查网络连接')
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        ElMessage.error('请求超时，请稍后重试或联系管理员')
+      } else {
+        ElMessage.error('网络错误，请检查网络连接')
+      }
     }
     
     return Promise.reject(error)

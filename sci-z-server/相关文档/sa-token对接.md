@@ -1,250 +1,83 @@
-## 基于 Sa-Token 的通用权限管理对接说明（可复用方案）
+## Sa-Token 对接现状与后续计划（项目专用）
 
-> 适用场景：后端基于 Java + Spring（Boot/Cloud）集成 [Sa-Token] 实现可复用的认证与权限（RBAC）、会话、风控与多端设备管理能力。
+### 1. 登录与注册后的能力说明
 
-### 目标与范围
+- **注册**：`POST /api/auth/register` 仅写入 `sys_user` 基础信息（用户名、邮箱、手机号、院系等），默认状态为启用。不会自动绑定角色或权限。
+- **默认角色**：注册完成后会自动尝试为用户绑定代码为 `ROLE_USER`、行业类型与注册院系一致的角色，并刷新权限缓存。若库中不存在该角色，会记录 warn 日志，需要运维提前在 `sys_role` 中配置好默认角色及其权限。
+- **登录**：`POST /api/auth/login` 成功后返回完整用户聚合信息：
+  - Token 及有效期；
+  - `userInfo`（由 `AuthConverter` 转换）：id、用户名、真实姓名、邮箱、手机号、院系、头像等；
+  - `roles` / `permissions` / `menus` 列表（通过 `PermissionService` 查询）。
+- **默认权限**：注册后的新用户在未被赋权前，上述集合均为空。前端可以拿到完整结构，但无任何菜单和功能可访问。
+- **赋权流程**：
+  1. 使用后台管理接口或脚本在 `sys_user_role`、`sys_role_permission` 等表中为该用户绑定角色/权限。
+  2. 操作后调用 `PermissionService.refreshUserAuthCache(userId, industryType)` 或提供对应的管理端刷新接口。
+  3. 用户重新登录即可在响应中看到角色、权限码和对应菜单，前端即可渲染具体功能。
 
-- **目标**：沉淀一套可复用的权限管理对接规范，覆盖认证、授权、会话、接口规范、测试与运维。
-- **范围**：后端集成、接口约定、数据模型建议、前后端对接约定、安全基线与测试要求。
+### 2. 已落地功能概览
 
-### 术语速览
+| 模块           | 状态 | 说明                                                      |
+| -------------- | ---- | --------------------------------------------------------- |
+| 登录/注册      | ✅   | 接口可用，注册写入用户表，登录返回全量聚合信息            |
+| 验证码校验     | ✅   | 登录/注册均支持图形验证码校验                             |
+| 全局鉴权过滤器 | ✅   | `SecurityConfig.saServletFilter` 放行公开接口，其余需登录 |
+| 登录日志与统计 | ✅   | 成功登录会写入 `sys_login_log` 并更新用户登录统计         |
 
-- **Token**：登录态凭证，默认放在 `Authorization: Bearer <token>` 或 `satoken` 头/参数中。
-- **StpUtil**：Sa-Token 提供的登录与权限校验工具类。
-- **注解**：`@SaCheckLogin`、`@SaCheckRole`、`@SaCheckPermission`、`@SaIgnore` 等。
-- **逻辑类**：`StpLogic`（可自定义多账号体系，如 admin、app、mini 等）。
-- **会话**：`SaSession`，支持用户会话、Token 会话与自定义会话。
+### 3. 待对接清单
 
----
+| 优先级 | 项目                           | 当前状态                                                    | 对接方案                                                              |
+| ------ | ------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| **高** | 角色/权限赋权链路              | 注册后无默认角色                                            | 落地用户/角色/权限绑定接口或后台管理界面，操作后刷新缓存              |
+| **高** | `POST /api/auth/profile`       | 返回占位数据                                                | 调 `PermissionService` 返回真实资料（角色、权限码、菜单树、基础信息） |
+| **高** | `POST /api/auth/refresh-token` | 仅回显当前 Token                                            | 使用 Sa-Token `renewTimeout` 或重新签发 Token，完善返回结构           |
+| **中** | 便捷校验接口                   | 未实现 (`check/login`、`check/role`、`check/perm`)          | 补齐简单接口，前端可快速判断登录态/权限态                             |
+| **中** | 会话治理接口                   | 未实现 (`session/current`、`kickout`、`disable`、`devices`) | 封装 `StpUtil` 能力，支持后台运维                                     |
+| **中** | 重置密码 `reset-password`      | 占位                                                        | 完成验证码/旧密码校验、强密码策略及事件推送                           |
+| **低** | 风控与限流                     | 部分缺失                                                    | 按业务需要补充分布式限流、黑名单、登录失败锁定等                      |
+| **低** | 测试与验收                     | 未覆盖                                                      | 编写登录/鉴权相关单测、集成测试，覆盖成功/失败/越权场景               |
 
-## 一、接入清单（最小可用到可复用）
-
-### 1. 依赖与版本
-
-```xml
-<dependency>
-  <groupId>cn.dev33</groupId>
-  <artifactId>sa-token-spring-boot3-starter</artifactId>
-  <version>latest</version>
-</dependency>
-<!-- 如需 Redis 持久化会话/黑名单等 -->
-<dependency>
-  <groupId>cn.dev33</groupId>
-  <artifactId>sa-token-dao-redis-jackson</artifactId>
-  <version>latest</version>
-</dependency>
-```
-
-### 2. 基础配置（application.yml 示例）
-
-```yaml
-sa-token:
-  token-name: Authorization # Token 名（也可用 satoken）
-  token-prefix: Bearer # HTTP 头前缀
-  timeout: 2592000 # 登录有效期（秒），默认 30 天
-  activity-timeout: 1800 # 临时有效期（秒），开启续期场景
-  is-concurrent: false # 是否同一账号并发登录
-  is-share: false # 同端是否共享 Token
-  token-style: uuid # uuid | random-32 | simple-uuid | tik 等
-  is-log: false # 生产建议 false
-  is-read-cookie: false # 前后端分离常设为 false
-  is-read-body: false
-  is-read-header: true
-  jwt-secret-key: "" # 若使用 jwt 模式需设置
-```
-
-### 3. Web 安全拦截
-
-- 全局拦截器/过滤器：放行登录、静态资源、健康检查；其余路径按需鉴权。
-
-```java
-@Configuration
-public class SaTokenConfigure {
-    @Bean
-    public SaServletFilter saServletFilter() {
-        return new SaServletFilter()
-            .addExclude("/auth/login", "/actuator/**", "/public/**")
-            .setAuth(obj -> { /* 可做统一前置校验与日志 */ })
-            .setError(e -> SaResult.error(e.getMessage()));
-    }
-}
-```
-
-### 4. 登录与鉴权基础流程
-
-1. 账号密码/第三方凭证校验通过后：`StpUtil.login(userId, device)` 生成 Token；
-2. 返回 Token 与用户基础资料；
-3. 业务接口使用注解或 `StpUtil` 做登录/角色/权限校验；
-4. 续签：访问期间若超出 `activity-timeout` 会自动刷新临时有效期；
-5. 登出/踢人/封禁、黑名单可按需开启。
-
-### 5. 注解与 AOP
-
-- `@SaCheckLogin`：要求已登录。
-- `@SaCheckRole("admin")`：要求角色。
-- `@SaCheckPermission("user:read")`：要求权限码。
-- `@SaIgnore`：忽略 Sa-Token 校验（如回调/公用接口）。
-
-### 6. RBAC 数据模型建议
-
-- 表：`sys_user`、`sys_role`、`sys_permission`、`sys_user_role`、`sys_role_permission`、`sys_menu`、`sys_tenant`（如需多租户）。
-- 可参考项目内种子脚本 `src/main/resources/db/seed/init_all_tables.sql` 进行落表与索引优化。
-
----
-
-## 二、标准接口规范（后端可复用模板）
-
-> 返回体建议统一为强类型 DTO，且状态码/提示语来自 `ResultCode` 枚举，避免硬编码。
-
-### 1) 认证类
-
-- `POST /auth/login`
-  - 入参：`username`、`password`、`device`、`captchaId`、`captchaCode`
-  - 出参：`token`、`expireIn`、`refreshIn`、`userProfile`
-- `POST /auth/logout`
-- `POST /auth/refresh`
-  - 场景：短 Token + 长刷新期；或主动续签通知
-- `GET /auth/profile`：获取当前用户资料、角色、权限码、菜单树
-- `GET /auth/permissions`：仅拉权限码列表（前端快速权限渲染）
-
-### 2) 鉴权便捷接口（可选）
-
-- `GET /auth/check/login`：是否登录
-- `GET /auth/check/role?code=admin`
-- `GET /auth/check/perm?code=user:query`
-
-### 3) 会话与风控
-
-- `GET /session/current`：当前 `SaSession` 与 Token 信息
-- `POST /session/kickout`：按用户或 Token 踢下线
-- `POST /session/disable`：封禁（含时长、原因）
-- `GET /session/devices`：多端设备列表与状态
-
-### 4) 用户与组织（管理端）
-
-- `POST /users`、`PUT /users/{id}`、`DELETE /users/{id}`、`GET /users/{id}`、`GET /users`
-- 绑定/解绑角色：`POST /users/{id}/roles`、`DELETE /users/{id}/roles/{roleId}`
-
-### 5) 角色管理
-
-- `POST /roles`、`PUT /roles/{id}`、`DELETE /roles/{id}`、`GET /roles/{id}`、`GET /roles`
-- 角色授权：`POST /roles/{id}/permissions`、`DELETE /roles/{id}/permissions/{permId}`
-
-### 6) 权限点/菜单
-
-- `POST /permissions`、`PUT /permissions/{id}`、`DELETE /permissions/{id}`、`GET /permissions`
-- `POST /menus`、`PUT /menus/{id}`、`DELETE /menus/{id}`、`GET /menus/tree`
-
-### 7) 多租户/多应用（可选）
-
-- `POST /tenants`、`GET /tenants`、`POST /tenants/{id}/users`
-- `POST /apps`、`GET /apps`、`POST /apps/{id}/roles`
-
----
-
-## 三、控制层示例（片段）
-
-```java
-@RestController
-@RequestMapping("/auth")
-public class AuthController {
-    @PostMapping("/login")
-    public LoginResp login(@RequestBody LoginReq req) {
-        // 1. 校验账号密码与验证码
-        // 2. 登录并指定设备类型（pc/app/mini 等）
-        StpUtil.login(req.getUserId(), req.getDevice());
-        // 3. 组装 Token 与用户资料返回
-        return LoginResp.from(StpUtil.getTokenValue(), StpUtil.getTokenTimeout());
-    }
-
-    @PostMapping("/logout")
-    public VoidResp logout() {
-        StpUtil.logout();
-        return VoidResp.success();
-    }
-
-    @GetMapping("/profile")
-    @SaCheckLogin
-    public ProfileResp profile() {
-        String loginId = String.valueOf(StpUtil.getLoginId());
-        // 加载角色、权限码、菜单树
-        return profileService.load(loginId);
-    }
-}
-```
-
----
-
-## 四、返回体与状态码规范
-
-- 统一响应：`code`、`message`、`data`、`traceId`。
-- `code/message` 必须来源于 `ResultCode` 枚举；`data` 使用强类型 DTO（位于 `sso` 目录或统一 dto 包）。
+### 4. 登录响应示例
 
 ```json
 {
-  "code": "OK",
-  "message": "操作成功",
-  "data": { "token": "...", "expireIn": 2592000 },
-  "traceId": "3f1f..."
+  "token": "xxx",
+  "tokenType": "Bearer",
+  "expiresIn": 2592000,
+  "rememberMe": false,
+  "userInfo": {
+    "id": 1,
+    "username": "admin001",
+    "realName": "张三",
+    "email": "zhangsan@example.com",
+    "phone": "13800138000",
+    "department": "计算机科学与技术学院",
+    "role": "ROLE_ADMIN",
+    "status": "启用",
+    "industry": "education",
+    "avatar": null
+  },
+  "roles": ["ROLE_ADMIN"],
+  "permissions": ["menu:dashboard:view"],
+  "menus": [
+    /* 菜单树 */
+  ]
 }
 ```
 
----
+> 上述 `roles`、`permissions`、`menus` 取决于用户所绑定的角色与权限。无角色时返回空数组。
 
-## 五、前后端约定
+### 5. 默认权限与运维流程
 
-- **认证头**：`Authorization: Bearer <token>`；未登录/过期返回特定错误码，前端统一跳转登录。
-- **幂等与重试**：登录、授权敏感接口建议加幂等键与失败重试上限。
-- **菜单与权限加载**：登录后首次拉取 `profile`（含角色、权限码、菜单树）；页面级动态校验权限码。
-- **时间与签名**：重要写操作可增加时间戳与签名校验，防止重放。
+1. 运维需在 `sys_role` 中为各行业配置好默认角色（角色编码固定为 `ROLE_USER`，状态启用、未删除），并在 `sys_role_permission` 中绑定默认菜单、按钮、接口等权限。
+2. 新用户注册成功后，系统自动绑定默认角色，无需人工介入；若数据库缺少默认角色，需及时补齐。
+3. 当用户需要调整权限时，由管理员（具备最高权限的账号）在系统管理模块中调整角色或直接绑定权限，操作完毕后调用 “刷新权限缓存” 接口或按钮（内部调用 `PermissionService.refreshUserAuthCache`），用户重新登录即可生效。
 
----
+### 5. 后续实施建议
 
-## 六、安全基线
+1. **完善权限管理链路**：实现角色/权限绑定、解除、查询接口，并支持行业维度的差异化配置。
+2. **打通用户资料接口**：`profile` 返回真实聚合信息，供前端在登录后一次性缓存。
+3. **补齐会话治理**：实现续期、踢人、封禁、查询在线设备等能力，满足运维管理需求。
+4. **安全与审计**：继续完善密码策略、登录失败锁定、限流等安全基线措施。
+5. **测试覆盖**：围绕登录、鉴权、会话管理补充单元测试和集成测试。
 
-- 密码加密：`BCrypt`/`Argon2` 存储；登录失败次数与冷却；图形/滑块验证码。
-- CORS 与 CSRF：前后端分离默认使用 Token，CSRF 关闭；严控跨域源与方法。
-- XSS/SQL 注入：参数校验、白名单、ORM 预编译；输出编码。
-- 速率限制：登录与权限管理接口限流；IP 与账号维度风控。
-- 会话治理：并发登录开关、黑名单、设备隔离、离线通知。
-
----
-
-## 七、可复用实现要点
-
-1. 模块化：抽象 `auth`、`user`、`role`、`permission`、`menu`、`session`、`tenant` 模块，统一 DTO 与错误码。
-2. 可配置：Token 风格、有效期、并发策略、设备枚举、登录源、权限注解白名单由配置驱动。
-3. 存储解耦：会话、黑名单可切 Redis；权限数据来自 DB；提供接口以便替换。
-4. 审计日志：登录、授权变更、踢人、封禁、角色/权限绑定均记录。
-
----
-
-## 八、测试与验收
-
-- 接口契约测试：在 `test/java` 目录为每个接口编写独立的 Mock 用例，覆盖成功/失败/越权场景。
-- 集成测试：登录—>访问受限接口—>续签—>登出—>再次访问 的端到端链路。
-- 数据权限：基于角色和组织的行/列级控制校验（如有数据权限需求）。
-
----
-
-## 九、快速对接清单（Checklist）
-
-- [ ] 引入 Sa-Token 与 Redis 依赖
-- [ ] 补齐 `application.yml` 中 Sa-Token 配置
-- [ ] 配置全局过滤器与放行路径
-- [ ] 实现登录/登出/续签与 `profile` 接口
-- [ ] 打通角色、权限、菜单、绑定关系 CRUD
-- [ ] 统一响应 DTO 与 `ResultCode` 枚举
-- [ ] 开启日志审计与限流
-- [ ] 完成单测与集成测试
-
----
-
-## 十、常见问题 FAQ
-
-- Q: 需要 JWT 吗？
-  - A: Sa-Token 自带多种 Token 风格，非必须。如需前端离线校验可选 JWT，并设置 `jwt-secret-key`。
-- Q: 并发登录如何控制？
-  - A: `is-concurrent=false` 禁止并发；结合设备维度与 `is-share` 控制同端共享。
-- Q: 如何做多端设备隔离？
-  - A: `StpUtil.login(userId, device)`，不同 `device` 生成独立 Token 与会话。
+完成以上事项后，即可满足 Sa-Token 在本项目中的完整落地要求。

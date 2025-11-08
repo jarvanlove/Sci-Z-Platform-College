@@ -1,22 +1,28 @@
 package com.sciz.server.interfaces.controller;
 
-import cn.dev33.satoken.stp.SaTokenInfo;
-import cn.dev33.satoken.stp.StpUtil;
 import com.sciz.server.application.service.user.AuthService;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
+import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
-import com.sciz.server.domain.pojo.dto.response.user.ProfileResp;
+import com.sciz.server.domain.pojo.dto.response.user.DepartmentLabelResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
+import com.sciz.server.domain.pojo.dto.response.user.ProfileResp;
+import com.sciz.server.domain.pojo.dto.response.user.CheckLoginResp;
+import com.sciz.server.domain.pojo.dto.response.user.CheckRoleResp;
+import com.sciz.server.domain.pojo.dto.response.user.CheckPermResp;
+import com.sciz.server.domain.pojo.dto.response.user.RefreshTokenResp;
+import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
+import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
 import com.sciz.server.infrastructure.shared.result.Result;
+import com.sciz.server.infrastructure.shared.result.ResultCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * @author JiaWen.Wu
@@ -29,9 +35,11 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final IndustryConfigCache industryConfigCache;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, IndustryConfigCache industryConfigCache) {
         this.authService = authService;
+        this.industryConfigCache = industryConfigCache;
     }
 
     /**
@@ -41,7 +49,7 @@ public class AuthController {
      * @param request HttpServletRequest 请求对象
      * @return LoginResp 登录响应
      */
-    @Operation(summary = "用户登录", description = "使用 Sa-Token 完成登录，返回 Token 信息。登录失败 >= 5 次时需要验证码")
+    @Operation(summary = "用户登录", description = "使用 Sa-Token 完成登录，返回 Token 信息。登录失败 >= 3 次时需要验证码")
     @PostMapping("/login")
     public Result<LoginResp> login(@RequestBody @Valid LoginReq req, HttpServletRequest request) {
         LoginResp resp = authService.login(req, request);
@@ -61,16 +69,34 @@ public class AuthController {
         return Result.success(resp);
     }
 
-    @Operation(summary = "用户注册", description = "注册新用户（占位，后续接入业务校验与持久化）")
+    @Operation(summary = "用户注册", description = "注册新用户，校验验证码并写入系统用户表")
     @PostMapping("/register")
-    public Result<Object> register(@RequestBody Object request) {
-        return Result.success(null);
+    public Result<RegisterResp> register(@RequestBody @Valid RegisterReq request) {
+        RegisterResp resp = authService.register(request);
+        return Result.success(resp, ResultCode.USER_REGISTER_SUCCESS.getMessage());
     }
 
     @Operation(summary = "重置密码", description = "重置用户密码（占位实现）")
     @PostMapping("/reset-password")
     public Result<Object> resetPassword(@RequestBody Object request) {
         return Result.success(null);
+    }
+
+    /**
+     * 获取行业部门标签
+     *
+     * @return Result<List<DepartmentLabelResp>> 部门标签列表
+     */
+    @Operation(summary = "行业部门标签", description = "获取当前行业下的部门标签列表")
+    @GetMapping("/department/label")
+    public Result<List<DepartmentLabelResp>> getDepartmentLabels() {
+        var industryView = industryConfigCache.get();
+        var departments = industryView.getDepartments();
+        var respList = departments == null ? List.<DepartmentLabelResp>of()
+                : departments.stream()
+                        .map(dept -> new DepartmentLabelResp(dept.getDepartmentName(), dept.getDepartmentCode()))
+                        .collect(Collectors.toList());
+        return Result.success(respList);
     }
 
     /**
@@ -88,58 +114,38 @@ public class AuthController {
 
     @Operation(summary = "刷新令牌/续期", description = "刷新或续期当前登录 Token（按 Sa-Token 配置生效）")
     @PostMapping("/refresh-token")
-    public Result<Object> refreshToken(@RequestBody(required = false) Object request) {
-        if (!StpUtil.isLogin()) {
-            return Result.fail(401, "未登录");
-        }
-        // 续期：基于配置与模式（示例：直接返回当前 token 信息）
-        SaTokenInfo tokenInfo = StpUtil.getTokenInfo();
-        Map<String, Object> data = new HashMap<>();
-        data.put("loginId", StpUtil.getLoginId());
-        data.put("tokenName", tokenInfo.getTokenName());
-        data.put("tokenValue", tokenInfo.getTokenValue());
-        data.put("tokenTimeout", StpUtil.getTokenTimeout());
-        return Result.success(data);
-    }
-
-    @Operation(summary = "个人信息", description = "获取当前登录用户的基本信息（占位）")
-    @PostMapping("/profile")
-    public Result<ProfileResp> profile() {
-        if (!StpUtil.isLogin()) {
-            return Result.fail(401, "未登录");
-        }
-        SaTokenInfo token = StpUtil.getTokenInfo();
-        ProfileResp resp = new ProfileResp();
-        resp.setUserId(Long.valueOf(String.valueOf(StpUtil.getLoginId())));
-        resp.setUsername(String.valueOf(StpUtil.getLoginId()));
-        resp.setTokenName(token.getTokenName());
-        resp.setTokenValue(token.getTokenValue());
-        resp.setTokenTimeout(StpUtil.getTokenTimeout());
+    public Result<RefreshTokenResp> refreshToken() {
+        var resp = authService.refreshToken();
         return Result.success(resp);
     }
 
-    public static void main(String[] args) {
-        // 生成 admin 的哈希值
-        String adminPassword = "admin";
-        String adminHash = BCrypt.hashpw(adminPassword, BCrypt.gensalt(10));
-        System.out.println("=== Admin 密码哈希值 ===");
-        System.out.println("密码: " + adminPassword);
-        System.out.println("哈希值: " + adminHash);
+    @Operation(summary = "个人信息", description = "获取当前登录用户的档案信息（基础资料、角色、权限、菜单）")
+    @PostMapping("/profile")
+    public Result<ProfileResp> profile() {
+        var resp = authService.profile();
+        return Result.success(resp);
+    }
 
-        // 验证
-        boolean adminMatch = BCrypt.checkpw(adminPassword, adminHash);
-        System.out.println("验证结果: " + adminMatch);
-        System.out.println();
+    @Operation(summary = "登录状态校验", description = "校验当前会话是否已登录，并返回 token 基础信息")
+    @GetMapping("/check/login")
+    public Result<CheckLoginResp> checkLogin() {
+        var resp = authService.checkLogin();
+        return Result.success(resp);
+    }
 
-        // 生成 user 的哈希值
-        String userPassword = "user";
-        String userHash = BCrypt.hashpw(userPassword, BCrypt.gensalt(10));
-        System.out.println("=== User 密码哈希值 ===");
-        System.out.println("密码: " + userPassword);
-        System.out.println("哈希值: " + userHash);
+    @Operation(summary = "角色校验", description = "校验当前登录用户是否拥有指定角色")
+    @GetMapping("/check/role")
+    public Result<CheckRoleResp> checkRole(@RequestParam("roleCode") String roleCode,
+            @RequestParam(value = "industryType", required = false) String industryType) {
+        var resp = authService.checkRole(roleCode, industryType);
+        return Result.success(resp);
+    }
 
-        // 验证
-        boolean userMatch = BCrypt.checkpw(userPassword, userHash);
-        System.out.println("验证结果: " + userMatch);
+    @Operation(summary = "权限校验", description = "校验当前登录用户是否拥有指定权限码")
+    @GetMapping("/check/perm")
+    public Result<CheckPermResp> checkPermission(@RequestParam("permissionCode") String permissionCode,
+            @RequestParam(value = "industryType", required = false) String industryType) {
+        var resp = authService.checkPermission(permissionCode, industryType);
+        return Result.success(resp);
     }
 }

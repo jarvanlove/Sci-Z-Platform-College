@@ -1,5 +1,7 @@
 package com.sciz.server.domain.pojo.entity.log;
 
+import java.time.LocalDateTime;
+
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -78,8 +80,8 @@ public class SysLoginLog extends BaseEntity {
     private String message;
 
     /**
-     * 登录时间（yyyy-MM-dd HH:mm:ss）
+     * 登录时间
      */
     @TableField("login_time")
-    private String loginTime;
+    private LocalDateTime loginTime;
 }

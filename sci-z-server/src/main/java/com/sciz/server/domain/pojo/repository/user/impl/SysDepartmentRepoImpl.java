@@ -5,7 +5,10 @@ import com.sciz.server.domain.pojo.entity.user.SysDepartment;
 import com.sciz.server.domain.pojo.mapper.user.SysDepartmentMapper;
 import com.sciz.server.domain.pojo.repository.user.SysDepartmentRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
+import com.sciz.server.infrastructure.shared.enums.EnableStatus;
 import org.springframework.stereotype.Repository;
+
+import java.util.List;
 
 /**
  * 部门仓储实现
@@ -46,6 +49,39 @@ public class SysDepartmentRepoImpl implements SysDepartmentRepo {
         return new LambdaQueryChainWrapper<>(mapper)
                 .eq(SysDepartment::getId, id)
                 .eq(SysDepartment::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .one();
+    }
+
+    /**
+     * 根据行业类型查询部门列表
+     *
+     * @param industryType String 行业类型
+     * @return java.util.List<SysDepartment> 部门列表
+     */
+    @Override
+    public List<SysDepartment> listByIndustryType(String industryType) {
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysDepartment::getIndustryType, industryType)
+                .eq(SysDepartment::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .eq(SysDepartment::getStatus, EnableStatus.ENABLED.getCode())
+                .orderByAsc(SysDepartment::getSortOrder)
+                .list();
+    }
+
+    /**
+     * 根据行业类型与部门编码查询
+     *
+     * @param industryType   String 行业类型
+     * @param departmentCode String 部门编码
+     * @return SysDepartment 部门实体或 null
+     */
+    @Override
+    public SysDepartment findByCode(String industryType, String departmentCode) {
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysDepartment::getIndustryType, industryType)
+                .eq(SysDepartment::getDepartmentCode, departmentCode)
+                .eq(SysDepartment::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .eq(SysDepartment::getStatus, EnableStatus.ENABLED.getCode())
                 .one();
     }
 }

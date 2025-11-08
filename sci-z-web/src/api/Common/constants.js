@@ -8,31 +8,34 @@
 // ================================
 
 /**
- * API 基础路径
+ * API 基础路径（与后端真实接口保持一致）
  */
-export const API_BASE_URL = '/sciz'
+export const API_BASE_URL = '/api'
 
 /**
- * API 版本
+ * 拼接完整 API 地址
+ * @param {string} path 模块相对路径，需以 / 开头
+ * @returns {string}
  */
-export const API_VERSION = 'v1'
+const buildApiUrl = (path) => `${API_BASE_URL}${path}`
 
 // ================================
 // 2. 认证模块 API 路径
 // ================================
 
 export const AUTH_API = {
-  BASE_PATH: `${API_BASE_URL}/auth`,
-  LOGIN: `${API_BASE_URL}/${API_VERSION}/auth/login`,
-  REGISTER: `${API_BASE_URL}/${API_VERSION}/auth/register`,
-  RESET_PASSWORD: `${API_BASE_URL}/${API_VERSION}/auth/reset-password`,
-  CAPTCHA: `${API_BASE_URL}/${API_VERSION}/auth/captcha`,
-  SEND_EMAIL_CODE: `${API_BASE_URL}/${API_VERSION}/auth/send-email-code`,
-  REFRESH_TOKEN: `${API_BASE_URL}/${API_VERSION}/auth/refresh`,
-  USER_INFO: `${API_BASE_URL}/${API_VERSION}/auth/user-info`,
-  PERMISSIONS: `${API_BASE_URL}/${API_VERSION}/auth/permissions`,  // 获取用户权限列表
-  MENUS: `${API_BASE_URL}/${API_VERSION}/auth/menus`,              // 获取用户菜单列表
-  LOGOUT: `${API_BASE_URL}/${API_VERSION}/auth/logout`
+  BASE_PATH: buildApiUrl('/auth'),
+  LOGIN: buildApiUrl('/auth/login'),
+  REGISTER: buildApiUrl('/auth/register'),
+  RESET_PASSWORD: buildApiUrl('/auth/reset-password'),
+  CAPTCHA: buildApiUrl('/auth/captcha'),
+  SEND_EMAIL_CODE: buildApiUrl('/auth/send-email-code'),
+  REFRESH_TOKEN: buildApiUrl('/auth/refresh'),
+  USER_INFO: buildApiUrl('/auth/user-info'),
+  PERMISSIONS: buildApiUrl('/auth/permissions'),  // 获取用户权限列表
+  MENUS: buildApiUrl('/auth/menus'),              // 获取用户菜单列表
+  LOGOUT: buildApiUrl('/auth/logout'),
+  DEPARTMENT_LABEL: buildApiUrl('/auth/department/label')
 }
 
 // ================================
@@ -40,13 +43,13 @@ export const AUTH_API = {
 // ================================
 
 export const DECLARATION_API = {
-  BASE_PATH: `${API_BASE_URL}/declaration`,
-  LIST: `${API_BASE_URL}/${API_VERSION}/declaration/list`,
-  CREATE: `${API_BASE_URL}/${API_VERSION}/declaration`,
-  DETAIL: (id) => `${API_BASE_URL}/${API_VERSION}/declaration/${id}`,
-  UPDATE: (id) => `${API_BASE_URL}/${API_VERSION}/declaration/${id}`,
-  DELETE: (id) => `${API_BASE_URL}/${API_VERSION}/declaration/${id}`,
-  SUBMIT: (id) => `${API_BASE_URL}/${API_VERSION}/declaration/${id}/submit`
+  BASE_PATH: buildApiUrl('/declaration'),
+  LIST: buildApiUrl('/declaration/list'),
+  CREATE: buildApiUrl('/declaration'),
+  DETAIL: (id) => buildApiUrl(`/declaration/${id}`),
+  UPDATE: (id) => buildApiUrl(`/declaration/${id}`),
+  DELETE: (id) => buildApiUrl(`/declaration/${id}`),
+  SUBMIT: (id) => buildApiUrl(`/declaration/${id}/submit`)
 }
 
 // ================================
@@ -54,16 +57,16 @@ export const DECLARATION_API = {
 // ================================
 
 export const PROJECT_API = {
-  BASE_PATH: `${API_BASE_URL}/${API_VERSION}/project`,
-  LIST: `${API_BASE_URL}/${API_VERSION}/project/list`,
-  DETAIL: (id) => `${API_BASE_URL}/${API_VERSION}/project/detail/${id}`,
-  CREATE: `${API_BASE_URL}/${API_VERSION}/project/create`,
-  UPDATE: (id) => `${API_BASE_URL}/${API_VERSION}/project/update/${id}`,
-  MEMBERS: (id) => `${API_BASE_URL}/${API_VERSION}/project/members/${id}`,
-  ADD_MEMBER: `${API_BASE_URL}/${API_VERSION}/project/members/add`,
-  REMOVE_MEMBER: `${API_BASE_URL}/${API_VERSION}/project/members/remove`,
-  PROGRESS: (id) => `${API_BASE_URL}/${API_VERSION}/project/progress/${id}`,
-  ADD_PROGRESS: `${API_BASE_URL}/${API_VERSION}/project/progress/add`
+  BASE_PATH: buildApiUrl('/project'),
+  LIST: buildApiUrl('/project/list'),
+  DETAIL: (id) => buildApiUrl(`/project/detail/${id}`),
+  CREATE: buildApiUrl('/project/create'),
+  UPDATE: (id) => buildApiUrl(`/project/update/${id}`),
+  MEMBERS: (id) => buildApiUrl(`/project/members/${id}`),
+  ADD_MEMBER: buildApiUrl('/project/members/add'),
+  REMOVE_MEMBER: buildApiUrl('/project/members/remove'),
+  PROGRESS: (id) => buildApiUrl(`/project/progress/${id}`),
+  ADD_PROGRESS: buildApiUrl('/project/progress/add')
 }
 
 // ================================
@@ -71,16 +74,16 @@ export const PROJECT_API = {
 // ================================
 
 export const ACCEPTANCE_API = {
-  BASE_PATH: `${API_BASE_URL}/${API_VERSION}/acceptance`,
-  APPLY: `${API_BASE_URL}/${API_VERSION}/acceptance/apply`,
-  LIST: `${API_BASE_URL}/${API_VERSION}/acceptance/list`,
-  DETAIL: (id) => `${API_BASE_URL}/${API_VERSION}/acceptance/detail/${id}`,
-  REPORT_GENERATE: `${API_BASE_URL}/${API_VERSION}/acceptance/report/generate`,
-  REPORT_LIST: (id) => `${API_BASE_URL}/${API_VERSION}/acceptance/report/list/${id}`,
-  REPORT_PREVIEW: (id) => `${API_BASE_URL}/${API_VERSION}/acceptance/report/preview/${id}`,
-  REPORT_DOWNLOAD: (id) => `${API_BASE_URL}/${API_VERSION}/acceptance/report/download/${id}`,
-  SUBMIT: (id) => `${API_BASE_URL}/${API_VERSION}/acceptance/submit/${id}`,
-  REVIEW: (id) => `${API_BASE_URL}/${API_VERSION}/acceptance/review/${id}`
+  BASE_PATH: buildApiUrl('/acceptance'),
+  APPLY: buildApiUrl('/acceptance/apply'),
+  LIST: buildApiUrl('/acceptance/list'),
+  DETAIL: (id) => buildApiUrl(`/acceptance/detail/${id}`),
+  REPORT_GENERATE: buildApiUrl('/acceptance/report/generate'),
+  REPORT_LIST: (id) => buildApiUrl(`/acceptance/report/list/${id}`),
+  REPORT_PREVIEW: (id) => buildApiUrl(`/acceptance/report/preview/${id}`),
+  REPORT_DOWNLOAD: (id) => buildApiUrl(`/acceptance/report/download/${id}`),
+  SUBMIT: (id) => buildApiUrl(`/acceptance/submit/${id}`),
+  REVIEW: (id) => buildApiUrl(`/acceptance/review/${id}`)
 }
 
 // ================================
@@ -88,16 +91,16 @@ export const ACCEPTANCE_API = {
 // ================================
 
 export const REPORT_API = {
-  BASE_PATH: `${API_BASE_URL}/${API_VERSION}/report`,
-  LIST: `${API_BASE_URL}/${API_VERSION}/report/list`,
-  CREATE: `${API_BASE_URL}/${API_VERSION}/report/create`,
-  DETAIL: (id) => `${API_BASE_URL}/${API_VERSION}/report/detail/${id}`,
-  GENERATE: `${API_BASE_URL}/${API_VERSION}/report/generate`,
-  STATUS: (id) => `${API_BASE_URL}/${API_VERSION}/report/status/${id}`,
-  EXPORT: `${API_BASE_URL}/${API_VERSION}/report/export`,
-  EXPORTS: (id) => `${API_BASE_URL}/${API_VERSION}/report/${id}/exports`,
-  REGENERATE: `${API_BASE_URL}/${API_VERSION}/report/regenerate`,
-  DELETE: (id) => `${API_BASE_URL}/${API_VERSION}/report/${id}`
+  BASE_PATH: buildApiUrl('/report'),
+  LIST: buildApiUrl('/report/list'),
+  CREATE: buildApiUrl('/report/create'),
+  DETAIL: (id) => buildApiUrl(`/report/detail/${id}`),
+  GENERATE: buildApiUrl('/report/generate'),
+  STATUS: (id) => buildApiUrl(`/report/status/${id}`),
+  EXPORT: buildApiUrl('/report/export'),
+  EXPORTS: (id) => buildApiUrl(`/report/${id}/exports`),
+  REGENERATE: buildApiUrl('/report/regenerate'),
+  DELETE: (id) => buildApiUrl(`/report/${id}`)
 }
 
 // ================================
@@ -105,15 +108,15 @@ export const REPORT_API = {
 // ================================
 
 export const AI_API = {
-  BASE_PATH: `${API_BASE_URL}/${API_VERSION}/ai`,
-  CONVERSATIONS: `${API_BASE_URL}/${API_VERSION}/ai/chat/conversations`,
-  CONVERSATION_DETAIL: (id) => `${API_BASE_URL}/${API_VERSION}/ai/chat/conversations/${id}`,
-  MESSAGES: `${API_BASE_URL}/${API_VERSION}/ai/chat/messages`,
-  MESSAGES_BY_CONVERSATION: (id) => `${API_BASE_URL}/${API_VERSION}/ai/chat/messages/${id}`,
-  DELETE_MESSAGE: (id) => `${API_BASE_URL}/${API_VERSION}/ai/chat/messages/${id}`,
-  WORKFLOW_EXECUTE: `${API_BASE_URL}/${API_VERSION}/ai/workflow/execute`,
-  KNOWLEDGE_SYNC: `${API_BASE_URL}/${API_VERSION}/ai/knowledge/sync`,
-  WORKFLOW_STATUS: (id) => `${API_BASE_URL}/${API_VERSION}/ai/workflow/status/${id}`
+  BASE_PATH: buildApiUrl('/ai'),
+  CONVERSATIONS: buildApiUrl('/ai/chat/conversations'),
+  CONVERSATION_DETAIL: (id) => buildApiUrl(`/ai/chat/conversations/${id}`),
+  MESSAGES: buildApiUrl('/ai/chat/messages'),
+  MESSAGES_BY_CONVERSATION: (id) => buildApiUrl(`/ai/chat/messages/${id}`),
+  DELETE_MESSAGE: (id) => buildApiUrl(`/ai/chat/messages/${id}`),
+  WORKFLOW_EXECUTE: buildApiUrl('/ai/workflow/execute'),
+  KNOWLEDGE_SYNC: buildApiUrl('/ai/knowledge/sync'),
+  WORKFLOW_STATUS: (id) => buildApiUrl(`/ai/workflow/status/${id}`)
 }
 
 // ================================
@@ -121,22 +124,22 @@ export const AI_API = {
 // ================================
 
 export const KNOWLEDGE_API = {
-  BASE_PATH: `${API_BASE_URL}/${API_VERSION}/knowledge`,
-  LIST: `${API_BASE_URL}/${API_VERSION}/knowledge/list`,
-  CREATE: `${API_BASE_URL}/${API_VERSION}/knowledge/create`,
-  DETAIL: (id) => `${API_BASE_URL}/${API_VERSION}/knowledge/detail/${id}`,
-  UPDATE: (id) => `${API_BASE_URL}/${API_VERSION}/knowledge/update/${id}`,
-  DELETE: (id) => `${API_BASE_URL}/${API_VERSION}/knowledge/delete/${id}`,
-  FOLDERS: (id) => `${API_BASE_URL}/${API_VERSION}/knowledge/folders/${id}`,
-  CREATE_FOLDER: `${API_BASE_URL}/${API_VERSION}/knowledge/folders`,
-  UPDATE_FOLDER: (id) => `${API_BASE_URL}/${API_VERSION}/knowledge/folders/${id}`,
-  DELETE_FOLDER: (id) => `${API_BASE_URL}/${API_VERSION}/knowledge/folders/${id}`,
-  UPLOAD_FILE: `${API_BASE_URL}/${API_VERSION}/knowledge/files/upload`,
-  FILES: (id) => `${API_BASE_URL}/${API_VERSION}/knowledge/files/${id}`,
-  DELETE_FILE: (id) => `${API_BASE_URL}/${API_VERSION}/knowledge/files/${id}`,
-  RENAME_FILE: (id) => `${API_BASE_URL}/${API_VERSION}/knowledge/files/rename/${id}`,
-  MOVE_FILE: (id) => `${API_BASE_URL}/${API_VERSION}/knowledge/files/move/${id}`,
-  QA_ASK: `${API_BASE_URL}/${API_VERSION}/knowledge/qa/ask`
+  BASE_PATH: buildApiUrl('/knowledge'),
+  LIST: buildApiUrl('/knowledge/list'),
+  CREATE: buildApiUrl('/knowledge/create'),
+  DETAIL: (id) => buildApiUrl(`/knowledge/detail/${id}`),
+  UPDATE: (id) => buildApiUrl(`/knowledge/update/${id}`),
+  DELETE: (id) => buildApiUrl(`/knowledge/delete/${id}`),
+  FOLDERS: (id) => buildApiUrl(`/knowledge/folders/${id}`),
+  CREATE_FOLDER: buildApiUrl('/knowledge/folders'),
+  UPDATE_FOLDER: (id) => buildApiUrl(`/knowledge/folders/${id}`),
+  DELETE_FOLDER: (id) => buildApiUrl(`/knowledge/folders/${id}`),
+  UPLOAD_FILE: buildApiUrl('/knowledge/files/upload'),
+  FILES: (id) => buildApiUrl(`/knowledge/files/${id}`),
+  DELETE_FILE: (id) => buildApiUrl(`/knowledge/files/${id}`),
+  RENAME_FILE: (id) => buildApiUrl(`/knowledge/files/rename/${id}`),
+  MOVE_FILE: (id) => buildApiUrl(`/knowledge/files/move/${id}`),
+  QA_ASK: buildApiUrl('/knowledge/qa/ask')
 }
 
 // ================================
@@ -144,15 +147,15 @@ export const KNOWLEDGE_API = {
 // ================================
 
 export const FILE_API = {
-  BASE_PATH: `${API_BASE_URL}/${API_VERSION}/file`,
-  UPLOAD: `${API_BASE_URL}/${API_VERSION}/file/upload`,
-  BATCH_UPLOAD: `${API_BASE_URL}/${API_VERSION}/file/batch-upload`,
-  LIST: `${API_BASE_URL}/${API_VERSION}/file/list`,
-  DOWNLOAD: (id) => `${API_BASE_URL}/${API_VERSION}/file/download/${id}`,
-  PREVIEW: (id) => `${API_BASE_URL}/${API_VERSION}/file/preview/${id}`,
-  DELETE: (id) => `${API_BASE_URL}/${API_VERSION}/file/delete/${id}`,
-  CHECK_DUPLICATE: `${API_BASE_URL}/${API_VERSION}/file/check-duplicate`,
-  SYNC_DIFY: `${API_BASE_URL}/${API_VERSION}/file/sync-dify`
+  BASE_PATH: buildApiUrl('/file'),
+  UPLOAD: buildApiUrl('/file/upload'),
+  BATCH_UPLOAD: buildApiUrl('/file/batch-upload'),
+  LIST: buildApiUrl('/file/list'),
+  DOWNLOAD: (id) => buildApiUrl(`/file/download/${id}`),
+  PREVIEW: (id) => buildApiUrl(`/file/preview/${id}`),
+  DELETE: (id) => buildApiUrl(`/file/delete/${id}`),
+  CHECK_DUPLICATE: buildApiUrl('/file/check-duplicate'),
+  SYNC_DIFY: buildApiUrl('/file/sync-dify')
 }
 
 // ================================
@@ -160,17 +163,17 @@ export const FILE_API = {
 // ================================
 
 export const SYSTEM_API = {
-  BASE_PATH: `${API_BASE_URL}/${API_VERSION}/system`,
-  INDUSTRY_CONFIG: `${API_BASE_URL}/${API_VERSION}/system/industry/config`,
-  DEPARTMENTS: `${API_BASE_URL}/${API_VERSION}/system/departments`,
-  DEPARTMENT_DETAIL: (id) => `${API_BASE_URL}/${API_VERSION}/system/departments/${id}`,
-  ROLES: `${API_BASE_URL}/${API_VERSION}/system/roles`,
-  ROLE_DETAIL: (id) => `${API_BASE_URL}/${API_VERSION}/system/roles/${id}`,
-  PERMISSIONS_TREE: `${API_BASE_URL}/${API_VERSION}/system/permissions/tree`,
-  PERMISSIONS: `${API_BASE_URL}/${API_VERSION}/system/permissions`,
-  PERMISSION_DETAIL: (id) => `${API_BASE_URL}/${API_VERSION}/system/permissions/${id}`,
-  USERS: `${API_BASE_URL}/${API_VERSION}/system/users`,
-  USER_DETAIL: (id) => `${API_BASE_URL}/${API_VERSION}/system/users/${id}`
+  BASE_PATH: buildApiUrl('/system'),
+  INDUSTRY_CONFIG: buildApiUrl('/system/industry/config'),
+  DEPARTMENTS: buildApiUrl('/system/departments'),
+  DEPARTMENT_DETAIL: (id) => buildApiUrl(`/system/departments/${id}`),
+  ROLES: buildApiUrl('/system/roles'),
+  ROLE_DETAIL: (id) => buildApiUrl(`/system/roles/${id}`),
+  PERMISSIONS_TREE: buildApiUrl('/system/permissions/tree'),
+  PERMISSIONS: buildApiUrl('/system/permissions'),
+  PERMISSION_DETAIL: (id) => buildApiUrl(`/system/permissions/${id}`),
+  USERS: buildApiUrl('/system/users'),
+  USER_DETAIL: (id) => buildApiUrl(`/system/users/${id}`)
 }
 
 // ================================
@@ -178,12 +181,12 @@ export const SYSTEM_API = {
 // ================================
 
 export const USER_API = {
-  BASE_PATH: `${API_BASE_URL}/user`,
-  INFO: `${API_BASE_URL}/user/info`,
-  UPDATE_INFO: `${API_BASE_URL}/user/info`,
-  CHANGE_PASSWORD: `${API_BASE_URL}/user/password`,
-  UPLOAD_AVATAR: `${API_BASE_URL}/user/avatar`,
-  LOGIN_LOGS: `${API_BASE_URL}/user/login-logs`
+  BASE_PATH: buildApiUrl('/user'),
+  INFO: buildApiUrl('/user/info'),
+  UPDATE_INFO: buildApiUrl('/user/info'),
+  CHANGE_PASSWORD: buildApiUrl('/user/password'),
+  UPLOAD_AVATAR: buildApiUrl('/user/avatar'),
+  LOGIN_LOGS: buildApiUrl('/user/login-logs')
 }
 
 // ================================
@@ -247,7 +250,6 @@ export const STATUS = {
 export default {
   // API 基础配置
   API_BASE_URL,
-  API_VERSION,
   
   // 模块 API 路径
   AUTH_API,

@@ -31,6 +31,16 @@ export const login = (data) => {
 /**
  * 用户注册
  * @param {RegisterRequest} data - 注册请求参数
+ * 结构说明：
+ * - username: 用户名
+ * - realName: 真实姓名
+ * - email: 邮箱
+ * - phone: 手机号
+ * - department: 所属院系
+ * - password: 登录密码
+ * - captcha: 图形验证码
+ * - captchaKey: 图形验证码唯一标识
+ * - verificationCode: 手机或邮箱验证码
  * @returns {Promise<ApiResponse>}
  */
 export const register = (data) => {
@@ -69,12 +79,26 @@ export const resetPassword = (data) => {
  * const response = await getCaptcha()
  * const { captchaKey, captchaImage, expiresIn } = response.data
  * // captchaImage 可以直接作为 img 标签的 src 使用
- * // 登录时需要将 captchaKey 作为 captchaId 参数传递
+ * // 登录时需要将 captchaKey 作为请求参数传递
  */
 export const getCaptcha = () => {
   return request({
     url: AUTH_API.CAPTCHA,
     method: HTTP_METHODS.GET
+  })
+}
+
+/**
+ * 获取行业部门标签列表
+ * @param {Object} params - 查询参数
+ * @param {string} params.industry - 行业编码
+ * @returns {Promise<ApiResponse<Array>>}
+ */
+export const getDepartmentLabels = (params = {}) => {
+  return request({
+    url: AUTH_API.DEPARTMENT_LABEL,
+    method: HTTP_METHODS.GET,
+    params
   })
 }
 

@@ -8,6 +8,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ActionButtons: typeof import('./src/components/Business/List/ActionButtons.vue')['default']
+    AgreementNotice: typeof import('./src/components/Common/AgreementNotice.vue')['default']
     AttachmentList: typeof import('./src/components/Business/Detail/AttachmentList.vue')['default']
     BaseButton: typeof import('./src/components/Common/BaseButton.vue')['default']
     BaseCard: typeof import('./src/components/Common/BaseCard.vue')['default']

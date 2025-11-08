@@ -82,6 +82,11 @@ public class SystemConstant {
     };
 
     /**
+     * 默认用户角色编码
+     */
+    public static final String DEFAULT_USER_ROLE_CODE = "user";
+
+    /**
      * 日期时间格式
      */
     public static final String DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";

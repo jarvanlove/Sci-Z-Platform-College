@@ -42,7 +42,7 @@ export const LoginRequest = {
   username: String,
   password: String,
   captcha: String,
-  captchaId: String
+  captchaKey: String
 }
 
 /**
@@ -59,11 +59,14 @@ export const LoginResponse = {
  */
 export const RegisterRequest = {
   username: String,
+  realName: String,
   password: String,
   email: String,
-  realName: String,
+  phone: String,
+  department: String,
   captcha: String,
-  captchaId: String
+  captchaKey: String,
+  verificationCode: String
 }
 
 /**

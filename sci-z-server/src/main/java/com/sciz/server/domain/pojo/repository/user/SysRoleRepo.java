@@ -27,4 +27,13 @@ public interface SysRoleRepo {
      * @return List<SysRole> 角色集合
      */
     List<SysRole> findByIds(List<Long> ids);
+
+    /**
+     * 根据角色编码和行业类型查询角色
+     *
+     * @param roleCode     String 角色编码
+     * @param industryType String 行业类型
+     * @return SysRole 角色实体（可能为空）
+     */
+    SysRole findByCode(String roleCode, String industryType);
 }

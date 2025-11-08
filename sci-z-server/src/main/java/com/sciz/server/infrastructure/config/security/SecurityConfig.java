@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.sciz.server.infrastructure.shared.result.ResultCode;
+import com.sciz.server.infrastructure.shared.result.Result;
+import com.sciz.server.infrastructure.shared.utils.JsonUtil;
 
 /**
  * Sa-Token 基础安全配置
@@ -30,6 +32,7 @@ public class SecurityConfig {
                 .addExclude("/api/auth/register") // 注册
                 .addExclude("/api/auth/reset-password") // 重置密码
                 .addExclude("/api/auth/captcha") // 获取验证码
+                .addExclude("/api/auth/department/label") // 获取行业部门标签
                 // 静态资源和文档
                 .addExclude("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**")
                 .addExclude("/webjars/**", "/static/**", "/favicon.ico")
@@ -37,7 +40,9 @@ public class SecurityConfig {
                 .setAuth(obj -> SaRouter.match("/**").check(r -> StpUtil.checkLogin()))
                 .setError(e -> {
                     // 统一未登录响应
-                    return ResultCode.UNAUTHORIZED;
+                    var result = Result.fail(ResultCode.UNAUTHORIZED);
+                    var json = JsonUtil.toJson(result);
+                    return json != null ? json : result.getMessage();
                 });
     }
 }

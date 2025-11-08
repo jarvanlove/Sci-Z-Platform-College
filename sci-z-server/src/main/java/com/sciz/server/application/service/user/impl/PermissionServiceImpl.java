@@ -196,6 +196,11 @@ public class PermissionServiceImpl implements PermissionService {
         RedisUtil.delete(redis, buildCacheKey(userId, industryType, "roles"));
         RedisUtil.delete(redis, buildCacheKey(userId, industryType, "permissions"));
         RedisUtil.delete(redis, buildCacheKey(userId, industryType, "menus"));
+
+        // 重新加载聚合信息，确保缓存立即生效
+        findRoleCodes(userId, industryType);
+        findPermissionCodes(userId, industryType);
+        buildMenus(userId, industryType);
     }
 
     // ==================== 私有辅助方法 ====================

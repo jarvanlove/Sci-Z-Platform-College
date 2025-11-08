@@ -1,8 +1,11 @@
 package com.sciz.server.domain.pojo.repository.user.impl;
 
+import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.sciz.server.domain.pojo.entity.user.SysRole;
 import com.sciz.server.domain.pojo.mapper.user.SysRoleMapper;
 import com.sciz.server.domain.pojo.repository.user.SysRoleRepo;
+import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
+import com.sciz.server.infrastructure.shared.enums.EnableStatus;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -44,5 +47,22 @@ public class SysRoleRepoImpl implements SysRoleRepo {
     @Override
     public List<SysRole> findByIds(List<Long> ids) {
         return mapper.selectBatchIds(ids);
+    }
+
+    /**
+     * 根据角色编码和行业类型查询角色
+     *
+     * @param roleCode     String 角色编码
+     * @param industryType String 行业类型
+     * @return SysRole 角色实体或 null
+     */
+    @Override
+    public SysRole findByCode(String roleCode, String industryType) {
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysRole::getRoleCode, roleCode)
+                .eq(SysRole::getIndustryType, industryType)
+                .eq(SysRole::getStatus, EnableStatus.ENABLED.getCode())
+                .eq(SysRole::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .one();
     }
 }
