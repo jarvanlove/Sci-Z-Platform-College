@@ -82,7 +82,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -218,6 +218,11 @@ onMounted(() => {
     authLogger.info('已自动填充上次登录的用户名', { username: lastUsername })
   }
   
+  const rememberedFlag = localStorage.getItem('auth_remember_me')
+  const defaultRemember = rememberedFlag === null ? true : rememberedFlag === '1'
+  loginForm.rememberMe = authStore.rememberMe ?? defaultRemember
+  authStore.rememberMe = loginForm.rememberMe
+  
   // 为表单添加键盘事件监听
   document.addEventListener('keydown', handleKeyDown)
 })
@@ -226,6 +231,13 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyDown)
 })
+
+watch(
+  () => loginForm.rememberMe,
+  (value) => {
+    authStore.rememberMe = value
+  }
+)
 </script>
 
 <style lang="scss" scoped>

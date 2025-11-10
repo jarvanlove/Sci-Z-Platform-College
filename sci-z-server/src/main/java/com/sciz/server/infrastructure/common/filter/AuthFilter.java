@@ -1,13 +1,13 @@
 package com.sciz.server.infrastructure.common.filter;
 
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import java.io.IOException;
+import org.springframework.stereotype.Component;
 
 /**
  * @author JiaWen.Wu
@@ -32,7 +32,8 @@ public class AuthFilter implements Filter {
         }
         // 这里只做最小化预检查（日志），真正鉴权交给 AuthInterceptor/Security 层
         String auth = req.getHeader("Authorization");
-        log.debug(String.format("[AuthFilter] uri=%s authHeaderPresent=%s", uri, auth != null));
+        boolean hasAuthHeader = Optional.ofNullable(auth).isPresent();
+        log.debug(String.format("[AuthFilter] uri=%s authHeaderPresent=%s", uri, Boolean.toString(hasAuthHeader)));
         chain.doFilter(request, response);
     }
 }

@@ -4,6 +4,19 @@ spring: # Spring 根配置
     name: sci-z-server # 应用名称（用于日志/监控展示）
   profiles: # 环境配置
     active: dev # 默认激活的环境：dev | prod
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.example.com} # 邮件服务器地址（支持环境变量覆盖）
+    port: ${SPRING_MAIL_PORT:587} # 邮件服务器端口（默认 587，支持 TLS）
+    username: ${SPRING_MAIL_USERNAME:no-reply@example.com} # 发件邮箱账号
+    password: ${SPRING_MAIL_PASSWORD:change-me} # 发件邮箱密码或授权码
+    properties:
+      mail:
+        smtp:
+          auth: true # 是否开启身份认证
+          starttls:
+            enable: true # 是否启用 STARTTLS 加密
+            required: true # 是否强制 STARTTLS
+    default-encoding: UTF-8 # 邮件内容编码
   jackson: # 全局 JSON 序列化/反序列化配置（影响所有 @RestController 返回与请求解析）
     date-format: yyyy-MM-dd HH:mm:ss # 日期时间统一格式
     time-zone: GMT+8 # 时区（与前端、人类可读保持一致）

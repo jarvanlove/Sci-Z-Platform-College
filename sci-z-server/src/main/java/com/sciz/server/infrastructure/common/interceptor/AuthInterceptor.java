@@ -1,11 +1,11 @@
 package com.sciz.server.infrastructure.common.interceptor;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * @author JiaWen.Wu
@@ -26,7 +26,9 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
         // 这里只记录并放行，真正认证交由安全模块
-        log.debug(String.format("[AuthInterceptor] uri=%s authHeaderPresent=%s", uri, auth != null));
+        boolean hasAuthHeader = Optional.ofNullable(auth).isPresent();
+        log.debug(String.format("[AuthInterceptor] uri=%s authHeaderPresent=%s", uri,
+                Boolean.toString(hasAuthHeader)));
         return true;
     }
 }

@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,24 +43,22 @@ public class UserRoleServiceImpl implements UserRoleService {
 
     @Override
     public List<Long> listUserRoleIds(Long userId, String industryType) {
-        var userRoles = userRoleRepo.findNotDeletedByUserId(userId);
-        if (CollectionUtils.isEmpty(userRoles)) {
-            return List.of();
-        }
-        var roleIds = userRoles.stream()
-                .map(SysUserRole::getRoleId)
-                .distinct()
-                .toList();
-        if (CollectionUtils.isEmpty(roleIds)) {
-            return List.of();
-        }
-        var roles = roleRepo.findByIds(roleIds);
-        return roles.stream()
-                .filter(role -> role.getIsDeleted() == null
-                        || DeleteStatus.NOT_DELETED.getCode().equals(role.getIsDeleted()))
-                .filter(role -> industryType == null || industryType.equals(role.getIndustryType()))
-                .map(SysRole::getId)
-                .toList();
+        return Optional.ofNullable(userRoleRepo.findNotDeletedByUserId(userId))
+                .filter(list -> !CollectionUtils.isEmpty(list))
+                .map(list -> list.stream().map(SysUserRole::getRoleId).distinct().toList())
+                .filter(ids -> !CollectionUtils.isEmpty(ids))
+                .map(roleRepo::findByIds)
+                .map(roles -> roles.stream()
+                        .filter(role -> Optional.ofNullable(role.getIsDeleted())
+                                .map(DeleteStatus.DELETED.getCode()::equals)
+                                .map(isDeleted -> !isDeleted)
+                                .orElse(true))
+                        .filter(role -> Optional.ofNullable(industryType)
+                                .map(type -> type.equals(role.getIndustryType()))
+                                .orElse(true))
+                        .map(SysRole::getId)
+                        .toList())
+                .orElseGet(List::of);
     }
 
     @Override
@@ -67,10 +66,8 @@ public class UserRoleServiceImpl implements UserRoleService {
     public void updateUserRoles(UserRoleUpdateReq req) {
         var userId = req.userId();
         var industryType = req.industryType();
-        if (req.roleIdList() == null) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "角色列表不能为空");
-        }
-        var roleIdList = new ArrayList<>(req.roleIdList());
+        var roleIdList = new ArrayList<>(Optional.ofNullable(req.roleIdList())
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "角色列表不能为空")));
 
         // 1. 查询角色并校验行业、状态
         var roleList = roleRepo.findByIds(roleIdList);
@@ -79,35 +76,34 @@ public class UserRoleServiceImpl implements UserRoleService {
             roleMap.put(role.getId(), role);
         }
         for (Long roleId : roleIdList) {
-            SysRole role = roleMap.get(roleId);
-            if (role == null) {
-                throw new BusinessException(ResultCode.BAD_REQUEST, String.format("角色不存在: roleId=%s", roleId));
-            }
+            SysRole role = Optional.ofNullable(roleMap.get(roleId))
+                    .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST,
+                            String.format("角色不存在: roleId=%s", roleId)));
             if (!industryType.equals(role.getIndustryType())) {
                 throw new BusinessException(ResultCode.BAD_REQUEST,
                         String.format("角色行业不匹配: roleId=%s, industryType=%s", roleId, role.getIndustryType()));
             }
-            if (role.getStatus() == null || !EnableStatus.ENABLED.getCode().equals(role.getStatus())) {
-                throw new BusinessException(ResultCode.BAD_REQUEST,
-                        String.format("角色未启用: roleId=%s", roleId));
-            }
-            if (role.getIsDeleted() != null && DeleteStatus.DELETED.getCode().equals(role.getIsDeleted())) {
+            Optional.ofNullable(role.getStatus())
+                    .filter(status -> EnableStatus.ENABLED.getCode().equals(status))
+                    .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST,
+                            String.format("角色未启用: roleId=%s", roleId)));
+            if (Optional.ofNullable(role.getIsDeleted())
+                    .map(DeleteStatus.DELETED.getCode()::equals)
+                    .orElse(false)) {
                 throw new BusinessException(ResultCode.BAD_REQUEST,
                         String.format("角色已删除: roleId=%s", roleId));
             }
         }
 
         // 2. 查询当前用户已有角色
-        var currentUserRoles = userRoleRepo.findNotDeletedByUserId(userId);
-        Map<Long, SysUserRole> currentByRoleId = new HashMap<>();
-        for (SysUserRole userRole : currentUserRoles) {
-            SysRole role = roleMap.get(userRole.getRoleId());
-            if (role == null) {
-                // 非本行业角色，略过但保留
-                continue;
-            }
-            currentByRoleId.put(userRole.getRoleId(), userRole);
-        }
+        var currentByRoleId = Optional.ofNullable(userRoleRepo.findNotDeletedByUserId(userId))
+                .map(currentUserRoles -> {
+                    Map<Long, SysUserRole> current = new HashMap<>();
+                    currentUserRoles.forEach(userRole -> Optional.ofNullable(roleMap.get(userRole.getRoleId()))
+                            .ifPresent(role -> current.put(userRole.getRoleId(), userRole)));
+                    return current;
+                })
+                .orElseGet(HashMap::new);
 
         Set<Long> newRoleIds = new HashSet<>(roleIdList);
         Set<Long> existingRoleIds = new HashSet<>(currentByRoleId.keySet());

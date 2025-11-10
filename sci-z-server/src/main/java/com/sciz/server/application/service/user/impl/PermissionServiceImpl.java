@@ -65,9 +65,10 @@ public class PermissionServiceImpl implements PermissionService {
     public List<String> findRoleCodes(Long userId, String industryType) {
         // 1. 检查缓存
         var cacheKey = buildCacheKey(userId, industryType, "roles");
-        var cached = RedisUtil.get(redis, cacheKey);
-        if (cached != null) {
-            return parseList(cached);
+        Optional<List<String>> cachedList = Optional.ofNullable(RedisUtil.get(redis, cacheKey))
+                .map(this::parseList);
+        if (cachedList.isPresent()) {
+            return cachedList.get();
         }
 
         // 2. 查询用户角色关联
@@ -103,9 +104,10 @@ public class PermissionServiceImpl implements PermissionService {
     public List<String> findPermissionCodes(Long userId, String industryType) {
         // 1. 检查缓存
         var cacheKey = buildCacheKey(userId, industryType, "permissions");
-        var cached = RedisUtil.get(redis, cacheKey);
-        if (cached != null) {
-            return parseList(cached);
+        Optional<List<String>> cachedList = Optional.ofNullable(RedisUtil.get(redis, cacheKey))
+                .map(this::parseList);
+        if (cachedList.isPresent()) {
+            return cachedList.get();
         }
 
         // 2. 查询用户角色ID列表
@@ -141,9 +143,10 @@ public class PermissionServiceImpl implements PermissionService {
     public List<LoginMenuResp> buildMenus(Long userId, String industryType) {
         // 1. 检查缓存
         var cacheKey = buildCacheKey(userId, industryType, "menus");
-        var cached = RedisUtil.get(redis, cacheKey);
-        if (cached != null) {
-            return JsonUtil.fromJsonList(cached, LoginMenuResp.class);
+        Optional<List<LoginMenuResp>> cachedMenus = Optional.ofNullable(RedisUtil.get(redis, cacheKey))
+                .map(json -> JsonUtil.fromJsonList(json, LoginMenuResp.class));
+        if (cachedMenus.isPresent()) {
+            return cachedMenus.get();
         }
 
         // 2. 查询用户角色ID列表
@@ -289,9 +292,12 @@ public class PermissionServiceImpl implements PermissionService {
      */
     private List<String> filterAndMapRoleCodes(List<SysRole> roles, String industryType) {
         return roles.stream()
-                .filter(role -> role.getIsDeleted() == null
-                        || DeleteStatus.NOT_DELETED.getCode().equals(role.getIsDeleted()))
-                .filter(role -> industryType == null || industryType.equals(role.getIndustryType()))
+                .filter(role -> !Optional.ofNullable(role.getIsDeleted())
+                        .map(DeleteStatus.DELETED.getCode()::equals)
+                        .orElse(false))
+                .filter(role -> Optional.ofNullable(industryType)
+                        .map(type -> type.equals(role.getIndustryType()))
+                        .orElse(true))
                 .map(SysRole::getRoleCode)
                 .filter(Objects::nonNull)
                 .distinct()
@@ -307,9 +313,12 @@ public class PermissionServiceImpl implements PermissionService {
      */
     private List<String> filterAndMapPermissionCodes(List<SysPermission> perms, String industryType) {
         return perms.stream()
-                .filter(perm -> perm.getIsDeleted() == null
-                        || DeleteStatus.NOT_DELETED.getCode().equals(perm.getIsDeleted()))
-                .filter(perm -> industryType == null || industryType.equals(perm.getIndustryType()))
+                .filter(perm -> !Optional.ofNullable(perm.getIsDeleted())
+                        .map(DeleteStatus.DELETED.getCode()::equals)
+                        .orElse(false))
+                .filter(perm -> Optional.ofNullable(industryType)
+                        .map(type -> type.equals(perm.getIndustryType()))
+                        .orElse(true))
                 .map(SysPermission::getPermissionCode)
                 .filter(Objects::nonNull)
                 .distinct()
@@ -325,11 +334,15 @@ public class PermissionServiceImpl implements PermissionService {
      */
     private List<SysPermission> filterMenuPermissions(List<SysPermission> perms, String industryType) {
         return perms.stream()
-                .filter(perm -> perm.getIsDeleted() == null
-                        || DeleteStatus.NOT_DELETED.getCode().equals(perm.getIsDeleted()))
-                .filter(perm -> industryType == null || industryType.equals(perm.getIndustryType()))
-                .filter(perm -> perm.getPermissionType() != null
-                        && PermissionType.MENU.getCode().equals(perm.getPermissionType()))
+                .filter(perm -> !Optional.ofNullable(perm.getIsDeleted())
+                        .map(DeleteStatus.DELETED.getCode()::equals)
+                        .orElse(false))
+                .filter(perm -> Optional.ofNullable(industryType)
+                        .map(type -> type.equals(perm.getIndustryType()))
+                        .orElse(true))
+                .filter(perm -> Optional.ofNullable(perm.getPermissionType())
+                        .map(type -> PermissionType.MENU.getCode().equals(type))
+                        .orElse(false))
                 .toList();
     }
 
@@ -353,13 +366,11 @@ public class PermissionServiceImpl implements PermissionService {
         for (var perm : menuPerms) {
             var parentId = perm.getParentId();
             var node = idToNode.get(perm.getId());
-            if (parentId == null || parentId == 0 || !idToNode.containsKey(parentId)) {
+            if (Optional.ofNullable(parentId).filter(id -> id != 0 && idToNode.containsKey(id)).isEmpty()) {
                 roots.add(node);
             } else {
                 var parent = idToNode.get(parentId);
-                if (parent.getChildren() == null) {
-                    parent.setChildren(new ArrayList<>());
-                }
+                parent.setChildren(Optional.ofNullable(parent.getChildren()).orElseGet(ArrayList::new));
                 parent.getChildren().add(node);
             }
         }
@@ -388,7 +399,7 @@ public class PermissionServiceImpl implements PermissionService {
      * @return 非 null 的字符串
      */
     private String safe(String str) {
-        return str == null ? "" : str;
+        return Optional.ofNullable(str).orElse("");
     }
 
     /**
@@ -398,13 +409,13 @@ public class PermissionServiceImpl implements PermissionService {
      * @return 字符串列表
      */
     private List<String> parseList(String csv) {
-        if (csv == null || csv.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return Arrays.stream(csv.split(","))
-                .filter(item -> !item.isEmpty())
-                .distinct()
-                .toList();
+        return Optional.ofNullable(csv)
+                .filter(value -> !value.isEmpty())
+                .map(value -> Arrays.stream(value.split(","))
+                        .filter(item -> !item.isEmpty())
+                        .distinct()
+                        .toList())
+                .orElse(Collections.emptyList());
     }
 
     /**
@@ -414,10 +425,10 @@ public class PermissionServiceImpl implements PermissionService {
      * @return CSV 字符串
      */
     private String toCsv(List<String> list) {
-        if (list == null || list.isEmpty()) {
-            return "";
-        }
-        return String.join(",", list);
+        return Optional.ofNullable(list)
+                .filter(items -> !items.isEmpty())
+                .map(items -> String.join(",", items))
+                .orElse("");
     }
 
 }

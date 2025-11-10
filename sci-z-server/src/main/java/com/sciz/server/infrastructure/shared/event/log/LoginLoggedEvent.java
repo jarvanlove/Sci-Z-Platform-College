@@ -1,6 +1,7 @@
 package com.sciz.server.infrastructure.shared.event.log;
 
 import com.sciz.server.infrastructure.shared.event.DomainEvent;
+import java.util.Optional;
 import java.time.LocalDateTime;
 
 import lombok.Getter;
@@ -74,7 +75,9 @@ public class LoginLoggedEvent extends DomainEvent {
 
     @Override
     public String getAggregateId() {
-        return userId == null ? "0" : String.valueOf(userId);
+        return Optional.ofNullable(userId)
+                .map(String::valueOf)
+                .orElse("0");
     }
 
     @Override

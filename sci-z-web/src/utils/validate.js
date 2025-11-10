@@ -12,11 +12,9 @@ export const validatePhone = (phone) => {
   return re.test(phone)
 }
 
-// 密码强度验证
+// 密码长度验证（6-20位）
 export const validatePassword = (password) => {
-  // 至少8位，包含字母和数字
-  const re = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]{8,}$/
-  return re.test(password)
+  return typeof password === 'string' && password.length >= 6 && password.length <= 20
 }
 
 // 身份证号验证

@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,9 +71,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     public void updateRolePermissions(RolePermissionUpdateReq req) {
         var roleId = req.roleId();
         var industryType = req.industryType();
-        if (req.permissionIdList() == null) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "权限列表不能为空");
-        }
+        var permissionIdList = Optional.ofNullable(req.permissionIdList())
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "权限列表不能为空"));
 
         // 1. 校验角色
         var roleList = roleRepo.findByIds(List.of(roleId));
@@ -84,38 +84,40 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             throw new BusinessException(ResultCode.BAD_REQUEST,
                     String.format("角色行业不匹配: roleId=%s, industryType=%s", roleId, role.getIndustryType()));
         }
-        if (role.getStatus() == null || !EnableStatus.ENABLED.getCode().equals(role.getStatus())) {
-            throw new BusinessException(ResultCode.BAD_REQUEST,
-                    String.format("角色未启用: roleId=%s", roleId));
-        }
-        if (role.getIsDeleted() != null && DeleteStatus.DELETED.getCode().equals(role.getIsDeleted())) {
+        Optional.ofNullable(role.getStatus())
+                .filter(status -> EnableStatus.ENABLED.getCode().equals(status))
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST,
+                        String.format("角色未启用: roleId=%s", roleId)));
+        if (Optional.ofNullable(role.getIsDeleted())
+                .map(DeleteStatus.DELETED.getCode()::equals)
+                .orElse(false)) {
             throw new BusinessException(ResultCode.BAD_REQUEST,
                     String.format("角色已删除: roleId=%s", roleId));
         }
 
         // 2. 查询并校验权限
-        var permissionIds = new HashSet<>(req.permissionIdList());
-        var permissionList = permissionRepo.findByIds(req.permissionIdList());
+        var permissionIds = new HashSet<>(permissionIdList);
+        var permissionList = permissionRepo.findByIds(permissionIdList);
         Map<Long, SysPermission> permissionMap = new HashMap<>();
         for (SysPermission permission : permissionList) {
             permissionMap.put(permission.getId(), permission);
         }
         for (Long permissionId : permissionIds) {
-            SysPermission permission = permissionMap.get(permissionId);
-            if (permission == null) {
-                throw new BusinessException(ResultCode.BAD_REQUEST,
-                        String.format("权限不存在: permissionId=%s", permissionId));
-            }
+            SysPermission permission = Optional.ofNullable(permissionMap.get(permissionId))
+                    .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST,
+                            String.format("权限不存在: permissionId=%s", permissionId)));
             if (!industryType.equals(permission.getIndustryType())) {
                 throw new BusinessException(ResultCode.BAD_REQUEST,
                         String.format("权限行业不匹配: permissionId=%s, industryType=%s", permissionId,
                                 permission.getIndustryType()));
             }
-            if (permission.getStatus() == null || !EnableStatus.ENABLED.getCode().equals(permission.getStatus())) {
-                throw new BusinessException(ResultCode.BAD_REQUEST,
-                        String.format("权限未启用: permissionId=%s", permissionId));
-            }
-            if (permission.getIsDeleted() != null && DeleteStatus.DELETED.getCode().equals(permission.getIsDeleted())) {
+            Optional.ofNullable(permission.getStatus())
+                    .filter(status -> EnableStatus.ENABLED.getCode().equals(status))
+                    .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST,
+                            String.format("权限未启用: permissionId=%s", permissionId)));
+            if (Optional.ofNullable(permission.getIsDeleted())
+                    .map(DeleteStatus.DELETED.getCode()::equals)
+                    .orElse(false)) {
                 throw new BusinessException(ResultCode.BAD_REQUEST,
                         String.format("权限已删除: permissionId=%s", permissionId));
             }

@@ -7,9 +7,9 @@ import com.sciz.server.domain.pojo.mapper.user.SysRolePermissionMapper;
 import com.sciz.server.domain.pojo.repository.user.SysRolePermissionRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import java.time.LocalDateTime;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
+import java.util.Optional;
+import org.springframework.stereotype.Repository;
 
 /**
  * 角色权限仓储实现
@@ -74,7 +74,7 @@ public class SysRolePermissionRepoImpl implements SysRolePermissionRepo {
      */
     @Override
     public void markDeletedByIds(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
+        if (Optional.ofNullable(ids).map(List::isEmpty).orElse(true)) {
             return;
         }
         new LambdaUpdateChainWrapper<>(mapper)

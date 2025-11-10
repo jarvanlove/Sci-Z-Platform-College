@@ -3,6 +3,7 @@ package com.sciz.server.infrastructure.config.security;
 import cn.dev33.satoken.filter.SaServletFilter;
 import cn.dev33.satoken.router.SaRouter;
 import cn.dev33.satoken.stp.StpUtil;
+import java.util.Optional;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -33,6 +34,7 @@ public class SecurityConfig {
                 .addExclude("/api/auth/reset-password") // 重置密码
                 .addExclude("/api/auth/captcha") // 获取验证码
                 .addExclude("/api/auth/department/label") // 获取行业部门标签
+                .addExclude("/api/auth/email-code") // 发送重置密码邮箱验证码
                 // 静态资源和文档
                 .addExclude("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**")
                 .addExclude("/webjars/**", "/static/**", "/favicon.ico")
@@ -41,8 +43,8 @@ public class SecurityConfig {
                 .setError(e -> {
                     // 统一未登录响应
                     var result = Result.fail(ResultCode.UNAUTHORIZED);
-                    var json = JsonUtil.toJson(result);
-                    return json != null ? json : result.getMessage();
+                    return Optional.ofNullable(JsonUtil.toJson(result))
+                            .orElse(result.getMessage());
                 });
     }
 }

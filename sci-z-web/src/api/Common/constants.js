@@ -30,10 +30,13 @@ export const AUTH_API = {
   RESET_PASSWORD: buildApiUrl('/auth/reset-password'),
   CAPTCHA: buildApiUrl('/auth/captcha'),
   SEND_EMAIL_CODE: buildApiUrl('/auth/send-email-code'),
-  REFRESH_TOKEN: buildApiUrl('/auth/refresh'),
-  USER_INFO: buildApiUrl('/auth/user-info'),
-  PERMISSIONS: buildApiUrl('/auth/permissions'),  // 获取用户权限列表
-  MENUS: buildApiUrl('/auth/menus'),              // 获取用户菜单列表
+  REFRESH_TOKEN: buildApiUrl('/auth/refresh-token'),
+  PROFILE: buildApiUrl('/auth/profile'),
+  CHECK_LOGIN: buildApiUrl('/auth/check/login'),
+  CHECK_ROLE: buildApiUrl('/auth/check/role'),
+  CHECK_PERMISSION: buildApiUrl('/auth/check/perm'),
+  PERMISSIONS: buildApiUrl('/auth/permissions'),  // 获取用户权限列表（保留占位，后端未实现）
+  MENUS: buildApiUrl('/auth/menus'),              // 获取用户菜单列表（保留占位，后端未实现）
   LOGOUT: buildApiUrl('/auth/logout'),
   DEPARTMENT_LABEL: buildApiUrl('/auth/department/label')
 }
@@ -163,17 +166,17 @@ export const FILE_API = {
 // ================================
 
 export const SYSTEM_API = {
-  BASE_PATH: buildApiUrl('/system'),
-  INDUSTRY_CONFIG: buildApiUrl('/system/industry/config'),
-  DEPARTMENTS: buildApiUrl('/system/departments'),
-  DEPARTMENT_DETAIL: (id) => buildApiUrl(`/system/departments/${id}`),
-  ROLES: buildApiUrl('/system/roles'),
-  ROLE_DETAIL: (id) => buildApiUrl(`/system/roles/${id}`),
-  PERMISSIONS_TREE: buildApiUrl('/system/permissions/tree'),
-  PERMISSIONS: buildApiUrl('/system/permissions'),
-  PERMISSION_DETAIL: (id) => buildApiUrl(`/system/permissions/${id}`),
-  USERS: buildApiUrl('/system/users'),
-  USER_DETAIL: (id) => buildApiUrl(`/system/users/${id}`)
+  BASE_PATH: buildApiUrl('/user'),
+  INDUSTRY_CONFIG: buildApiUrl('/user/industry/config'),
+  DEPARTMENTS: buildApiUrl('/user/departments'),
+  DEPARTMENT_DETAIL: (id) => buildApiUrl(`/user/departments/${id}`),
+  ROLES: buildApiUrl('/user/roles'),
+  ROLE_DETAIL: (id) => buildApiUrl(`/user/roles/${id}`),
+  PERMISSIONS_TREE: buildApiUrl('/user/permissions/tree'),
+  PERMISSIONS: buildApiUrl('/user/permissions'),
+  PERMISSION_DETAIL: (id) => buildApiUrl(`/user/permissions/${id}`),
+  USERS: buildApiUrl('/user/users'),
+  USER_DETAIL: (id) => buildApiUrl(`/user/users/${id}`)
 }
 
 // ================================

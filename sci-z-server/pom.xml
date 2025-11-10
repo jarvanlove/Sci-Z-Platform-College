@@ -119,6 +119,12 @@
       <version>${langchain4j.version}</version>
     </dependency>
 
+    <!-- 邮件发送 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
+
    <!-- jBCrypt 密码哈希 -->
     <dependency>
       <groupId>org.mindrot</groupId>

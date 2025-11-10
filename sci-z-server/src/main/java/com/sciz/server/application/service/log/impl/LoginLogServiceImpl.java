@@ -7,6 +7,8 @@ import com.sciz.server.infrastructure.shared.event.log.LoginLoggedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 /**
  * 登录日志应用服务实现
  *
@@ -48,11 +50,16 @@ public class LoginLogServiceImpl implements LoginLogService {
         return repository.save(entity);
     }
 
+    /**
+     * 截取字符串
+     *
+     * @param s   字符串
+     * @param max 最大长度
+     * @return 截取后的字符串
+     */
     private String truncate(String s, int max) {
-        if (s == null)
-            return null;
-        if (s.length() <= max)
-            return s;
-        return s.substring(0, max);
+        return Optional.ofNullable(s)
+                .map(value -> value.length() <= max ? value : value.substring(0, max))
+                .orElse(null);
     }
 }

@@ -10,6 +10,7 @@ import com.sciz.server.domain.pojo.entity.user.SysUser;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -66,9 +67,9 @@ public interface AuthConverter {
             List<String> permissionCodes,
             List<LoginMenuResp> menus,
             Long tokenTimeout) {
-        var safeRoles = roleCodes == null ? List.<String>of() : List.copyOf(roleCodes);
-        var safePermissions = permissionCodes == null ? List.<String>of() : List.copyOf(permissionCodes);
-        var safeMenus = menus == null ? List.<LoginMenuResp>of() : List.copyOf(menus);
+        var safeRoles = Optional.ofNullable(roleCodes).map(List::copyOf).orElseGet(List::of);
+        var safePermissions = Optional.ofNullable(permissionCodes).map(List::copyOf).orElseGet(List::of);
+        var safeMenus = Optional.ofNullable(menus).map(List::copyOf).orElseGet(List::of);
         return new ProfileResp(
                 user.getId(),
                 Objects.requireNonNull(tokenInfo).getTokenName(),

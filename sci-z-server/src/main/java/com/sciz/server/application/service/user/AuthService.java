@@ -1,7 +1,9 @@
 package com.sciz.server.application.service.user;
 
+import com.sciz.server.domain.pojo.dto.request.user.EmailCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
 import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
+import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
 import com.sciz.server.domain.pojo.dto.response.user.ProfileResp;
@@ -89,4 +91,18 @@ public interface AuthService {
      * @return CheckPermResp 权限校验结果
      */
     CheckPermResp checkPermission(String permissionCode, String industryType);
+
+    /**
+     * 发送重置密码邮箱验证码
+     *
+     * @param req EmailCodeSendReq 请求参数
+     */
+    void sendResetPasswordEmailCode(EmailCodeSendReq req);
+
+    /**
+     * 重置密码
+     *
+     * @param req ResetPasswordReq 重置密码请求
+     */
+    void resetPassword(ResetPasswordReq req);
 }

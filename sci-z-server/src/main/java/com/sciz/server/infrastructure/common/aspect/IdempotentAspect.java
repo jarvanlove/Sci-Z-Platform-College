@@ -16,6 +16,7 @@ import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -40,14 +41,15 @@ public class IdempotentAspect {
         Idempotent.IdempotentStrategy strategy = anno.strategy();
 
         long now = System.currentTimeMillis();
-        Entry exist = STORE.get(key);
-        if (exist != null && !exist.isExpired(now)) {
+        Optional<Entry> existing = Optional.ofNullable(STORE.get(key))
+                .filter(entry -> !entry.isExpired(now));
+        if (existing.isPresent()) {
             switch (strategy) {
                 case REJECT:
                     throw new BusinessException(429, anno.message());
                 case RETURN_CACHED:
                     log.info(String.format("幂等命中，返回缓存结果 key=%s", key));
-                    return exist.result;
+                    return existing.map(entry -> entry.result).orElse(null);
                 case WAIT_AND_RETURN:
                     return waitAndReturn(key, expireSeconds);
                 default:
@@ -72,12 +74,21 @@ public class IdempotentAspect {
         }
     }
 
+    /**
+     * 等待并返回结果
+     *
+     * @param key           幂等性键
+     * @param expireSeconds 过期时间（秒）
+     * @return 结果
+     * @throws InterruptedException 中断异常
+     */
     private Object waitAndReturn(String key, long expireSeconds) throws InterruptedException {
         long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(expireSeconds);
         while (System.currentTimeMillis() < deadline) {
-            Entry entry = STORE.get(key);
-            if (entry != null && entry.resultAvailable()) {
-                return entry.result;
+            Optional<Entry> entry = Optional.ofNullable(STORE.get(key));
+            Optional<Object> result = entry.filter(Entry::resultAvailable).map(value -> value.result);
+            if (result.isPresent()) {
+                return result.get();
             }
             Thread.sleep(100);
         }
@@ -86,39 +97,66 @@ public class IdempotentAspect {
         throw new BusinessException(408, "请求处理中超时，请稍后重试");
     }
 
+    /**
+     * 获取方法
+     *
+     * @param joinPoint 连接点
+     * @return 方法
+     */
     private Method getMethod(ProceedingJoinPoint joinPoint) {
         Signature signature = joinPoint.getSignature();
         MethodSignature methodSignature = (MethodSignature) signature;
         return methodSignature.getMethod();
     }
 
+    /**
+     * 构建幂等性键
+     *
+     * @param anno      注解
+     * @param joinPoint 连接点
+     * @return 幂等性键
+     */
     private String buildKey(Idempotent anno, ProceedingJoinPoint joinPoint) {
         String prefix = anno.prefix();
-        String raw;
-        if (anno.key() != null && !anno.key().isEmpty()) {
-            // 简化实现：不解析 SpEL，直接使用给定 key 文本；
-            // 若需要 SpEL，可引入 Spring Expression 解析（此处避免额外依赖/复杂性）。
-            raw = anno.key();
-        } else {
-            Method method = getMethod(joinPoint);
-            raw = method.getDeclaringClass().getName() + "#" + method.getName() + ArraysHash(joinPoint.getArgs());
-        }
+        String raw = Optional.ofNullable(anno.key())
+                .filter(text -> !text.isEmpty())
+                .orElseGet(() -> {
+                    Method method = getMethod(joinPoint);
+                    return method.getDeclaringClass().getName() + "#"
+                            + method.getName() + ArraysHash(joinPoint.getArgs());
+                });
         return prefix + ":" + sha256(raw);
     }
 
+    /**
+     * 数组哈希
+     *
+     * @param args 参数数组
+     * @return 哈希值
+     */
     private String ArraysHash(Object[] args) {
-        if (args == null || args.length == 0)
-            return "()";
-        StringBuilder sb = new StringBuilder("(");
-        for (int i = 0; i < args.length; i++) {
-            sb.append(Objects.toString(args[i]));
-            if (i < args.length - 1)
-                sb.append(',');
-        }
-        sb.append(')');
-        return sb.toString();
+        return Optional.ofNullable(args)
+                .filter(array -> array.length > 0)
+                .map(array -> {
+                    StringBuilder sb = new StringBuilder("(");
+                    for (int i = 0; i < array.length; i++) {
+                        sb.append(Objects.toString(array[i]));
+                        if (i < array.length - 1) {
+                            sb.append(',');
+                        }
+                    }
+                    sb.append(')');
+                    return sb.toString();
+                })
+                .orElse("()");
     }
 
+    /**
+     * SHA-256 哈希
+     *
+     * @param input 输入字符串
+     * @return 哈希值
+     */
     private String sha256(String input) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -153,7 +191,7 @@ public class IdempotentAspect {
         }
 
         boolean resultAvailable() {
-            return result != null;
+            return Optional.ofNullable(result).isPresent();
         }
     }
 }

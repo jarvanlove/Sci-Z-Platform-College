@@ -1,18 +1,19 @@
 package com.sciz.server.infrastructure.external.dify.impl;
 
 import com.sciz.server.infrastructure.external.dify.DifyService;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
  * 基于 HTTP 的 Dify 实现（占位实现）
- * 
+ *
  * 说明：
  * - 实际项目中请通过配置（baseUrl、apiKey）+ RestTemplate/WebClient 实现调用
  * - 这里提供最小可用骨架，确保依赖注入与调用路径清晰
- * 
+ *
  * @author JiaWen.Wu
- * 
+ *
  * @className HttpDifyServiceImpl
  * @date 2025-10-29 10:00
  */
@@ -36,9 +37,12 @@ public class HttpDifyServiceImpl implements DifyService {
 
     @Override
     public void syncKnowledge(String knowledgeBaseId, String documentId, String content) {
+        var length = Optional.ofNullable(content)
+                .map(String::length)
+                .orElse(0);
         log.info(String.format("[Dify] syncKnowledge kbId=%s, docId=%s, contentLength=%s...", knowledgeBaseId,
                 documentId,
-                String.valueOf(content == null ? 0 : content.length())));
+                length));
         // TODO 调用 Dify KB API 同步文档
     }
 }

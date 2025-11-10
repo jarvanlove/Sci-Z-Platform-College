@@ -351,6 +351,36 @@ public enum ResultCode {
     CAPTCHA_EXPIRED(9002, "验证码已过期"),
 
     /**
+     * 邮箱未注册
+     */
+    EMAIL_NOT_FOUND(9005, "邮箱未注册"),
+
+    /**
+     * 邮箱验证码发送频繁
+     */
+    EMAIL_CODE_RATE_LIMITED(9006, "验证码发送频繁，请稍后再试"),
+
+    /**
+     * 邮箱验证码错误
+     */
+    EMAIL_CODE_INVALID(9007, "邮箱验证码错误"),
+
+    /**
+     * 邮箱验证码已过期
+     */
+    EMAIL_CODE_EXPIRED(9008, "邮箱验证码已过期"),
+
+    /**
+     * 邮箱验证码发送成功
+     */
+    EMAIL_CODE_SEND_SUCCESS(9100, "验证码发送成功"),
+
+    /**
+     * 重置密码成功
+     */
+    RESET_PASSWORD_SUCCESS(9101, "重置密码成功"),
+
+    /**
      * 令牌已过期
      */
     TOKEN_EXPIRED(9003, "令牌已过期"),

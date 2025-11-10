@@ -89,6 +89,45 @@ export const CaptchaResponse = {
   expiresIn: Number         // 验证码过期时间(秒)
 }
 
+/**
+ * Token 刷新响应
+ */
+export const RefreshTokenResponse = {
+  loginId: String,
+  tokenName: String,
+  tokenValue: String,
+  expiresIn: Number,
+  expiresAt: String
+}
+
+/**
+ * 登录状态校验响应
+ */
+export const CheckLoginResponse = {
+  login: Boolean,
+  loginId: String,
+  tokenRemainingSeconds: Number,
+  tokenInfo: Object
+}
+
+/**
+ * 角色校验响应
+ */
+export const CheckRoleResponse = {
+  roleCode: String,
+  industryType: String,
+  hasRole: Boolean
+}
+
+/**
+ * 权限校验响应
+ */
+export const CheckPermissionResponse = {
+  permissionCode: String,
+  industryType: String,
+  hasPermission: Boolean
+}
+
 // ================================
 // 3. 核心业务类型（只定义稳定字段）
 // ================================
@@ -254,6 +293,10 @@ export default {
   RegisterRequest,
   ResetPasswordRequest,
   CaptchaResponse,
+  RefreshTokenResponse,
+  CheckLoginResponse,
+  CheckRoleResponse,
+  CheckPermissionResponse,
   
   // 核心业务类型
   User,

@@ -93,7 +93,7 @@ public void callUnreliableService() {
     maxAttempts = 3,
     delay = 2000,
     strategy = Retry.RetryStrategy.LINEAR,
-    condition = "#result == null || #result.isEmpty()"
+    condition = "T(java.util.Optional).ofNullable(#result).map(T(java.lang.String)::isEmpty).orElse(true)"
 )
 public String fetchData(String key) {
     return null; // 如果返回空则重试

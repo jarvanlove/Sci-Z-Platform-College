@@ -66,7 +66,7 @@ public class AnnotationExamples {
     /**
      * 条件重试
      */
-    @Retry(maxAttempts = 3, delay = 2000, strategy = Retry.RetryStrategy.LINEAR, condition = "#result == null || #result.isEmpty()", logRetry = true)
+    @Retry(maxAttempts = 3, delay = 2000, strategy = Retry.RetryStrategy.LINEAR, condition = "T(java.util.Optional).ofNullable(#result).map(T(java.lang.String)::isEmpty).orElse(true)", logRetry = true)
     public String fetchData(String key) {
         // 获取数据，如果为空则重试
         return null;

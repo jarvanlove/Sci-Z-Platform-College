@@ -1,8 +1,11 @@
 package com.sciz.server.infrastructure.shared.handler.user;
 
+import com.sciz.server.infrastructure.external.mail.MailService;
 import com.sciz.server.infrastructure.shared.event.user.UserLoginEvent;
 import com.sciz.server.infrastructure.shared.event.user.UserLogoutEvent;
 import com.sciz.server.infrastructure.shared.event.user.UserRegisteredEvent;
+import com.sciz.server.infrastructure.shared.event.user.UserResetPwdEmailCodeEvent;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
@@ -18,7 +21,9 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class UserEventHandler {
+    private final MailService mailService;
 
     /**
      * 处理用户注册事件
@@ -107,6 +112,25 @@ public class UserEventHandler {
 
         } catch (Exception e) {
             log.error("处理用户退出事件失败: userId={}", event.getUserId(), e);
+        }
+    }
+
+    /**
+     * 处理用户重置密码验证码事件
+     *
+     * @param event UserResetPwdEmailCodeEvent 事件
+     */
+    @EventListener
+    @Async
+    public void handleUserResetPasswordEmailCode(UserResetPwdEmailCodeEvent event) {
+        try {
+            log.info(String.format("处理用户重置密码验证码事件: userId=%s, email=%s",
+                    event.getUserId(), event.getEmail()));
+            sendResetPasswordEmailCode(event);
+            log.info(String.format("用户重置密码验证码处理完成: userId=%s", event.getUserId()));
+        } catch (Exception e) {
+            log.error(String.format("处理用户重置密码验证码事件失败: userId=%s, email=%s, err=%s",
+                    event.getUserId(), event.getEmail(), e.getMessage()), e);
         }
     }
 
@@ -202,5 +226,16 @@ public class UserEventHandler {
     private void cleanupUserSession(UserLogoutEvent event) {
         log.info("清理用户会话: userId={}", event.getUserId());
         // 实现清理用户会话的逻辑
+    }
+
+    /**
+     * 发送重置密码验证码邮件
+     *
+     * @param event UserResetPwdEmailCodeEvent 事件
+     */
+    private void sendResetPasswordEmailCode(UserResetPwdEmailCodeEvent event) {
+        log.info(String.format("发送重置密码验证码邮件: email=%s", event.getEmail()));
+        log.debug(String.format("重置密码验证码明文: email=%s, code=%s", event.getEmail(), event.getEmailCode()));
+        mailService.sendResetPasswordCodeMail(event.getEmail(), event.getEmailCode());
     }
 }

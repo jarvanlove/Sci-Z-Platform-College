@@ -6,12 +6,13 @@ import com.sciz.server.domain.pojo.entity.user.SysUser;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
 import com.sciz.server.infrastructure.shared.enums.LoginStatus;
 import com.sciz.server.infrastructure.shared.event.log.LoginLoggedEvent;
+import java.time.LocalDateTime;
+import java.util.Optional;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 
 /**
  * 登录日志和统计服务实现类
@@ -42,9 +43,9 @@ public class LoginLogAndStatsServiceImpl implements LoginLogAndStatsService {
         log.debug(String.format("保存登录日志成功: logId=%s, userId=%s", logId, event.getUserId()));
 
         // 2. 更新用户登录统计（仅成功登录时更新）
-        if (event.getStatus() != null && LoginStatus.SUCCESS.getCode().equals(event.getStatus())) {
-            updateUserLoginStats(event);
-        }
+        Optional.ofNullable(event.getStatus())
+                .filter(LoginStatus.SUCCESS.getCode()::equals)
+                .ifPresent(status -> updateUserLoginStats(event));
     }
 
     /**
@@ -53,31 +54,23 @@ public class LoginLogAndStatsServiceImpl implements LoginLogAndStatsService {
      * @param event 登录日志事件
      */
     private void updateUserLoginStats(LoginLoggedEvent event) {
-        SysUser user = sysUserRepo.findById(event.getUserId());
-        if (user == null) {
-            log.warn(String.format("用户不存在，无法更新登录统计: userId=%s", event.getUserId()));
-            return;
-        }
+        Optional.ofNullable(sysUserRepo.findById(event.getUserId()))
+                .ifPresentOrElse(user -> {
+                    var currentCount = Optional.ofNullable(user.getLoginCount()).orElse(0);
+                    user.setLoginCount(currentCount + 1);
 
-        // 更新登录统计字段
-        Integer currentCount = user.getLoginCount();
-        if (currentCount == null) {
-            currentCount = 0;
-        }
-        user.setLoginCount(currentCount + 1);
+                    var loginTime = Optional.ofNullable(event.getLoginTime()).orElseGet(LocalDateTime::now);
+                    user.setLastLoginTime(loginTime);
+                    user.setLastLoginIp(event.getLoginIp());
 
-        LocalDateTime loginTime = event.getLoginTime() != null ? event.getLoginTime() : LocalDateTime.now();
-        user.setLastLoginTime(loginTime);
-        user.setLastLoginIp(event.getLoginIp());
-
-        // 更新用户信息
-        boolean updated = sysUserRepo.updateById(user);
-        if (updated) {
-            log.info(String.format("用户登录统计更新成功: userId=%s, loginCount=%s, lastLoginTime=%s, lastLoginIp=%s",
-                    event.getUserId(), user.getLoginCount(), user.getLastLoginTime(), user.getLastLoginIp()));
-        } else {
-            log.warn(String.format("用户登录统计更新失败: userId=%s", event.getUserId()));
-        }
+                    if (sysUserRepo.updateById(user)) {
+                        log.info(String.format("用户登录统计更新成功: userId=%s, loginCount=%s, lastLoginTime=%s, lastLoginIp=%s",
+                                event.getUserId(), user.getLoginCount(), user.getLastLoginTime(),
+                                user.getLastLoginIp()));
+                    } else {
+                        log.warn(String.format("用户登录统计更新失败: userId=%s", event.getUserId()));
+                    }
+                }, () -> log.warn(String.format("用户不存在，无法更新登录统计: userId=%s", event.getUserId())));
     }
 
 }

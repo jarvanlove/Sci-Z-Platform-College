@@ -5,8 +5,10 @@ import cn.dev33.satoken.stp.SaTokenInfo;
 import cn.dev33.satoken.stp.StpUtil;
 import com.sciz.server.application.service.user.AuthService;
 import com.sciz.server.application.service.user.PermissionService;
+import com.sciz.server.domain.pojo.dto.request.user.EmailCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
 import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
+import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
 import com.sciz.server.domain.pojo.dto.response.user.ProfileResp;
@@ -15,6 +17,7 @@ import com.sciz.server.domain.pojo.dto.response.user.CheckRoleResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckPermResp;
 import com.sciz.server.domain.pojo.dto.response.user.RefreshTokenResp;
 import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
+import com.sciz.server.domain.pojo.entity.user.SysDepartment;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
 import com.sciz.server.domain.pojo.entity.user.SysUserRole;
 import com.sciz.server.domain.pojo.repository.user.SysDepartmentRepo;
@@ -29,6 +32,7 @@ import com.sciz.server.infrastructure.shared.enums.EnableStatus;
 import com.sciz.server.infrastructure.shared.enums.LoginStatus;
 import com.sciz.server.infrastructure.shared.enums.UserStatus;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
+import com.sciz.server.infrastructure.shared.event.user.UserResetPwdEmailCodeEvent;
 import com.sciz.server.infrastructure.shared.event.log.LoginLoggedEvent;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -37,6 +41,7 @@ import com.sciz.server.infrastructure.shared.utils.ClientInfoUtil;
 import com.sciz.server.infrastructure.shared.utils.RedisUtil;
 import com.sciz.server.interfaces.converter.AuthConverter;
 
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -45,6 +50,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.UUID;
 import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -74,6 +81,7 @@ public class AuthServiceImpl implements AuthService {
     private final AuthConverter authConverter;
 
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Shanghai");
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     public AuthServiceImpl(SysUserRepo sysUserRepo, StringRedisTemplate stringRedisTemplate,
             EventPublisher eventPublisher,
@@ -175,12 +183,11 @@ public class AuthServiceImpl implements AuthService {
 
         // 从 Redis 获取验证码
         var cacheKey = String.format(CacheConstant.CAPTCHA_KEY_PREFIX, captchaKey);
-        var cachedCaptcha = RedisUtil.get(stringRedisTemplate, cacheKey);
-
-        if (cachedCaptcha == null) {
-            log.warn(String.format("验证码已过期, username=%s, captchaKey=%s", username, captchaKey));
-            throw new BusinessException(ResultCode.CAPTCHA_EXPIRED);
-        }
+        var cachedCaptcha = Optional.ofNullable(RedisUtil.get(stringRedisTemplate, cacheKey))
+                .orElseThrow(() -> {
+                    log.warn(String.format("验证码已过期, username=%s, captchaKey=%s", username, captchaKey));
+                    return new BusinessException(ResultCode.CAPTCHA_EXPIRED);
+                });
 
         // 验证码不匹配
         var normalizedUserCaptcha = captcha.trim().toUpperCase(Locale.ROOT);
@@ -197,49 +204,57 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 校验注册验证码
+     * 强制校验图形验证码（注册、重置密码等场景）
+     *
+     * @param captcha    String 验证码文本
+     * @param captchaKey String 验证码唯一标识
      */
-    private void validateRegisterCaptcha(String captcha, String captchaKey) {
+    private void validateCaptchaStrict(String captcha, String captchaKey) {
         if (!StringUtils.hasText(captcha) || !StringUtils.hasText(captchaKey)) {
-            log.warn("register captcha missing");
+            log.warn("captcha missing for strict validation");
             throw new BusinessException(ResultCode.CAPTCHA_REQUIRED);
         }
 
         var cacheKey = String.format(CacheConstant.CAPTCHA_KEY_PREFIX, captchaKey);
         var cachedCaptcha = RedisUtil.get(stringRedisTemplate, cacheKey);
-        if (cachedCaptcha == null) {
-            log.warn(String.format("register captcha expired, captchaKey=%s", captchaKey));
+        if (!StringUtils.hasText(cachedCaptcha)) {
+            log.warn(String.format("captcha expired or not found, captchaKey=%s", captchaKey));
             throw new BusinessException(ResultCode.CAPTCHA_EXPIRED);
         }
 
         var normalizedUserCaptcha = captcha.trim().toUpperCase(Locale.ROOT);
         var normalizedCachedCaptcha = cachedCaptcha.trim().toUpperCase(Locale.ROOT);
-
         if (!CaptchaUtil.verify(normalizedUserCaptcha, normalizedCachedCaptcha)) {
-            log.warn(String.format("register captcha invalid, input=%s", captcha));
+            log.warn(String.format("captcha invalid, input=%s", captcha));
             throw new BusinessException(ResultCode.CAPTCHA_INVALID);
         }
 
         RedisUtil.delete(stringRedisTemplate, cacheKey);
-        log.debug(String.format("register captcha verify success, captchaKey=%s", captchaKey));
+        log.debug(String.format("captcha strict validation success, captchaKey=%s", captchaKey));
     }
 
+    /**
+     * 校验注册验证码
+     */
     /**
      * 校验账号唯一性
      */
     private void ensureAccountUniqueness(String username, String email, String phone) {
-        if (sysUserRepo.findByUsername(username) != null) {
-            log.warn(String.format("register username exists, username=%s", username));
-            throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "用户名已存在");
-        }
-        if (sysUserRepo.findByEmail(email) != null) {
-            log.warn(String.format("register email exists, email=%s", email));
-            throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "邮箱已被注册");
-        }
-        if (sysUserRepo.findByPhone(phone) != null) {
-            log.warn(String.format("register phone exists, phone=%s", phone));
-            throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "手机号已被注册");
-        }
+        Optional.ofNullable(sysUserRepo.findByUsername(username))
+                .ifPresent(existing -> {
+                    log.warn(String.format("register username exists, username=%s", username));
+                    throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "用户名已存在");
+                });
+        Optional.ofNullable(sysUserRepo.findByEmail(email))
+                .ifPresent(existing -> {
+                    log.warn(String.format("register email exists, email=%s", email));
+                    throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "邮箱已被注册");
+                });
+        Optional.ofNullable(sysUserRepo.findByPhone(phone))
+                .ifPresent(existing -> {
+                    log.warn(String.format("register phone exists, phone=%s", phone));
+                    throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "手机号已被注册");
+                });
     }
 
     /**
@@ -282,7 +297,9 @@ public class AuthServiceImpl implements AuthService {
      * @return String 员工ID
      */
     private String generateEmployeeId(String industryType, String username) {
-        var normalizedIndustry = industryType == null ? "GLOBAL" : industryType.toUpperCase(Locale.ROOT);
+        var normalizedIndustry = Optional.ofNullable(industryType)
+                .map(value -> value.toUpperCase(Locale.ROOT))
+                .orElse("GLOBAL");
         var normalizedUsername = username.replaceAll("[^a-zA-Z0-9]", "").toUpperCase(Locale.ROOT);
         if (normalizedUsername.length() > 16) {
             normalizedUsername = normalizedUsername.substring(0, 16);
@@ -298,25 +315,21 @@ public class AuthServiceImpl implements AuthService {
      * @param industryType String 行业类型
      */
     private void assignDefaultRole(Long userId, String industryType) {
-        var defaultRole = sysRoleRepo.findByCode(SystemConstant.DEFAULT_USER_ROLE_CODE, industryType);
-        if (defaultRole == null) {
-            log.warn(String.format("默认角色不存在: code=%s, industryType=%s", SystemConstant.DEFAULT_USER_ROLE_CODE,
-                    industryType));
-            return;
-        }
-        var now = LocalDateTime.now();
-        var userRole = new SysUserRole();
-        userRole.setUserId(userId);
-        userRole.setRoleId(defaultRole.getId());
-        userRole.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
-        userRole.setCreatedTime(now);
-        userRole.setUpdatedTime(now);
-        Long id = sysUserRoleRepo.save(userRole);
-        if (id == null) {
-            log.error(String.format("绑定默认角色失败: userId=%s, roleId=%s", userId, defaultRole.getId()));
-            return;
-        }
-        permissionService.refreshUserAuthCache(userId, industryType);
+        Optional.ofNullable(sysRoleRepo.findByCode(SystemConstant.DEFAULT_USER_ROLE_CODE, industryType))
+                .ifPresentOrElse(defaultRole -> {
+                    var now = LocalDateTime.now();
+                    var userRole = new SysUserRole();
+                    userRole.setUserId(userId);
+                    userRole.setRoleId(defaultRole.getId());
+                    userRole.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
+                    userRole.setCreatedTime(now);
+                    userRole.setUpdatedTime(now);
+                    Optional.ofNullable(sysUserRoleRepo.save(userRole))
+                            .ifPresentOrElse(id -> permissionService.refreshUserAuthCache(userId, industryType),
+                                    () -> log.error(String.format("绑定默认角色失败: userId=%s, roleId=%s", userId,
+                                            defaultRole.getId())));
+                }, () -> log.warn(String.format("默认角色不存在: code=%s, industryType=%s",
+                        SystemConstant.DEFAULT_USER_ROLE_CODE, industryType)));
     }
 
     /**
@@ -335,11 +348,16 @@ public class AuthServiceImpl implements AuthService {
      * 校验用户有效性
      */
     private void validateUser(SysUser user, String username) {
-        if (user == null || (user.getStatus() != null && UserStatus.DISABLED.getCode().equals(user.getStatus()))) {
-            onFail(username);
-            log.warn(String.format("login user invalid, username=%s", username));
-            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), ResultCode.USER_LOGIN_FAILED.getMessage());
-        }
+        Optional.ofNullable(user)
+                .filter(current -> !Optional.ofNullable(current.getStatus())
+                        .map(UserStatus.DISABLED.getCode()::equals)
+                        .orElse(false))
+                .orElseThrow(() -> {
+                    onFail(username);
+                    log.warn(String.format("login user invalid, username=%s", username));
+                    return new BusinessException(ResultCode.UNAUTHORIZED.getCode(),
+                            ResultCode.USER_LOGIN_FAILED.getMessage());
+                });
     }
 
     /**
@@ -429,11 +447,10 @@ public class AuthServiceImpl implements AuthService {
      * 获取部门名称
      */
     private String getDepartmentName(Long departmentId) {
-        if (departmentId == null) {
-            return "";
-        }
-        var dept = sysDepartmentRepo.findById(departmentId);
-        return dept != null ? dept.getDepartmentName() : "";
+        return Optional.ofNullable(departmentId)
+                .flatMap(id -> Optional.ofNullable(sysDepartmentRepo.findById(id)))
+                .map(SysDepartment::getDepartmentName)
+                .orElse("");
     }
 
     /**
@@ -450,9 +467,15 @@ public class AuthServiceImpl implements AuthService {
      * 发布登录日志事件
      */
     private void publishLoginLogEvent(SysUser user, HttpServletRequest request) {
-        var clientIp = request != null ? ClientInfoUtil.getClientIp(request) : "unknown";
-        var browser = request != null ? ClientInfoUtil.getBrowser(request) : "unknown";
-        var os = request != null ? ClientInfoUtil.getOs(request) : "unknown";
+        var clientIp = Optional.ofNullable(request)
+                .map(ClientInfoUtil::getClientIp)
+                .orElse("unknown");
+        var browser = Optional.ofNullable(request)
+                .map(ClientInfoUtil::getBrowser)
+                .orElse("unknown");
+        var os = Optional.ofNullable(request)
+                .map(ClientInfoUtil::getOs)
+                .orElse("unknown");
         var location = ClientInfoUtil.getLocation(clientIp);
         var loginTime = LocalDateTime.now();
 
@@ -492,6 +515,91 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /**
+     * 生成六位邮箱验证码
+     *
+     * @return String 邮箱验证码
+     */
+    private String generateEmailCode() {
+        return String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+    }
+
+    /**
+     * 校验邮箱验证码发送频率
+     *
+     * @param email String 邮箱
+     */
+    private void ensureEmailCodeRateLimit(String email) {
+        var limitKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_RATE_LIMIT_KEY, email);
+        var exists = RedisUtil.get(stringRedisTemplate, limitKey);
+        if (StringUtils.hasText(exists)) {
+            log.warn(String.format("邮箱验证码发送频繁: email=%s", email));
+            throw new BusinessException(ResultCode.EMAIL_CODE_RATE_LIMITED);
+        }
+    }
+
+    /**
+     * 缓存邮箱验证码
+     *
+     * @param email     String 邮箱
+     * @param emailCode String 验证码
+     */
+    private void cacheEmailCode(String email, String emailCode) {
+        var cacheKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_KEY, email);
+        RedisUtil.set(stringRedisTemplate, cacheKey, emailCode,
+                Duration.ofSeconds(CacheConstant.RESET_PASSWORD_EMAIL_CODE_EXPIRE));
+
+        var limitKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_RATE_LIMIT_KEY, email);
+        RedisUtil.set(stringRedisTemplate, limitKey, "1",
+                Duration.ofSeconds(CacheConstant.RESET_PASSWORD_EMAIL_CODE_INTERVAL));
+    }
+
+    /**
+     * 校验邮箱验证码
+     *
+     * @param email     String 邮箱
+     * @param emailCode String 验证码
+     */
+    private void validateEmailCode(String email, String emailCode) {
+        if (!StringUtils.hasText(emailCode)) {
+            throw new BusinessException(ResultCode.EMAIL_CODE_INVALID);
+        }
+
+        var cacheKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_KEY, email);
+        var cachedCode = RedisUtil.get(stringRedisTemplate, cacheKey);
+        if (!StringUtils.hasText(cachedCode)) {
+            throw new BusinessException(ResultCode.EMAIL_CODE_EXPIRED);
+        }
+
+        if (!cachedCode.equals(emailCode.trim())) {
+            throw new BusinessException(ResultCode.EMAIL_CODE_INVALID);
+        }
+    }
+
+    /**
+     * 清理邮箱验证码缓存
+     *
+     * @param email String 邮箱
+     */
+    private void clearEmailCode(String email) {
+        var cacheKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_KEY, email);
+        var limitKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_RATE_LIMIT_KEY, email);
+        RedisUtil.delete(stringRedisTemplate, cacheKey);
+        RedisUtil.delete(stringRedisTemplate, limitKey);
+    }
+
+    /**
+     * 规格化邮箱
+     *
+     * @param email String 邮箱
+     * @return String 规格化后的邮箱
+     */
+    private String normalizeEmail(String email) {
+        return Optional.ofNullable(email)
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .orElse(null);
     }
 
     /**
@@ -596,6 +704,74 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
+     * 发送重置密码邮箱验证码：规格化邮箱 → 校验图形验证码 → 校验账号存在 → 校验发送频率 → 生成并缓存验证码 → 发布通知事件
+     *
+     * @param req EmailCodeSendReq 请求参数（包含邮箱、图形验证码、图形验证码标识）
+     */
+    @Override
+    public void sendResetPasswordEmailCode(EmailCodeSendReq req) {
+        var email = Optional.ofNullable(req.email())
+                .map(this::normalizeEmail)
+                .filter(StringUtils::hasText)
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "邮箱不能为空"));
+
+        log.info(String.format("发送重置密码邮箱验证码: email=%s", email));
+
+        validateCaptchaStrict(req.captcha(), req.captchaKey());
+
+        var user = Optional.ofNullable(sysUserRepo.findByEmail(email))
+                .orElseThrow(() -> {
+                    log.warn(String.format("发送重置密码验证码失败，邮箱不存在: email=%s", email));
+                    return new BusinessException(ResultCode.EMAIL_NOT_FOUND);
+                });
+
+        ensureEmailCodeRateLimit(email);
+
+        var emailCode = generateEmailCode();
+        cacheEmailCode(email, emailCode);
+
+        log.info(String.format("重置密码邮箱验证码生成成功: email=%s, code=%s", email, emailCode));
+        var event = new UserResetPwdEmailCodeEvent(user.getId(), email, emailCode);
+        eventPublisher.publishAsync(event);
+    }
+
+    /**
+     * 重置密码：规格化邮箱 → 校验图形验证码 → 校验邮箱验证码 → 更新密码并清理验证码缓存
+     *
+     * @param req ResetPasswordReq 重置密码请求
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetPassword(ResetPasswordReq req) {
+        var email = Optional.ofNullable(req.email())
+                .map(this::normalizeEmail)
+                .filter(StringUtils::hasText)
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "邮箱不能为空"));
+        log.info(String.format("重置密码开始: email=%s", email));
+
+        validateCaptchaStrict(req.captcha(), req.captchaKey());
+
+        var user = Optional.ofNullable(sysUserRepo.findByEmail(email))
+                .orElseThrow(() -> {
+                    log.warn(String.format("重置密码失败，邮箱不存在: email=%s", email));
+                    return new BusinessException(ResultCode.EMAIL_NOT_FOUND);
+                });
+
+        validateEmailCode(email, req.emailCode());
+
+        user.setPassword(hashPassword(req.newPassword()));
+        user.setUpdatedTime(LocalDateTime.now());
+
+        if (!sysUserRepo.updateById(user)) {
+            log.error(String.format("重置密码更新数据库失败: userId=%s, email=%s", user.getId(), email));
+            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+        }
+
+        clearEmailCode(email);
+        log.info(String.format("重置密码成功: userId=%s, email=%s", user.getId(), email));
+    }
+
+    /**
      * 用户注册:规格化入参 → 校验验证码 → 校验账号唯一性 → 校验院系有效性 → 构造实体并入库 → 返回注册结果
      *
      * @param registerReq RegisterReq 注册请求
@@ -615,28 +791,28 @@ public class AuthServiceImpl implements AuthService {
                 username, email, phone, departmentCode));
 
         // 2. 校验验证码 & 账号唯一性
-        validateRegisterCaptcha(registerReq.getCaptcha(), registerReq.getCaptchaKey());
+        validateCaptchaStrict(registerReq.getCaptcha(), registerReq.getCaptchaKey());
         ensureAccountUniqueness(username, email, phone);
 
         // 3. 校验院系/行业信息
         var industryView = industryConfigCache.get();
         var industryType = industryView.getType();
-        var department = sysDepartmentRepo.findByCode(industryType, departmentCode);
-        if (department == null) {
-            log.warn(String.format("register department invalid, departmentCode=%s, industryType=%s",
-                    departmentCode, industryType));
-            throw new BusinessException(ResultCode.BAD_REQUEST, "院系/部门不存在或已停用");
-        }
+        var department = Optional.ofNullable(sysDepartmentRepo.findByCode(industryType, departmentCode))
+                .orElseThrow(() -> {
+                    log.warn(String.format("register department invalid, departmentCode=%s, industryType=%s",
+                            departmentCode, industryType));
+                    return new BusinessException(ResultCode.BAD_REQUEST, "院系/部门不存在或已停用");
+                });
 
         // 4. 构造并持久化用户实体
         var user = buildUserEntity(username, realName, email, phone, registerReq.getPassword(),
                 industryType, department.getId());
 
-        Long userId = sysUserRepo.save(user);
-        if (userId == null) {
-            log.error(String.format("register failed when saving user, username=%s", username));
-            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
-        }
+        Optional.ofNullable(sysUserRepo.save(user))
+                .orElseThrow(() -> {
+                    log.error(String.format("register failed when saving user, username=%s", username));
+                    return new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+                });
 
         // 5. 绑定默认角色并刷新权限缓存
         assignDefaultRole(user.getId(), industryType);
@@ -647,7 +823,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 查询当前登录用户档案
+     * 查询当前登录用户档案：校验登录态 → 加载用户与行业信息 → 汇总角色、权限、菜单及 token 信息
      *
      * @return ProfileResp 用户档案
      */
@@ -658,17 +834,16 @@ public class AuthServiceImpl implements AuthService {
         }
 
         var userId = StpUtil.getLoginIdAsLong();
-        var user = sysUserRepo.findById(userId);
-        if (user == null || DeleteStatus.DELETED.getCode().equals(user.getIsDeleted())) {
-            throw new BusinessException(ResultCode.USER_NOT_FOUND);
-        }
+        var user = Optional.ofNullable(sysUserRepo.findById(userId))
+                .filter(found -> !DeleteStatus.DELETED.getCode().equals(found.getIsDeleted()))
+                .orElseThrow(() -> new BusinessException(ResultCode.USER_NOT_FOUND));
         if (UserStatus.DISABLED.getCode().equals(user.getStatus())) {
             throw new BusinessException(ResultCode.USER_ACCOUNT_DISABLED);
         }
 
-        var industryType = StringUtils.hasText(user.getIndustryType())
-                ? user.getIndustryType()
-                : industryConfigCache.get().getType();
+        var industryType = Optional.ofNullable(user.getIndustryType())
+                .filter(StringUtils::hasText)
+                .orElseGet(() -> industryConfigCache.get().getType());
 
         var userInfo = authConverter.toLoginUserInfoResp(user);
         userInfo.setDepartment(getDepartmentName(user.getDepartmentId()));
@@ -695,7 +870,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 刷新或续期当前会话 Token
+     * 刷新或续期当前会话 Token：校验登录态 → 按需续期 token → 返回最新的 token 详情
      *
      * @return RefreshTokenResp 刷新结果
      */
@@ -722,14 +897,13 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 校验当前是否登录
+     * 校验当前是否登录：返回是否登录、登录 ID、token 剩余时间及 token 信息
      *
      * @return CheckLoginResp 登录校验结果
      */
     @Override
     public CheckLoginResp checkLogin() {
-        var isLogin = StpUtil.isLogin();
-        if (!isLogin) {
+        if (!StpUtil.isLogin()) {
             return new CheckLoginResp(false, null, 0L, null, null);
         }
         var loginId = String.valueOf(StpUtil.getLoginId());
@@ -739,10 +913,10 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 校验当前登录用户是否拥有指定角色
+     * 校验当前登录用户是否拥有指定角色：规格化角色编码 → 根据行业类型查询角色列表并判断是否命中
      *
      * @param roleCode     String 角色编码
-     * @param industryType String 行业类型
+     * @param industryType String 行业类型（可为空，为空时使用当前行业配置）
      * @return CheckRoleResp 角色校验结果
      */
     @Override
@@ -751,21 +925,22 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ResultCode.BAD_REQUEST, "roleCode 不能为空");
         }
 
+        var normalizedRoleCode = roleCode.trim();
         var normalizedIndustry = resolveIndustryType(industryType);
         var hasRole = hasLoginAnd(() -> {
             var userId = StpUtil.getLoginIdAsLong();
             List<String> roleCodes = permissionService.findRoleCodes(userId, normalizedIndustry);
-            return roleCodes.contains(roleCode);
+            return roleCodes.stream().anyMatch(normalizedRoleCode::equals);
         });
 
-        return new CheckRoleResp(roleCode, normalizedIndustry, hasRole);
+        return new CheckRoleResp(normalizedRoleCode, normalizedIndustry, hasRole);
     }
 
     /**
-     * 校验当前登录用户是否拥有指定权限
+     * 校验当前登录用户是否拥有指定权限：规格化权限编码 → 根据行业类型查询权限列表并判断是否命中
      *
      * @param permissionCode String 权限编码
-     * @param industryType   String 行业类型
+     * @param industryType   String 行业类型（可为空，为空时使用当前行业配置）
      * @return CheckPermResp 权限校验结果
      */
     @Override
@@ -773,22 +948,35 @@ public class AuthServiceImpl implements AuthService {
         if (!StringUtils.hasText(permissionCode)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "permissionCode 不能为空");
         }
+        var normalizedPermissionCode = permissionCode.trim();
         var normalizedIndustry = resolveIndustryType(industryType);
         var hasPermission = hasLoginAnd(() -> {
             var userId = StpUtil.getLoginIdAsLong();
             List<String> permissionCodes = permissionService.findPermissionCodes(userId, normalizedIndustry);
-            return permissionCodes.contains(permissionCode);
+            return permissionCodes.stream().anyMatch(normalizedPermissionCode::equals);
         });
-        return new CheckPermResp(permissionCode, normalizedIndustry, hasPermission);
+        return new CheckPermResp(normalizedPermissionCode, normalizedIndustry, hasPermission);
     }
 
-    private boolean hasLoginAnd(java.util.function.Supplier<Boolean> supplier) {
+    /**
+     * 校验当前是否登录并执行指定操作
+     *
+     * @param supplier java.util.function.Supplier<Boolean> 操作提供者
+     * @return boolean 是否执行操作
+     */
+    private boolean hasLoginAnd(Supplier<Boolean> supplier) {
         if (!StpUtil.isLogin()) {
             return false;
         }
         return Boolean.TRUE.equals(supplier.get());
     }
 
+    /**
+     * 解析行业类型
+     *
+     * @param industryType String 行业类型
+     * @return String 解析后的行业类型
+     */
     private String resolveIndustryType(String industryType) {
         return StringUtils.hasText(industryType) ? industryType : industryConfigCache.get().getType();
     }

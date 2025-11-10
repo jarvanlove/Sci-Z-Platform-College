@@ -3,6 +3,7 @@ package com.sciz.server.infrastructure.shared.utils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -27,11 +28,9 @@ public final class RedisUtil {
      * @return void
      */
     public static void set(StringRedisTemplate template, String key, String value, Duration ttl) {
-        if (ttl == null) {
-            template.opsForValue().set(key, value);
-        } else {
-            template.opsForValue().set(key, value, ttl);
-        }
+        Optional.ofNullable(ttl)
+                .ifPresentOrElse(duration -> template.opsForValue().set(key, value, duration),
+                        () -> template.opsForValue().set(key, value));
     }
 
     /**

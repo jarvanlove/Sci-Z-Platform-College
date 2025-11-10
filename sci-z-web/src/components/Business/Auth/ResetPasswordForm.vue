@@ -10,6 +10,7 @@
     :model="resetForm"
     :rules="resetRules"
     class="reset-form"
+    autocomplete="off"
     @submit.prevent="handleReset"
   >
     <!-- 邮箱输入 -->
@@ -20,6 +21,8 @@
         size="large"
         prefix-icon="Message"
         clearable
+        autocomplete="off"
+        name="reset-email"
       />
     </el-form-item>
 
@@ -32,6 +35,8 @@
           size="large"
           prefix-icon="Picture"
           clearable
+          autocomplete="off"
+          name="reset-captcha"
         />
         <div class="captcha-image" @click="refreshCaptcha">
           <img v-if="captchaUrl" :src="captchaUrl" alt="验证码" />
@@ -49,6 +54,8 @@
           size="large"
           prefix-icon="Message"
           clearable
+          autocomplete="one-time-code"
+          name="reset-email-code"
         />
         <BaseButton
           type="primary"
@@ -70,6 +77,8 @@
         prefix-icon="Lock"
         show-password
         clearable
+        autocomplete="new-password"
+        name="reset-new-password"
       />
     </el-form-item>
 
@@ -83,6 +92,8 @@
         prefix-icon="Lock"
         show-password
         clearable
+        autocomplete="new-password"
+        name="reset-confirm-password"
       />
     </el-form-item>
 
@@ -99,21 +110,11 @@
         {{ $t('auth.resetPassword') }}
       </BaseButton>
     </el-form-item>
-
-    <!-- 登录链接 -->
-    <el-form-item>
-      <div class="login-link">
-        {{ $t('auth.rememberPassword') }}
-        <el-button type="text" @click="handleGoToLogin">
-          {{ $t('auth.login') }}
-        </el-button>
-      </div>
-    </el-form-item>
   </el-form>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -138,19 +139,44 @@ const captchaUrl = ref('')
 
 // 邮箱验证码相关
 const emailCodeCountdown = ref(0)
+let emailCodeTimer = null
 const canSendEmailCode = computed(() => {
-  return resetForm.email && resetForm.captcha && emailCodeCountdown.value === 0
+  return (
+    resetForm.email &&
+    resetForm.captcha &&
+    resetForm.captchaKey &&
+    emailCodeCountdown.value === 0
+  )
 })
 
 // 表单数据
 const resetForm = reactive({
   email: '',
   captcha: '',
-  captchaId: '', // 验证码ID，对应后端的 captchaKey
+  captchaKey: '', // 图形验证码唯一标识
   emailCode: '',
   newPassword: '',
   confirmPassword: ''
 })
+
+const blankFormFields = {
+  email: '',
+  captcha: '',
+  emailCode: '',
+  newPassword: '',
+  confirmPassword: ''
+}
+
+const clearFormValues = (preserveCaptchaKey = true) => {
+  const currentCaptchaKey = preserveCaptchaKey ? resetForm.captchaKey : ''
+  Object.assign(resetForm, {
+    ...blankFormFields,
+    captchaKey: currentCaptchaKey
+  })
+  if (resetFormRef.value && typeof resetFormRef.value.clearValidate === 'function') {
+    resetFormRef.value.clearValidate()
+  }
+}
 
 // 表单验证规则
 const resetRules = {
@@ -204,7 +230,7 @@ const handleReset = async () => {
     const response = await resetPassword({
       email: resetForm.email,
       captcha: resetForm.captcha,
-      captchaId: resetForm.captchaId, // 传递验证码唯一标识
+      captchaKey: resetForm.captchaKey, // 传递验证码唯一标识
       emailCode: resetForm.emailCode,
       newPassword: resetForm.newPassword
     })
@@ -242,19 +268,28 @@ const sendEmailCode = async () => {
   if (!canSendEmailCode.value) return
   
   try {
+    const email = (resetForm.email || '').trim()
+    const captcha = (resetForm.captcha || '').trim()
+    resetForm.email = email
+    resetForm.captcha = captcha
     await sendEmailCodeApi({
-      email: resetForm.email,
-      captcha: resetForm.captcha
+      email,
+      captcha,
+      captchaKey: resetForm.captchaKey
     })
     
     ElMessage.success(t('auth.emailCodeSent'))
     
     // 开始倒计时
     emailCodeCountdown.value = 60
-    const timer = setInterval(() => {
+    if (emailCodeTimer) {
+      clearInterval(emailCodeTimer)
+    }
+    emailCodeTimer = setInterval(() => {
       emailCodeCountdown.value--
       if (emailCodeCountdown.value <= 0) {
-        clearInterval(timer)
+        clearInterval(emailCodeTimer)
+        emailCodeTimer = null
       }
     }, 1000)
     
@@ -274,15 +309,29 @@ const refreshCaptcha = async () => {
     const response = await getCaptcha()
     // 根据后端 CaptchaResp 定义，使用 captchaImage 和 captchaKey
     captchaUrl.value = response.data.captchaImage || response.data.captchaUrl // 兼容两种字段名
-    resetForm.captchaId = response.data.captchaKey || ''
+    resetForm.captchaKey = response.data.captchaKey || ''
+    resetForm.captcha = ''
   } catch (error) {
     console.error('获取验证码失败:', error)
   }
 }
 
 // 组件挂载时初始化
-onMounted(() => {
-  refreshCaptcha()
+onMounted(async () => {
+  clearFormValues(false)
+  await refreshCaptcha()
+  await nextTick()
+  // 避免浏览器自动填充继承登录信息
+  requestAnimationFrame(() => {
+    clearFormValues(true)
+  })
+})
+
+onUnmounted(() => {
+  if (emailCodeTimer) {
+    clearInterval(emailCodeTimer)
+    emailCodeTimer = null
+  }
 })
 </script>
 

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Sa-Token 权限数据源实现
@@ -38,18 +39,19 @@ public class CustomStpInterface implements StpInterface {
      */
     @Override
     public List<String> getPermissionList(Object loginId, String loginType) {
-        if (loginId == null) {
-            return Collections.emptyList();
-        }
-
-        try {
-            var userId = Long.parseLong(String.valueOf(loginId));
-            var industryType = industryConfigCache.get().getType();
-            return permissionService.findPermissionCodes(userId, industryType);
-        } catch (Exception e) {
-            log.error(String.format("获取用户权限列表失败: loginId=%s, err=%s", loginId, e.getMessage()), e);
-            return Collections.emptyList();
-        }
+        return Optional.ofNullable(loginId)
+                .map(String::valueOf)
+                .flatMap(this::parseLongSafe)
+                .map(userId -> {
+                    try {
+                        var industryType = industryConfigCache.get().getType();
+                        return permissionService.findPermissionCodes(userId, industryType);
+                    } catch (Exception e) {
+                        log.error(String.format("获取用户权限列表失败: loginId=%s, err=%s", loginId, e.getMessage()), e);
+                        return Collections.<String>emptyList();
+                    }
+                })
+                .orElse(Collections.emptyList());
     }
 
     /**
@@ -61,17 +63,27 @@ public class CustomStpInterface implements StpInterface {
      */
     @Override
     public List<String> getRoleList(Object loginId, String loginType) {
-        if (loginId == null) {
-            return Collections.emptyList();
-        }
+        return Optional.ofNullable(loginId)
+                .map(String::valueOf)
+                .flatMap(this::parseLongSafe)
+                .map(userId -> {
+                    try {
+                        var industryType = industryConfigCache.get().getType();
+                        return permissionService.findRoleCodes(userId, industryType);
+                    } catch (Exception e) {
+                        log.error(String.format("获取用户角色列表失败: loginId=%s, err=%s", loginId, e.getMessage()), e);
+                        return Collections.<String>emptyList();
+                    }
+                })
+                .orElse(Collections.emptyList());
+    }
 
+    private Optional<Long> parseLongSafe(String value) {
         try {
-            var userId = Long.parseLong(String.valueOf(loginId));
-            var industryType = industryConfigCache.get().getType();
-            return permissionService.findRoleCodes(userId, industryType);
-        } catch (Exception e) {
-            log.error(String.format("获取用户角色列表失败: loginId=%s, err=%s", loginId, e.getMessage()), e);
-            return Collections.emptyList();
+            return Optional.of(Long.parseLong(value));
+        } catch (NumberFormatException exception) {
+            log.error(String.format("解析 loginId 失败: value=%s, err=%s", value, exception.getMessage()), exception);
+            return Optional.empty();
         }
     }
 }

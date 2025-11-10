@@ -1,10 +1,11 @@
 package com.sciz.server.infrastructure.shared.exception;
 
 import com.sciz.server.infrastructure.shared.result.ResultCode;
+import java.util.Optional;
 
 /**
  * BusinessException 使用示例
- * 
+ *
  * 展示如何使用简化的 BusinessException 处理各种业务异常
  *
  * @author JiaWen.Wu
@@ -115,24 +116,26 @@ public class BusinessExceptionExample {
      */
     public void registerUser(String username, String email) {
         // 1. 参数验证
-        if (username == null || username.trim().isEmpty()) {
-            throw new BusinessException(ResultCode.VALIDATION_ERROR, "用户名不能为空");
-        }
-        if (email == null || !email.contains("@")) {
-            throw new BusinessException(ResultCode.VALIDATION_ERROR, "邮箱格式不正确");
-        }
+        var normalizedUsername = Optional.ofNullable(username)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .orElseThrow(() -> new BusinessException(ResultCode.VALIDATION_ERROR, "用户名不能为空"));
+        var normalizedEmail = Optional.ofNullable(email)
+                .map(String::trim)
+                .filter(value -> value.contains("@"))
+                .orElseThrow(() -> new BusinessException(ResultCode.VALIDATION_ERROR, "邮箱格式不正确"));
 
         // 2. 业务规则验证
-        if (userExists(username)) {
+        if (userExists(normalizedUsername)) {
             throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "用户名已存在");
         }
-        if (emailExists(email)) {
+        if (emailExists(normalizedEmail)) {
             throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "邮箱已被注册");
         }
 
         // 3. 业务处理
         try {
-            createUser(username, email);
+            createUser(normalizedUsername, normalizedEmail);
         } catch (Exception e) {
             throw new BusinessException(ResultCode.BUSINESS_ERROR, "用户创建失败: " + e.getMessage());
         }
@@ -142,11 +145,9 @@ public class BusinessExceptionExample {
      * 获取项目示例
      */
     public Project getProject(Long projectId) {
-        Project project = projectRepository.findById(projectId);
-        if (project == null) {
-            throw new BusinessException(ResultCode.PROJECT_NOT_FOUND, "项目ID: " + projectId + " 不存在");
-        }
-        return project;
+        return Optional.ofNullable(projectRepository.findById(projectId))
+                .orElseThrow(() -> new BusinessException(ResultCode.PROJECT_NOT_FOUND,
+                        "项目ID: " + projectId + " 不存在"));
     }
 
     // ==================== 私有方法 ====================

@@ -161,6 +161,31 @@ public class CacheConstant {
      */
     public static final int CAPTCHA_REQUIRED_FAIL_COUNT = 5;
 
+    // ==================== 重置密码邮箱验证码缓存常量 ====================
+    /**
+     * 重置密码邮箱验证码缓存键
+     * 格式：auth:reset:email:{email}
+     */
+    public static final String RESET_PASSWORD_EMAIL_CODE_KEY = "auth:reset:email:%s";
+
+    /**
+     * 重置密码邮箱验证码发送频率限制键
+     * 格式：auth:reset:limit:{email}
+     */
+    public static final String RESET_PASSWORD_EMAIL_CODE_RATE_LIMIT_KEY = "auth:reset:limit:%s";
+
+    /**
+     * 重置密码邮箱验证码过期时间（秒）
+     * 默认：10分钟
+     */
+    public static final Long RESET_PASSWORD_EMAIL_CODE_EXPIRE = 10L * 60L;
+
+    /**
+     * 重置密码邮箱验证码发送间隔（秒）
+     * 默认：60秒
+     */
+    public static final Long RESET_PASSWORD_EMAIL_CODE_INTERVAL = 60L;
+
     // ==================== 行业配置相关缓存常量 ====================
     /**
      * 行业配置缓存命名空间

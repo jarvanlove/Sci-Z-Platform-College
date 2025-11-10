@@ -7,6 +7,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -21,20 +22,23 @@ public class IdempotentInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        // 仅提供简要兜底：读取 Idempotency-Key 头，使用内存占位避免短时间重复请求
-        String key = request.getHeader("Idempotency-Key");
-        if (key == null || key.isEmpty()) {
-            return true;
-        }
-        long now = System.currentTimeMillis();
-        Entry exist = STORE.get(key);
-        if (exist != null && now < exist.expireAtMs) {
-            log.warn(String.format("[IdempotentInterceptor] duplicated key=%s rejected", key));
-            response.setStatus(429);
-            return false;
-        }
-        STORE.put(key, new Entry(now + TimeUnit.SECONDS.toMillis(DEFAULT_TTL_SECONDS)));
-        return true;
+        return Optional.ofNullable(request.getHeader("Idempotency-Key"))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(key -> {
+                    long now = System.currentTimeMillis();
+                    boolean exists = Optional.ofNullable(STORE.get(key))
+                            .filter(entry -> now < entry.expireAtMs)
+                            .isPresent();
+                    if (exists) {
+                        log.warn(String.format("[IdempotentInterceptor] duplicated key=%s rejected", key));
+                        response.setStatus(429);
+                        return false;
+                    }
+                    STORE.put(key, new Entry(now + TimeUnit.SECONDS.toMillis(DEFAULT_TTL_SECONDS)));
+                    return true;
+                })
+                .orElse(true);
     }
 
     private static final long DEFAULT_TTL_SECONDS = 30;

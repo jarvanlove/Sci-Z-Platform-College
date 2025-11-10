@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -47,24 +48,13 @@ public class IndustryConfigCache {
      * @return IndustryView 行业视图
      */
     public IndustryView get() {
-        var json = RedisUtil.get(redis, CacheConstant.INDUSTRY_CONFIG_CURRENT_KEY);
-        if (json != null) {
-            try {
-                var view = objectMapper.readValue(json, IndustryView.class);
-                if (view != null && view.getDepartments() != null && !view.getDepartments().isEmpty()) {
+        return Optional.ofNullable(RedisUtil.get(redis, CacheConstant.INDUSTRY_CONFIG_CURRENT_KEY))
+                .flatMap(this::parseCachedView)
+                .orElseGet(() -> {
+                    var view = loadFromDb();
+                    cache(view);
                     return view;
-                }
-                log.info(String.format("行业配置缓存缺少部门信息，触发回源加载: type=%s", view != null ? view.getType() : "unknown"));
-            } catch (Exception e) {
-                log.warn(String.format("解析行业配置缓存失败，将从数据库重新加载: err=%s", e.getMessage()));
-                // 解析异常则回源 DB
-            }
-        }
-
-        // 从数据库加载并缓存
-        var view = loadFromDb();
-        cache(view);
-        return view;
+                });
     }
 
     /**
@@ -106,10 +96,9 @@ public class IndustryConfigCache {
 
         var configMap = new HashMap<String, String>();
         for (var key : configKeys) {
-            var config = sysConfigRepo.findByKey(key);
-            if (config != null && config.getConfigValue() != null) {
-                configMap.put(key, config.getConfigValue());
-            }
+            Optional.ofNullable(sysConfigRepo.findByKey(key))
+                    .map(config -> config.getConfigValue())
+                    .ifPresent(value -> configMap.put(key, value));
         }
 
         var view = new IndustryView();
@@ -133,6 +122,33 @@ public class IndustryConfigCache {
         log.info(String.format("从数据库加载行业配置成功: type=%s, name=%s, departmentCount=%s",
                 view.getType(), view.getName(), departmentOptions.size()));
         return view;
+    }
+
+    /**
+     * 解析缓存的行业视图
+     *
+     * @param json String 缓存的 JSON 字符串
+     * @return Optional<IndustryView> 行业视图
+     */
+    private Optional<IndustryView> parseCachedView(String json) {
+        try {
+            var view = objectMapper.readValue(json, IndustryView.class);
+            if (view == null) {
+                return Optional.empty();
+            }
+            var hasDepartments = Optional.ofNullable(view.getDepartments())
+                    .map(list -> !list.isEmpty())
+                    .orElse(false);
+            if (!hasDepartments) {
+                log.info(String.format("行业配置缓存缺少部门信息，触发回源加载: type=%s",
+                        Optional.ofNullable(view.getType()).orElse("unknown")));
+                return Optional.empty();
+            }
+            return Optional.of(view);
+        } catch (Exception e) {
+            log.warn(String.format("解析行业配置缓存失败，将从数据库重新加载: err=%s", e.getMessage()));
+            return Optional.empty();
+        }
     }
 
     /**

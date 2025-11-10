@@ -4,9 +4,11 @@ import com.sciz.server.application.service.user.RolePermissionService;
 import com.sciz.server.application.service.user.UserRoleService;
 import com.sciz.server.domain.pojo.dto.request.system.RolePermissionUpdateReq;
 import com.sciz.server.domain.pojo.dto.request.system.UserRoleUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.user.IndustryConfigResp;
 import com.sciz.server.domain.pojo.dto.response.user.RolePermissionIdsResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserRoleIdsResp;
 import com.sciz.server.interfaces.converter.UserConverter;
+import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
 import com.sciz.server.infrastructure.shared.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,11 +40,14 @@ public class UserController {
     private final UserRoleService userRoleService;
     private final RolePermissionService rolePermissionService;
     private final UserConverter userConverter;
+    private final IndustryConfigCache industryConfigCache;
 
     @Operation(summary = "获取行业配置", description = "查询当前行业配置")
     @GetMapping("/industry/config")
-    public Result<Object> getIndustryConfig() {
-        return Result.success(null);
+    public Result<IndustryConfigResp> getIndustryConfig() {
+        var view = industryConfigCache.get();
+        var resp = new IndustryConfigResp(view.getType(), view.getName());
+        return Result.success(resp);
     }
 
     @Operation(summary = "更新行业配置", description = "更新行业配置")

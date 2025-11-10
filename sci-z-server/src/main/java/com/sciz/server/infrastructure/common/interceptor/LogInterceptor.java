@@ -1,11 +1,11 @@
 package com.sciz.server.infrastructure.common.interceptor;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.servlet.ModelAndView;
 
 /**
@@ -37,19 +37,20 @@ public class LogInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler,
             Exception ex) {
-        Object startObj = request.getAttribute("__log_start_ts");
-        long cost = 0L;
-        if (startObj instanceof Long) {
-            cost = System.currentTimeMillis() - (Long) startObj;
-        }
+        long cost = Optional.ofNullable(request.getAttribute("__log_start_ts"))
+                .filter(Long.class::isInstance)
+                .map(Long.class::cast)
+                .map(start -> System.currentTimeMillis() - start)
+                .orElse(0L);
         String method = request.getMethod();
         String uri = request.getRequestURI();
         int status = response.getStatus();
-        if (ex == null) {
-            log.info(String.format("[LogInterceptor] <- %s %s status=%d cost=%dms", method, uri, status, cost));
-        } else {
-            log.error(String.format("[LogInterceptor] <- %s %s status=%d cost=%dms err=%s", method, uri, status, cost,
-                    ex.getMessage()), ex);
-        }
+        Optional.ofNullable(ex)
+                .ifPresentOrElse(exception -> log.error(
+                        String.format("[LogInterceptor] <- %s %s status=%d cost=%dms err=%s",
+                                method, uri, status, cost, exception.getMessage()),
+                        exception),
+                        () -> log.info(String.format("[LogInterceptor] <- %s %s status=%d cost=%dms",
+                                method, uri, status, cost)));
     }
 }

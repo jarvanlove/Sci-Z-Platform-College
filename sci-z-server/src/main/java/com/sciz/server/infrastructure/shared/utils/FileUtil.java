@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -28,14 +29,17 @@ public class FileUtil {
      * @return 扩展名
      */
     public static String getFileExtension(String fileName) {
-        if (fileName == null || fileName.isEmpty()) {
-            return "";
-        }
-        int lastDotIndex = fileName.lastIndexOf('.');
-        if (lastDotIndex == -1 || lastDotIndex == fileName.length() - 1) {
-            return "";
-        }
-        return fileName.substring(lastDotIndex + 1).toLowerCase();
+        return Optional.ofNullable(fileName)
+                .map(String::trim)
+                .filter(name -> !name.isEmpty())
+                .map(name -> {
+                    int lastDotIndex = name.lastIndexOf('.');
+                    if (lastDotIndex == -1 || lastDotIndex == name.length() - 1) {
+                        return "";
+                    }
+                    return name.substring(lastDotIndex + 1).toLowerCase();
+                })
+                .orElse("");
     }
 
     /**
@@ -45,14 +49,14 @@ public class FileUtil {
      * @return 不带扩展名的文件名
      */
     public static String getFileNameWithoutExtension(String fileName) {
-        if (fileName == null || fileName.isEmpty()) {
-            return "";
-        }
-        int lastDotIndex = fileName.lastIndexOf('.');
-        if (lastDotIndex == -1) {
-            return fileName;
-        }
-        return fileName.substring(0, lastDotIndex);
+        return Optional.ofNullable(fileName)
+                .map(String::trim)
+                .filter(name -> !name.isEmpty())
+                .map(name -> {
+                    int lastDotIndex = name.lastIndexOf('.');
+                    return lastDotIndex == -1 ? name : name.substring(0, lastDotIndex);
+                })
+                .orElse("");
     }
 
     /**
@@ -73,7 +77,9 @@ public class FileUtil {
      * @return 是否超出限制
      */
     public static boolean isFileSizeExceeded(Long fileSize) {
-        return fileSize != null && fileSize > SystemConstant.MAX_FILE_SIZE;
+        return Optional.ofNullable(fileSize)
+                .map(size -> size > SystemConstant.MAX_FILE_SIZE)
+                .orElse(false);
     }
 
     /**
@@ -199,15 +205,18 @@ public class FileUtil {
      * @return 是否有效
      */
     public static boolean isValidFilePath(String filePath) {
-        if (filePath == null || filePath.isEmpty()) {
-            return false;
-        }
-        try {
-            Path path = Paths.get(filePath);
-            return path.isAbsolute() || path.normalize().equals(path);
-        } catch (Exception e) {
-            return false;
-        }
+        return Optional.ofNullable(filePath)
+                .map(String::trim)
+                .filter(path -> !path.isEmpty())
+                .map(value -> {
+                    try {
+                        Path path = Paths.get(value);
+                        return path.isAbsolute() || path.normalize().equals(path);
+                    } catch (Exception e) {
+                        return false;
+                    }
+                })
+                .orElse(false);
     }
 
     /**
@@ -217,9 +226,11 @@ public class FileUtil {
      * @return 父目录路径
      */
     public static String getParentDirectory(String filePath) {
-        Path path = Paths.get(filePath);
-        Path parent = path.getParent();
-        return parent != null ? parent.toString() : null;
+        return Optional.ofNullable(filePath)
+                .map(Paths::get)
+                .map(Path::getParent)
+                .map(Path::toString)
+                .orElse(null);
     }
 
     /**

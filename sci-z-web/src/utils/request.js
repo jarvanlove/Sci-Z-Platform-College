@@ -17,8 +17,14 @@ const service = axios.create({
 // 请求拦截器
 service.interceptors.request.use(
   (config) => {
+    const skipAuth = config.skipAuth === true
+    if (skipAuth) {
+      Reflect.deleteProperty(config, 'skipAuth')
+      return config
+    }
     const authStore = useAuthStore()
     if (authStore.token) {
+      config.headers = config.headers || {}
       config.headers.Authorization = `Bearer ${authStore.token}`
     }
     return config

@@ -1,8 +1,10 @@
 package com.sciz.server.interfaces.controller;
 
 import com.sciz.server.application.service.user.AuthService;
+import com.sciz.server.domain.pojo.dto.request.user.EmailCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
 import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
+import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
 import com.sciz.server.domain.pojo.dto.response.user.DepartmentLabelResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
@@ -15,13 +17,17 @@ import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
 import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
 import com.sciz.server.infrastructure.shared.result.Result;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
+
+import cn.dev33.satoken.annotation.SaIgnore;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -69,6 +75,13 @@ public class AuthController {
         return Result.success(resp);
     }
 
+    @Operation(summary = "发送重置密码邮箱验证码", description = "校验图形验证码并向邮箱发送重置密码验证码")
+    @PostMapping("/email-code")
+    public Result<Void> sendResetPasswordEmailCode(@RequestBody @Valid EmailCodeSendReq request) {
+        authService.sendResetPasswordEmailCode(request);
+        return Result.success(null, ResultCode.EMAIL_CODE_SEND_SUCCESS.getMessage());
+    }
+
     @Operation(summary = "用户注册", description = "注册新用户，校验验证码并写入系统用户表")
     @PostMapping("/register")
     public Result<RegisterResp> register(@RequestBody @Valid RegisterReq request) {
@@ -76,10 +89,11 @@ public class AuthController {
         return Result.success(resp, ResultCode.USER_REGISTER_SUCCESS.getMessage());
     }
 
-    @Operation(summary = "重置密码", description = "重置用户密码（占位实现）")
+    @Operation(summary = "重置密码", description = "校验图形验证码、邮箱验证码并重置密码")
     @PostMapping("/reset-password")
-    public Result<Object> resetPassword(@RequestBody Object request) {
-        return Result.success(null);
+    public Result<Void> resetPassword(@RequestBody @Valid ResetPasswordReq request) {
+        authService.resetPassword(request);
+        return Result.success(null, ResultCode.RESET_PASSWORD_SUCCESS.getMessage());
     }
 
     /**
@@ -91,11 +105,11 @@ public class AuthController {
     @GetMapping("/department/label")
     public Result<List<DepartmentLabelResp>> getDepartmentLabels() {
         var industryView = industryConfigCache.get();
-        var departments = industryView.getDepartments();
-        var respList = departments == null ? List.<DepartmentLabelResp>of()
-                : departments.stream()
-                        .map(dept -> new DepartmentLabelResp(dept.getDepartmentName(), dept.getDepartmentCode()))
-                        .collect(Collectors.toList());
+        var respList = Optional.ofNullable(industryView.getDepartments())
+                .stream()
+                .flatMap(Collection::stream)
+                .map(dept -> new DepartmentLabelResp(dept.getDepartmentName(), dept.getDepartmentCode()))
+                .collect(Collectors.toList());
         return Result.success(respList);
     }
 

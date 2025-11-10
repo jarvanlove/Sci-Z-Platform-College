@@ -67,10 +67,12 @@ export default {
     rememberMe: 'Remember Me',
     forgotPassword: 'Forgot Password',
     resetPassword: 'Reset Password',
+    resetPasswordDesc: 'Enter your registered email and complete the verification to reset your password.',
     welcomeBack: 'Welcome back, please log in to your account',
     noAccount: 'No account yet?',
     registerNow: 'Register now',
     rememberPassword: 'Remember password?',
+    backToLogin: 'Back to Login',
     sendCode: 'Send Code',
     emailCodeSent: 'Verification code sent',
     sendCodeFailed: 'Failed to send verification code',
@@ -83,6 +85,37 @@ export default {
     accountLocked: 'Account is locked',
     captchaRequired: 'Please enter captcha',
     captchaError: 'Invalid captcha'
+  },
+
+  // Legal
+  legal: {
+    agreePrefix: 'I have read and agree to the',
+    and: 'and',
+    userAgreement: 'User Agreement',
+    privacyPolicy: 'Privacy Policy',
+    userAgreementContent: `
+      <h3>User Agreement</h3>
+      <p>Welcome to Sci-Z Platform. This agreement is a legally binding contract between you and the platform regarding registration and use of services.</p>
+      <p><strong>1. Account Registration & Security</strong>: Ensure your registration information is authentic, accurate, and complete, and update it promptly. You are responsible for safeguarding your credentials and any losses caused by incorrect information or improper custody.</p>
+      <p><strong>2. Platform Usage Rules</strong>: Comply with laws and regulations. Do not upload or transmit illegal, infringing, malicious code or other harmful content, nor engage in behavior that endangers platform security or the rights of others.</p>
+      <p><strong>3. Data & Privacy</strong>: We collect and use necessary information while providing services. The scope and usage follow the Privacy Policy.</p>
+      <p><strong>4. Intellectual Property</strong>: All content displayed on the platform (including text, images, code, and interfaces) is protected by intellectual property laws. Unauthorized copying, modification, or distribution is prohibited.</p>
+      <p><strong>5. Liability & Disclaimer</strong>: The platform is not responsible for service interruption or data loss caused by force majeure, network issues, or third parties. You bear the responsibility for losses arising from violations of laws or this agreement.</p>
+      <p><strong>6. Agreement Changes & Termination</strong>: The platform may adjust this agreement based on business needs and will notify you in advance. If you disagree with the changes, you may stop using the services.</p>
+      <p>Clicking "Confirm" means you have read and agree to all terms of this agreement.</p>
+    `,
+    privacyPolicyContent: `
+      <h3>Privacy Policy</h3>
+      <p>We value your personal information and privacy. This policy describes how Sci-Z Platform collects, uses, stores, and protects your personal information when you use the services.</p>
+      <p><strong>1. Information Collection</strong>: To register and verify your identity, we collect the name, email, phone number, department, and other information you provide, as well as logs and device information generated during usage.</p>
+      <p><strong>2. Information Use</strong>: We use your information for identity verification, feature implementation, troubleshooting, and security, without exceeding the purposes allowed by law.</p>
+      <p><strong>3. Information Sharing & Disclosure</strong>: We do not share your personal information with third parties unless required by law or with your explicit consent. When sharing is necessary, we follow the principle of minimum necessity and ensure security measures.</p>
+      <p><strong>4. Information Storage & Security</strong>: We implement encryption and access control to protect information and store it for the minimum period required by law. In case of a security incident, we will notify you promptly and activate contingency plans.</p>
+      <p><strong>5. Your Rights</strong>: You may access, update, correct personal information, withdraw authorization, or close your account through the platform features. We will handle requests within a reasonable time according to legal requirements.</p>
+      <p><strong>6. Protection of Minors</strong>: If you are a minor, read and use the services under guardian supervision.</p>
+      <p><strong>7. Policy Updates</strong>: We may update this policy when necessary and will notify you via in-app messages or other methods. Continued use of the services signifies your acceptance of the updates.</p>
+      <p>If you have questions about this policy, please contact us through the channels provided by the platform.</p>
+    `
   },
 
   // User

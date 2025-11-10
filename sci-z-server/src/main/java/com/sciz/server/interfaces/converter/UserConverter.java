@@ -3,6 +3,7 @@ package com.sciz.server.interfaces.converter;
 import com.sciz.server.domain.pojo.dto.response.user.RolePermissionIdsResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserRoleIdsResp;
 import java.util.List;
+import java.util.Optional;
 import org.mapstruct.Mapper;
 
 /**
@@ -26,8 +27,7 @@ public interface UserConverter {
      * @return UserRoleIdsResp 响应
      */
     default UserRoleIdsResp toUserRoleIdsResp(List<Long> roleIds) {
-        var safeRoleIds = roleIds == null ? List.<Long>of() : List.copyOf(roleIds);
-        return new UserRoleIdsResp(safeRoleIds);
+        return new UserRoleIdsResp(Optional.ofNullable(roleIds).map(List::copyOf).orElseGet(List::of));
     }
 
     /**
@@ -37,7 +37,7 @@ public interface UserConverter {
      * @return RolePermissionIdsResp 响应
      */
     default RolePermissionIdsResp toRolePermissionIdsResp(List<Long> permissionIds) {
-        var safePermissionIds = permissionIds == null ? List.<Long>of() : List.copyOf(permissionIds);
-        return new RolePermissionIdsResp(safePermissionIds);
+        return new RolePermissionIdsResp(
+                Optional.ofNullable(permissionIds).map(List::copyOf).orElseGet(List::of));
     }
 }

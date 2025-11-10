@@ -97,10 +97,12 @@ export default {
     rememberMe: '记住我',
     forgotPassword: '忘记密码',
     resetPassword: '重置密码',
+    resetPasswordDesc: '输入注册邮箱并完成双重验证即可重置密码',
     welcomeBack: '欢迎回来，请登录您的账户',
     noAccount: '还没有账号？',
     registerNow: '立即注册',
     rememberPassword: '想起密码了？',
+    backToLogin: '返回登录',
     sendCode: '发送验证码',
     emailCodeSent: '验证码已发送',
     sendCodeFailed: '发送验证码失败',
@@ -159,7 +161,7 @@ export default {
       passwordLabel: '密码',
       passwordPlaceholder: '请输入密码',
       passwordRequired: '请输入密码',
-      passwordLength: '密码长度需为 8-20 个字符',
+      passwordLength: '密码长度需为 6-20 个字符',
       passwordStrengthLabel: '密码强度',
       passwordWeak: '弱',
       passwordMedium: '中',
@@ -191,19 +193,7 @@ export default {
       agreePrefix: '我已阅读并同意',
       agreeMiddle: '和',
       userAgreement: '《用户协议》',
-      privacyPolicy: '《隐私政策》',
-      userAgreementPlaceholder: '用户协议内容正在完善，敬请期待',
-      privacyPolicyPlaceholder: '隐私政策内容正在完善，敬请期待',
-      departmentOptionCS: '计算机科学与技术学院',
-      departmentOptionAI: '人工智能学院',
-      departmentOptionMath: '数学与统计学院',
-      departmentOptionPhysics: '物理与电子工程学院',
-      departmentOptionChemistry: '化学与材料科学学院',
-      departmentOptionBiology: '生物科学与技术学院',
-      departmentOptionEconomics: '经济管理学院',
-      departmentOptionLiterature: '文学院',
-      departmentOptionForeign: '外国语学院',
-      departmentOptionEducation: '教育学院'
+      privacyPolicy: '《隐私政策》'
     }
   },
 
@@ -211,7 +201,30 @@ export default {
     agreePrefix: '我已阅读并同意',
     and: '和',
     userAgreement: '《用户协议》',
-    privacyPolicy: '《隐私政策》'
+    privacyPolicy: '《隐私政策》',
+    userAgreementContent: `
+      <h3>用户协议</h3>
+      <p>欢迎使用 Sci-Z Platform。本协议系您与 Sci-Z Platform 平台之间就注册、使用平台服务所订立的具备法律效力的协议。</p>
+      <p><strong>1. 账户注册与安全</strong>：您应当确保注册信息真实、准确、完整，并及时更新。账户凭证由您自行保管，因信息不实或保管不善导致的损失由您承担。</p>
+      <p><strong>2. 平台使用规范</strong>：您在使用平台时应遵守法律法规，不得上传或传播违法、侵权、恶意代码及其他有害内容，不得进行危害平台安全或损害他人权益的行为。</p>
+      <p><strong>3. 数据与隐私</strong>：平台将在提供服务过程中收集并使用您的必要信息，具体范围及使用方式以《隐私政策》为准。</p>
+      <p><strong>4. 知识产权</strong>：平台展示的全部内容（含文本、图片、代码、界面等）受知识产权法律保护，未经授权不得复制、修改或传播。</p>
+      <p><strong>5. 责任与免责</strong>：对于因不可抗力、网络状况或第三方原因导致的服务中断、数据丢失，平台不承担责任。因您违反法律法规或本协议而导致的责任由您自行承担。</p>
+      <p><strong>6. 协议变更与终止</strong>：平台有权根据业务需要对协议进行变更，并提前以公告等方式告知。您有权在不同意变更时停止使用平台服务。</p>
+      <p>点击“确认”即表示您已阅读并同意本协议全部内容。</p>
+    `,
+    privacyPolicyContent: `
+      <h3>隐私政策</h3>
+      <p>我们十分重视您的个人信息及隐私保护。本政策旨在说明 Sci-Z Platform 在您使用服务时如何收集、使用、存储和保护您的个人信息。</p>
+      <p><strong>1. 信息收集</strong>：为注册与身份验证，我们会收集您提供的姓名、邮箱、手机号、院系等信息，以及使用过程中产生的日志、设备信息等。</p>
+      <p><strong>2. 信息使用</strong>：我们依据提供服务的必要性以及法律法规要求，将信息用于身份校验、功能实现、故障排查、安全保障等场景，不会超出目的范围使用。</p>
+      <p><strong>3. 信息共享与披露</strong>：除法律法规要求或获得您明确授权外，我们不会向第三方共享您的个人信息。当共享不可避免时，将遵循最小必要原则并确保相应安全措施。</p>
+      <p><strong>4. 信息存储与安全</strong>：我们采取加密、访问控制等安全措施保护信息，并按照法律规定的最短期限存储。发生安全事件时，我们将及时告知并启动应急预案。</p>
+      <p><strong>5. 您的权利</strong>：您可通过平台功能访问、更新、更正个人信息，或撤回授权、注销账户。我们将根据法律法规在合理时间内予以处理。</p>
+      <p><strong>6. 未成年人保护</strong>：若您为未成年人，请在监护人陪同下阅读并使用平台服务。</p>
+      <p><strong>7. 本政策更新</strong>：我们可能适时更新本政策，重要变更将通过站内通知或其他方式告知。若您继续使用服务，即表示认可更新内容。</p>
+      <p>如您对本政策有任何疑问，可通过平台提供的联系方式与我们取得联系。</p>
+    `
   },
 
   // 认证模块页面

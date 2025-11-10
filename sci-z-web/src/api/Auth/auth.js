@@ -60,7 +60,8 @@ export const resetPassword = (data) => {
   return request({
     url: AUTH_API.RESET_PASSWORD,
     method: HTTP_METHODS.POST,
-    data
+    data,
+    skipAuth: true
   })
 }
 
@@ -84,7 +85,8 @@ export const resetPassword = (data) => {
 export const getCaptcha = () => {
   return request({
     url: AUTH_API.CAPTCHA,
-    method: HTTP_METHODS.GET
+    method: HTTP_METHODS.GET,
+    skipAuth: true
   })
 }
 
@@ -113,7 +115,8 @@ export const sendEmailCode = (data) => {
   return request({
     url: AUTH_API.SEND_EMAIL_CODE,
     method: HTTP_METHODS.POST,
-    data
+    data,
+    skipAuth: true
   })
 }
 
@@ -134,14 +137,14 @@ export const refreshToken = () => {
  */
 export const getUserInfo = () => {
   /**
-   * 获取用户信息接口（可选）
-   * 后端接口：GET /auth/user-info
-   * 出参：与登录接口相同的结构（userInfo, roles, permissions, menus）
+   * 获取用户档案信息
+   * 后端接口：POST /auth/profile
+   * 出参：与登录接口相同的结构（userInfo, roles, permissions, menus、token 信息）
    * 说明：用于会话恢复时重新获取用户初始化数据
    */
   return request({
-    url: AUTH_API.USER_INFO,
-    method: HTTP_METHODS.GET
+    url: AUTH_API.PROFILE,
+    method: HTTP_METHODS.POST
   })
 }
 
@@ -164,6 +167,47 @@ export const getMenus = () => {
   return request({
     url: AUTH_API.MENUS,
     method: HTTP_METHODS.GET
+  })
+}
+
+/**
+ * 校验当前登录状态
+ * @returns {Promise<ApiResponse>}
+ */
+export const checkLoginStatus = () => {
+  return request({
+    url: AUTH_API.CHECK_LOGIN,
+    method: HTTP_METHODS.GET
+  })
+}
+
+/**
+ * 校验指定角色是否存在
+ * @param {Object} params
+ * @param {string} params.roleCode - 角色编码
+ * @param {string} [params.industryType] - 行业类型
+ * @returns {Promise<ApiResponse>}
+ */
+export const checkRole = (params = {}) => {
+  return request({
+    url: AUTH_API.CHECK_ROLE,
+    method: HTTP_METHODS.GET,
+    params
+  })
+}
+
+/**
+ * 校验指定权限是否存在
+ * @param {Object} params
+ * @param {string} params.permissionCode - 权限编码
+ * @param {string} [params.industryType] - 行业类型
+ * @returns {Promise<ApiResponse>}
+ */
+export const checkPermission = (params = {}) => {
+  return request({
+    url: AUTH_API.CHECK_PERMISSION,
+    method: HTTP_METHODS.GET,
+    params
   })
 }
 

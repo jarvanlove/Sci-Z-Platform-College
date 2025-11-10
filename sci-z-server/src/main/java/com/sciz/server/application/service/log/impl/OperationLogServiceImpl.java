@@ -4,6 +4,7 @@ import com.sciz.server.application.service.log.OperationLogService;
 import com.sciz.server.domain.pojo.entity.log.SysOperationLog;
 import com.sciz.server.domain.pojo.repository.log.SysOperationLogRepo;
 import com.sciz.server.infrastructure.shared.event.log.OperationLoggedEvent;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -54,10 +55,8 @@ public class OperationLogServiceImpl implements OperationLogService {
     }
 
     private String truncate(String s, int max) {
-        if (s == null)
-            return null;
-        if (s.length() <= max)
-            return s;
-        return s.substring(0, max);
+        return Optional.ofNullable(s)
+                .map(value -> value.length() <= max ? value : value.substring(0, max))
+                .orElse(null);
     }
 }

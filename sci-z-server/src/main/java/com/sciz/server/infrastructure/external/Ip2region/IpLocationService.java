@@ -1,15 +1,16 @@
 package com.sciz.server.infrastructure.external.Ip2region;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.lionsoul.ip2region.xdb.Searcher;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
-
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-
-import java.io.IOException;
-import java.io.InputStream;
 
 /**
  * IP地址解析服务
@@ -62,13 +63,13 @@ public class IpLocationService {
      */
     @PreDestroy
     public void destroy() {
-        if (searcher != null) {
+        Optional.ofNullable(searcher).ifPresent(current -> {
             try {
-                searcher.close();
+                current.close();
             } catch (IOException e) {
                 log.warn(String.format("关闭IP地址查询器失败: err=%s", e.getMessage()), e);
             }
-        }
+        });
     }
 
     /**
@@ -79,33 +80,32 @@ public class IpLocationService {
      *         例如：中国|0|北京|北京市|电信
      */
     public String getLocation(String ip) {
-        if (searcher == null) {
-            log.warn(String.format("IP地址库未初始化，返回默认值"));
+        if (Optional.ofNullable(searcher).isEmpty()) {
+            log.warn("IP地址库未初始化，返回默认值");
             return formatDefaultLocation(ip);
         }
 
-        if (ip == null || ip.isEmpty()) {
+        var normalizedIp = Optional.ofNullable(ip)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty());
+
+        if (normalizedIp.isEmpty()) {
             return "未知";
         }
 
-        // 处理内网IP
-        if (isInternalIp(ip)) {
+        var actualIp = normalizedIp.get();
+        if (isInternalIp(actualIp)) {
             return "内网";
         }
 
         try {
-            // 使用 ip2region 查询
-            String region = searcher.search(ip);
-            if (region == null || region.isEmpty()) {
-                return "未知";
-            }
-
-            // 格式化返回结果
-            return formatLocation(region);
-
+            return Optional.ofNullable(searcher.search(actualIp))
+                    .filter(this::hasText)
+                    .map(this::formatLocation)
+                    .orElse("未知");
         } catch (Exception e) {
-            log.warn(String.format("IP地址解析失败: ip=%s, err=%s", ip, e.getMessage()));
-            return formatDefaultLocation(ip);
+            log.warn(String.format("IP地址解析失败: ip=%s, err=%s", actualIp, e.getMessage()));
+            return formatDefaultLocation(actualIp);
         }
     }
 
@@ -119,48 +119,61 @@ public class IpLocationService {
      * @return 格式化后的地理位置信息
      */
     private String formatLocation(String region) {
-        if (region == null || region.isEmpty()) {
-            return "未知";
-        }
+        return Optional.ofNullable(region)
+                .filter(this::hasText)
+                .map(value -> {
+                    String[] parts = value.split("\\|");
+                    if (parts.length < 5) {
+                        return value;
+                    }
 
-        String[] parts = region.split("\\|");
-        if (parts.length < 5) {
-            return region;
-        }
+                    var country = parts[0];
+                    var province = parts[2];
+                    var city = parts[3];
+                    var isp = parts[4];
 
-        String country = parts[0];
-        String province = parts[2];
-        String city = parts[3];
-        String isp = parts[4];
+                    if (Optional.ofNullable(country)
+                            .filter(this::hasText)
+                            .filter(item -> !"0".equals(item))
+                            .filter(item -> !"中国".equals(item))
+                            .isPresent()) {
+                        return country;
+                    }
 
-        // 如果国家不是中国，返回国家信息
-        if (!"中国".equals(country) && !"0".equals(country) && !country.isEmpty()) {
-            return country;
-        }
+                    var location = new StringBuilder();
+                    Optional.ofNullable(province)
+                            .filter(this::hasText)
+                            .filter(item -> !"0".equals(item))
+                            .ifPresent(location::append);
 
-        // 格式化省份和城市
-        StringBuilder location = new StringBuilder();
-        if (province != null && !province.isEmpty() && !"0".equals(province)) {
-            location.append(province);
-        }
-        if (city != null && !city.isEmpty() && !"0".equals(city) && province != null && !province.equals(city)) {
-            if (location.length() > 0) {
-                location.append(" ");
-            }
-            location.append(city);
-        }
+                    Optional.ofNullable(city)
+                            .filter(this::hasText)
+                            .filter(item -> !"0".equals(item))
+                            .filter(item -> Optional.ofNullable(province)
+                                    .filter(this::hasText)
+                                    .map(provinceVal -> !provinceVal.equals(item))
+                                    .orElse(true))
+                            .ifPresent(item -> {
+                                if (location.length() > 0) {
+                                    location.append(" ");
+                                }
+                                location.append(item);
+                            });
 
-        // 如果省份和城市都为空，返回国家
-        if (location.length() == 0) {
-            location.append(country);
-        }
+                    if (location.length() == 0) {
+                        Optional.ofNullable(country)
+                                .filter(this::hasText)
+                                .ifPresent(location::append);
+                    }
 
-        // 添加ISP信息（如果有）
-        if (isp != null && !isp.isEmpty() && !"0".equals(isp)) {
-            location.append(" (").append(isp).append(")");
-        }
+                    Optional.ofNullable(isp)
+                            .filter(this::hasText)
+                            .filter(item -> !"0".equals(item))
+                            .ifPresent(item -> location.append(" (").append(item).append(")"));
 
-        return location.toString();
+                    return location.toString();
+                })
+                .orElse("未知");
     }
 
     /**
@@ -170,46 +183,28 @@ public class IpLocationService {
      * @return 是否为内网IP
      */
     private boolean isInternalIp(String ip) {
-        if (ip == null || ip.isEmpty()) {
-            return false;
-        }
-
-        // 127.0.0.1
-        if ("127.0.0.1".equals(ip) || "localhost".equalsIgnoreCase(ip)) {
-            return true;
-        }
-
-        // 192.168.x.x
-        if (ip.startsWith("192.168.")) {
-            return true;
-        }
-
-        // 10.x.x.x
-        if (ip.startsWith("10.")) {
-            return true;
-        }
-
-        // 172.16.x.x - 172.31.x.x
-        if (ip.startsWith("172.")) {
-            String[] parts = ip.split("\\.");
-            if (parts.length >= 2) {
-                try {
-                    int second = Integer.parseInt(parts[1]);
-                    if (second >= 16 && second <= 31) {
+        return Optional.ofNullable(ip)
+                .map(String::trim)
+                .filter(this::hasText)
+                .map(value -> {
+                    var lower = value.toLowerCase(Locale.ROOT);
+                    if (List.of("127.0.0.1", "localhost").contains(lower)) {
                         return true;
                     }
-                } catch (NumberFormatException e) {
-                    // 忽略解析错误
-                }
-            }
-        }
-
-        // 169.254.x.x (链路本地地址)
-        if (ip.startsWith("169.254.")) {
-            return true;
-        }
-
-        return false;
+                    if (lower.startsWith("192.168.")
+                            || lower.startsWith("10.")
+                            || lower.startsWith("169.254.")) {
+                        return true;
+                    }
+                    if (lower.startsWith("172.")) {
+                        var parts = lower.split("\\.");
+                        return parts.length >= 2 && parseIntSafe(parts[1])
+                                .filter(num -> num >= 16 && num <= 31)
+                                .isPresent();
+                    }
+                    return false;
+                })
+                .orElse(false);
     }
 
     /**
@@ -219,10 +214,22 @@ public class IpLocationService {
      * @return 默认位置信息
      */
     private String formatDefaultLocation(String ip) {
-        if (isInternalIp(ip)) {
-            return "内网";
+        return isInternalIp(ip) ? "内网"
+                : String.format("IP:%s", Optional.ofNullable(ip).filter(this::hasText).orElse("未知"));
+    }
+
+    private Optional<Integer> parseIntSafe(String value) {
+        try {
+            return Optional.of(Integer.parseInt(value));
+        } catch (NumberFormatException ignored) {
+            return Optional.empty();
         }
-        return "未知";
+    }
+
+    private boolean hasText(String value) {
+        return Optional.ofNullable(value)
+                .map(text -> !text.trim().isEmpty())
+                .orElse(false);
     }
 
     /**
@@ -231,6 +238,6 @@ public class IpLocationService {
      * @return 是否可用
      */
     public boolean isAvailable() {
-        return searcher != null;
+        return Optional.ofNullable(searcher).isPresent();
     }
 }

@@ -299,24 +299,59 @@ router.beforeEach(async (to, from, next) => {
         ElMessage.error('请先登录')
         return next('/login')
       }
-    
-    // 检查页面权限
-    if (to.meta.permission && !authStore.hasPermission(to.meta.permission)) {
-      routerLogger.warn('权限检查失败', { 
-        requiredPermission: to.meta.permission, 
-        userPermissions: authStore.permissions,
-        targetPath: to.path
-      })
-      ElMessage.error('没有权限访问该页面')
       
-      // 如果当前要访问的就是dashboard，则重定向到登录页面避免无限循环
-      if (to.path === '/dashboard') {
-        routerLogger.warn('无权限访问dashboard，重定向到登录页面')
+      try {
+        const sessionValid = await authStore.verifyLoginStatus()
+        if (!sessionValid) {
+          routerLogger.warn('服务端会话无效，重定向到登录页面', { targetPath: to.path })
+          ElMessage.error('登录状态已过期，请重新登录')
+          return next('/login')
+        }
+      } catch (error) {
+        routerLogger.error('登录状态校验异常', { error: error.message })
+        ElMessage.error('校验登录状态失败，请重新登录')
         return next('/login')
       }
+    
+    // 检查页面权限
+    if (to.meta.permission) {
+      let hasPermission = authStore.hasPermission(to.meta.permission)
       
-      // 重定向到有权限的页面
-      return next('/dashboard')
+      if (!hasPermission) {
+        routerLogger.info('本地权限校验失败，尝试调用服务端校验接口', {
+          requiredPermission: to.meta.permission
+        })
+        try {
+          hasPermission = await authStore.validatePermission(to.meta.permission)
+          if (hasPermission) {
+            routerLogger.info('服务端确认具有权限，准备同步用户信息')
+            await authStore.getUserInfo(true)
+          }
+        } catch (error) {
+          routerLogger.error('服务端权限校验失败', {
+            error: error.message,
+            requiredPermission: to.meta.permission
+          })
+        }
+      }
+      
+      if (!hasPermission) {
+        routerLogger.warn('权限检查失败', { 
+          requiredPermission: to.meta.permission, 
+          userPermissions: authStore.permissions,
+          targetPath: to.path
+        })
+        ElMessage.error('没有权限访问该页面')
+        
+        // 如果当前要访问的就是dashboard，则重定向到登录页面避免无限循环
+        if (to.path === '/dashboard') {
+          routerLogger.warn('无权限访问dashboard，重定向到登录页面')
+          return next('/login')
+        }
+        
+        // 重定向到有权限的页面
+        return next('/dashboard')
+      }
     }
   }
 

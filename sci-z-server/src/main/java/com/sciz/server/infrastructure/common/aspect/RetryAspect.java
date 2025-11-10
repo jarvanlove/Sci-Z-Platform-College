@@ -10,7 +10,8 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
-import java.util.Objects;
+import java.util.Arrays;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -45,8 +46,11 @@ public class RetryAspect {
             try {
                 lastResult = joinPoint.proceed();
                 // 条件重试：当 condition 表达式为真时继续重试（此处简化：仅对 null/空字符串判定）
-                if (condition != null && !condition.isEmpty()) {
-                    if (lastResult == null || (lastResult instanceof String && ((String) lastResult).isEmpty())) {
+                if (Optional.ofNullable(condition).filter(text -> !text.isEmpty()).isPresent()) {
+                    boolean needRetry = Optional.ofNullable(lastResult)
+                            .map(result -> result instanceof String && ((String) result).isEmpty())
+                            .orElse(true);
+                    if (needRetry) {
                         waitDelay(attempt, baseDelay, strategy, multiplier, maxDelay);
                         continue;
                     }
@@ -64,35 +68,57 @@ public class RetryAspect {
                 waitDelay(attempt, baseDelay, strategy, multiplier, maxDelay);
             }
         }
-        if (lastError != null)
-            throw lastError;
+        Optional.ofNullable(lastError).ifPresent(RetryAspect::sneakyThrow);
         return lastResult;
     }
 
+    /**
+     * 获取方法
+     *
+     * @param joinPoint 连接点
+     * @return 方法
+     */
     private Method getMethod(ProceedingJoinPoint joinPoint) {
         Signature signature = joinPoint.getSignature();
         MethodSignature methodSignature = (MethodSignature) signature;
         return methodSignature.getMethod();
     }
 
+    /**
+     * 是否需要重试
+     *
+     * @param ex         异常
+     * @param retryFor   需要重试的异常类型
+     * @param noRetryFor 不需要重试的异常类型
+     * @return boolean 是否需要重试
+     */
     private boolean shouldRetry(Throwable ex, Class<? extends Throwable>[] retryFor,
             Class<? extends Throwable>[] noRetryFor) {
-        if (noRetryFor != null) {
-            for (Class<? extends Throwable> clazz : noRetryFor) {
-                if (clazz.isInstance(ex))
-                    return false;
-            }
-        }
-        if (retryFor != null && retryFor.length > 0) {
-            for (Class<? extends Throwable> clazz : retryFor) {
-                if (clazz.isInstance(ex))
-                    return true;
-            }
+        boolean inNoRetry = Optional.ofNullable(noRetryFor)
+                .map(array -> Arrays.stream(array).anyMatch(clazz -> clazz.isInstance(ex)))
+                .orElse(false);
+        if (inNoRetry) {
             return false;
         }
-        return true; // 默认重试所有异常
+        Optional<Class<? extends Throwable>[]> retryArray = Optional.ofNullable(retryFor)
+                .filter(array -> array.length > 0);
+        if (retryArray.isPresent()) {
+            boolean matchRetry = Arrays.stream(retryArray.get()).anyMatch(clazz -> clazz.isInstance(ex));
+            return matchRetry;
+        }
+        // 默认重试所有异常
+        return true;
     }
 
+    /**
+     * 等待延迟
+     *
+     * @param attempt    尝试次数
+     * @param baseDelay  基础延迟时间
+     * @param strategy   重试策略
+     * @param multiplier 退避倍数
+     * @param maxDelay   最大延迟时间
+     */
     private void waitDelay(int attempt, long baseDelay, Retry.RetryStrategy strategy, double multiplier,
             long maxDelay) {
         long delay;
@@ -117,5 +143,10 @@ public class RetryAspect {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <E extends Throwable> void sneakyThrow(Throwable throwable) throws E {
+        throw (E) throwable;
     }
 }

@@ -5,6 +5,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.util.Base64;
+import java.util.Optional;
 import java.util.Random;
 
 /**
@@ -176,9 +177,11 @@ public final class CaptchaUtil {
      * @return boolean 是否匹配
      */
     public static boolean verify(String userInput, String actual) {
-        if (userInput == null || actual == null) {
-            return false;
-        }
-        return userInput.trim().equalsIgnoreCase(actual.trim());
+        return Optional.ofNullable(userInput)
+                .map(String::trim)
+                .flatMap(input -> Optional.ofNullable(actual)
+                        .map(String::trim)
+                        .map(input::equalsIgnoreCase))
+                .orElse(false);
     }
 }

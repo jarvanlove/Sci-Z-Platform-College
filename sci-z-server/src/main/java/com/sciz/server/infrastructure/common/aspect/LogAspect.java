@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -104,37 +105,33 @@ public class LogAspect {
     private void logByLevel(Log.LogLevel level, String message, Throwable t) {
         switch (level) {
             case DEBUG:
-                if (t == null)
-                    log.debug(message);
-                else
-                    log.debug(message, t);
+                Optional.ofNullable(t)
+                        .ifPresentOrElse(throwable -> log.debug(message, throwable),
+                                () -> log.debug(message));
                 break;
             case WARN:
-                if (t == null)
-                    log.warn(message);
-                else
-                    log.warn(message, t);
+                Optional.ofNullable(t)
+                        .ifPresentOrElse(throwable -> log.warn(message, throwable),
+                                () -> log.warn(message));
                 break;
             case ERROR:
-                if (t == null)
-                    log.error(message);
-                else
-                    log.error(message, t);
+                Optional.ofNullable(t)
+                        .ifPresentOrElse(throwable -> log.error(message, throwable),
+                                () -> log.error(message));
                 break;
             case INFO:
             default:
-                if (t == null)
-                    log.info(message);
-                else
-                    log.info(message, t);
+                Optional.ofNullable(t)
+                        .ifPresentOrElse(throwable -> log.info(message, throwable),
+                                () -> log.info(message));
         }
     }
 
     private Object[] maskArgs(Object[] args, Set<String> sensitiveNames) {
         // 名称级敏感无法直接拿到参数名，这里仅做常见字段名的粗略脱敏
-        if (args == null)
-            return new Object[0];
-        Object[] copy = Arrays.copyOf(args, args.length);
+        Object[] copy = Optional.ofNullable(args)
+                .map(original -> Arrays.copyOf(original, original.length))
+                .orElseGet(() -> new Object[0]);
         for (int i = 0; i < copy.length; i++) {
             Object val = copy[i];
             if (val instanceof CharSequence) {
@@ -153,12 +150,14 @@ public class LogAspect {
     }
 
     private String maskString(String s) {
-        if (s == null)
-            return null;
-        int keep = Math.min(3, s.length());
-        char[] stars = new char[Math.max(0, s.length() - keep)];
-        Arrays.fill(stars, '*');
-        return s.substring(0, keep) + new String(stars);
+        return Optional.ofNullable(s)
+                .map(value -> {
+                    int keep = Math.min(3, value.length());
+                    char[] stars = new char[Math.max(0, value.length() - keep)];
+                    Arrays.fill(stars, '*');
+                    return value.substring(0, keep) + new String(stars);
+                })
+                .orElse(null);
     }
 
     private String safeToString(Object obj) {
