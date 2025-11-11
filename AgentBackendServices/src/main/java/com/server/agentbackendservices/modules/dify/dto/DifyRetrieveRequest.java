@@ -1,12 +1,10 @@
 package com.server.agentbackendservices.modules.dify.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import jakarta.validation.constraints.NotBlank;
 
 /**
  * Dify 知识库检索请求 DTO

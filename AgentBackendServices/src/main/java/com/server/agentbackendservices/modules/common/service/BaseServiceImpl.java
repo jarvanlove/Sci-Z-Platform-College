@@ -1,18 +1,17 @@
 package com.server.agentbackendservices.modules.common.service;
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-
-import com.server.agentbackendservices.modules.common.mapper.MyBaseMapper;
-import com.server.agentbackendservices.modules.common.entity.BaseEntity;
 import com.server.agentbackendservices.modules.common.annotation.FuzzyQueries;
+import com.server.agentbackendservices.modules.common.entity.BaseEntity;
+import com.server.agentbackendservices.modules.common.mapper.MyBaseMapper;
 import com.server.agentbackendservices.modules.common.vo.ResultVO;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class BaseServiceImpl<M extends MyBaseMapper<T>, T extends BaseEntity> extends ServiceImpl<M, T> implements BaseService<T> {

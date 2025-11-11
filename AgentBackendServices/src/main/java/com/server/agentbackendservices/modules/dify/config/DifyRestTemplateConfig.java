@@ -13,7 +13,7 @@ import org.springframework.web.client.RestTemplate;
  * 配置 HTTP 客户端的超时和连接参数
  * 
  * @author shihang.shang
- * @since 2024-10-22
+ * @since 2025-10-22
  */
 @Configuration
 @RequiredArgsConstructor

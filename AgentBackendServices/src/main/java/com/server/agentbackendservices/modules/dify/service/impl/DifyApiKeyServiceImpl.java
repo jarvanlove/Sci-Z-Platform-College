@@ -22,7 +22,7 @@ import java.util.List;
 public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, DifyApiKey> implements DifyApiKeyService {
 
     @Override
-    public String getApiKey(String userId, String resourceId, String keyType) {
+    public String getApiKey(Long userId, String resourceId, String keyType) {
         try {
             QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
             queryWrapper.eq("user_id", userId)
@@ -49,7 +49,7 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
     }
 
     @Override
-    public DifyApiKey saveOrUpdateApiKey(String userId, String resourceId, String keyType, 
+    public DifyApiKey saveOrUpdateApiKey(Long userId, String resourceId, String keyType,
                                         String apiKey, String keyName, String description, String operator) {
         try {
             QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
@@ -94,7 +94,7 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
     }
 
     @Override
-    public List<DifyApiKey> getUserApiKeys(String userId) {
+    public List<DifyApiKey> getUserApiKeys(Long userId) {
         QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId)
                    .eq("is_active", true)
@@ -103,7 +103,7 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
     }
 
     @Override
-    public List<DifyApiKey> getUserApiKeysByType(String userId, String keyType) {
+    public List<DifyApiKey> getUserApiKeysByType(Long userId, String keyType) {
         QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId)
                    .eq("key_type", keyType)

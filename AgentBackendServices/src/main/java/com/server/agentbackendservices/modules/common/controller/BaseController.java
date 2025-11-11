@@ -1,18 +1,13 @@
 package com.server.agentbackendservices.modules.common.controller;
 
-import com.server.agentbackendservices.modules.common.mapper.MyBaseMapper;
-
 import com.server.agentbackendservices.modules.common.entity.BaseEntity;
-
+import com.server.agentbackendservices.modules.common.mapper.MyBaseMapper;
 import com.server.agentbackendservices.modules.common.service.BaseServiceImpl;
-
 import com.server.agentbackendservices.modules.common.vo.ResultVO;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import jakarta.annotation.Resource;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 
 @SuppressWarnings("all")

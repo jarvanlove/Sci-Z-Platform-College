@@ -1,15 +1,15 @@
 package com.server.agentbackendservices.modules.dify.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.server.agentbackendservices.modules.dify.config.DifyConfig;
 import com.server.agentbackendservices.modules.dify.config.DifyDocumentConfig;
-import com.server.agentbackendservices.modules.dify.dto.DifyDatasetRequest;
-import com.server.agentbackendservices.modules.dify.dto.DifyRetrieveRequest;
-import com.server.agentbackendservices.modules.dify.dto.DifyWorkflowRequest;
+import com.server.agentbackendservices.modules.dify.dto.*;
 import com.server.agentbackendservices.modules.dify.entity.DifyApiKey;
+import com.server.agentbackendservices.modules.dify.service.impl.DifyApiKeyServiceImpl;
 import com.server.agentbackendservices.modules.dify.util.DifyApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
@@ -17,8 +17,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Dify API 服务类
@@ -36,10 +38,100 @@ public class DifyApiService {
     private final DifyApiClient difyApiClient;
     private final DifyConfig difyConfig;
     private final DifyDocumentConfig difyDocumentConfig;
+    private final ObjectMapper objectMapper;
+    private final  DifyApiKeyServiceImpl difyApiKeyService;
+
+    /**
+     * 创建 Chatbot 应用
+     */
+    public ResponseEntity<DifyChatbotAppResponse> createChatbotApp(DifyChatbotAppRequest request) {
+        try {
+            ResponseEntity<String> response = difyApiClient.request("POST", "/console/api/apps", request,
+                    request.getUserId(), request.getResourceId(), request.getKeyType(), 1);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                return ResponseEntity.status(response.getStatusCode()).body(null);
+            }
+            DifyChatbotAppResponse body = objectMapper.readValue(response.getBody(), DifyChatbotAppResponse.class);
+            DifyChatbotAppApiKeyResponse apiKeyResponse = createChatbotAppApiKey(request, body);
+            body.setApiToken(apiKeyResponse.getToken());
+            persistChatbotMetadata(request, body, apiKeyResponse);
+            return ResponseEntity.status(response.getStatusCode()).body(body);
+        } catch (HttpClientErrorException e) {
+            log.error("Dify Chatbot 创建失败: {}", e.getMessage());
+            return ResponseEntity.status(e.getStatusCode()).build();
+        } catch (JsonProcessingException e) {
+            log.error("Dify Chatbot 响应解析失败", e);
+            return ResponseEntity.internalServerError().build();
+        } catch (RuntimeException e) {
+            log.error("Dify Chatbot API Key 创建失败", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * 更新 Chatbot 应用模型配置
+     */
+    public ResponseEntity<String> updateChatbotModelConfig(String appId, DifyChatbotModelConfigRequest config) {
+        try {
+            return difyApiClient.request("POST", "/console/api/apps/" + appId + "/model-config", config,
+                    null, null, null, 1);
+        } catch (HttpClientErrorException e) {
+            log.error("更新 Chatbot 模型配置失败: {}", e.getMessage());
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        }
+    }
+
+    /**
+     * 发送 Chatbot 对话（支持阻塞与流式）
+     */
+    public ResponseEntity<String> sendChatbotMessage(DifyChatbotMessageRequest request) {
+        try {
+            return difyApiClient.request("POST", "/chat-messages", request,
+                    request.getUserId(), request.getResourceId(), request.getKeyType());
+        } catch (HttpClientErrorException e) {
+            log.error("发送 Chatbot 对话失败: {}", e.getMessage());
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        }
+    }
+
+    private DifyChatbotAppApiKeyResponse createChatbotAppApiKey(DifyChatbotAppRequest request, DifyChatbotAppResponse appResponse) throws JsonProcessingException {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("id", UUID.randomUUID().toString());
+        payload.put("type", "app");
+        payload.put("token", "app-" + UUID.randomUUID().toString().replace("-", ""));
+        payload.put("created_at", Instant.now().getEpochSecond());
+        payload.put("last_used_at", null);
+        ResponseEntity<String> response = difyApiClient.request(
+                "POST",
+                "/console/api/apps/" + appResponse.getId() + "/api-keys",
+                payload,
+                request.getUserId(),
+                request.getResourceId(),
+                request.getKeyType(),
+                1);
+        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            throw new RuntimeException("创建 Chatbot API Key 失败，状态码: " + response.getStatusCode());
+        }
+        return objectMapper.readValue(response.getBody(), DifyChatbotAppApiKeyResponse.class);
+    }
+
+    private void persistChatbotMetadata(DifyChatbotAppRequest request, DifyChatbotAppResponse response, DifyChatbotAppApiKeyResponse apiKeyResponse) {
+        DifyApiKey difyApiKey = new DifyApiKey();
+        difyApiKey.setUserId(1L);
+        difyApiKey.setKeyType("chatbot");
+        difyApiKey.setResourceId(response.getId());
+        difyApiKey.setApiKey(apiKeyResponse.getToken());
+        difyApiKey.setKeyName("chatbot_"+UUID.randomUUID());
+        difyApiKey.setDescription(response.getDescription());
+        difyApiKey.setIsActive(Boolean.TRUE);
+        difyApiKey.setCreatedBy("admin");
+        difyApiKey.setUpdatedBy("admin");
+        difyApiKeyService.save(difyApiKey);
+    }
     /**
      * 获取所有数据集
      */
-    public ResponseEntity<String> getDatasets(int page, int limit, String userId, String resourceId, String keyType) {
+    public ResponseEntity<String> getDatasets(int page, int limit, Long userId, String resourceId, String keyType) {
         try {
             Map<String, Object> params = new HashMap<>();
             params.put("page", page);
@@ -55,7 +147,7 @@ public class DifyApiService {
     /**
      * 创建数据集
      */
-    public ResponseEntity<String> createDataset(DifyDatasetRequest request, String userId, String resourceId, String keyType) {
+    public ResponseEntity<String> createDataset(DifyDatasetRequest request, Long userId, String resourceId, String keyType) {
         try {
             return difyApiClient.request("POST", "/datasets", request, userId, resourceId, keyType);
         } catch (HttpClientErrorException e) {
@@ -68,7 +160,7 @@ public class DifyApiService {
     /**
      * 获取数据集详情
      */
-    public ResponseEntity<String> getDataset(String datasetId, String userId, String resourceId, String keyType) {
+    public ResponseEntity<String> getDataset(String datasetId, Long userId, String resourceId, String keyType) {
         try {
             return difyApiClient.request("GET", "/datasets/" + datasetId, userId, resourceId, keyType);
         } catch (HttpClientErrorException e) {
@@ -80,7 +172,7 @@ public class DifyApiService {
     /**
      * 更新数据集
      */
-    public ResponseEntity<String> updateDataset(String datasetId, DifyDatasetRequest request, String userId, String resourceId, String keyType) {
+    public ResponseEntity<String> updateDataset(String datasetId, DifyDatasetRequest request, Long userId, String resourceId, String keyType) {
         try {
             return difyApiClient.request("PUT", "/datasets/" + datasetId, request, userId, resourceId, keyType);
         } catch (HttpClientErrorException e) {
@@ -92,7 +184,7 @@ public class DifyApiService {
     /**
      * 删除数据集
      */
-    public ResponseEntity<String> deleteDataset(String datasetId, String userId, String resourceId, String keyType) {
+    public ResponseEntity<String> deleteDataset(String datasetId, Long userId, String resourceId, String keyType) {
         try {
             return difyApiClient.request("DELETE", "/datasets/" + datasetId, userId, resourceId, keyType);
         } catch (HttpClientErrorException e) {
@@ -107,7 +199,7 @@ public class DifyApiService {
     /**
      * 检索知识库
      */
-    public ResponseEntity<String> retrieveDataset(String datasetId, DifyRetrieveRequest request, String userId, String resourceId, String keyType) {
+    public ResponseEntity<String> retrieveDataset(String datasetId, DifyRetrieveRequest request, Long userId, String resourceId, String keyType) {
         try {
             return difyApiClient.request("POST", "/datasets/" + datasetId + "/retrieve", request, userId, resourceId, keyType);
         } catch (HttpClientErrorException e) {
@@ -162,7 +254,7 @@ public class DifyApiService {
         config.put("process_rule", processRule);
         
         try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(config);
+            return new ObjectMapper().writeValueAsString(config);
         } catch (Exception e) {
             throw new RuntimeException("构建默认配置JSON失败", e);
         }
@@ -170,7 +262,7 @@ public class DifyApiService {
     /**
      * 上传文档到数据集（先存储文件，再调用Dify API）
      */
-    public ResponseEntity<String> uploadDocumentWithFileStorage(String datasetId, MultipartFile file, String userId, String resourceId, String keyType) {
+    public ResponseEntity<String> uploadDocumentWithFileStorage(String datasetId, MultipartFile file, Long userId, String resourceId, String keyType) {
         try {
             // 1. 先验证文件
             validateFile(file);
@@ -327,7 +419,7 @@ public class DifyApiService {
      * @param workflowId 工作流ID
      * @return 工作流执行结果
      */
-    public ResponseEntity<String> runWorkflowWithDynamicKey(DifyWorkflowRequest request, String userId, String workflowId) {
+    public ResponseEntity<String> runWorkflowWithDynamicKey(DifyWorkflowRequest request, Long userId, String workflowId) {
         try {
             log.info("开始执行 Dify 工作流（动态密钥），用户: {}, 工作流ID: {}", userId, workflowId);
             Map<String, Object> params = new HashMap<>();
@@ -359,7 +451,7 @@ public class DifyApiService {
      * @param workflowId 工作流ID
      * @return 工作流运行状态
      */
-    public ResponseEntity<String> getWorkflowRunStatusWithDynamicKey(String workflowRunId, String userId, String workflowId) {
+    public ResponseEntity<String> getWorkflowRunStatusWithDynamicKey(String workflowRunId, Long userId, String workflowId) {
         try {
             log.info("获取工作流运行状态（动态密钥），运行ID: {}, 用户: {}, 工作流ID: {}", workflowRunId, userId, workflowId);
             String endpoint = "/workflows/run/" + workflowRunId;
@@ -385,7 +477,7 @@ public class DifyApiService {
      * @param workflowId 工作流ID
      * @return 工作流日志
      */
-    public ResponseEntity<String> getWorkflowLogsWithDynamicKey(Integer page, Integer limit, String userId, String workflowId) {
+    public ResponseEntity<String> getWorkflowLogsWithDynamicKey(Integer page, Integer limit, Long userId, String workflowId) {
         try {
             log.info("获取工作流日志（动态密钥），页码: {}, 每页数量: {}, 用户: {}, 工作流ID: {}", page, limit, userId, workflowId);
             Map<String, Object> params = new HashMap<>();
@@ -418,7 +510,7 @@ public class DifyApiService {
      * @param resourceId 资源ID
      * @return 文件上传结果
      */
-    public ResponseEntity<String> uploadFileWithDynamicKey(String user, MultipartFile file, String userId, String resourceId) {
+    public ResponseEntity<String> uploadFileWithDynamicKey(Long user, MultipartFile file, Long userId, String resourceId) {
         try {
             log.info("开始上传文件到 Dify（动态密钥），用户: {}, 文件名: {}, 大小: {} bytes, 资源ID: {}", 
                     user, file.getOriginalFilename(), file.getSize(), resourceId);

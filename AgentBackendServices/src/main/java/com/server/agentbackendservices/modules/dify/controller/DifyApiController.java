@@ -2,7 +2,6 @@ package com.server.agentbackendservices.modules.dify.controller;
 import com.server.agentbackendservices.modules.dify.dto.*;
 import com.server.agentbackendservices.modules.dify.service.DifyApiService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -97,7 +96,7 @@ public class DifyApiController {
     public ResponseEntity<String> uploadDocument(
             @PathVariable String datasetId,
             @RequestParam("file") MultipartFile file,
-            @RequestParam("userId") String userId,
+            @RequestParam("userId") Long userId,
             @RequestParam("resourceId") String resourceId,
             @RequestParam("keyType") String keyType) {
         return difyApiService.uploadDocumentWithFileStorage(datasetId, file, userId, resourceId, keyType);
@@ -136,7 +135,7 @@ public class DifyApiController {
     @Operation(summary = "上传文件到 Dify")
     public ResponseEntity<String> uploadFile(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("userId") String userId,
+            @RequestParam("userId") Long userId,
             @RequestParam("resourceId") String resourceId,
             @RequestParam("keyType") String keyType) {
         return difyApiService.uploadFileWithDynamicKey(userId, file, userId, resourceId);

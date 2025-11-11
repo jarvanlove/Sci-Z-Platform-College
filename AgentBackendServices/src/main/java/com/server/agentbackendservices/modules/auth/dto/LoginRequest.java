@@ -1,10 +1,9 @@
 package com.server.agentbackendservices.modules.auth.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Data;
-
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import lombok.Data;
 
 /**
  * 登录请求 DTO

@@ -1,5 +1,6 @@
 package com.sciz.server;
 
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -8,9 +9,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @className ServerApplication
  * @date 2025-10-28 00:00
  */
+@MapperScan({
+        "com.sciz.server.infrastructure.external.dify.mapper"
+})
 @SpringBootApplication
 public class ServerApplication {
-
     /**
      * 应用启动入口
      *

@@ -1,5 +1,4 @@
 package com.server.agentbackendservices.modules.auth.service;
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.server.agentbackendservices.modules.auth.entity.User;
 import com.server.agentbackendservices.modules.common.service.BaseService;
 
