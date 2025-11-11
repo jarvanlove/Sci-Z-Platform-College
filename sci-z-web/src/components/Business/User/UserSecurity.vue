@@ -201,6 +201,8 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 const logger = createLogger('UserSecurityComponent')
 
+logger.info('UserSecurity component setup initialized')
+
 const passwordFormRef = ref()
 const passwordForm = reactive({
   oldPassword: '',
@@ -258,6 +260,7 @@ const logFilters = reactive({
 
 const checkPasswordStrength = () => {
   const pwd = passwordForm.newPassword || ''
+  logger.debug?.('计算密码强度', { length: pwd.length })
   if (!pwd) {
     passwordStrength.value = 0
     return
@@ -304,6 +307,7 @@ const passwordStrengthTips = computed(() => {
 })
 
 const handleChangePassword = async () => {
+  logger.info('准备提交修改密码')
   try {
     await passwordFormRef.value.validate()
     await ElMessageBox.confirm(
@@ -335,6 +339,7 @@ const handleChangePassword = async () => {
 }
 
 const handleResetPassword = () => {
+  logger.info('重置密码表单')
   passwordFormRef.value?.resetFields()
   passwordStrength.value = 0
 }
@@ -376,6 +381,7 @@ const buildLogParams = () => {
 }
 
 const loadLoginLogs = async () => {
+  logger.info('加载登录日志', buildLogParams())
   try {
     logsLoading.value = true
     const response = await getLoginLogs(buildLogParams())
@@ -393,17 +399,20 @@ const loadLoginLogs = async () => {
 
 const handleFilterChange = () => {
   pagination.current = 1
+  logger.info('筛选条件变化，重新加载日志', logFilters)
   loadLoginLogs()
 }
 
 const handlePageChange = (page) => {
   pagination.current = page
+  logger.info('分页变化', { page })
   loadLoginLogs()
 }
 
 const handlePageSizeChange = (size) => {
   pagination.size = size
   pagination.current = 1
+  logger.info('分页大小变化', { size })
   loadLoginLogs()
 }
 
@@ -411,6 +420,7 @@ watch(
   () => authStore.token,
   (token) => {
     if (token) {
+      logger.info('检测到 token，加载登录日志')
       loadLoginLogs()
     }
   },

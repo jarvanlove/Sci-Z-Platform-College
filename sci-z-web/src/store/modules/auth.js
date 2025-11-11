@@ -169,7 +169,6 @@ export const useAuthStore = defineStore('auth', {
         const payload = unwrapResponse(response) || {}
         authLogger.debug('API返回的完整数据', payload)
         
-        // 方案一：从登录接口直接获取所有数据，包括 menus
         const { token, userInfo, permissions, roles, menus, rememberMe: rememberFromApi } = payload
         
         authLogger.debug('解构后的数据', { 

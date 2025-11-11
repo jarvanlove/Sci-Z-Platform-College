@@ -237,6 +237,8 @@ const logger = createLogger('UserProfileComponent')
 const authStore = useAuthStore()
 const industryStore = useIndustryStore()
 
+logger.info('UserProfile component setup initialized')
+
 const formRef = ref()
 const fileInputRef = ref()
 const defaultAvatar = ref('https://dummyimage.com/160x160/f3f4f6/8c9eff&text=Avatar')
@@ -354,12 +356,14 @@ const loadDepartments = async () => {
 }
 
 const loadProfile = async (force = false) => {
+  logger.info('开始加载个人信息', { force })
   try {
     if (loading.value && !force) return
     loading.value = true
     await industryStore.fetchIndustryConfig(force)
     await loadDepartments()
     const response = await getUserInfo()
+    logger.info('获取个人信息接口返回', response)
     const payload = response?.data?.data || response?.data || response || {}
     const data = payload.userInfo || payload
 
@@ -385,6 +389,7 @@ const loadProfile = async (force = false) => {
 }
 
 const handleSave = async () => {
+  logger.info('提交个人信息更新')
   try {
     await formRef.value.validate()
 
@@ -422,6 +427,7 @@ const handleSave = async () => {
 }
 
 const handleReset = async () => {
+  logger.info('重置个人信息表单')
   try {
     await ElMessageBox.confirm(
       t('user.profile.resetConfirmMessage'),
@@ -445,6 +451,7 @@ const handleReset = async () => {
 }
 
 const openFileDialog = () => {
+  logger.info('触发头像选择对话框')
   if (!fileInputRef.value) return
   fileInputRef.value.value = ''
   fileInputRef.value.click()
@@ -452,6 +459,7 @@ const openFileDialog = () => {
 
 const handleSelectAvatar = async (event) => {
   const file = event.target?.files?.[0]
+  logger.info('选择头像文件', { hasFile: !!file })
   if (!file) return
 
   const allowedTypes = ['image/png', 'image/jpeg', 'image/gif']
@@ -490,6 +498,7 @@ const handleSelectAvatar = async (event) => {
 }
 
 const simulateVerify = async (type, successMessage, errorMessage) => {
+  logger.info('执行模拟验证', { type })
   resetVerification(type)
   verification[type].loading = true
   try {
@@ -516,6 +525,7 @@ const handleSendSms = () => {
 }
 
 onMounted(() => {
+  logger.info('UserProfile component mounted，开始加载数据')
   loadProfile()
 })
 </script>

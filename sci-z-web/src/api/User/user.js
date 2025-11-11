@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import { USER_API, HTTP_METHODS } from '../Common/constants'
+import { USER_API, AUTH_API, HTTP_METHODS } from '../Common/constants'
 
 /**
  * 用户模块 API 接口
@@ -12,8 +12,8 @@ import { USER_API, HTTP_METHODS } from '../Common/constants'
  */
 export const getUserInfo = () => {
   return request({
-    url: USER_API.INFO,
-    method: HTTP_METHODS.GET
+    url: AUTH_API.PROFILE,
+    method: HTTP_METHODS.POST
   })
 }
 
