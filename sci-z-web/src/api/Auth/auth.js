@@ -121,6 +121,26 @@ export const sendEmailCode = (data) => {
 }
 
 /**
+ * 发送短信验证码
+ * @param {Object} data - 发送短信验证码请求参数
+ * @param {string} data.phone - 手机号
+ * @param {string} data.captcha - 图形验证码
+ * @param {string} data.captchaKey - 图形验证码唯一标识
+ * @returns {Promise<ApiResponse>}
+ *
+ * 后端接口：POST /auth/sms-code
+ * 注意：阿里云短信服务未开通前，请保持前端调用处注释状态，待服务可用后放开。
+ */
+export const sendSmsVerificationCode = (data) => {
+  return request({
+    url: AUTH_API.SEND_SMS_CODE,
+    method: HTTP_METHODS.POST,
+    data,
+    skipAuth: true
+  })
+}
+
+/**
  * 刷新Token
  * @returns {Promise<ApiResponse>}
  */

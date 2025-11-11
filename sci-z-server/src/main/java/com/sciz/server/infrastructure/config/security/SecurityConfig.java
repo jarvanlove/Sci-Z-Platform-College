@@ -14,7 +14,7 @@ import com.sciz.server.infrastructure.shared.utils.JsonUtil;
 /**
  * Sa-Token 基础安全配置
  *
- * 放行：登录、注册、重置密码、静态资源、Swagger 文档
+ * 放行：登录、注册、验证码发送、重置密码、静态资源、Swagger 文档
  * 其余：默认需要登录（包括 logout、refresh-token、profile 等）
  *
  * @author JiaWen.Wu
@@ -34,7 +34,8 @@ public class SecurityConfig {
                 .addExclude("/api/auth/reset-password") // 重置密码
                 .addExclude("/api/auth/captcha") // 获取验证码
                 .addExclude("/api/auth/department/label") // 获取行业部门标签
-                .addExclude("/api/auth/email-code") // 发送重置密码邮箱验证码
+                .addExclude("/api/auth/email-code") // 发送邮箱验证码
+                .addExclude("/api/auth/sms-code") // 发送短信验证码
                 // 静态资源和文档
                 .addExclude("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**")
                 .addExclude("/webjars/**", "/static/**", "/favicon.ico")

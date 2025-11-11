@@ -1,22 +1,11 @@
 # Spring 基础配置：应用名与默认激活的环境
 spring: # Spring 根配置
+  config:
+    import: optional:classpath:config/production.env.properties # 加载环境占位符配置
   application: # 应用信息
     name: sci-z-server # 应用名称（用于日志/监控展示）
   profiles: # 环境配置
     active: dev # 默认激活的环境：dev | prod
-  mail:
-    host: ${SPRING_MAIL_HOST:smtp.example.com} # 邮件服务器地址（支持环境变量覆盖）
-    port: ${SPRING_MAIL_PORT:587} # 邮件服务器端口（默认 587，支持 TLS）
-    username: ${SPRING_MAIL_USERNAME:no-reply@example.com} # 发件邮箱账号
-    password: ${SPRING_MAIL_PASSWORD:change-me} # 发件邮箱密码或授权码
-    properties:
-      mail:
-        smtp:
-          auth: true # 是否开启身份认证
-          starttls:
-            enable: true # 是否启用 STARTTLS 加密
-            required: true # 是否强制 STARTTLS
-    default-encoding: UTF-8 # 邮件内容编码
   jackson: # 全局 JSON 序列化/反序列化配置（影响所有 @RestController 返回与请求解析）
     date-format: yyyy-MM-dd HH:mm:ss # 日期时间统一格式
     time-zone: GMT+8 # 时区（与前端、人类可读保持一致）
@@ -102,3 +91,64 @@ sa-token: # Sa-Token 身份认证配置
   auto-renew-timeout: 1800 # 自动续期步长（秒），例如 30 分钟
   is-renew-active-timeout: true # 每次请求是否续期 activity-timeout
 
+# 邮箱服务商配置（按需启用并填写账号信息）
+mail:
+  providers:
+    GMAIL:
+      enabled: ${MAIL_GMAIL_ENABLED:false}
+      oauth:
+        token-url: ${MAIL_GMAIL_TOKEN_URL:https://oauth2.googleapis.com/token}
+        client-id: ${MAIL_GMAIL_CLIENT_ID:}
+        client-secret: ${MAIL_GMAIL_CLIENT_SECRET:}
+        refresh-token: ${MAIL_GMAIL_REFRESH_TOKEN:}
+        scope: ${MAIL_GMAIL_SCOPE:https://www.googleapis.com/auth/gmail.send}
+        user-id: ${MAIL_GMAIL_USER_ID:}
+        send-url: ${MAIL_GMAIL_SEND_URL:https://gmail.googleapis.com/gmail/v1/users/%s/messages/send}
+    OUTLOOK:
+      enabled: ${MAIL_OUTLOOK_ENABLED:false}
+      oauth:
+        token-url: ${MAIL_OUTLOOK_TOKEN_URL:https://login.microsoftonline.com/%s/oauth2/v2.0/token}
+        tenant-id: ${MAIL_OUTLOOK_TENANT_ID:common}
+        client-id: ${MAIL_OUTLOOK_CLIENT_ID:}
+        client-secret: ${MAIL_OUTLOOK_CLIENT_SECRET:}
+        refresh-token: ${MAIL_OUTLOOK_REFRESH_TOKEN:}
+        scope: ${MAIL_OUTLOOK_SCOPE:https://graph.microsoft.com/.default offline_access}
+        user-id: ${MAIL_OUTLOOK_USER_ID:}
+        send-url: ${MAIL_OUTLOOK_SEND_URL:https://graph.microsoft.com/v1.0/users/%s/sendMail}
+    NETEASE:
+      enabled: ${MAIL_NETEASE_ENABLED:false}
+      smtp:
+        host: ${MAIL_NETEASE_HOST:smtp.163.com}
+        port: ${MAIL_NETEASE_PORT:465}
+        username: ${MAIL_NETEASE_USERNAME:}
+        password: ${MAIL_NETEASE_PASSWORD:}
+        from: ${MAIL_NETEASE_FROM:}
+        ssl: ${MAIL_NETEASE_SSL:true}
+        starttls: ${MAIL_NETEASE_STARTTLS:false}
+    QQ:
+      enabled: ${MAIL_QQ_ENABLED:false}
+      smtp:
+        host: ${MAIL_QQ_HOST:smtp.qq.com}
+        port: ${MAIL_QQ_PORT:465}
+        username: ${MAIL_QQ_USERNAME:}
+        password: ${MAIL_QQ_PASSWORD:}
+        from: ${MAIL_QQ_FROM:}
+        ssl: ${MAIL_QQ_SSL:true}
+        starttls: ${MAIL_QQ_STARTTLS:false}
+
+# 短信服务配置
+sms:
+  aliyun:
+    enabled: ${SMS_ALIYUN_ENABLED:false}
+    region-id: ${SMS_ALIYUN_REGION_ID:cn-hangzhou}
+    access-key-id: ${SMS_ALIYUN_ACCESS_KEY_ID:}
+    access-key-secret: ${SMS_ALIYUN_ACCESS_KEY_SECRET:}
+    sign-name: ${SMS_ALIYUN_SIGN_NAME:Sci-Z Platform}
+    template-code: ${SMS_ALIYUN_TEMPLATE_CODE:SMS_000000000}
+    template-param-name: ${SMS_ALIYUN_TEMPLATE_PARAM_NAME:code}
+  twilio:
+    enabled: ${SMS_TWILIO_ENABLED:false}
+    account-sid: ${SMS_TWILIO_ACCOUNT_SID:}
+    auth-token: ${SMS_TWILIO_AUTH_TOKEN:}
+    from-number: ${SMS_TWILIO_FROM_NUMBER:}
+    api-url: ${SMS_TWILIO_API_URL:https://api.twilio.com/2010-04-01}

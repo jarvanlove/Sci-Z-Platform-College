@@ -7,6 +7,7 @@ import com.sciz.server.application.service.user.AuthService;
 import com.sciz.server.application.service.user.PermissionService;
 import com.sciz.server.domain.pojo.dto.request.user.EmailCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
+import com.sciz.server.domain.pojo.dto.request.user.PhoneCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
 import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
@@ -25,6 +26,7 @@ import com.sciz.server.domain.pojo.repository.user.SysRoleRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRoleRepo;
 import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
+import com.sciz.server.infrastructure.external.sms.SmsService;
 import com.sciz.server.infrastructure.shared.constant.CacheConstant;
 import com.sciz.server.infrastructure.shared.constant.SystemConstant;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
@@ -32,7 +34,7 @@ import com.sciz.server.infrastructure.shared.enums.EnableStatus;
 import com.sciz.server.infrastructure.shared.enums.LoginStatus;
 import com.sciz.server.infrastructure.shared.enums.UserStatus;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
-import com.sciz.server.infrastructure.shared.event.user.UserResetPwdEmailCodeEvent;
+import com.sciz.server.infrastructure.shared.event.user.UserEmailVerificationEvent;
 import com.sciz.server.infrastructure.shared.event.log.LoginLoggedEvent;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -79,6 +81,7 @@ public class AuthServiceImpl implements AuthService {
     private final SysRoleRepo sysRoleRepo;
     private final SysUserRoleRepo sysUserRoleRepo;
     private final AuthConverter authConverter;
+    private final SmsService smsService;
 
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Shanghai");
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -90,7 +93,8 @@ public class AuthServiceImpl implements AuthService {
             SysDepartmentRepo sysDepartmentRepo,
             SysRoleRepo sysRoleRepo,
             SysUserRoleRepo sysUserRoleRepo,
-            AuthConverter authConverter) {
+            AuthConverter authConverter,
+            SmsService smsService) {
         this.sysUserRepo = sysUserRepo;
         this.stringRedisTemplate = stringRedisTemplate;
         this.eventPublisher = eventPublisher;
@@ -100,6 +104,7 @@ public class AuthServiceImpl implements AuthService {
         this.sysRoleRepo = sysRoleRepo;
         this.sysUserRoleRepo = sysUserRoleRepo;
         this.authConverter = authConverter;
+        this.smsService = smsService;
     }
 
     /**
@@ -518,11 +523,11 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 生成六位邮箱验证码
+     * 生成六位验证码
      *
-     * @return String 邮箱验证码
+     * @return String 数字验证码
      */
-    private String generateEmailCode() {
+    private String generateVerificationCode() {
         return String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
     }
 
@@ -531,8 +536,8 @@ public class AuthServiceImpl implements AuthService {
      *
      * @param email String 邮箱
      */
-    private void ensureEmailCodeRateLimit(String email) {
-        var limitKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_RATE_LIMIT_KEY, email);
+    private void ensureEmailVerificationRateLimit(String email) {
+        var limitKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_RATE_LIMIT_KEY, email);
         var exists = RedisUtil.get(stringRedisTemplate, limitKey);
         if (StringUtils.hasText(exists)) {
             log.warn(String.format("邮箱验证码发送频繁: email=%s", email));
@@ -546,14 +551,14 @@ public class AuthServiceImpl implements AuthService {
      * @param email     String 邮箱
      * @param emailCode String 验证码
      */
-    private void cacheEmailCode(String email, String emailCode) {
-        var cacheKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_KEY, email);
+    private void cacheEmailVerificationCode(String email, String emailCode) {
+        var cacheKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_CODE_KEY, email);
         RedisUtil.set(stringRedisTemplate, cacheKey, emailCode,
-                Duration.ofSeconds(CacheConstant.RESET_PASSWORD_EMAIL_CODE_EXPIRE));
+                Duration.ofSeconds(CacheConstant.AUTH_EMAIL_VERIFICATION_CODE_EXPIRE));
 
-        var limitKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_RATE_LIMIT_KEY, email);
+        var limitKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_RATE_LIMIT_KEY, email);
         RedisUtil.set(stringRedisTemplate, limitKey, "1",
-                Duration.ofSeconds(CacheConstant.RESET_PASSWORD_EMAIL_CODE_INTERVAL));
+                Duration.ofSeconds(CacheConstant.AUTH_EMAIL_VERIFICATION_CODE_INTERVAL));
     }
 
     /**
@@ -562,12 +567,12 @@ public class AuthServiceImpl implements AuthService {
      * @param email     String 邮箱
      * @param emailCode String 验证码
      */
-    private void validateEmailCode(String email, String emailCode) {
+    private void validateEmailVerificationCode(String email, String emailCode) {
         if (!StringUtils.hasText(emailCode)) {
             throw new BusinessException(ResultCode.EMAIL_CODE_INVALID);
         }
 
-        var cacheKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_KEY, email);
+        var cacheKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_CODE_KEY, email);
         var cachedCode = RedisUtil.get(stringRedisTemplate, cacheKey);
         if (!StringUtils.hasText(cachedCode)) {
             throw new BusinessException(ResultCode.EMAIL_CODE_EXPIRED);
@@ -583,11 +588,72 @@ public class AuthServiceImpl implements AuthService {
      *
      * @param email String 邮箱
      */
-    private void clearEmailCode(String email) {
-        var cacheKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_KEY, email);
-        var limitKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_RATE_LIMIT_KEY, email);
+    private void clearEmailVerificationCode(String email) {
+        var cacheKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_CODE_KEY, email);
+        var limitKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_RATE_LIMIT_KEY, email);
         RedisUtil.delete(stringRedisTemplate, cacheKey);
         RedisUtil.delete(stringRedisTemplate, limitKey);
+    }
+
+    /**
+     * 校验短信验证码发送频率
+     *
+     * @param phone String 手机号
+     */
+    private void ensureSmsVerificationRateLimit(String phone) {
+        var limitKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_RATE_LIMIT_KEY, phone);
+        var exists = RedisUtil.get(stringRedisTemplate, limitKey);
+        if (StringUtils.hasText(exists)) {
+            log.warn(String.format("短信验证码发送频繁: phone=%s", phone));
+            throw new BusinessException(ResultCode.SMS_CODE_RATE_LIMITED);
+        }
+    }
+
+    /**
+     * 缓存短信验证码
+     *
+     * @param phone   String 手机号
+     * @param smsCode String 验证码
+     */
+    private void cacheSmsVerificationCode(String phone, String smsCode) {
+        var cacheKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_CODE_KEY, phone);
+        RedisUtil.set(stringRedisTemplate, cacheKey, smsCode,
+                Duration.ofSeconds(CacheConstant.AUTH_SMS_VERIFICATION_CODE_EXPIRE));
+
+        var limitKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_RATE_LIMIT_KEY, phone);
+        RedisUtil.set(stringRedisTemplate, limitKey, "1",
+                Duration.ofSeconds(CacheConstant.AUTH_SMS_VERIFICATION_CODE_INTERVAL));
+    }
+
+    /**
+     * 发送短信验证码：规格化手机号 → 校验图形验证码 → 校验账号存在 → 校验发送频率 → 生成并缓存验证码 → 调用短信服务
+     *
+     * @param req PhoneCodeSendReq 请求参数
+     */
+    @Override
+    public void sendSmsVerificationCode(PhoneCodeSendReq req) {
+        var phone = Optional.ofNullable(req.phone())
+                .map(this::normalizePhone)
+                .filter(StringUtils::hasText)
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "手机号不能为空"));
+
+        log.info(String.format("发送短信验证码: phone=%s", phone));
+
+        validateCaptchaStrict(req.captcha(), req.captchaKey());
+
+        var user = Optional.ofNullable(sysUserRepo.findByPhone(phone))
+                .orElseThrow(() -> {
+                    log.warn(String.format("发送短信验证码失败，手机号不存在: phone=%s", phone));
+                    return new BusinessException(ResultCode.PHONE_NOT_FOUND);
+                });
+
+        ensureSmsVerificationRateLimit(phone);
+
+        var verificationCode = generateVerificationCode();
+        cacheSmsVerificationCode(phone, verificationCode);
+        smsService.sendVerificationCode(phone, verificationCode);
+
+        log.info(String.format("短信验证码发送成功: userId=%s, phone=%s", user.getId(), phone));
     }
 
     /**
@@ -599,6 +665,18 @@ public class AuthServiceImpl implements AuthService {
     private String normalizeEmail(String email) {
         return Optional.ofNullable(email)
                 .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .orElse(null);
+    }
+
+    /**
+     * 规格化手机号
+     *
+     * @param phone String 手机号
+     * @return String 规格化后的手机号
+     */
+    private String normalizePhone(String phone) {
+        return Optional.ofNullable(phone)
+                .map(String::trim)
                 .orElse(null);
     }
 
@@ -704,34 +782,38 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 发送重置密码邮箱验证码：规格化邮箱 → 校验图形验证码 → 校验账号存在 → 校验发送频率 → 生成并缓存验证码 → 发布通知事件
+     * 发送邮箱验证码：规格化邮箱 → 校验图形验证码 → 校验账号存在 → 校验发送频率 → 生成并缓存验证码 → 发布通知事件
      *
      * @param req EmailCodeSendReq 请求参数（包含邮箱、图形验证码、图形验证码标识）
      */
     @Override
-    public void sendResetPasswordEmailCode(EmailCodeSendReq req) {
+    public void sendEmailVerificationCode(EmailCodeSendReq req) {
         var email = Optional.ofNullable(req.email())
                 .map(this::normalizeEmail)
                 .filter(StringUtils::hasText)
                 .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "邮箱不能为空"));
 
-        log.info(String.format("发送重置密码邮箱验证码: email=%s", email));
+        log.info(String.format("发送邮箱验证码: email=%s", email));
 
         validateCaptchaStrict(req.captcha(), req.captchaKey());
 
         var user = Optional.ofNullable(sysUserRepo.findByEmail(email))
                 .orElseThrow(() -> {
-                    log.warn(String.format("发送重置密码验证码失败，邮箱不存在: email=%s", email));
+                    log.warn(String.format("发送邮箱验证码失败，邮箱不存在: email=%s", email));
                     return new BusinessException(ResultCode.EMAIL_NOT_FOUND);
                 });
 
-        ensureEmailCodeRateLimit(email);
+        ensureEmailVerificationRateLimit(email);
 
-        var emailCode = generateEmailCode();
-        cacheEmailCode(email, emailCode);
+        var verificationCode = generateVerificationCode();
+        cacheEmailVerificationCode(email, verificationCode);
 
-        log.info(String.format("重置密码邮箱验证码生成成功: email=%s, code=%s", email, emailCode));
-        var event = new UserResetPwdEmailCodeEvent(user.getId(), email, emailCode);
+        var mailProvider = Optional.ofNullable(req.provider())
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "邮箱服务商不能为空"));
+
+        log.info(String.format("邮箱验证码生成成功: email=%s, provider=%s, code=%s",
+                email, mailProvider, verificationCode));
+        var event = new UserEmailVerificationEvent(user.getId(), email, verificationCode, mailProvider);
         eventPublisher.publishAsync(event);
     }
 
@@ -757,7 +839,7 @@ public class AuthServiceImpl implements AuthService {
                     return new BusinessException(ResultCode.EMAIL_NOT_FOUND);
                 });
 
-        validateEmailCode(email, req.emailCode());
+        validateEmailVerificationCode(email, req.emailCode());
 
         user.setPassword(hashPassword(req.newPassword()));
         user.setUpdatedTime(LocalDateTime.now());
@@ -767,7 +849,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
         }
 
-        clearEmailCode(email);
+        clearEmailVerificationCode(email);
         log.info(String.format("重置密码成功: userId=%s, email=%s", user.getId(), email));
     }
 

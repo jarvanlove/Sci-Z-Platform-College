@@ -92,9 +92,14 @@ public class SystemConstant {
     public static final String DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
     /**
-     * 重置密码邮件主题
+     * 邮件标题：重置密码验证码
      */
     public static final String EMAIL_SUBJECT_RESET_PASSWORD = "Sci-Z Platform 账号重置验证码";
+
+    /**
+     * 邮件标题：通用验证码
+     */
+    public static final String EMAIL_SUBJECT_VERIFICATION = "Sci-Z Platform 验证码";
 
     /**
      * 日期格式

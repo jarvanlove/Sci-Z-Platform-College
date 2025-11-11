@@ -5,6 +5,7 @@ import com.sciz.server.domain.pojo.dto.request.user.EmailCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
 import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
 import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
+import com.sciz.server.domain.pojo.dto.request.user.PhoneCodeSendReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
 import com.sciz.server.domain.pojo.dto.response.user.DepartmentLabelResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
@@ -18,7 +19,6 @@ import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
 import com.sciz.server.infrastructure.shared.result.Result;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 
-import cn.dev33.satoken.annotation.SaIgnore;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -68,18 +68,25 @@ public class AuthController {
      *
      * @return CaptchaResp 验证码响应
      */
-    @Operation(summary = "获取验证码", description = "生成图形验证码，返回 Base64 图片和唯一标识。前端在登录失败 >= 5 次时调用")
+    @Operation(summary = "获取验证码", description = "生成图形验证码，返回 Base64 图片和唯一标识。前端在登录失败 >= 3 次时调用")
     @GetMapping("/captcha")
     public Result<CaptchaResp> getCaptcha() {
         CaptchaResp resp = authService.getCaptcha();
         return Result.success(resp);
     }
 
-    @Operation(summary = "发送重置密码邮箱验证码", description = "校验图形验证码并向邮箱发送重置密码验证码")
+    @Operation(summary = "发送邮箱验证码", description = "校验图形验证码并向目标邮箱发送验证码")
     @PostMapping("/email-code")
-    public Result<Void> sendResetPasswordEmailCode(@RequestBody @Valid EmailCodeSendReq request) {
-        authService.sendResetPasswordEmailCode(request);
+    public Result<Void> sendEmailVerificationCode(@RequestBody @Valid EmailCodeSendReq request) {
+        authService.sendEmailVerificationCode(request);
         return Result.success(null, ResultCode.EMAIL_CODE_SEND_SUCCESS.getMessage());
+    }
+
+    @Operation(summary = "发送短信验证码", description = "校验图形验证码并向目标手机发送验证码")
+    @PostMapping("/sms-code")
+    public Result<Void> sendSmsVerificationCode(@RequestBody @Valid PhoneCodeSendReq request) {
+        authService.sendSmsVerificationCode(request);
+        return Result.success(null, ResultCode.SMS_CODE_SEND_SUCCESS.getMessage());
     }
 
     @Operation(summary = "用户注册", description = "注册新用户，校验验证码并写入系统用户表")

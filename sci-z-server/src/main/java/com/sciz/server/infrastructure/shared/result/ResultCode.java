@@ -371,6 +371,36 @@ public enum ResultCode {
     EMAIL_CODE_EXPIRED(9008, "邮箱验证码已过期"),
 
     /**
+     * 邮箱服务商未配置
+     */
+    EMAIL_PROVIDER_NOT_CONFIGURED(9009, "邮箱服务商未配置"),
+
+    /**
+     * 邮箱验证码发送失败
+     */
+    EMAIL_CODE_SEND_FAILED(9010, "邮箱验证码发送失败"),
+
+    /**
+     * 手机号未注册
+     */
+    PHONE_NOT_FOUND(9011, "手机号未注册"),
+
+    /**
+     * 短信验证码发送频繁
+     */
+    SMS_CODE_RATE_LIMITED(9012, "短信验证码发送频繁，请稍后再试"),
+
+    /**
+     * 短信验证码发送失败
+     */
+    SMS_CODE_SEND_FAILED(9013, "短信验证码发送失败"),
+
+    /**
+     * 短信服务商未配置
+     */
+    SMS_PROVIDER_NOT_CONFIGURED(9014, "短信服务商未配置"),
+
+    /**
      * 邮箱验证码发送成功
      */
     EMAIL_CODE_SEND_SUCCESS(9100, "验证码发送成功"),
@@ -379,6 +409,11 @@ public enum ResultCode {
      * 重置密码成功
      */
     RESET_PASSWORD_SUCCESS(9101, "重置密码成功"),
+
+    /**
+     * 短信验证码发送成功
+     */
+    SMS_CODE_SEND_SUCCESS(9200, "短信验证码发送成功"),
 
     /**
      * 令牌已过期
