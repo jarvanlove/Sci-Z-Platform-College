@@ -88,6 +88,7 @@ mybatis-plus:
 # Dify API 配置
 dify:
   base-url: http://192.168.1.203/v1
+  private-url: http://192.168.1.203
   api-key: dataset-MwOxGbIDhZmg6bUdHEid0rhX
   api-workflow-key: app-TsSdGbD50r8fDt1shM3RBSMi
   timeout: 30000

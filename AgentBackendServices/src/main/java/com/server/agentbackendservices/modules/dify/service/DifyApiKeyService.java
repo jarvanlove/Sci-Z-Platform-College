@@ -22,7 +22,7 @@ public interface DifyApiKeyService extends BaseService<DifyApiKey> {
      * @param keyType 密钥类型
      * @return API密钥
      */
-    String getApiKey(String userId, String resourceId, String keyType);
+    String getApiKey(Long userId, String resourceId, String keyType);
 
     /**
      * 保存或更新API密钥
@@ -36,7 +36,7 @@ public interface DifyApiKeyService extends BaseService<DifyApiKey> {
      * @param operator 操作者
      * @return 保存的密钥信息
      */
-    DifyApiKey saveOrUpdateApiKey(String userId, String resourceId, String keyType, 
+    DifyApiKey saveOrUpdateApiKey(Long userId, String resourceId, String keyType,
                                  String apiKey, String keyName, String description, String operator);
 
     /**
@@ -45,7 +45,7 @@ public interface DifyApiKeyService extends BaseService<DifyApiKey> {
      * @param userId 用户ID
      * @return 密钥列表
      */
-    List<DifyApiKey> getUserApiKeys(String userId);
+    List<DifyApiKey> getUserApiKeys(Long userId);
 
     /**
      * 获取用户指定类型的密钥
@@ -54,7 +54,7 @@ public interface DifyApiKeyService extends BaseService<DifyApiKey> {
      * @param keyType 密钥类型
      * @return 密钥列表
      */
-    List<DifyApiKey> getUserApiKeysByType(String userId, String keyType);
+    List<DifyApiKey> getUserApiKeysByType(Long userId, String keyType);
 
     /**
      * 停用API密钥

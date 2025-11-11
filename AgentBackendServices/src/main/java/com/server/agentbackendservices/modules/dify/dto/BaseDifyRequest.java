@@ -19,7 +19,7 @@ public class BaseDifyRequest {
      * 用户ID
      */
     @Schema(description = "用户ID", required = true, example = "admin")
-    private String userId;
+    private Long userId;
 
     /**
      * 资源ID（知识库ID或工作流ID）

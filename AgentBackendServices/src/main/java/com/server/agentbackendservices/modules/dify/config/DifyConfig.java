@@ -20,6 +20,10 @@ public class DifyConfig {
      */
     private String baseUrl;
     /**
+     * 私钥
+     */
+    private String privateUrl;
+    /**
      * API Key (知识库)
      */
     private String apiKey;

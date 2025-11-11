@@ -42,36 +42,42 @@ public class DifyApiClient {
      * @return 响应结果
      */
     public ResponseEntity<String> request(String method, String path, Object body, Map<String, Object> params,
-                                         String userId, String resourceId, String keyType) {
+                                         Long userId, String resourceId, String keyType, int key) {
         HttpMethod httpMethod = HttpMethod.valueOf(method.toUpperCase());
-        String url = buildUrl(path, params);
-        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType);
-        
+        String url = buildUrl(path, params,key);
+        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType,key);
         log.debug("Dify {} 请求: {}, userId={}, resourceId={}, keyType={}", 
                 method, url, userId, resourceId, keyType);
-        return restTemplate.exchange(url, httpMethod, entity, String.class);
+        ResponseEntity<String> response = restTemplate.exchange(url, httpMethod, entity, String.class);
+        validateResponse(url, response);
+        return response;
     }
-
     /**
      * 简化请求方法 - 无请求体
      */
-    public ResponseEntity<String> request(String method, String path, String userId, String resourceId, String keyType) {
-        return request(method, path, null, null, userId, resourceId, keyType);
+    public ResponseEntity<String> request(String method, String path, Long userId, String resourceId, String keyType) {
+        return request(method, path, null, null, userId, resourceId, keyType,0);
     }
     
     /**
      * 简化请求方法 - 带请求体
      */
-    public ResponseEntity<String> request(String method, String path, Object body, String userId, String resourceId, String keyType) {
-        return request(method, path, body, null, userId, resourceId, keyType);
+    public ResponseEntity<String> request(String method, String path, Object body, Long userId, String resourceId, String keyType) {
+        return request(method, path, body, null, userId, resourceId, keyType,0);
     }
-    
+
+    public ResponseEntity<String> request(String method, String path, Object body, Long userId, String resourceId, String keyType,int  key) {
+        return request(method, path, body, null, userId, resourceId, keyType,key);
+    }
+
     /**
      * 简化请求方法 - 带查询参数
      */
-    public ResponseEntity<String> request(String method, String path, Map<String, Object> params, String userId, String resourceId, String keyType) {
-        return request(method, path, null, params, userId, resourceId, keyType);
+    public ResponseEntity<String> request(String method, String path, Map<String, Object> params, Long userId, String resourceId, String keyType) {
+        return request(method, path, null, params, userId, resourceId, keyType,0);
     }
+
+
     
     /**
      * 文件上传请求方法（使用动态密钥）
@@ -86,22 +92,26 @@ public class DifyApiClient {
      * @return 响应结果
      */
     public ResponseEntity<String> uploadFile(String method, String path, MultipartFile file, Map<String, Object> data,
-                                           String userId, String resourceId, String keyType) {
+                                           Long userId, String resourceId, String keyType) {
         HttpMethod httpMethod = HttpMethod.valueOf(method.toUpperCase());
         String url = difyConfig.getBaseUrl() + path;
         HttpEntity<?> entity = createFileUploadEntityWithDynamicKey(file, data, userId, resourceId, keyType);
         
         log.debug("Dify {} 文件上传请求: {}, userId={}, resourceId={}, keyType={}", 
                 method, url, userId, resourceId, keyType);
-        return restTemplate.exchange(url, httpMethod, entity, String.class);
+        ResponseEntity<String> response = restTemplate.exchange(url, httpMethod, entity, String.class);
+        validateResponse(url, response);
+        return response;
     }
     
     
     /**
      * 构建完整URL
      */
-    private String buildUrl(String path, Map<String, Object> params) {
-        String url = difyConfig.getBaseUrl() + path;
+    private String buildUrl(String path, Map<String, Object> params,int Urlkey) {
+        String url = "";
+        if (Urlkey==0) url = difyConfig.getBaseUrl() + path;
+        if (Urlkey==1) url = difyConfig.getPrivateUrl() + path;
         
         if (params != null && !params.isEmpty()) {
             StringBuilder queryString = new StringBuilder("?");
@@ -119,14 +129,15 @@ public class DifyApiClient {
     /**
      * 创建带动态密钥的 HTTP 实体
      */
-    private HttpEntity<?> createHttpEntityWithDynamicKey(Object body, String userId, String resourceId, String keyType) {
+    private HttpEntity<?> createHttpEntityWithDynamicKey(Object body, Long userId, String resourceId, String keyType,int IsKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        
-        // 动态获取API密钥
-        String apiKey = difyApiKeyService.getApiKey(userId, resourceId, keyType);
-        headers.set("Authorization", "Bearer " + apiKey);
-        
+        if (IsKey==0){
+            // 动态获取API密钥
+            String apiKey = difyApiKeyService.getApiKey(userId, resourceId, keyType);
+            headers.set("Authorization", "Bearer " + apiKey);
+        }
+
         return new HttpEntity<>(body, headers);
     }
 
@@ -134,7 +145,7 @@ public class DifyApiClient {
      * 创建带动态密钥的文件上传 HTTP 实体
      */
     private HttpEntity<?> createFileUploadEntityWithDynamicKey(MultipartFile file, Map<String, Object> data, 
-                                                              String userId, String resourceId, String keyType) {
+                                                              long userId, String resourceId, String keyType) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         
@@ -161,5 +172,15 @@ public class DifyApiClient {
         
         return new HttpEntity<>(body, headers);
     }
+
+
+    private void validateResponse(String url, ResponseEntity<String> response) {
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Dify 请求失败，url: " + url
+                    + ", 状态码: " + response.getStatusCode()
+                    + ", 响应体: " + response.getBody());
+        }
+    }
+
 
 }

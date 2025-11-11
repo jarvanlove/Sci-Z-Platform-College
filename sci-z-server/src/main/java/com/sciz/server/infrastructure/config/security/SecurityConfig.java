@@ -15,17 +15,17 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SecurityConfig {
 
-    @Bean
-    public SaServletFilter saServletFilter() {
-        return new SaServletFilter()
-                .addInclude("/**")
-                .addExclude("/api/auth/**")
-                .addExclude("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**")
-                .addExclude("/webjars/**", "/static/**", "/favicon.ico")
-                .setAuth(obj -> SaRouter.match("/**").check(r -> StpUtil.checkLogin()))
-                .setError(e -> {
-                    // 统一未登录响应
-                    return "NOT_LOGIN";
-                });
-    }
+//    @Bean
+//    public SaServletFilter saServletFilter() {
+//        return new SaServletFilter()
+//                .addInclude("/**")
+//                .addExclude("/api/auth/**")
+//                .addExclude("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**")
+//                .addExclude("/webjars/**", "/static/**", "/favicon.ico")
+//                .setAuth(obj -> SaRouter.match("/**").check(r -> StpUtil.checkLogin()))
+//                .setError(e -> {
+//                    // 统一未登录响应
+//                    return "NOT_LOGIN";
+//                });
+//    }
 }

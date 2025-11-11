@@ -22,7 +22,7 @@ public class DifyApiKey extends BaseEntity {
      * 用户ID
      */
     @TableField("user_id")
-    private String userId;
+    private Long userId;
 
     /**
      * 密钥类型

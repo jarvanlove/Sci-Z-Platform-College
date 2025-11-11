@@ -151,7 +151,6 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
             log.debug("使用系统默认 {} 密钥，资源ID: {}", keyType, resourceId);
             return defaultKey.getApiKey();
         }
-        
         throw new RuntimeException("未找到 " + keyType + " 的API密钥，资源ID: " + resourceId);
     }
 }

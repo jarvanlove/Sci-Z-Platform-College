@@ -13,6 +13,7 @@ dify/
 │   └── DifyDocumentConfig.java  # 文档处理配置
 ├── controller/            # 控制器层
 │   └── DifyApiController.java
+│   └── DifyChatbotController.java
 ├── dto/                  # 数据传输对象
 │   ├── DifyDatasetRequest.java
 │   └── DifyRetrieveRequest.java
@@ -207,6 +208,79 @@ curl -X POST "http://localhost:8081/api/dify/workflows/logs" \
 ---
 
 ### 通用文件上传（multipart/form-data）
+### Chatbot 应用 APIs
+
+#### 创建 Chatbot 应用
+- 路由：`POST /api/dify/chatbot/apps`
+- 请求体：`DifyChatbotAppRequest`
+```bash
+curl -X POST "http://localhost:8081/api/dify/chatbot/apps" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"app_resource_001",
+    "keyType":"dataset",
+    "name":"test",
+    "description":"testte",
+    "mode":"chat",
+    "icon":"🤖",
+    "icon_background":"#FFEAD5",
+    "icon_type":"emoji"
+  }'
+```
+
+成功后会自动为新应用生成 Dify API Key，并在响应体 `api_token` 字段返回，同时同步落库。
+
+#### 更新 Chatbot 应用模型配置
+- 路由：`POST /api/dify/chatbot/apps/{appId}/model-config`
+- 请求体：模型配置 JSON（同 Dify 控制台）
+```bash
+curl -X POST "http://localhost:8081/api/dify/chatbot/apps/{appId}/model-config" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pre_prompt": "",
+    "prompt_type": "simple",
+    "chat_prompt_config": {},
+    "model": {
+      "provider": "langgenius/tongyi/tongyi",
+      "name": "qwen3-next-80b-a3b-instruct",
+      "mode": "chat",
+      "completion_params": {}
+    }
+  }'
+```
+
+#### Chatbot 阻塞式对话
+- 路由：`POST /api/dify/chatbot/messages`
+- 请求体：`DifyChatbotMessageRequest`
+```bash
+curl -X POST "http://localhost:8081/api/dify/chatbot/messages" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"c1541603-0989-4aea-8a58-3b6c63b8b872",
+    "keyType":"chatbot",
+    "query":"What are the specs of the iPhone 13 Pro Max?",
+    "response_mode":"blocking",
+    "user":"abc-123"
+  }'
+```
+
+#### Chatbot 流式对话
+- 路由：`POST /api/dify/chatbot/messages/stream`
+- 请求体：`DifyChatbotMessageRequest`（`response_mode` 会自动设置为 `streaming`）
+```bash
+curl -X POST "http://localhost:8081/api/dify/chatbot/messages/stream" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"admin",
+    "resourceId":"c1541603-0989-4aea-8a58-3b6c63b8b872",
+    "keyType":"chatbot",
+    "query":"Show logo",
+    "files":[{"type":"image","transfer_method":"remote_url","url":"https://cloud.dify.ai/logo/logo-site.png"}]
+  }'
+```
+
 - 路由：`POST /api/dify/files/upload`
 - 表单字段：`file`、`userId`、`resourceId`、`keyType`
 ```bash
