@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { login, logout, getUserInfo as fetchUserProfile, refreshToken as refreshTokenApi, checkLoginStatus, checkRole as checkRoleApi, checkPermission as checkPermissionApi } from '@/api/Auth'
+import { login, logout as logoutApi, getUserInfo as fetchUserProfile, refreshToken as refreshTokenApi, checkLoginStatus, checkRole as checkRoleApi, checkPermission as checkPermissionApi } from '@/api/Auth'
 import { getToken, setToken, removeToken, getUserInfo as getLocalUserInfo, setUserInfo, removeUserInfo, getPermissions, setPermissions, removePermissions, getRoles, setRoles, removeRoles, getMenus, setMenus, removeMenus, saveLastUsername } from '@/utils/auth'
 import { createLogger } from '@/utils/simpleLogger'
 
@@ -442,15 +442,57 @@ export const useAuthStore = defineStore('auth', {
 
 
     // 退出登录
-    async logout() {
+    async logout(options = {}) {
+      const {
+        redirect = true,
+        redirectPath = '/login',
+        useReplace = false,
+        clearRemember = false
+      } = options
+
       try {
         if (this.token) {
-          await logout()
+          await logoutApi()
         }
       } catch (error) {
         authLogger.error('退出登录失败', { error: error.message })
       } finally {
-        this.resetState()
+        this.resetState({ clearRemember })
+
+        if (redirect && typeof window !== 'undefined') {
+          try {
+            const routerModule = await import('@/router')
+            const routerInstance = routerModule?.default || routerModule
+            if (routerInstance) {
+              const currentRoute = routerInstance.currentRoute?.value
+              const target =
+                typeof redirectPath === 'string'
+                  ? { path: redirectPath }
+                  : redirectPath || { path: '/login' }
+              const currentFullPath = currentRoute?.fullPath || currentRoute?.path
+              const targetPath =
+                typeof redirectPath === 'string'
+                  ? redirectPath
+                  : target.path || '/login'
+
+              if (currentFullPath !== targetPath) {
+                const navigation = useReplace
+                  ? routerInstance.replace(target)
+                  : routerInstance.push(target)
+                navigation.catch(() => {})
+              }
+            } else {
+              window.location.href =
+                typeof redirectPath === 'string' ? redirectPath : '/login'
+            }
+          } catch (navigationError) {
+            authLogger.error('退出后跳转登录页失败，使用浏览器跳转', {
+              error: navigationError.message
+            })
+            window.location.href =
+              typeof redirectPath === 'string' ? redirectPath : '/login'
+          }
+        }
       }
     },
 

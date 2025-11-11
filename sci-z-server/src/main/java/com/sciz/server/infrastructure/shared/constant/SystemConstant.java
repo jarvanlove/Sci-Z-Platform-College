@@ -110,4 +110,9 @@ public class SystemConstant {
      * 时间格式
      */
     public static final String TIME_FORMAT = "HH:mm:ss";
+
+    /**
+     * 登录用户信息在 Session 中的缓存键
+     */
+    public static final String LOGIN_USER_SESSION_KEY = "login:user:context";
 }

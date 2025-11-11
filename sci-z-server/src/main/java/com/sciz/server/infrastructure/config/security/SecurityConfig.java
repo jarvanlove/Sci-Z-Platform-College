@@ -16,6 +16,7 @@ import com.sciz.server.infrastructure.shared.utils.JsonUtil;
  *
  * 放行：登录、注册、验证码发送、重置密码、静态资源、Swagger 文档
  * 其余：默认需要登录（包括 logout、refresh-token、profile 等）
+ * 当前策略：直接放行 `/api/auth/**` 下所有接口
  *
  * @author JiaWen.Wu
  * @className SecurityConfig
@@ -28,14 +29,7 @@ public class SecurityConfig {
     public SaServletFilter saServletFilter() {
         return new SaServletFilter()
                 .addInclude("/**")
-                // 认证相关接口：只放行真正不需要 token 的接口
-                .addExclude("/api/auth/login") // 登录
-                .addExclude("/api/auth/register") // 注册
-                .addExclude("/api/auth/reset-password") // 重置密码
-                .addExclude("/api/auth/captcha") // 获取验证码
-                .addExclude("/api/auth/department/label") // 获取行业部门标签
-                .addExclude("/api/auth/email-code") // 发送邮箱验证码
-                .addExclude("/api/auth/sms-code") // 发送短信验证码
+                .addExclude("/api/auth/**") // 认证相关接口全部放行
                 // 静态资源和文档
                 .addExclude("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**")
                 .addExclude("/webjars/**", "/static/**", "/favicon.ico")

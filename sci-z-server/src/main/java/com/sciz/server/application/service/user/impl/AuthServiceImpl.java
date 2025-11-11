@@ -12,6 +12,7 @@ import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
 import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
+import com.sciz.server.domain.pojo.dto.response.user.LoginUserContext;
 import com.sciz.server.domain.pojo.dto.response.user.ProfileResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckLoginResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckRoleResp;
@@ -40,6 +41,7 @@ import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.infrastructure.shared.utils.CaptchaUtil;
 import com.sciz.server.infrastructure.shared.utils.ClientInfoUtil;
+import com.sciz.server.infrastructure.shared.utils.LoginUserUtil;
 import com.sciz.server.infrastructure.shared.utils.RedisUtil;
 import com.sciz.server.interfaces.converter.AuthConverter;
 
@@ -148,11 +150,14 @@ public class AuthServiceImpl implements AuthService {
         // 8. 缓存 token
         cacheUserToken(user.getId(), tokenInfo);
 
-        // 9. 组装返回结果
+        // 9. 写入登录用户上下文
         var industryType = industryConfigCache.get().getType();
+        cacheLoginUserContext(user, industryType);
+
+        // 10. 组装返回结果
         var loginResp = buildLoginResponse(user, tokenInfo, industryType, rememberMe);
 
-        // 10. 发布登录日志事件
+        // 11. 发布登录日志事件
         publishLoginLogEvent(user, request);
 
         log.info(String.format("login success, userId=%s, username=%s", user.getId(), user.getUsername()));
@@ -724,7 +729,8 @@ public class AuthServiceImpl implements AuthService {
         // 3. 清理权限缓存（roles、permissions、menus）
         clearPermissionCache(userId, industryType);
 
-        // 4. 调用 Sa-Token 登出
+        // 4. 清理登录用户上下文并调用 Sa-Token 登出
+        LoginUserUtil.clearCurrentUser();
         StpUtil.logout();
 
         log.info(String.format("用户退出登录成功: userId=%s", userId));
@@ -1063,4 +1069,25 @@ public class AuthServiceImpl implements AuthService {
         return StringUtils.hasText(industryType) ? industryType : industryConfigCache.get().getType();
     }
 
+    /**
+     * 缓存登录用户上下文
+     *
+     * @param user         SysUser 用户实体
+     * @param industryType String 行业类型
+     */
+    private void cacheLoginUserContext(SysUser user, String industryType) {
+        if (user == null) {
+            return;
+        }
+        var departmentName = getDepartmentName(user.getDepartmentId());
+        var context = LoginUserContext.of(user.getId(),
+                user.getUsername(),
+                user.getRealName(),
+                industryType,
+                user.getDepartmentId(),
+                departmentName,
+                user.getEmail(),
+                user.getPhone());
+        LoginUserUtil.cacheCurrentUser(context);
+    }
 }
