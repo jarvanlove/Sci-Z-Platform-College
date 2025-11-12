@@ -186,8 +186,9 @@ export const SYSTEM_API = {
 
 export const USER_API = {
   BASE_PATH: buildApiUrl('/user'),
-  INFO: buildApiUrl('/user/info'),
-  UPDATE_INFO: buildApiUrl('/user/info'),
+  INFO: buildApiUrl('/auth/user/info'),
+  UPDATE_INFO: buildApiUrl('/auth/user/info'),
+  PROFILE_FIELDS: buildApiUrl('/user/profile/fields'),
   CHANGE_PASSWORD: buildApiUrl('/user/password'),
   UPLOAD_AVATAR: buildApiUrl('/user/avatar'),
   LOGIN_LOGS: buildApiUrl('/user/login-logs')

@@ -12,6 +12,7 @@ import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
 import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
+import com.sciz.server.domain.pojo.dto.response.user.LoginUserInfoResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginUserContext;
 import com.sciz.server.domain.pojo.dto.response.user.ProfileResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckLoginResp;
@@ -19,11 +20,17 @@ import com.sciz.server.domain.pojo.dto.response.user.CheckRoleResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckPermResp;
 import com.sciz.server.domain.pojo.dto.response.user.RefreshTokenResp;
 import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
+import com.sciz.server.domain.pojo.dto.response.user.UserInfoUpdateResp;
+import com.sciz.server.domain.pojo.dto.request.user.UserInfoUpdateReq;
 import com.sciz.server.domain.pojo.entity.user.SysDepartment;
+import com.sciz.server.domain.pojo.entity.user.SysProfileField;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
+import com.sciz.server.domain.pojo.entity.user.SysUserProfile;
 import com.sciz.server.domain.pojo.entity.user.SysUserRole;
 import com.sciz.server.domain.pojo.repository.user.SysDepartmentRepo;
+import com.sciz.server.domain.pojo.repository.user.SysProfileFieldRepo;
 import com.sciz.server.domain.pojo.repository.user.SysRoleRepo;
+import com.sciz.server.domain.pojo.repository.user.SysUserProfileRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRoleRepo;
 import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
@@ -82,19 +89,25 @@ public class AuthServiceImpl implements AuthService {
     private final SysDepartmentRepo sysDepartmentRepo;
     private final SysRoleRepo sysRoleRepo;
     private final SysUserRoleRepo sysUserRoleRepo;
+    private final SysProfileFieldRepo sysProfileFieldRepo;
+    private final SysUserProfileRepo sysUserProfileRepo;
     private final AuthConverter authConverter;
     private final SmsService smsService;
 
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Shanghai");
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String PROFILE_TITLE_CODE = "title";
+    private static final String PROFILE_AVATAR_FILE_ID_CODE = "avatar_file_id";
 
     public AuthServiceImpl(SysUserRepo sysUserRepo, StringRedisTemplate stringRedisTemplate,
             EventPublisher eventPublisher,
-            com.sciz.server.application.service.user.PermissionService permissionService,
+            PermissionService permissionService,
             IndustryConfigCache industryConfigCache,
             SysDepartmentRepo sysDepartmentRepo,
             SysRoleRepo sysRoleRepo,
             SysUserRoleRepo sysUserRoleRepo,
+            SysProfileFieldRepo sysProfileFieldRepo,
+            SysUserProfileRepo sysUserProfileRepo,
             AuthConverter authConverter,
             SmsService smsService) {
         this.sysUserRepo = sysUserRepo;
@@ -105,6 +118,8 @@ public class AuthServiceImpl implements AuthService {
         this.sysDepartmentRepo = sysDepartmentRepo;
         this.sysRoleRepo = sysRoleRepo;
         this.sysUserRoleRepo = sysUserRoleRepo;
+        this.sysProfileFieldRepo = sysProfileFieldRepo;
+        this.sysUserProfileRepo = sysUserProfileRepo;
         this.authConverter = authConverter;
         this.smsService = smsService;
     }
@@ -438,11 +453,7 @@ public class AuthServiceImpl implements AuthService {
 
         // 设置用户信息（基础字段由转换器生成，其余业务字段由当前方法补齐）
         var userInfo = authConverter.toLoginUserInfoResp(user);
-        userInfo.setDepartment(getDepartmentName(user.getDepartmentId()));
-        userInfo.setRole(permissionService.getPrimaryRoleCode(user.getId(), industryType));
-        userInfo.setStatus(getUserStatusDescription(user.getStatus()));
-        userInfo.setIndustry(industryType);
-        userInfo.setAvatar(user.getAvatarUrl());
+        populateUserInfo(user, userInfo, industryType);
         resp.setUserInfo(userInfo);
 
         // 设置角色/权限/菜单
@@ -461,6 +472,158 @@ public class AuthServiceImpl implements AuthService {
                 .flatMap(id -> Optional.ofNullable(sysDepartmentRepo.findById(id)))
                 .map(SysDepartment::getDepartmentName)
                 .orElse("");
+    }
+
+    /**
+     * 填充用户基础信息的扩展属性
+     *
+     * @param user         SysUser 用户实体
+     * @param userInfo     LoginUserInfoResp 用户信息
+     * @param industryType String 行业类型
+     */
+    private void populateUserInfo(SysUser user, LoginUserInfoResp userInfo, String industryType) {
+        if (userInfo == null) {
+            return;
+        }
+        userInfo.setDepartment(getDepartmentName(user.getDepartmentId()));
+        userInfo.setRole(permissionService.getPrimaryRoleCode(user.getId(), industryType));
+        userInfo.setStatus(getUserStatusDescription(user.getStatus()));
+        userInfo.setIndustry(industryType);
+        userInfo.setIndustryCode(industryType);
+        userInfo.setAvatar(user.getAvatarUrl());
+        userInfo.setTitle(loadUserProfileAttribute(user.getId(), PROFILE_TITLE_CODE));
+        userInfo.setAvatarFileId(loadUserProfileAttributeAsLong(user.getId(), PROFILE_AVATAR_FILE_ID_CODE));
+    }
+
+    /**
+     * 读取用户扩展属性值
+     *
+     * @param userId        Long 用户ID
+     * @param attributeCode String 属性编码
+     * @return String 属性值
+     */
+    private String loadUserProfileAttribute(Long userId, String attributeCode) {
+        return Optional.ofNullable(sysUserProfileRepo.findByUserIdAndAttribute(userId, attributeCode))
+                .map(SysUserProfile::getAttributeValue)
+                .orElse(null);
+    }
+
+    /**
+     * 读取用户扩展属性（Long）
+     *
+     * @param userId        Long 用户ID
+     * @param attributeCode String 属性编码
+     * @return Long 属性值
+     */
+    private Long loadUserProfileAttributeAsLong(Long userId, String attributeCode) {
+        return Optional.ofNullable(loadUserProfileAttribute(userId, attributeCode))
+                .filter(StringUtils::hasText)
+                .map(value -> {
+                    try {
+                        return Long.parseLong(value);
+                    } catch (NumberFormatException ignored) {
+                        return null;
+                    }
+                })
+                .orElse(null);
+    }
+
+    /**
+     * 保存用户职称信息（基于扩展字段模板）
+     *
+     * @param userId       Long 用户ID
+     * @param industryType String 行业类型
+     * @param titleCode    String 职称编码
+     */
+    private void saveUserTitle(Long userId, String industryType, String titleCode) {
+        var profileField = findProfileFieldByCode(industryType, PROFILE_TITLE_CODE)
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "当前行业未配置职称字段"));
+        validateProfileOption(profileField, titleCode);
+        upsertUserProfileAttribute(userId, profileField.getFieldCode(), titleCode, profileField.getFieldType());
+    }
+
+    /**
+     * 保存头像附件ID
+     *
+     * @param userId       Long 用户ID
+     * @param avatarFileId Long 头像附件ID
+     */
+    private void saveAvatarFileId(Long userId, Long avatarFileId) {
+        var value = Optional.ofNullable(avatarFileId)
+                .map(String::valueOf)
+                .orElse(null);
+        upsertUserProfileAttribute(userId, PROFILE_AVATAR_FILE_ID_CODE, value, "number");
+    }
+
+    /**
+     * 创建或更新扩展属性
+     *
+     * @param userId         Long 用户ID
+     * @param attributeCode  String 属性编码
+     * @param attributeValue String 属性值
+     * @param attributeType  String 属性类型
+     */
+    private void upsertUserProfileAttribute(Long userId, String attributeCode, String attributeValue,
+            String attributeType) {
+        if (!StringUtils.hasText(attributeCode)) {
+            return;
+        }
+        var normalizedType = StringUtils.hasText(attributeType) ? attributeType : "text";
+        var now = LocalDateTime.now(DEFAULT_ZONE);
+        var existing = sysUserProfileRepo.findByUserIdAndAttribute(userId, attributeCode);
+        if (existing != null) {
+            existing.setAttributeValue(attributeValue);
+            existing.setAttributeType(normalizedType);
+            existing.setUpdatedTime(now);
+            existing.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
+            sysUserProfileRepo.updateById(existing);
+            return;
+        }
+        var profile = new SysUserProfile();
+        profile.setUserId(userId);
+        profile.setAttributeName(attributeCode);
+        profile.setAttributeValue(attributeValue);
+        profile.setAttributeType(normalizedType);
+        profile.setIsRequired(0);
+        profile.setSortOrder(0);
+        profile.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
+        profile.setCreatedTime(now);
+        profile.setUpdatedTime(now);
+        sysUserProfileRepo.save(profile);
+    }
+
+    /**
+     * 根据编码查找扩展字段
+     *
+     * @param industryType String 行业类型
+     * @param fieldCode    String 字段编码
+     * @return Optional<SysProfileField> 扩展字段
+     */
+    private Optional<SysProfileField> findProfileFieldByCode(String industryType, String fieldCode) {
+        return sysProfileFieldRepo.listEnabledByIndustry(industryType)
+                .stream()
+                .filter(field -> fieldCode.equals(field.getFieldCode()))
+                .findFirst();
+    }
+
+    /**
+     * 校验扩展字段选项
+     *
+     * @param field       SysProfileField 扩展字段
+     * @param optionValue String 选项值
+     */
+    private void validateProfileOption(SysProfileField field, String optionValue) {
+        if (!StringUtils.hasText(optionValue) || !"select".equalsIgnoreCase(field.getFieldType())) {
+            return;
+        }
+        var options = sysProfileFieldRepo.listOptionsByFieldIds(List.of(field.getId()));
+        var matched = Optional.ofNullable(options)
+                .orElse(List.of())
+                .stream()
+                .anyMatch(option -> optionValue.equals(option.getOptionValue()));
+        if (!matched) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "职称编码不存在或已禁用");
+        }
     }
 
     /**
@@ -934,11 +1097,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseGet(() -> industryConfigCache.get().getType());
 
         var userInfo = authConverter.toLoginUserInfoResp(user);
-        userInfo.setDepartment(getDepartmentName(user.getDepartmentId()));
-        userInfo.setRole(permissionService.getPrimaryRoleCode(user.getId(), industryType));
-        userInfo.setStatus(getUserStatusDescription(user.getStatus()));
-        userInfo.setIndustry(industryType);
-        userInfo.setAvatar(user.getAvatarUrl());
+        populateUserInfo(user, userInfo, industryType);
 
         var roles = permissionService.findRoleCodes(user.getId(), industryType);
         var permissions = permissionService.findPermissionCodes(user.getId(), industryType);
@@ -955,6 +1114,66 @@ public class AuthServiceImpl implements AuthService {
                 permissions,
                 menus,
                 tokenTimeout);
+    }
+
+    /**
+     * 更新个人信息：登录校验 → 校验部门与行业 → 更新用户表 → 刷新会话缓存 → 返回最新用户信息
+     *
+     * @param req UserInfoUpdateReq 个人信息更新请求
+     * @return UserInfoUpdateResp 更新后的个人信息
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public UserInfoUpdateResp updateUserInfo(UserInfoUpdateReq req) {
+        if (!StpUtil.isLogin()) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+
+        var userId = StpUtil.getLoginIdAsLong();
+        log.info(String.format("update user info start: userId=%s", userId));
+
+        var user = Optional.ofNullable(sysUserRepo.findById(userId))
+                .filter(found -> !DeleteStatus.DELETED.getCode().equals(found.getIsDeleted()))
+                .orElseThrow(() -> new BusinessException(ResultCode.USER_NOT_FOUND));
+        if (UserStatus.DISABLED.getCode().equals(user.getStatus())) {
+            throw new BusinessException(ResultCode.USER_ACCOUNT_DISABLED);
+        }
+
+        var normalizedIndustry = resolveIndustryType(req.industryCode());
+        var departmentCode = normalizeDepartmentCode(req.department());
+        var department = Optional.ofNullable(sysDepartmentRepo.findByCode(normalizedIndustry, departmentCode))
+                .orElseThrow(() -> {
+                    log.warn(String.format("update user info department invalid: userId=%s, department=%s, industry=%s",
+                            userId, departmentCode, normalizedIndustry));
+                    return new BusinessException(ResultCode.BAD_REQUEST, "所属部门不存在或已停用");
+                });
+
+        user.setRealName(req.realName());
+        user.setEmail(req.email());
+        user.setPhone(req.phone());
+        user.setIndustryType(normalizedIndustry);
+        user.setDepartmentId(department.getId());
+        user.setAvatarUrl(Optional.ofNullable(req.avatar())
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .orElse(null));
+        user.setUpdatedTime(LocalDateTime.now(DEFAULT_ZONE));
+
+        if (!sysUserRepo.updateById(user)) {
+            log.error(String.format("update user info failed when updating record: userId=%s", userId));
+            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+        }
+
+        saveUserTitle(userId, normalizedIndustry, req.title());
+        saveAvatarFileId(userId, req.avatarFileId());
+
+        var userInfo = authConverter.toLoginUserInfoResp(user);
+        populateUserInfo(user, userInfo, normalizedIndustry);
+
+        cacheLoginUserContext(user, normalizedIndustry);
+        log.info(String.format("update user info success: userId=%s", userId));
+
+        return new UserInfoUpdateResp(userInfo);
     }
 
     /**
@@ -1057,6 +1276,20 @@ public class AuthServiceImpl implements AuthService {
             return false;
         }
         return Boolean.TRUE.equals(supplier.get());
+    }
+
+    /**
+     * 规格化部门编码
+     *
+     * @param departmentCode String 部门编码
+     * @return String 规格化后的部门编码
+     */
+    private String normalizeDepartmentCode(String departmentCode) {
+        return Optional.ofNullable(departmentCode)
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .map(value -> value.toUpperCase(Locale.ROOT))
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "所属部门不能为空"));
     }
 
     /**

@@ -15,6 +15,8 @@ import com.sciz.server.domain.pojo.dto.response.user.CheckRoleResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckPermResp;
 import com.sciz.server.domain.pojo.dto.response.user.RefreshTokenResp;
 import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
+import com.sciz.server.domain.pojo.dto.request.user.UserInfoUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.user.UserInfoUpdateResp;
 import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
 import com.sciz.server.infrastructure.shared.result.Result;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -48,13 +50,6 @@ public class AuthController {
         this.industryConfigCache = industryConfigCache;
     }
 
-    /**
-     * 登录（Sa-Token）
-     *
-     * @param req     LoginReq 登录请求（包含用户名、密码、验证码等）
-     * @param request HttpServletRequest 请求对象
-     * @return LoginResp 登录响应
-     */
     @Operation(summary = "用户登录", description = "使用 Sa-Token 完成登录，返回 Token 信息。登录失败 >= 3 次时需要验证码")
     @PostMapping("/login")
     public Result<LoginResp> login(@RequestBody @Valid LoginReq req, HttpServletRequest request) {
@@ -62,12 +57,6 @@ public class AuthController {
         return Result.success(resp);
     }
 
-    /**
-     * 获取验证码
-     * 生成图形验证码（Base64）
-     *
-     * @return CaptchaResp 验证码响应
-     */
     @Operation(summary = "获取验证码", description = "生成图形验证码，返回 Base64 图片和唯一标识。前端在登录失败 >= 3 次时调用")
     @GetMapping("/captcha")
     public Result<CaptchaResp> getCaptcha() {
@@ -103,11 +92,6 @@ public class AuthController {
         return Result.success(null, ResultCode.RESET_PASSWORD_SUCCESS.getMessage());
     }
 
-    /**
-     * 获取行业部门标签
-     *
-     * @return Result<List<DepartmentLabelResp>> 部门标签列表
-     */
     @Operation(summary = "行业部门标签", description = "获取当前行业下的部门标签列表")
     @GetMapping("/department/label")
     public Result<List<DepartmentLabelResp>> getDepartmentLabels() {
@@ -120,12 +104,6 @@ public class AuthController {
         return Result.success(respList);
     }
 
-    /**
-     * 退出登录
-     * 注销当前登录会话，清理 token 和权限缓存
-     *
-     * @return Result<Void> 退出结果
-     */
     @Operation(summary = "退出登录", description = "注销当前登录会话，清理 token 和权限缓存")
     @PostMapping("/logout")
     public Result<Void> logout() {
@@ -144,6 +122,13 @@ public class AuthController {
     @PostMapping("/profile")
     public Result<ProfileResp> profile() {
         var resp = authService.profile();
+        return Result.success(resp);
+    }
+
+    @Operation(summary = "保存个人信息", description = "更新当前登录用户的基础资料信息")
+    @PutMapping("/user/info")
+    public Result<UserInfoUpdateResp> updateUserInfo(@Valid @RequestBody UserInfoUpdateReq req) {
+        var resp = authService.updateUserInfo(req);
         return Result.success(resp);
     }
 

@@ -16,9 +16,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StreamUtils;
@@ -73,7 +75,7 @@ public class FileController {
     @GetMapping("/download/{id}")
     public void download(@PathVariable Long id, HttpServletResponse response) {
         try (FileDownloadContext context = fileService.download(id);
-                var inputStream = context.inputStream()) {
+             var inputStream = context.inputStream()) {
             response.setContentType(context.contentType());
             if (context.contentLength() != null) {
                 response.setContentLengthLong(context.contentLength());
@@ -91,8 +93,7 @@ public class FileController {
 
     @Operation(summary = "文件预览", description = "根据ID获取预览签名链接")
     @GetMapping("/preview/{id}")
-    public Result<String> preview(@PathVariable Long id,
-            @RequestParam(required = false) Integer expireSeconds) {
+    public Result<String> preview(@PathVariable Long id, @RequestParam(required = false) Integer expireSeconds) {
         String previewUrl = fileService.preview(id, expireSeconds);
         return Result.success(previewUrl, ResultCode.FILE_DOWNLOAD_SUCCESS.getMessage());
     }

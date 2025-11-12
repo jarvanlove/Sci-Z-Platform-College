@@ -42,7 +42,7 @@ kafka: # Kafka 开发环境配置
 # 本地 MinIO（默认控制台/存储均为本机）
 minio: # MinIO 开发环境配置
   endpoint: http://localhost:9000
-  access-key: minioadmin
+  access-key: admin
   secret-key: minioadmin
   bucket: sciz-files
 

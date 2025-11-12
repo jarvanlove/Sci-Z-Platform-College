@@ -5,6 +5,8 @@ import com.sciz.server.application.service.user.UserRoleService;
 import com.sciz.server.domain.pojo.dto.request.system.RolePermissionUpdateReq;
 import com.sciz.server.domain.pojo.dto.request.system.UserRoleUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.user.IndustryConfigResp;
+import com.sciz.server.domain.pojo.dto.response.user.IndustryProfileFieldOptionResp;
+import com.sciz.server.domain.pojo.dto.response.user.IndustryProfileFieldResp;
 import com.sciz.server.domain.pojo.dto.response.user.RolePermissionIdsResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserRoleIdsResp;
 import com.sciz.server.interfaces.converter.UserConverter;
@@ -14,6 +16,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -46,8 +51,60 @@ public class UserController {
     @GetMapping("/industry/config")
     public Result<IndustryConfigResp> getIndustryConfig() {
         var view = industryConfigCache.get();
-        var resp = new IndustryConfigResp(view.getType(), view.getName());
+        var profileFieldRespList = Optional.ofNullable(view.getProfileFields())
+                .orElseGet(List::of)
+                .stream()
+                .map(field -> new IndustryProfileFieldResp(
+                        field.getFieldCode(),
+                        field.getFieldLabel(),
+                        field.getFieldType(),
+                        field.getIsRequired(),
+                        Optional.ofNullable(field.getOptions())
+                                .orElseGet(List::of)
+                                .stream()
+                                .map(option -> new IndustryProfileFieldOptionResp(
+                                        option.getOptionValue(),
+                                        option.getOptionLabel(),
+                                        option.getIsDefault()))
+                                .toList()))
+                .toList();
+        var resp = new IndustryConfigResp(
+                view.getType(),
+                view.getName(),
+                view.getDepartmentLabel(),
+                view.getRoleLabel(),
+                view.getEmployeeIdLabel(),
+                profileFieldRespList);
         return Result.success(resp);
+    }
+
+    /**
+     * 行业扩展字段
+     *
+     * @return Result<List<IndustryProfileFieldResp>> 扩展字段配置
+     */
+    @Operation(summary = "行业扩展字段", description = "获取当前行业下的用户扩展字段列表（含选项）")
+    @GetMapping("/profile/fields")
+    public Result<List<IndustryProfileFieldResp>> listProfileFields() {
+        var view = industryConfigCache.get();
+        var respList = Optional.ofNullable(view.getProfileFields())
+                .orElseGet(List::of)
+                .stream()
+                .map(field -> new IndustryProfileFieldResp(
+                        field.getFieldCode(),
+                        field.getFieldLabel(),
+                        field.getFieldType(),
+                        field.getIsRequired(),
+                        Optional.ofNullable(field.getOptions())
+                                .orElseGet(List::of)
+                                .stream()
+                                .map(option -> new IndustryProfileFieldOptionResp(
+                                        option.getOptionValue(),
+                                        option.getOptionLabel(),
+                                        option.getIsDefault()))
+                                .toList()))
+                .toList();
+        return Result.success(respList);
     }
 
     @Operation(summary = "更新行业配置", description = "更新行业配置")

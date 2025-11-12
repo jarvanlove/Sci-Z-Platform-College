@@ -274,18 +274,26 @@ export const useAuthStore = defineStore('auth', {
         const { userInfo, permissions, roles, menus } = payload
         
         this.userInfo = userInfo
-        this.permissions = permissions || []
-        this.roles = roles || []
+
+        if (Array.isArray(permissions) && permissions.length > 0) {
+          this.permissions = permissions
+          setPermissions(this.permissions)
+        }
         
-        // 如果接口返回了 menus，则使用接口返回的菜单；否则保持原有菜单不变
-        if (menus && menus.length > 0) {
+        if (Array.isArray(roles) && roles.length > 0) {
+          this.roles = roles
+          setRoles(this.roles)
+        }
+        
+        if (Array.isArray(menus) && menus.length > 0) {
           this.menus = menus
           setMenus(this.menus)
         }
-        
+
         setUserInfo(userInfo)
         setPermissions(this.permissions)
         setRoles(this.roles)
+        setMenus(this.menus)
         
         // 同步会话信息
         this.applySessionInfo(payload)

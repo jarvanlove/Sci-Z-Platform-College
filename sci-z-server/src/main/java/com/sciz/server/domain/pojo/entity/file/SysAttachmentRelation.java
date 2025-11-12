@@ -35,7 +35,7 @@ public class SysAttachmentRelation extends BaseEntity {
     private Long attachmentId;
 
     /**
-     * 关联类型（project/declaration/report/user）
+     * 关联类型（project/declaration/report/user/knowledge）
      */
     @TableField("relation_type")
     private String relationType;

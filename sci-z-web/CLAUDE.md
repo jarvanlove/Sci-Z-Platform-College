@@ -101,6 +101,39 @@ Vue 3 + TypeScript 专家、UI 设计师
 - 保持 `read_lints` 无警告。  
 - 完成后在总结里列出涉及的接口与 JSON 结构，方便后端联调。
 
+### 5. 文件上传规范
+- **枚举常量**：前端统一使用 `src/constants/attachment.js` 中的 `ATTACHMENT_RELATION`、`ATTACHMENT_CATEGORY`，与后端枚举保持一致，禁止在业务代码中写字符串常量。
+- **relationType 使用场景**：当文件需要挂载到具体业务对象（如项目、申报、报告、用户、知识库）时必须传递，对应选择 `ATTACHMENT_RELATION` 中的值；纯个人临时文件可留空。
+- **attachmentType 取值**：根据文件内容选择 `document`、`image`、`export`、`other`，与 `ATTACHMENT_CATEGORY` 对齐，便于服务端分类。
+- **relationId / relationName**：仅在有业务关联时传递。其中 `relationId` 为业务主键，`relationName` 为可读名辅助展示；若无具体关联对象则不要提交这两个字段。
+- **公共字段**：始终通过 `FormData` 上传文件本体（`file`），并根据业务约定补充 `isPublic`、业务自定义参数等。
+
+### 6. 组件目录速览
+- **业务组件**：
+  - `components/Business/Detail/`：详情页通用组件（时间轴、进度条、信息卡、附件列表等）。
+  - `components/Business/Form/`：表单流程组件（区块包装、按钮区、通用文件上传等）。
+  - `components/Business/Legacy/`：旧版仪表盘/统计相关组件，逐步迁移但仍保留复用。
+  - `components/Business/List/`：列表页基础组件（筛选表单、表格、状态标签、行内操作按钮）。
+- **通用组件 (`components/Common/`)**：
+  - `BaseButton.vue`：二次封装按钮，统一主题色、尺寸、加载态。
+  - `BaseCard.vue`：标准卡片容器，提供标题/内容插槽与统一样式。
+  - `BaseDialog.vue`：通用弹窗，内置标题、页脚、快捷关闭等逻辑。
+  - `BasePagination.vue`：分页器封装，兼容后端分页字段与事件。
+  - `BaseScrollbar.vue`：自定义滚动容器，统一不同浏览器滚动体验。
+  - `BaseTable.vue`：通用表格，整合列配置、加载态、空状态等。
+  - `LanguageSwitcher.vue`：语言切换入口，驱动 `i18n` 国际化。
+  - `AgreementNotice.vue`：协议提醒/确认组件，常用于登录注册场景。
+
+### 7. 组件化思想
+- **能复用就抽象**：前端实现优先考虑可复用的“组件 + 工具 + 常量”组合，再由页面进行装配；不要在业务页面内散写重复逻辑。
+- **单一职责**：组件只承担单一功能（如上传校验、按钮样式、弹窗逻辑），复合场景通过组合多个组件完成。
+- **配置驱动**：将枚举、白名单、尺寸等可调参数集中定义（如 `attachment.js`），页面仅引用配置，提高一致性与维护效率。
+- **后端兜底**：前端提供基础校验和良好提示，服务端仍需做最终判断，确保安全与一致性。
+- **文件上传流程***：
+  - `useFileUpload` 组合函数统一处理文件校验（大小默认 150MB、支持传入枚举）、MD5 去重（调用 `/api/file/check-duplicate`）、上传与复用提示。
+  - 使用方式：`const uploader = useFileUpload({ maxSizeMB, allowedExtensions, getExtraFormData })` → `await uploader.uploadWithCheck(file)`，返回 `{ fileInfo, reused }`；根据业务需要提示用户保存或落库。
+  - 所有上传业务需通过该流程，确保前端校验一致、避免重复上传，业务差异通过入参和文案控制。
+
 ---
 
 

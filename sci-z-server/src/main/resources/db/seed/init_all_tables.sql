@@ -715,7 +715,7 @@ CREATE TABLE IF NOT EXISTS sys_attachment_relation (
 COMMENT ON TABLE sys_attachment_relation IS '附件关联表';
 COMMENT ON COLUMN sys_attachment_relation.id IS '关联ID，主键，自增';
 COMMENT ON COLUMN sys_attachment_relation.attachment_id IS '附件ID';
-COMMENT ON COLUMN sys_attachment_relation.relation_type IS '关联类型（project/declaration/report/user）';
+COMMENT ON COLUMN sys_attachment_relation.relation_type IS '关联类型（project/declaration/report/user/knowledge）';
 COMMENT ON COLUMN sys_attachment_relation.relation_id IS '关联对象ID';
 COMMENT ON COLUMN sys_attachment_relation.relation_name IS '关联对象名称';
 COMMENT ON COLUMN sys_attachment_relation.attachment_type IS '附件类型（document/image/export/other）';

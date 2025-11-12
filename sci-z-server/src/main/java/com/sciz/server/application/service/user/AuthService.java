@@ -13,6 +13,8 @@ import com.sciz.server.domain.pojo.dto.response.user.CheckRoleResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckPermResp;
 import com.sciz.server.domain.pojo.dto.response.user.RefreshTokenResp;
 import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
+import com.sciz.server.domain.pojo.dto.request.user.UserInfoUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.user.UserInfoUpdateResp;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
@@ -113,4 +115,12 @@ public interface AuthService {
      * @param req ResetPasswordReq 重置密码请求
      */
     void resetPassword(ResetPasswordReq req);
+
+    /**
+     * 更新个人信息
+     *
+     * @param req UserInfoUpdateReq 个人信息更新请求
+     * @return UserInfoUpdateResp 更新后的个人信息
+     */
+    UserInfoUpdateResp updateUserInfo(UserInfoUpdateReq req);
 }

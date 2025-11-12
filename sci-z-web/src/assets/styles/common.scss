@@ -193,9 +193,18 @@ h5 {
   
   .el-message-box__content {
     padding: 20px;
+    display: flex;
+    align-items: flex-start;
+
+    .el-message-box__status {
+      font-size: 28px !important;
+      margin-right: 12px;
+      line-height: 1;
+    }
     
     .el-message-box__message {
       color: var(--text);
+      line-height: 1.6;
     }
   }
   

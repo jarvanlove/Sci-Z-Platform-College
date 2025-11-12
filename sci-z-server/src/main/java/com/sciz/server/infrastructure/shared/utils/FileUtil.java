@@ -2,6 +2,7 @@ package com.sciz.server.infrastructure.shared.utils;
 
 import com.sciz.server.infrastructure.shared.constant.SystemConstant;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,6 +32,7 @@ public class FileUtil {
     public static String getFileExtension(String fileName) {
         return Optional.ofNullable(fileName)
                 .map(String::trim)
+                .map(FileUtil::sanitizeFileName)
                 .filter(name -> !name.isEmpty())
                 .map(name -> {
                     int lastDotIndex = name.lastIndexOf('.');
@@ -40,6 +42,21 @@ public class FileUtil {
                     return name.substring(lastDotIndex + 1).toLowerCase();
                 })
                 .orElse("");
+    }
+
+    /**
+     * 移除文件名中可能出现的引号等无效字符
+     *
+     * @param fileName 文件名
+     * @return 清洗后的文件名
+     */
+    private static String sanitizeFileName(String fileName) {
+        if (!StringUtils.hasText(fileName)) {
+            return "";
+        }
+        return fileName.replace("\"", "")
+                .replace("'", "")
+                .trim();
     }
 
     /**
@@ -68,6 +85,20 @@ public class FileUtil {
     public static boolean isSupportedFileType(String fileName) {
         String extension = getFileExtension(fileName);
         return Arrays.asList(SystemConstant.SUPPORTED_FILE_TYPES).contains(extension);
+    }
+
+    /**
+     * 检查 MIME 类型是否支持
+     *
+     * @param mimeType MIME 类型
+     * @return 是否支持
+     */
+    public static boolean isSupportedMimeType(String mimeType) {
+        if (!StringUtils.hasText(mimeType)) {
+            return false;
+        }
+        return Arrays.stream(SystemConstant.SUPPORTED_MIME_TYPES)
+                .anyMatch(type -> type.equalsIgnoreCase(mimeType));
     }
 
     /**

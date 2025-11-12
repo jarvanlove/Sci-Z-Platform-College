@@ -3,7 +3,6 @@ package com.sciz.server.application.service.file.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.application.service.file.FileService;
-import com.sciz.server.domain.pojo.dto.request.BaseQueryReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileBatchUploadReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileCheckDuplicateReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileListQueryReq;
@@ -15,6 +14,8 @@ import com.sciz.server.domain.pojo.entity.file.SysAttachment;
 import com.sciz.server.domain.pojo.entity.file.SysAttachmentRelation;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRelationRepo;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRepo;
+import com.sciz.server.infrastructure.shared.enums.AttachmentCategoryStatus;
+import com.sciz.server.infrastructure.shared.enums.AttachmentRelationStatus;
 import com.sciz.server.infrastructure.shared.constant.SystemConstant;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
@@ -45,6 +46,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 文件应用服务实现类
@@ -83,22 +85,42 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public FileInfoResp upload(FileUploadReq req) {
+        // 1. 参数校验
         validateUploadRequest(req);
+
+        // 2. 解析附件分类并校验关联信息
+        var category = normalizeAttachmentCategory(req.getAttachmentType());
+        req.setAttachmentType(category.getCode());
+        validateRelationParams(req);
+
+        // 3. 获取当前用户
         var currentUser = LoginUserUtil.requireCurrentUser();
+        log.info(String.format("文件上传开始: originalName=%s, uploaderId=%s",
+                req.getFile().getOriginalFilename(), currentUser.userId()));
+
+        // 4. 确保存储桶可用
         ensureBucket();
 
-        var attachment = buildAttachment(req, currentUser.userId(), currentUser.realName());
-        uploadToMinio(req.getFile(), attachment.getFilePath(), attachment.getMimeType(), attachment.getFileSize());
+        // 5. 构建附件实体
+        var attachment = buildAttachment(req, currentUser.userId(), currentUser.realName(), category);
 
-        Long attachmentId = sysAttachmentRepo.save(attachment);
-        if (attachmentId == null) {
-            throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED, "附件保存失败");
-        }
+        // 6. 上传至对象存储
+        uploadToObjectStorage(req, attachment);
 
+        // 7. 持久化附件记录
+        var attachmentId = persistAttachment(attachment);
+
+        // 8. 记录业务关联（可选）
         saveRelationIfNecessary(req, attachmentId);
+
+        // 9. 发布上传事件
         publishUploadEvent(req, currentUser.userId(), currentUser.realName(), attachment);
 
-        return buildFileInfoResp(attachment, DEFAULT_PREVIEW_EXPIRE_SECONDS);
+        // 10. 构建响应并返回
+        FileInfoResp resp = buildFileInfoResp(attachment, DEFAULT_PREVIEW_EXPIRE_SECONDS);
+        log.info(String.format("文件上传完成: attachmentId=%s, uploaderId=%s",
+                attachment.getId(), currentUser.userId()));
+        return resp;
     }
 
     /**
@@ -110,18 +132,14 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public List<FileInfoResp> uploadBatch(FileBatchUploadReq req) {
-        if (req == null || req.files() == null || req.files().length == 0) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "上传文件列表不能为空");
-        }
-        List<FileInfoResp> responses = new ArrayList<>();
+        // 1. 校验批量上传请求
+        validateBatchUploadRequest(req);
+
+        // 2. 遍历上传每一个文件
+        log.info(String.format("批量上传文件: fileCount=%s, relationType=%s", req.files().length, req.relationType()));
+        var responses = new ArrayList<FileInfoResp>(req.files().length);
         for (var multipartFile : req.files()) {
-            FileUploadReq singleReq = new FileUploadReq();
-            singleReq.setFile(multipartFile);
-            singleReq.setRelationType(req.relationType());
-            singleReq.setRelationId(req.relationId());
-            singleReq.setRelationName(req.relationName());
-            singleReq.setAttachmentType(req.attachmentType());
-            singleReq.setIsPublic(req.isPublic());
+            var singleReq = buildSingleUploadReq(req, multipartFile);
             responses.add(upload(singleReq));
         }
         return responses;
@@ -135,14 +153,13 @@ public class FileServiceImpl implements FileService {
      */
     @Override
     public PageResult<FileInfoResp> page(FileListQueryReq req) {
-        BaseQueryReq baseQuery = req.toBaseQuery();
-        Page<SysAttachment> page = new Page<>(baseQuery.pageNo(), baseQuery.pageSize());
+        var baseQuery = req.toBaseQuery();
+        var page = new Page<SysAttachment>(baseQuery.pageNo(), baseQuery.pageSize());
 
-        List<Long> relationAttachmentIds = sysAttachmentRelationRepo.findAttachmentIds(req.relationType(),
-                req.relationId());
+        var relationAttachmentIds = sysAttachmentRelationRepo.findAttachmentIds(req.relationType(), req.relationId());
 
-        boolean asc = "ASC".equalsIgnoreCase(baseQuery.sortOrder());
-        String sortColumn = normalizeSortColumn(baseQuery.sortBy());
+        var asc = "ASC".equalsIgnoreCase(baseQuery.sortOrder());
+        var sortColumn = normalizeSortColumn(baseQuery.sortBy());
 
         IPage<SysAttachment> attachmentPage = sysAttachmentRepo.page(page,
                 req.relationType(),
@@ -154,7 +171,7 @@ public class FileServiceImpl implements FileService {
                 sortColumn,
                 asc);
 
-        List<FileInfoResp> records = attachmentPage.getRecords().stream()
+        var records = attachmentPage.getRecords().stream()
                 .map(item -> buildFileInfoResp(item, DEFAULT_PREVIEW_EXPIRE_SECONDS))
                 .toList();
 
@@ -172,21 +189,14 @@ public class FileServiceImpl implements FileService {
      */
     @Override
     public FileDownloadContext download(Long attachmentId) {
-        SysAttachment attachment = obtainAttachment(attachmentId);
+        // 1. 查询附件
+        var attachment = obtainAttachment(attachmentId);
+
+        // 2. 确保存储桶可用
         ensureBucket();
-        try {
-            GetObjectResponse response = MinioUtil.download(minioClient, bucketName, attachment.getFilePath());
-            sysAttachmentRepo.increaseDownloadCount(attachmentId,
-                    LoginUserUtil.getCurrentUserId().orElse(null));
-            return new FileDownloadContext(attachment.getFileName(),
-                    attachment.getOriginalName(),
-                    attachment.getMimeType(),
-                    attachment.getFileSize(),
-                    response);
-        } catch (Exception exception) {
-            log.error(String.format("文件下载失败: attachmentId=%s", attachmentId), exception);
-            throw new BusinessException(ResultCode.FILE_DOWNLOAD_FAILED, "文件下载失败");
-        }
+
+        // 3. 执行下载并更新统计
+        return downloadFromObjectStorage(attachmentId, attachment);
     }
 
     /**
@@ -198,10 +208,15 @@ public class FileServiceImpl implements FileService {
      */
     @Override
     public String preview(Long attachmentId, Integer expireSeconds) {
-        SysAttachment attachment = obtainAttachment(attachmentId);
-        int effectiveExpire = (expireSeconds == null || expireSeconds <= 0)
+        // 1. 查询附件
+        var attachment = obtainAttachment(attachmentId);
+
+        // 2. 计算有效期
+        var effectiveExpire = (expireSeconds == null || expireSeconds <= 0)
                 ? DEFAULT_PREVIEW_EXPIRE_SECONDS
                 : expireSeconds;
+
+        // 3. 生成预签名链接
         ensureBucket();
         try {
             return MinioUtil.presignedGetUrl(minioClient, bucketName, attachment.getFilePath(), effectiveExpire);
@@ -219,20 +234,20 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long attachmentId) {
-        SysAttachment attachment = obtainAttachment(attachmentId);
-        ensureBucket();
-        try {
-            MinioUtil.deleteObject(minioClient, bucketName, attachment.getFilePath());
-        } catch (Exception exception) {
-            log.error(String.format("删除 MinIO 对象失败: attachmentId=%s", attachmentId), exception);
-            throw new BusinessException(ResultCode.FILE_DOWNLOAD_FAILED, "删除存储对象失败");
-        }
+        // 1. 查询附件
+        var attachment = obtainAttachment(attachmentId);
 
-        Long operatorId = LoginUserUtil.getCurrentUserId().orElse(null);
+        // 2. 删除对象存储文件
+        removeObjectFromStorage(attachmentId, attachment);
+
+        // 3. 删除数据库记录与关联
+        var operatorId = LoginUserUtil.getCurrentUserId().orElse(null);
         if (!sysAttachmentRepo.markDeleted(attachmentId, operatorId)) {
             throw new BusinessException(ResultCode.FILE_DOWNLOAD_FAILED, "删除数据库记录失败");
         }
         sysAttachmentRelationRepo.deleteByAttachmentId(attachmentId);
+
+        // 4. 发布删除事件
         publishDeleteEvent(attachment, operatorId);
     }
 
@@ -247,16 +262,18 @@ public class FileServiceImpl implements FileService {
         if (req == null || !StringUtils.hasText(req.md5())) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "文件MD5不能为空");
         }
-        SysAttachment attachment = sysAttachmentRepo.findByMd5(req.md5());
+        var attachment = sysAttachmentRepo.findByMd5(req.md5());
         if (attachment == null) {
             return new FileDuplicateCheckResp(false, null);
         }
-        FileInfoResp infoResp = buildFileInfoResp(attachment, DEFAULT_PREVIEW_EXPIRE_SECONDS);
+        var infoResp = buildFileInfoResp(attachment, DEFAULT_PREVIEW_EXPIRE_SECONDS);
         return new FileDuplicateCheckResp(true, infoResp);
     }
 
     /**
      * 校验上传请求
+     *
+     * @param req FileUploadReq 上传请求
      */
     private void validateUploadRequest(FileUploadReq req) {
         if (req == null || req.getFile() == null || req.getFile().isEmpty()) {
@@ -265,29 +282,84 @@ public class FileServiceImpl implements FileService {
         if (FileUtil.isFileSizeExceeded(req.getFile().getSize())) {
             throw new BusinessException(ResultCode.FILE_SIZE_EXCEEDED);
         }
-        if (!FileUtil.isSupportedFileType(req.getFile().getOriginalFilename())) {
+        if (!FileUtil.isSupportedFileType(req.getFile().getOriginalFilename())
+                && !FileUtil.isSupportedMimeType(req.getFile().getContentType())) {
             throw new BusinessException(ResultCode.FILE_TYPE_NOT_SUPPORTED);
+        }
+    }
+
+    /**
+     * 解析并校验附件分类
+     *
+     * @param attachmentType String 附件分类编码
+     * @return AttachmentCategoryStatus 分类枚举
+     */
+    private AttachmentCategoryStatus normalizeAttachmentCategory(String attachmentType) {
+        if (!StringUtils.hasText(attachmentType)) {
+            return AttachmentCategoryStatus.defaultType();
+        }
+        try {
+            return AttachmentCategoryStatus.fromCode(attachmentType);
+        } catch (IllegalArgumentException exception) {
+            log.warn(String.format("不支持的附件类型: attachmentType=%s", attachmentType));
+            throw new BusinessException(ResultCode.BAD_REQUEST, "不支持的附件类型");
+        }
+    }
+
+    /**
+     * 校验附件关联参数
+     *
+     * @param req FileUploadReq 上传请求
+     */
+    private void validateRelationParams(FileUploadReq req) {
+        var hasRelationType = StringUtils.hasText(req.getRelationType());
+        if (!hasRelationType) {
+            if (req.getRelationId() != null || StringUtils.hasText(req.getRelationName())) {
+                throw new BusinessException(ResultCode.BAD_REQUEST, "未指定关联类型时不能提供关联对象信息");
+            }
+            return;
+        }
+
+        try {
+            AttachmentRelationStatus.fromCode(req.getRelationType());
+        } catch (IllegalArgumentException exception) {
+            log.warn(String.format("不支持的附件关联类型: relationType=%s", req.getRelationType()));
+            throw new BusinessException(ResultCode.BAD_REQUEST, "不支持的附件关联类型");
+        }
+
+        if (req.getRelationId() == null) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "附件关联对象ID不能为空");
+        }
+    }
+
+    /**
+     * 校验批量上传请求
+     *
+     * @param req FileBatchUploadReq 批量上传请求
+     */
+    private void validateBatchUploadRequest(FileBatchUploadReq req) {
+        if (req == null || req.files() == null || req.files().length == 0) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "上传文件列表不能为空");
         }
     }
 
     /**
      * 构建附件实体
      */
-    private SysAttachment buildAttachment(FileUploadReq req, Long userId, String realName) {
+    private SysAttachment buildAttachment(FileUploadReq req, Long userId, String realName,
+            AttachmentCategoryStatus category) {
         var multipartFile = req.getFile();
-        String originalName = StringUtils.hasText(multipartFile.getOriginalFilename())
-                ? multipartFile.getOriginalFilename()
-                : multipartFile.getName();
-        String extension = FileUtil.getFileExtension(originalName);
-        String objectName = buildObjectName(originalName);
-        String mimeType = resolveMimeType(multipartFile, originalName);
-        String md5 = computeMd5(multipartFile);
-
+        var originalName = resolveOriginalName(multipartFile);
+        var extension = FileUtil.getFileExtension(originalName);
+        var objectName = buildObjectName(originalName);
+        var mimeType = resolveMimeType(multipartFile, originalName);
+        var md5 = computeMd5(multipartFile);
         var now = LocalDateTime.now();
-        SysAttachment attachment = new SysAttachment();
+
+        var attachment = new SysAttachment();
         attachment.setFileName(objectName);
         attachment.setOriginalName(originalName);
-        attachment.setFileType(StringUtils.hasText(req.getAttachmentType()) ? req.getAttachmentType() : extension);
+        attachment.setFileType(category.getCode());
         attachment.setFileExtension(extension);
         attachment.setFileSize(multipartFile.getSize());
         attachment.setFileUrl(String.format("%s/%s", bucketName, objectName));
@@ -319,7 +391,10 @@ public class FileServiceImpl implements FileService {
         }
     }
 
-    private void uploadToMinio(org.springframework.web.multipart.MultipartFile multipartFile,
+    /**
+     * 上传至 MinIO
+     */
+    private void uploadToMinio(MultipartFile multipartFile,
             String objectName,
             String mimeType,
             long size) {
@@ -333,7 +408,7 @@ public class FileServiceImpl implements FileService {
         if (!StringUtils.hasText(req.getRelationType()) || req.getRelationId() == null) {
             return;
         }
-        SysAttachmentRelation relation = new SysAttachmentRelation();
+        var relation = new SysAttachmentRelation();
         relation.setAttachmentId(attachmentId);
         relation.setRelationType(req.getRelationType());
         relation.setRelationId(req.getRelationId());
@@ -345,12 +420,24 @@ public class FileServiceImpl implements FileService {
         sysAttachmentRelationRepo.save(relation);
     }
 
+    /*
+     * 发布上传事件
+     *
+     * @param req FileUploadReq 上传请求
+     * 
+     * @param userId Long 上传人 ID
+     * 
+     * @param realName String 上传人姓名
+     * 
+     * @param attachment SysAttachment 附件实体
+     */
+
     /**
      * 发布上传事件
      */
     private void publishUploadEvent(FileUploadReq req, Long userId, String realName, SysAttachment attachment) {
         try {
-            FileUploadedEvent event = new FileUploadedEvent(String.valueOf(attachment.getId()),
+            var event = new FileUploadedEvent(String.valueOf(attachment.getId()),
                     attachment.getOriginalName(),
                     attachment.getFileType(),
                     String.valueOf(attachment.getFileSize()),
@@ -373,7 +460,7 @@ public class FileServiceImpl implements FileService {
      */
     private void publishDeleteEvent(SysAttachment attachment, Long operatorId) {
         try {
-            FileDeletedEvent event = new FileDeletedEvent(String.valueOf(attachment.getId()),
+            var event = new FileDeletedEvent(String.valueOf(attachment.getId()),
                     attachment.getOriginalName(),
                     attachment.getFileType(),
                     attachment.getFilePath(),
@@ -394,11 +481,11 @@ public class FileServiceImpl implements FileService {
      * 构建响应
      */
     private FileInfoResp buildFileInfoResp(SysAttachment attachment, int expireSeconds) {
-        FileInfoResp resp = fileConverter.toInfoResp(attachment);
+        var resp = fileConverter.toInfoResp(attachment);
         if (resp == null) {
             return null;
         }
-        String previewUrl = generatePreviewUrlSafely(attachment.getFilePath(), expireSeconds);
+        var previewUrl = generatePreviewUrlSafely(attachment.getFilePath(), expireSeconds);
         return resp.withBucketName(bucketName).withPreviewUrl(previewUrl);
     }
 
@@ -430,14 +517,16 @@ public class FileServiceImpl implements FileService {
      * 确保桶存在
      */
     private void ensureBucket() {
-        if (bucketInitialized.compareAndSet(false, true)) {
-            try {
-                MinioUtil.makeBucketIfAbsent(minioClient, bucketName);
-            } catch (Exception exception) {
-                log.error(String.format("初始化 MinIO 桶失败: bucket=%s", bucketName), exception);
-                bucketInitialized.set(false);
-                throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED, "初始化存储桶失败");
-            }
+        if (!bucketInitialized.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            MinioUtil.makeBucketIfAbsent(minioClient, bucketName);
+        } catch (Exception exception) {
+            bucketInitialized.set(false);
+            log.error(String.format("初始化 MinIO 桶失败: bucket=%s", bucketName), exception);
+            throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED,
+                    String.format("初始化存储桶失败: %s", exception.getMessage()));
         }
     }
 
@@ -453,8 +542,8 @@ public class FileServiceImpl implements FileService {
     /**
      * 解析 MIME 类型
      */
-    private String resolveMimeType(org.springframework.web.multipart.MultipartFile file, String originalName) {
-        String mimeType = file.getContentType();
+    private String resolveMimeType(MultipartFile file, String originalName) {
+        var mimeType = file.getContentType();
         if (!StringUtils.hasText(mimeType)) {
             mimeType = FileUtil.getMimeType(originalName);
         }
@@ -464,7 +553,7 @@ public class FileServiceImpl implements FileService {
     /**
      * 计算 MD5
      */
-    private String computeMd5(org.springframework.web.multipart.MultipartFile file) {
+    private String computeMd5(MultipartFile file) {
         try (InputStream inputStream = file.getInputStream()) {
             return DigestUtils.md5DigestAsHex(inputStream);
         } catch (IOException exception) {
@@ -486,6 +575,104 @@ public class FileServiceImpl implements FileService {
             case "uploadTime" -> "uploadTime";
             default -> "uploadTime";
         };
+    }
+
+    /**
+     * 构建单文件上传请求（供批量上传复用）
+     *
+     * @param req           FileBatchUploadReq 批量上传请求
+     * @param multipartFile MultipartFile 当前文件
+     * @return FileUploadReq 单文件请求
+     */
+    private FileUploadReq buildSingleUploadReq(FileBatchUploadReq req,
+            MultipartFile multipartFile) {
+        var singleReq = new FileUploadReq();
+        singleReq.setFile(multipartFile);
+        singleReq.setRelationType(req.relationType());
+        singleReq.setRelationId(req.relationId());
+        singleReq.setRelationName(req.relationName());
+        singleReq.setAttachmentType(req.attachmentType());
+        singleReq.setIsPublic(req.isPublic());
+        return singleReq;
+    }
+
+    /**
+     * 上传文件到对象存储
+     *
+     * @param req        FileUploadReq 上传请求
+     * @param attachment SysAttachment 附件实体
+     */
+    private void uploadToObjectStorage(FileUploadReq req, SysAttachment attachment) {
+        uploadToMinio(req.getFile(), attachment.getFilePath(), attachment.getMimeType(), attachment.getFileSize());
+    }
+
+    /**
+     * 持久化附件数据
+     *
+     * @param attachment SysAttachment 附件实体
+     * @return Long 附件ID
+     */
+    private Long persistAttachment(SysAttachment attachment) {
+        var attachmentId = sysAttachmentRepo.save(attachment);
+        if (attachmentId == null) {
+            throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED, "附件保存失败");
+        }
+        attachment.setId(attachmentId);
+        return attachmentId;
+    }
+
+    /**
+     * 解析原始文件名
+     *
+     * @param multipartFile MultipartFile 上传文件
+     * @return String 原始文件名
+     */
+    private String resolveOriginalName(MultipartFile multipartFile) {
+        if (multipartFile == null) {
+            return "";
+        }
+        return StringUtils.hasText(multipartFile.getOriginalFilename())
+                ? multipartFile.getOriginalFilename()
+                : multipartFile.getName();
+    }
+
+    /**
+     * 从对象存储下载文件并封装上下文
+     *
+     * @param attachmentId Long 附件ID
+     * @param attachment   SysAttachment 附件实体
+     * @return FileDownloadContext 下载上下文
+     */
+    private FileDownloadContext downloadFromObjectStorage(Long attachmentId, SysAttachment attachment) {
+        try {
+            GetObjectResponse response = MinioUtil.download(minioClient, bucketName, attachment.getFilePath());
+            sysAttachmentRepo.increaseDownloadCount(attachmentId,
+                    LoginUserUtil.getCurrentUserId().orElse(null));
+            return new FileDownloadContext(attachment.getFileName(),
+                    attachment.getOriginalName(),
+                    attachment.getMimeType(),
+                    attachment.getFileSize(),
+                    response);
+        } catch (Exception exception) {
+            log.error(String.format("文件下载失败: attachmentId=%s", attachmentId), exception);
+            throw new BusinessException(ResultCode.FILE_DOWNLOAD_FAILED, "文件下载失败");
+        }
+    }
+
+    /**
+     * 删除对象存储中的文件
+     *
+     * @param attachmentId Long 附件ID
+     * @param attachment   SysAttachment 附件实体
+     */
+    private void removeObjectFromStorage(Long attachmentId, SysAttachment attachment) {
+        ensureBucket();
+        try {
+            MinioUtil.deleteObject(minioClient, bucketName, attachment.getFilePath());
+        } catch (Exception exception) {
+            log.error(String.format("删除 MinIO 对象失败: attachmentId=%s", attachmentId), exception);
+            throw new BusinessException(ResultCode.FILE_DOWNLOAD_FAILED, "删除存储对象失败");
+        }
     }
 
     /**

@@ -121,6 +121,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { BaseButton } from '@/components/Common'
+import { SUPPORTED_FILE_EXTENSIONS, validateFileType, validateFileSize } from '@/constants/attachment'
 import {
   UploadFilled,
   Plus,
@@ -246,6 +247,11 @@ const fileList = computed({
 const uploadAction = computed(() => props.action)
 const uploadHeaders = computed(() => props.headers)
 const uploadData = computed(() => props.data)
+const resolvedAllowedTypes = computed(() => {
+  return props.allowedTypes.length > 0
+    ? props.allowedTypes.map((item) => String(item).toLowerCase())
+    : SUPPORTED_FILE_EXTENSIONS
+})
 
 // 获取文件图标
 const getFileIcon = (file) => {
@@ -293,18 +299,17 @@ const getStatusText = (status) => {
 // 上传前检查
 const handleBeforeUpload = (file) => {
   // 检查文件大小
-  if (file.size > props.maxSize * 1024 * 1024) {
-    ElMessage.error(`文件大小不能超过 ${props.maxSize}MB`)
+  const sizeValidation = validateFileSize(file, props.maxSize)
+  if (!sizeValidation.passed) {
+    ElMessage.error(sizeValidation.reason || `文件大小不能超过 ${props.maxSize}MB`)
     return false
   }
   
   // 检查文件类型
-  if (props.allowedTypes.length > 0) {
-    const extension = file.name.split('.').pop()?.toLowerCase()
-    if (!props.allowedTypes.includes(extension)) {
-      ElMessage.error(`不支持的文件类型: ${extension}`)
-      return false
-    }
+  const { passed, reason } = validateFileType(file, resolvedAllowedTypes.value)
+  if (!passed) {
+    ElMessage.error(reason || '文件类型不被支持')
+    return false
   }
   
   return true

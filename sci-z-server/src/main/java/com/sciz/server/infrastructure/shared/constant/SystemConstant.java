@@ -78,7 +78,29 @@ public class SystemConstant {
      * 支持的文件类型
      */
     public static final String[] SUPPORTED_FILE_TYPES = {
-            "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md"
+            "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md",
+            "png", "jpg", "jpeg", "gif", "bmp", "webp", "svg"
+    };
+
+    /**
+     * 支持的 MIME 类型
+     */
+    public static final String[] SUPPORTED_MIME_TYPES = {
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "text/plain",
+            "text/markdown",
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/bmp",
+            "image/webp",
+            "image/svg"
     };
 
     /**

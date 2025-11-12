@@ -11,15 +11,15 @@ BEGIN;
 -- =============== 行业配置（更完整、可跨行业） ===============
 -- 约定：仅一个行业 is_active=1 作为默认“当前行业”；其余为 0
 INSERT INTO sys_industry_config (industry_type, industry_name, department_label, role_label, employee_id_label, is_active)
-SELECT 'education', '教育行业', '院系', '角色', '学工号', 1
+SELECT 'education', '教育行业', '院系', '职称/职务', '学工号', 1
 WHERE NOT EXISTS (SELECT 1 FROM sys_industry_config WHERE industry_type = 'education');
 
 INSERT INTO sys_industry_config (industry_type, industry_name, department_label, role_label, employee_id_label, is_active)
-SELECT 'medical', '医疗行业', '科室', '职务', '工号', 0
+SELECT 'medical', '医疗行业', '科室', '职称/职务', '工号', 0
 WHERE NOT EXISTS (SELECT 1 FROM sys_industry_config WHERE industry_type = 'medical');
 
 INSERT INTO sys_industry_config (industry_type, industry_name, department_label, role_label, employee_id_label, is_active)
-SELECT 'power', '电力行业', '部门', '岗位', '员工号', 0
+SELECT 'power', '电力行业', '部门', '职称/职务', '员工号', 0
 WHERE NOT EXISTS (SELECT 1 FROM sys_industry_config WHERE industry_type = 'power');
 
 -- =============== 行业 -> 部门种子（贴近真实行业，仅顶级层，幂等） ===============

@@ -1,6 +1,9 @@
 package com.sciz.server.infrastructure.config.cache;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sciz.server.domain.pojo.entity.user.SysProfileField;
+import com.sciz.server.domain.pojo.entity.user.SysProfileFieldOption;
+import com.sciz.server.domain.pojo.repository.user.SysProfileFieldRepo;
 import com.sciz.server.domain.pojo.repository.user.SysConfigRepo;
 import com.sciz.server.domain.pojo.repository.user.SysDepartmentRepo;
 import com.sciz.server.infrastructure.shared.constant.CacheConstant;
@@ -13,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -33,13 +37,15 @@ public class IndustryConfigCache {
     private final SysConfigRepo sysConfigRepo;
     private final StringRedisTemplate redis;
     private final SysDepartmentRepo sysDepartmentRepo;
+    private final SysProfileFieldRepo sysProfileFieldRepo;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public IndustryConfigCache(SysConfigRepo sysConfigRepo, StringRedisTemplate redis,
-            SysDepartmentRepo sysDepartmentRepo) {
+            SysDepartmentRepo sysDepartmentRepo, SysProfileFieldRepo sysProfileFieldRepo) {
         this.sysConfigRepo = sysConfigRepo;
         this.redis = redis;
         this.sysDepartmentRepo = sysDepartmentRepo;
+        this.sysProfileFieldRepo = sysProfileFieldRepo;
     }
 
     /**
@@ -119,9 +125,46 @@ public class IndustryConfigCache {
                 .collect(Collectors.toList());
         view.setDepartments(departmentOptions);
 
-        log.info(String.format("从数据库加载行业配置成功: type=%s, name=%s, departmentCount=%s",
-                view.getType(), view.getName(), departmentOptions.size()));
+        var profileFields = buildProfileFieldViews(view.getType());
+        view.setProfileFields(profileFields);
+
+        log.info(String.format("从数据库加载行业配置成功: type=%s, name=%s, departmentCount=%s, fieldCount=%s",
+                view.getType(), view.getName(), departmentOptions.size(), profileFields.size()));
         return view;
+    }
+
+    private List<ProfileFieldView> buildProfileFieldViews(String industryType) {
+        var fields = sysProfileFieldRepo.listEnabledByIndustry(industryType);
+        if (fields.isEmpty()) {
+            return List.of();
+        }
+        var fieldIds = fields.stream()
+                .map(SysProfileField::getId)
+                .toList();
+        var options = sysProfileFieldRepo.listOptionsByFieldIds(fieldIds);
+        Map<Long, List<SysProfileFieldOption>> optionMap = options.stream()
+                .collect(Collectors.groupingBy(SysProfileFieldOption::getFieldId));
+        return fields.stream()
+                .map(field -> {
+                    var view = new ProfileFieldView();
+                    view.setFieldCode(field.getFieldCode());
+                    view.setFieldLabel(field.getFieldLabel());
+                    view.setFieldType(field.getFieldType());
+                    view.setIsRequired(field.getIsRequired());
+                    view.setOptions(Optional.ofNullable(optionMap.get(field.getId()))
+                            .orElseGet(List::of)
+                            .stream()
+                            .map(option -> {
+                                var optionView = new ProfileFieldOptionView();
+                                optionView.setOptionValue(option.getOptionValue());
+                                optionView.setOptionLabel(option.getOptionLabel());
+                                optionView.setIsDefault(option.getIsDefault());
+                                return optionView;
+                            })
+                            .toList());
+                    return view;
+                })
+                .toList();
     }
 
     /**
@@ -134,14 +177,6 @@ public class IndustryConfigCache {
         try {
             var view = objectMapper.readValue(json, IndustryView.class);
             if (view == null) {
-                return Optional.empty();
-            }
-            var hasDepartments = Optional.ofNullable(view.getDepartments())
-                    .map(list -> !list.isEmpty())
-                    .orElse(false);
-            if (!hasDepartments) {
-                log.info(String.format("行业配置缓存缺少部门信息，触发回源加载: type=%s",
-                        Optional.ofNullable(view.getType()).orElse("unknown")));
                 return Optional.empty();
             }
             return Optional.of(view);
@@ -181,6 +216,11 @@ public class IndustryConfigCache {
          * 行业下的部门列表
          */
         private List<DepartmentOption> departments;
+
+        /**
+         * 行业下的扩展字段配置
+         */
+        private List<ProfileFieldView> profileFields;
     }
 
     /**
@@ -196,5 +236,51 @@ public class IndustryConfigCache {
          * 部门编码
          */
         private String departmentCode;
+    }
+
+    /**
+     * 扩展字段视图
+     */
+    @Data
+    public static class ProfileFieldView {
+        /**
+         * 字段编码
+         */
+        private String fieldCode;
+        /**
+         * 字段展示名称
+         */
+        private String fieldLabel;
+        /**
+         * 字段类型
+         */
+        private String fieldType;
+        /**
+         * 是否必填
+         */
+        private Integer isRequired;
+        /**
+         * 选项列表
+         */
+        private List<ProfileFieldOptionView> options;
+    }
+
+    /**
+     * 扩展字段选项视图
+     */
+    @Data
+    public static class ProfileFieldOptionView {
+        /**
+         * 选项值
+         */
+        private String optionValue;
+        /**
+         * 选项名称
+         */
+        private String optionLabel;
+        /**
+         * 是否默认
+         */
+        private Integer isDefault;
     }
 }
