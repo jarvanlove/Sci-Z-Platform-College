@@ -449,30 +449,12 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         // 6. 异步调用 Dify API 并转发流式响应
         new Thread(() -> {
             try {
-                // 调用 Dify API 进行流式对话
-                ResponseEntity<String> response = difyApiService.sendChatbotMessage(difyRequest);
-                
-                // 检查响应状态
-                if (!response.getStatusCode().is2xxSuccessful()) {
-                    String errorBody = response.getBody() != null ? response.getBody() : "Unknown error";
-                    emitter.send(SseEmitter.event()
-                            .name("error")
-                            .data(String.format("{\"error\": true, \"message\": \"Dify API调用失败: %s\", \"body\": %s}", 
-                                    response.getStatusCode(), errorBody)));
-                    emitter.complete();
-                    return;
-                }
-
-                // 转发流式响应
-                String responseBody = response.getBody();
-                if (responseBody != null) {
-                    // 如果响应是完整的JSON，直接发送
-                    // 如果是SSE格式，需要逐行解析
-                    String[] lines = responseBody.split("\n");
-                    for (String line : lines) {
+                // 调用 Dify API 进行流式对话（使用流式请求方法）
+                difyApiService.sendChatbotMessageStream(difyRequest, line -> {
+                    try {
                         String trimmedLine = line.trim();
                         if (trimmedLine.isEmpty()) {
-                            continue;
+                            return;
                         }
                         
                         // 处理 SSE 格式的数据行
@@ -483,14 +465,20 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                                         .name("message")
                                         .data(data));
                             }
+                        } else if (trimmedLine.startsWith("event:")) {
+                            // 处理事件类型
+                            String eventType = trimmedLine.substring(6).trim();
+                            log.debug(String.format("收到SSE事件: %s", eventType));
                         } else {
-                            // 如果不是 SSE 格式，直接发送原始数据
+                            // 如果不是标准 SSE 格式，直接发送原始数据
                             emitter.send(SseEmitter.event()
                                     .name("message")
                                     .data(trimmedLine));
                         }
+                    } catch (Exception e) {
+                        log.warn(String.format("处理流式数据行失败: line=%s, err=%s", line, e.getMessage()));
                     }
-                }
+                });
                 
                 // 发送完成事件
                 emitter.send(SseEmitter.event()

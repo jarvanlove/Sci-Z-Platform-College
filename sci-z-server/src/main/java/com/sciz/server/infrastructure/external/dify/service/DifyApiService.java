@@ -94,6 +94,22 @@ public class DifyApiService {
         }
     }
 
+    /**
+     * 发送 Chatbot 流式对话（SSE）
+     * 
+     * @param request 对话请求
+     * @param onData 数据回调函数，每收到一行数据时调用
+     */
+    public void sendChatbotMessageStream(DifyChatbotMessageRequest request, java.util.function.Consumer<String> onData) {
+        try {
+            difyApiClient.requestStream("POST", "/chat-messages", request,
+                    request.getUserId(), request.getResourceId(), request.getKeyType(), onData);
+        } catch (Exception e) {
+            log.error("发送 Chatbot 流式对话失败: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
     private DifyChatbotAppApiKeyResponse createChatbotAppApiKey(DifyChatbotAppRequest request, DifyChatbotAppResponse appResponse) throws JsonProcessingException {
         Map<String, Object> payload = new HashMap<>();
         payload.put("id", UUID.randomUUID().toString());

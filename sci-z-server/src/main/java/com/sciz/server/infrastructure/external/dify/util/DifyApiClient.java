@@ -1,5 +1,6 @@
 package com.sciz.server.infrastructure.external.dify.util;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sciz.server.infrastructure.external.dify.config.DifyConfig;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiKeyService;
 import lombok.RequiredArgsConstructor;
@@ -8,10 +9,16 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.ResponseExtractor;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * Dify API 客户端工具类
@@ -28,6 +35,7 @@ public class DifyApiClient {
     private final DifyConfig difyConfig;
     private final RestTemplate restTemplate;
     private final DifyApiKeyService difyApiKeyService;
+    private final ObjectMapper objectMapper;
     
     /**
      * 统一请求方法（使用动态密钥）
@@ -173,6 +181,87 @@ public class DifyApiClient {
         return new HttpEntity<>(body, headers);
     }
 
+
+    /**
+     * 流式请求方法（用于 SSE 流式响应）
+     * 
+     * @param method 请求类型 (POST)
+     * @param path 请求路径
+     * @param body 请求体
+     * @param userId 用户ID
+     * @param resourceId 资源ID
+     * @param keyType 密钥类型
+     * @param onData 数据回调函数，每收到一行数据时调用
+     */
+    public void requestStream(String method, String path, Object body,
+                             Long userId, String resourceId, String keyType,
+                             Consumer<String> onData) {
+        HttpMethod httpMethod = HttpMethod.valueOf(method.toUpperCase());
+        String url = buildUrl(path, null, 0);
+        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType, 0);
+        
+        log.debug("Dify {} 流式请求: {}, userId={}, resourceId={}, keyType={}", 
+                method, url, userId, resourceId, keyType);
+        
+        ResponseExtractor<Void> responseExtractor = response -> {
+            HttpStatusCode statusCode = response.getStatusCode();
+            
+            if (!statusCode.is2xxSuccessful()) {
+                // 读取错误响应
+                try (InputStream inputStream = response.getBody();
+                     BufferedReader reader = new BufferedReader(
+                             new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                    StringBuilder errorBody = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        errorBody.append(line).append("\n");
+                    }
+                    throw new RuntimeException("Dify 流式请求失败，url: " + url
+                            + ", 状态码: " + statusCode
+                            + ", 响应体: " + errorBody.toString());
+                }
+            }
+            
+            // 流式读取响应
+            try (InputStream inputStream = response.getBody();
+                 BufferedReader reader = new BufferedReader(
+                         new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (onData != null) {
+                        onData.accept(line);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("流式读取响应失败: {}", e.getMessage(), e);
+                throw new RuntimeException("流式读取响应失败: " + e.getMessage(), e);
+            }
+            
+            return null;
+        };
+        
+        restTemplate.execute(url, httpMethod, 
+                request -> {
+                    // 设置请求头
+                    HttpHeaders headers = entity.getHeaders();
+                    if (headers != null) {
+                        headers.forEach((name, values) -> {
+                            request.getHeaders().put(name, values);
+                        });
+                    }
+                    // 设置请求体
+                    if (entity.getBody() != null) {
+                        try {
+                            String jsonBody = objectMapper.writeValueAsString(entity.getBody());
+                            request.getBody().write(jsonBody.getBytes(StandardCharsets.UTF_8));
+                        } catch (Exception e) {
+                            log.error("序列化请求体失败: {}", e.getMessage(), e);
+                            throw new RuntimeException("序列化请求体失败: " + e.getMessage(), e);
+                        }
+                    }
+                }, 
+                responseExtractor);
+    }
 
     private void validateResponse(String url, ResponseEntity<String> response) {
         if (!response.getStatusCode().is2xxSuccessful()) {

@@ -102,3 +102,9 @@ sa-token: # Sa-Token 身份认证配置
   auto-renew-timeout: 1800 # 自动续期步长（秒），例如 30 分钟
   is-renew-active-timeout: true # 每次请求是否续期 activity-timeout
 
+# Actuator 健康检查配置（全局默认）
+management: # Spring Boot Actuator 配置
+  health: # 健康检查配置
+    mail: # 邮件健康检查配置
+      enabled: false # 禁用邮件健康检查（避免默认配置导致连接失败）
+
