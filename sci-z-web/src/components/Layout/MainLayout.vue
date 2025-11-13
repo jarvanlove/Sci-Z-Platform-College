@@ -38,7 +38,7 @@ import Sidebar from './Sidebar.vue'
   padding: 24px;
   
   .content-wrapper {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     min-height: calc(100vh - 108px); // 减去 header 和 padding
   }

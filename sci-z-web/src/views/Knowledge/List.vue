@@ -17,6 +17,15 @@
         <div class="kb-header-actions">
           <button
             class="action-icon"
+            :title="isContentExpanded ? '收起内容区' : '展开内容区'"
+            @click="toggleContentCollapse"
+          >
+            <el-icon>
+              <component :is="isContentExpanded ? ArrowLeft : ArrowRight" />
+            </el-icon>
+          </button>
+          <button
+            class="action-icon"
             title="新建共享知识库"
             @click="showCreateDialog = true"
           >
@@ -63,188 +72,232 @@
     </div>
 
     <!-- 中间内容区域 -->
-    <div class="main-content">
-      <div class="content-header">
-        <div class="content-title">
-          <div class="content-icon">
-            <el-icon><Document /></el-icon>
+    <transition name="main-content-fade">
+      <div v-show="isContentExpanded" class="main-content">
+        <div class="content-wrapper">
+          <div class="content-header">
+            <div class="content-title">
+              <div class="content-icon">
+                <el-icon><Document /></el-icon>
+              </div>
+              <div>
+                <div>
+                  {{ selectedKnowledgeBase ? (selectedKnowledgeBase.shortName || selectedKnowledgeBase.name) : '科研' }}
+                </div>
+                <div class="content-meta">
+                  Sci-Z | {{ selectedKnowledgeBase ? getCurrentFileCount() : 0 }}个内容
+                </div>
+                <div class="content-description">
+                  {{ selectedKnowledgeBase ? selectedKnowledgeBase.description : '科研项目知识库' }}
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <div>
-              {{ selectedKnowledgeBase ? (selectedKnowledgeBase.shortName || selectedKnowledgeBase.name) : '科研' }}
-            </div>
-            <div class="content-meta">
-              Sci-Z | {{ selectedKnowledgeBase ? getCurrentFileCount() : 0 }}个内容
-            </div>
-            <div class="content-description">
-              {{ selectedKnowledgeBase ? selectedKnowledgeBase.description : '科研项目知识库' }}
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div class="content-body">
-        <!-- 选中任何知识库都显示框架（标题/按钮/列表容器） -->
-        <div v-if="selectedKnowledgeBase" class="content-section">
-          <div class="section-header">
-            <div class="section-title">
-              <template v-if="currentFolder">
-                <span class="kb-breadcrumb">
-                  <span class="kb-crumb-link" @click="backToParent">内容</span>
-                  <span>></span>
-                  <span>{{ currentFolder.name }}</span>
+          <div class="content-body">
+            <div v-if="selectedKnowledgeBase" class="content-section">
+              <div class="section-header">
+                <div class="section-title">
+                  <template v-if="currentFolder">
+                    <span class="kb-breadcrumb">
+                      <span class="kb-crumb-link" @click="backToParent">内容</span>
+                      <span>></span>
+                      <span>{{ currentFolder.name }}</span>
+                    </span>
+                  </template>
+                  <template v-else>内容</template>
+                </div>
+                <div class="section-actions">
+                  <button
+                    class="action-icon"
+                    @click="toggleSearch"
+                    title="查询"
+                  >
+                    <el-icon><Search /></el-icon>
+                  </button>
+                  <button
+                    class="action-icon"
+                    @click="createFolder"
+                    title="创建文件夹"
+                  >
+                    <el-icon><FolderAdd /></el-icon>
+                  </button>
+                  <button
+                    class="action-icon"
+                    @click="triggerKbUpload"
+                    title="上传本地文件"
+                  >
+                    <el-icon><Upload /></el-icon>
+                  </button>
+                  <input
+                    ref="kbUploadInput"
+                    type="file"
+                    multiple
+                    style="display: none"
+                    @change="handleKbUpload"
+                  />
+                </div>
+              </div>
+
+              <div
+                v-if="showSearch"
+                class="search-input-wrap"
+                style="margin: 0 0 12px 0"
+              >
+                <span class="search-left-icon">
+                  <el-icon><Search /></el-icon>
                 </span>
-              </template>
-              <template v-else>内容</template>
-            </div>
-            <div class="section-actions">
-              <button
-                class="action-icon"
-                @click="toggleSearch"
-                title="查询"
-              >
-                <el-icon><Search /></el-icon>
-              </button>
-              <button
-                class="action-icon"
-                @click="createFolder"
-                title="创建文件夹"
-              >
-                <el-icon><FolderAdd /></el-icon>
-              </button>
-              <button
-                class="action-icon"
-                @click="triggerKbUpload"
-                title="上传本地文件"
-              >
-                <el-icon><Upload /></el-icon>
-              </button>
-              <input
-                ref="kbUploadInput"
-                type="file"
-                multiple
-                style="display: none"
-                @change="handleKbUpload"
-              />
-            </div>
-          </div>
-
-          <div
-            v-if="showSearch"
-            class="search-input-wrap"
-            style="margin: 0 0 12px 0"
-          >
-            <span class="search-left-icon">
-              <el-icon><Search /></el-icon>
-            </span>
-            <input
-              class="form-input"
-              v-model="kbSearchQuery"
-              placeholder="在知识库中搜索"
-              style="width: 100%; padding: 10px 40px 10px 36px"
-            />
-            <div
-              class="search-dismiss"
-              title="关闭搜索"
-              @click="toggleSearch"
-            >
-              <el-icon><Close /></el-icon>
-            </div>
-          </div>
-
-          <div class="content-list">
-            <template v-for="item in currentKbDisplayItems" :key="item.id">
-              <div class="content-item" v-if="item.type === 'file'">
-                <div class="content-item-icon">
-                  <el-icon><Document /></el-icon>
-                </div>
-                <div class="content-item-info">
-                  <div class="content-item-name">{{ item.name }}</div>
-                  <div class="content-item-meta">
-                    <span>{{ item.ext }}</span>
-                    <span>|</span>
-                    <span>{{ item.time }}</span>
-                  </div>
-                </div>
-                <div class="content-item-actions">
-                  <button
-                    class="action-icon"
-                    title="重命名"
-                    @click.stop="renameItem(item)"
-                  >
-                    <el-icon><Edit /></el-icon>
-                  </button>
-                  <button
-                    class="action-icon"
-                    title="删除"
-                    @click.stop="deleteItem(item)"
-                  >
-                    <el-icon><Delete /></el-icon>
-                  </button>
+                <input
+                  class="form-input"
+                  v-model="kbSearchQuery"
+                  placeholder="在知识库中搜索"
+                  style="width: 100%; padding: 10px 40px 10px 36px"
+                />
+                <div
+                  class="search-dismiss"
+                  title="关闭搜索"
+                  @click="toggleSearch"
+                >
+                  <el-icon><Close /></el-icon>
                 </div>
               </div>
 
-              <div class="content-item" v-else @click="enterFolder(item)">
-                <div class="content-item-icon folder-icon">
-                  <el-icon><Folder /></el-icon>
-                </div>
-                <div class="content-item-info">
-                  <div class="content-item-name">{{ item.name }}</div>
-                  <div class="content-item-meta">
-                    <span>{{ (item.files || []).length }} 个文件</span>
+              <div class="content-list">
+                <template v-for="item in currentKbDisplayItems" :key="item.id">
+                  <div class="content-item" v-if="item.type === 'file'">
+                    <div class="content-item-icon">
+                      <el-icon><Document /></el-icon>
+                    </div>
+                    <div class="content-item-info">
+                      <div class="content-item-name">{{ item.name }}</div>
+                      <div class="content-item-meta">
+                        <span>{{ item.ext }}</span>
+                        <span>|</span>
+                        <span>{{ item.time }}</span>
+                      </div>
+                    </div>
+                    <div class="content-item-actions">
+                      <button
+                        class="action-icon"
+                        title="重命名"
+                        @click.stop="renameItem(item)"
+                      >
+                        <el-icon><Edit /></el-icon>
+                      </button>
+                      <button
+                        class="action-icon"
+                        title="删除"
+                        @click.stop="deleteItem(item)"
+                      >
+                        <el-icon><Delete /></el-icon>
+                      </button>
+                      <el-dropdown
+                        class="content-actions-dropdown"
+                        trigger="click"
+                        @command="(cmd) => handleContentAction(cmd, item)"
+                      >
+                        <button class="action-icon more-action" title="更多操作">
+                          <el-icon><MoreFilled /></el-icon>
+                        </button>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item command="rename">
+                              重命名
+                            </el-dropdown-item>
+                            <el-dropdown-item command="delete" divided>
+                              删除
+                            </el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
+                    </div>
                   </div>
-                </div>
-                <div class="content-item-actions">
-                  <span
-                    v-if="(item.files || []).length > 2"
-                    style="color: #9ca3af"
-                  >▼</span>
-                  <button
-                    class="action-icon"
-                    title="重命名"
-                    @click.stop="renameItem(item)"
-                  >
-                    <el-icon><Edit /></el-icon>
-                  </button>
-                  <button
-                    class="action-icon"
-                    title="删除"
-                    @click.stop="deleteItem(item)"
-                  >
-                    <el-icon><Delete /></el-icon>
-                  </button>
-                </div>
-              </div>
-            </template>
-          </div>
-          <div
-            v-if="currentFolder && currentKbDisplayItems.length === 0"
-            class="content-empty"
-          >
-            <div>文件夹什么也没有，去这里添加</div>
-          </div>
-          <div v-else-if="!currentFolder && currentKbDisplayItems.length === 0" class="content-empty">
-            没有更多内容了
-          </div>
-        </div>
 
-        <!-- 未选中任何知识库时的空状态显示 -->
-        <div v-else class="empty-knowledge-base">
-          <div class="empty-icon-large"></div>
-          <div class="empty-title">知识库什么也没有，去这里添加</div>
-          <div class="empty-description">
-            上传文档、图片、视频等文件，让AI助手帮你整理和回答问题
+                  <div class="content-item" v-else @click="enterFolder(item)">
+                    <div class="content-item-icon folder-icon">
+                      <el-icon><Folder /></el-icon>
+                    </div>
+                    <div class="content-item-info">
+                      <div class="content-item-name">{{ item.name }}</div>
+                      <div class="content-item-meta">
+                        <span>{{ (item.files || []).length }} 个文件</span>
+                      </div>
+                    </div>
+                    <div class="content-item-actions">
+                      <span
+                        v-if="(item.files || []).length > 2"
+                        style="color: #9ca3af"
+                      >▼</span>
+                      <button
+                        class="action-icon"
+                        title="重命名"
+                        @click.stop="renameItem(item)"
+                      >
+                        <el-icon><Edit /></el-icon>
+                      </button>
+                      <button
+                        class="action-icon"
+                        title="删除"
+                        @click.stop="deleteItem(item)"
+                      >
+                        <el-icon><Delete /></el-icon>
+                      </button>
+                      <el-dropdown
+                        class="content-actions-dropdown"
+                        trigger="click"
+                        @command="(cmd) => handleContentAction(cmd, item)"
+                      >
+                        <button class="action-icon more-action" title="更多操作">
+                          <el-icon><MoreFilled /></el-icon>
+                        </button>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item command="rename">
+                              重命名
+                            </el-dropdown-item>
+                            <el-dropdown-item command="delete" divided>
+                              删除
+                            </el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <div
+                v-if="currentFolder && currentKbDisplayItems.length === 0"
+                class="content-empty"
+              >
+                <div>文件夹什么也没有，去这里添加</div>
+              </div>
+              <div
+                v-else-if="!currentFolder && currentKbDisplayItems.length === 0"
+                class="content-empty"
+              >
+                没有更多内容了
+              </div>
+            </div>
+
+            <div v-else class="empty-knowledge-base">
+              <div class="empty-icon-large"></div>
+              <div class="empty-title">知识库什么也没有，去这里添加</div>
+              <div class="empty-description">
+                上传文档、图片、视频等文件，让AI助手帮你整理和回答问题
+              </div>
+              <button class="upload-files-btn" @click="showCreateDialog = true">
+                <el-icon><Plus /></el-icon>
+                创建知识库
+              </button>
+            </div>
           </div>
-          <button class="upload-files-btn" @click="showCreateDialog = true">
-            <el-icon><Plus /></el-icon>
-            创建知识库
-          </button>
         </div>
       </div>
-    </div>
+    </transition>
 
     <!-- 右侧AI助手区域 -->
-    <div class="ai-assistant">
+    <div class="ai-assistant" :class="{ 'ai-expanded': !isContentExpanded }">
       <div class="ai-header">
         <div class="ai-header-left">
           <div class="ai-header-title">问知识库</div>
@@ -464,6 +517,8 @@ import {
   FolderOpened,
   Plus,
   ArrowDown,
+  ArrowLeft,
+  ArrowRight,
   Document,
   Search,
   FolderAdd,
@@ -473,7 +528,8 @@ import {
   Delete,
   Folder,
   Picture,
-  ArrowUp
+  ArrowUp,
+  MoreFilled
 } from '@element-plus/icons-vue'
 import {
   getKnowledgeList,
@@ -499,6 +555,7 @@ import { createLogger } from '@/utils/simpleLogger'
 const logger = createLogger('KnowledgeList')
 
 // 响应式数据
+const isContentExpanded = ref(true)
 const knowledgeBases = ref([])
 const selectedKnowledgeBase = ref(null)
 const kbItems = ref([])
@@ -731,6 +788,18 @@ const toggleSearch = () => {
   showSearch.value = !showSearch.value
   if (!showSearch.value) {
     kbSearchQuery.value = ''
+  }
+}
+
+const toggleContentCollapse = () => {
+  isContentExpanded.value = !isContentExpanded.value
+}
+
+const handleContentAction = (command, item) => {
+  if (command === 'rename') {
+    renameItem(item)
+  } else if (command === 'delete') {
+    deleteItem(item)
   }
 }
 
@@ -1133,6 +1202,9 @@ onMounted(() => {
 .knowledge-base-container {
   display: flex;
   height: 100vh;
+  width: 100vw;
+  max-width: 100%;
+  margin: 0 auto;
   background: #f7f9fc;
   overflow: hidden;
 }
@@ -1140,6 +1212,7 @@ onMounted(() => {
 /* 左侧导航栏 */
 .kb-list-sidebar {
   width: 280px;
+  min-width: 280px;
   background: white;
   border-right: 1px solid #e5e7eb;
   display: flex;
@@ -1148,11 +1221,12 @@ onMounted(() => {
 }
 
 .kb-list-header {
-  padding: 14px 20px 14px 12px;
+  padding: 14px 20px 14px 16px;
   border-bottom: 1px solid #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .kb-header-title {
@@ -1162,13 +1236,26 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0;
 }
 
 .kb-header-actions {
   display: flex;
   gap: 8px;
 }
+
+// .kb-list-sidebar:not(.is-open) .kb-toggle-text {
+//   display: none;
+// }
+//
+// .kb-list-sidebar:not(.is-open) .kb-toggle-button {
+//   justify-content: center;
+//   padding: 10px;
+// }
+//
+// .kb-list-sidebar:not(.is-open) .kb-toggle-arrow {
+//   transform: rotate(-90deg);
+// }
+// Legacy sidebar collapse selectors removed
 
 .kb-section {
   margin-bottom: 24px;
@@ -1191,6 +1278,18 @@ onMounted(() => {
   overflow-y: auto;
   padding: 0 20px;
 }
+
+// .kb-collapse-enter-active,
+// .kb-collapse-leave-active {
+//   transition: opacity 0.2s ease, transform 0.2s ease;
+// }
+
+// .kb-collapse-enter-from,
+// .kb-collapse-leave-to {
+//   opacity: 0;
+//   transform: translateY(-8px);
+// }
+// Transition helpers for the old sidebar collapse removed
 
 .kb-item {
   cursor: pointer;
@@ -1261,17 +1360,30 @@ onMounted(() => {
 
 /* 中间内容区域 */
 .main-content {
-  flex: 1;
+  flex: 1 1 0%;
+  max-width: 100%;
   background: white;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
+.main-content .content-wrapper {
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .content-header {
   padding: 24px;
   border-bottom: 1px solid #f3f4f6;
   background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .content-title {
@@ -1282,6 +1394,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
 }
 
 .content-icon {
@@ -1348,6 +1461,8 @@ onMounted(() => {
 .section-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .action-icon {
@@ -1362,7 +1477,6 @@ onMounted(() => {
   justify-content: center;
   color: #374151;
   transition: all 0.2s ease;
-  font-size: 14px;
 
   &:hover {
     background: #eef2ff;
@@ -1383,10 +1497,11 @@ onMounted(() => {
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   gap: 12px;
   transition: all 0.2s ease;
+  align-items: center;
 
   &:hover {
     background: #f3f4f6;
@@ -1436,7 +1551,26 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
+
+.content-actions-dropdown {
+  display: none;
+}
+
+// .content-collapse-enter-active,
+// .content-collapse-leave-active {
+//   transition: all 0.3s ease;
+//   overflow: hidden;
+// }
+//
+// .content-collapse-enter-from,
+// .content-collapse-leave-to {
+//   opacity: 0;
+//   max-height: 0;
+// }
+// Legacy content-collapse transitions removed
 
 .content-empty {
   text-align: center;
@@ -1617,11 +1751,18 @@ onMounted(() => {
 /* 右侧AI助手区域 */
 .ai-assistant {
   width: 600px;
+  flex: 0 0 600px;
   background: white;
   border-left: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.ai-assistant.ai-expanded {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
 }
 
 .ai-header {
@@ -1630,6 +1771,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.ai-header-left {
+  display: flex;
+  align-items: center;
 }
 
 .ai-header-title {
@@ -1669,11 +1815,13 @@ onMounted(() => {
   margin-bottom: 24px;
   display: flex;
   align-items: flex-start;
-
+  gap: 12px;
+ 
   &.user {
-    justify-content: flex-end;
+    flex-direction: row-reverse;
+    gap: 16px;
   }
-
+ 
   &.ai {
     justify-content: flex-start;
   }
@@ -1690,17 +1838,15 @@ onMounted(() => {
   font-weight: 600;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-
+ 
   &.user {
     background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
     color: #fff;
-    margin-left: 12px;
   }
-
+ 
   &.ai {
     background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
     color: #fff;
-    margin-right: 12px;
   }
 }
 
@@ -1725,6 +1871,10 @@ onMounted(() => {
   color: #fff;
   border-color: transparent;
   border-radius: 16px 16px 4px 16px;
+}
+
+.kb-message.user .kb-message-bubble {
+  align-self: flex-end;
 }
 
 .kb-message.ai .kb-message-content-wrapper {
@@ -1925,5 +2075,94 @@ onMounted(() => {
 .kb-streaming-text {
   font-size: 12px;
   color: #6b7280;
+}
+
+.main-content-fade-enter-active,
+.main-content-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.main-content-fade-enter-from,
+.main-content-fade-leave-to {
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+@media (max-width: 1440px) {
+  .ai-assistant {
+    width: 420px;
+  }
+}
+
+@media (max-width: 1400px) {
+  .knowledge-base-container {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    width: 100%;
+    max-width: none;
+  }
+
+  .kb-list-sidebar {
+    width: 100%;
+    min-width: 0;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .kb-list {
+    padding: 0 16px 16px;
+    max-height: 50vh;
+  }
+
+  .main-content {
+    order: 2;
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .ai-assistant {
+    order: 3;
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #e5e7eb;
+  }
+}
+
+@media (max-width: 768px) {
+  .content-header {
+    padding: 16px;
+  }
+
+  .ai-assistant {
+    border-top: none;
+  }
+
+  .content-item {
+    padding: 12px 10px;
+  }
+
+  .content-item-meta {
+    font-size: 11px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .content-item-actions {
+    gap: 4px;
+  }
+
+  .action-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .content-item-actions .action-icon:not(.more-action) {
+    display: none;
+  }
+
+  .content-item-actions .action-icon.more-action {
+    display: inline-flex;
+  }
 }
 </style>
