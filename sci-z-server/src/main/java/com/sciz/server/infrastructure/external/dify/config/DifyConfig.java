@@ -59,7 +59,12 @@ public class DifyConfig {
      * 文件上传配置
      */
     private Upload upload;
-    
+
+    /**
+     * Chatbot 模型配置
+     */
+    private Chatbot chatbot;
+
     @Data
     public static class Document {
         private String indexingTechnique;
@@ -79,5 +84,49 @@ public class DifyConfig {
         private String dir;
         private Long maxFileSize;
         private String allowedExtensions;
+    }
+
+    @Data
+    public static class Chatbot {
+        /**
+         * 模型配置
+         */
+        private Model model;
+
+        /**
+         * 重排序模型配置
+         */
+        private RerankingModel rerankingModel;
+
+        @Data
+        public static class Model {
+            /**
+             * 模型提供商
+             */
+            private String provider;
+
+            /**
+             * 模型名称
+             */
+            private String name;
+
+            /**
+             * 模型模式（chat/completion）
+             */
+            private String mode;
+        }
+
+        @Data
+        public static class RerankingModel {
+            /**
+             * 重排序提供商名称
+             */
+            private String rerankingProviderName;
+
+            /**
+             * 重排序模型名称
+             */
+            private String rerankingModelName;
+        }
     }
 }

@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/store/modules/auth'
 import { createLogger } from '@/utils/simpleLogger'
@@ -43,6 +43,7 @@ const routes = [
   },
   {
     path: '/declaration',
+    component: RouterView,
     children: [
       {
         path: 'list',
@@ -81,6 +82,7 @@ const routes = [
   },
   {
     path: '/project',
+    component: RouterView,
     children: [
       {
         path: 'list',
@@ -119,6 +121,7 @@ const routes = [
   },
   {
     path: '/report',
+    component: RouterView,
     children: [
       {
         path: 'list',
@@ -146,6 +149,7 @@ const routes = [
   },
   {
     path: '/knowledge',
+    component: RouterView,
     children: [
       {
         path: 'list',
@@ -184,6 +188,7 @@ const routes = [
   },
   {
     path: '/user',
+    component: RouterView,
     children: [
       {
         path: 'profile',
@@ -211,6 +216,7 @@ const routes = [
   },
   {
     path: '/system',
+    component: RouterView,
     children: [
       {
         path: 'user',

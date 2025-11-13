@@ -195,13 +195,22 @@
         <div class="form-row single">
           <div class="form-item">
             <el-form-item :label="$t('auth.register.verificationCodeLabel')" prop="verificationCode">
-              <el-input
-                v-model="registerForm.verificationCode"
-                :placeholder="$t('auth.register.verificationCodePlaceholder')"
-                maxlength="6"
-                size="large"
-                clearable
-              />
+              <div class="sms-code-wrapper">
+                <el-input
+                  v-model="registerForm.verificationCode"
+                  :placeholder="$t('auth.register.verificationCodePlaceholder')"
+                  maxlength="6"
+                  size="large"
+                  clearable
+                />
+                <BaseButton
+                  type="primary"
+                  :disabled="!canSendSmsCode || smsCodeCountdown > 0"
+                  @click="handleSendSmsCode"
+                >
+                  {{ smsCodeCountdown > 0 ? `${smsCodeCountdown}s` : $t('auth.register.sendSmsCode') }}
+                </BaseButton>
+              </div>
               <div class="verification-hint">
                 {{ $t('auth.register.smsCodeHint') }}
               </div>
@@ -251,6 +260,11 @@ import { validateEmail, validatePhone, validatePassword } from '@/utils/validate
 import { createLogger } from '@/utils/simpleLogger'
 import { useIndustryStore } from '@/store/modules/industry'
 
+/**
+ * TODO: 短信服务未开通前保持以下导入注释，开通后去掉注释并使用 sendSmsVerificationCode 发送短信验证码。
+ * import { sendSmsVerificationCode } from '@/api/Auth'
+ */
+
 const emit = defineEmits(['register-success'])
 
 const router = useRouter()
@@ -296,7 +310,45 @@ const departments = ref([])
 const departmentsLoading = ref(false)
 const departmentLabel = computed(() => t(industryStore.departmentLabelKey))
 const departmentPlaceholder = computed(() => t(industryStore.departmentPlaceholderKey))
-// let countdownTimer = null
+/**
+ * TODO: 短信验证码服务开通后启用以下状态管理逻辑，并搭配 sendSmsVerificationCode 接口使用。
+ *
+ * const smsCodeCountdown = ref(0)
+ * let smsCountdownTimer = null
+ * const canSendSmsCode = computed(() => {
+ *   return (
+ *     !!registerForm.phone &&
+ *     !!registerForm.captcha &&
+ *     !!registerForm.captchaKey &&
+ *     !phoneError.value &&
+ *     smsCodeCountdown.value === 0
+ *   )
+ * })
+ *
+ * const handleSendSmsCode = async () => {
+ *   if (!canSendSmsCode.value) return
+ *   try {
+ *     await sendSmsVerificationCode({
+ *       phone: registerForm.phone,
+ *       captcha: registerForm.captcha,
+ *       captchaKey: registerForm.captchaKey
+ *     })
+ *     ElMessage.success(t('auth.register.smsCodeSent'))
+ *     smsCodeCountdown.value = 60
+ *     smsCountdownTimer = window.setInterval(() => {
+ *       if (smsCodeCountdown.value <= 0) {
+ *         window.clearInterval(smsCountdownTimer)
+ *         smsCountdownTimer = null
+ *         return
+ *       }
+ *       smsCodeCountdown.value -= 1
+ *     }, 1000)
+ *   } catch (error) {
+ *     logger.error('Send sms verification code failed', error)
+ *     ElMessage.error(t('auth.register.smsCodeSendFailed'))
+ *   }
+ * }
+ */
 
 const registerRules = {
   username: [

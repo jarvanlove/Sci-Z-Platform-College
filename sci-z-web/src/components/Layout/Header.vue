@@ -34,11 +34,11 @@
           <el-dropdown-menu>
             <el-dropdown-item command="profile">
               <el-icon><User /></el-icon>
-              {{ $t('user.profile') }}
+            {{ $t('user.profile.menu') }}
             </el-dropdown-item>
             <el-dropdown-item command="security">
               <el-icon><Lock /></el-icon>
-              {{ $t('user.security') }}
+              {{ $t('user.security.menu') }}
             </el-dropdown-item>
             <el-dropdown-item divided command="logout">
               <el-icon><SwitchButton /></el-icon>
@@ -118,7 +118,7 @@ const handleLogout = async () => {
     const authStore = useAuthStore()
     
     // 调用退出接口并清理本地数据
-    await authStore.logout()
+    await authStore.logout({ redirect: false })
     
     // 显示退出成功消息
     ElMessage.success(t('auth.logoutSuccess'))

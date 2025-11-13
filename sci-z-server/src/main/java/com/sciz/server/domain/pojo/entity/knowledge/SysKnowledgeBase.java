@@ -13,7 +13,7 @@ import lombok.Setter;
  *
  * - 对应表：sys_knowledge_base
  *
- * @author JiaWen.Wu
+ * @author ShiHang.Shang
  * @className SysKnowledgeBase
  * @date 2025-10-30 00:00
  */
@@ -69,6 +69,18 @@ public class SysKnowledgeBase extends BaseEntity {
      */
     @TableField("dify_kb_id")
     private String difyKbId;
+
+    /**
+     * Dify知识库数据ID（Dify返回的id字段）
+     */
+    @TableField("dify_knowdata_id")
+    private String difyKnowdataId;
+
+    /**
+     * 回调数据（Dify API返回的完整JSON数据）
+     */
+    @TableField("callback")
+    private String callback;
 
     /**
      * 是否共享

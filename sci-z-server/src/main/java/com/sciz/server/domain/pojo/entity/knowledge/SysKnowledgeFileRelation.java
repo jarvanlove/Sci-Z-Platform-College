@@ -13,7 +13,7 @@ import lombok.Setter;
  *
  * - 对应表：sys_knowledge_file_relation
  *
- * @author JiaWen.Wu
+ * @author ShiHang.Shang
  * @className SysKnowledgeFileRelation
  * @date 2025-10-30 00:00
  */
@@ -57,4 +57,10 @@ public class SysKnowledgeFileRelation extends BaseEntity {
      */
     @TableField("sort_order")
     private Integer sortOrder;
+
+    /**
+     * 回调数据（Dify API返回的完整JSON数据）
+     */
+    @TableField("callback")
+    private String callback;
 }

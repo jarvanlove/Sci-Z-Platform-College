@@ -29,7 +29,8 @@ export const AUTH_API = {
   REGISTER: buildApiUrl('/auth/register'),
   RESET_PASSWORD: buildApiUrl('/auth/reset-password'),
   CAPTCHA: buildApiUrl('/auth/captcha'),
-  SEND_EMAIL_CODE: buildApiUrl('/auth/send-email-code'),
+  SEND_EMAIL_CODE: buildApiUrl('/auth/email-code'),
+  SEND_SMS_CODE: buildApiUrl('/auth/sms-code'),
   REFRESH_TOKEN: buildApiUrl('/auth/refresh-token'),
   PROFILE: buildApiUrl('/auth/profile'),
   CHECK_LOGIN: buildApiUrl('/auth/check/login'),
@@ -128,8 +129,8 @@ export const AI_API = {
 
 export const KNOWLEDGE_API = {
   BASE_PATH: buildApiUrl('/knowledge'),
-  LIST: buildApiUrl('/knowledge/list'),
-  CREATE: buildApiUrl('/knowledge/create'),
+  LIST: buildApiUrl('/knowledge'), // GET /api/knowledge?page=1&size=10
+  CREATE: buildApiUrl('/knowledge'), // POST /api/knowledge
   DETAIL: (id) => buildApiUrl(`/knowledge/detail/${id}`),
   UPDATE: (id) => buildApiUrl(`/knowledge/update/${id}`),
   DELETE: (id) => buildApiUrl(`/knowledge/delete/${id}`),
@@ -138,11 +139,22 @@ export const KNOWLEDGE_API = {
   UPDATE_FOLDER: (id) => buildApiUrl(`/knowledge/folders/${id}`),
   DELETE_FOLDER: (id) => buildApiUrl(`/knowledge/folders/${id}`),
   UPLOAD_FILE: buildApiUrl('/knowledge/files/upload'),
+  UPLOAD: (id) => buildApiUrl(`/knowledge/${id}/upload`), // POST /api/knowledge/{difyKbId}/upload
   FILES: (id) => buildApiUrl(`/knowledge/files/${id}`),
   DELETE_FILE: (id) => buildApiUrl(`/knowledge/files/${id}`),
   RENAME_FILE: (id) => buildApiUrl(`/knowledge/files/rename/${id}`),
   MOVE_FILE: (id) => buildApiUrl(`/knowledge/files/move/${id}`),
-  QA_ASK: buildApiUrl('/knowledge/qa/ask')
+  SEARCH: (id) => buildApiUrl(`/knowledge/${id}/search`), // GET /api/knowledge/{id}/search?query=xxx
+  QA_ASK: buildApiUrl('/knowledge/qa/ask'),
+  // 知识库Chatbot流式对话接口
+  CHATBOT_STREAM: buildApiUrl('/knowledge/chatbot/stream'), // POST /api/knowledge/chatbot/stream
+  // 文件关联接口
+  FILE_RELATION_BASE: buildApiUrl('/knowledge/file-relation'),
+  FILE_RELATION_CREATE: buildApiUrl('/knowledge/file-relation'), // POST /api/knowledge/file-relation
+  FILE_RELATION_UPDATE: (id) => buildApiUrl(`/knowledge/file-relation/${id}`), // PUT /api/knowledge/file-relation/{id}
+  FILE_RELATION_DELETE: (id) => buildApiUrl(`/knowledge/file-relation/${id}`), // DELETE /api/knowledge/file-relation/{id}
+  FILE_RELATION_DETAIL: (id) => buildApiUrl(`/knowledge/file-relation/${id}`), // GET /api/knowledge/file-relation/{id}
+  FILE_RELATION_LIST: buildApiUrl('/knowledge/file-relation') // GET /api/knowledge/file-relation?knowledgeId=1&folderId=0&page=1&size=10
 }
 
 // ================================

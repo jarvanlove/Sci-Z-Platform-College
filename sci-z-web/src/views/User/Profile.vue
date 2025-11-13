@@ -1,23 +1,16 @@
 <!--
 /**
- * @description 个人信息页面
- * 查看和编辑用户个人信息
+ * @description 用户中心 - 个人信息页面
+ * 参考《安全设置页面开发提示词》《个人信息页面开发提示词》实现
  */
 -->
 <template>
-  <div class="user-profile-page">
-    <h1>个人信息页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <UserProfile />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import { UserProfile } from '@/components/Business/User'
 </script>
 
 <style lang="scss" scoped>
-.user-profile-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
 </style>

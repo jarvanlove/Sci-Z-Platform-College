@@ -1,18 +1,26 @@
 package com.sciz.server.interfaces.controller;
-
 import com.sciz.server.application.service.knowledge.KnowledgeService;
+import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeChatbotStreamReq;
+import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeCreateReq;
+import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeResp;
+import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * @author JiaWen.Wu
+ * 知识库控制器
+ *
+ * @author ShiHang.Shang
  * @className KnowledgeController
- * @date 2025-10-29 10:00
+ * @date 2025-01-28 14:30
  */
-@Tag(name = "知识库控制器", description = "知识库相关接口")
+@Tag(name = "知识库管理", description = "知识库相关接口")
 @RestController
 @RequestMapping("/api/knowledge")
 @RequiredArgsConstructor
@@ -20,19 +28,33 @@ public class KnowledgeController {
 
     private final KnowledgeService knowledgeService;
 
-    @Operation(summary = "创建知识库", description = "创建新的知识库")
+    /**
+     * 创建知识库
+     *
+     * @param req 创建请求
+     * @return 知识库响应
+     */
+    @Operation(summary = "创建知识库", description = "创建新的知识库，调用Dify API创建数据集并保存到数据库")
     @PostMapping
-    public Result<Void> createKnowledgeBase(@RequestBody Object request) {
-        // TODO: 实现知识库创建逻辑
-        return Result.success();
+    public Result<KnowledgeResp> createKnowledgeBase(@Valid @RequestBody KnowledgeCreateReq req) {
+        KnowledgeResp resp = knowledgeService.create(req);
+        return Result.success(resp);
     }
 
-    @Operation(summary = "获取知识库列表", description = "分页获取知识库列表")
+    /**
+     * 分页获取知识库列表
+     *
+     * @param page 页码
+     * @param size 页大小
+     * @return 知识库分页结果
+     */
+    @Operation(summary = "获取知识库列表", description = "分页获取知识库列表，如果用户已登录则只返回该用户的知识库")
     @GetMapping
-    public Result<Object> getKnowledgeBases(@RequestParam(defaultValue = "1") int page,
+    public Result<PageResult<KnowledgeResp>> pageKnowledgeBases(
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
-        // TODO: 实现知识库列表查询逻辑
-        return Result.success();
+        PageResult<KnowledgeResp> result = knowledgeService.page(page, size);
+        return Result.success(result);
     }
 
     @Operation(summary = "获取知识库详情", description = "根据ID获取知识库详细信息")
@@ -42,11 +64,34 @@ public class KnowledgeController {
         return Result.success();
     }
 
-    @Operation(summary = "上传文件", description = "向知识库上传文件")
+    /**
+     * 上传文件到知识库
+     *
+     * @param id 知识库ID
+     * @param file 上传的文件
+     * @param folderId 文件夹ID（可选，0为根目录）
+     * @return 操作结果
+     */
+    @Operation(summary = "上传文件", description = "向知识库上传文件，调用Dify API上传文档并保存关联关系")
     @PostMapping("/{id}/upload")
-    public Result<Void> uploadFile(@PathVariable Long id, @RequestParam("file") Object file) {
-        // TODO: 实现文件上传逻辑
+    public Result<Void> uploadFile(
+            @PathVariable String id,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "folderId", required = false, defaultValue = "0") Long folderId) {
+        knowledgeService.uploadFile(id, file, folderId);
         return Result.success();
+    }
+
+    /**
+     * 基于知识库的 Chatbot 流式对话
+     *
+     * @param req 流式对话请求
+     * @return 流式响应（SSE格式）
+     */
+    @Operation(summary = "知识库Chatbot流式对话", description = "基于知识库的Chatbot流式问答，如果用户未创建Chatbot则返回提示")
+    @PostMapping(value = "/chatbot/stream", produces = "text/event-stream")
+    public SseEmitter chatbotStream(@Valid @RequestBody KnowledgeChatbotStreamReq req) {
+        return knowledgeService.chatbotStream(req);
     }
 
     @Operation(summary = "搜索知识库", description = "在知识库中搜索内容")

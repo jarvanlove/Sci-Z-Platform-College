@@ -42,7 +42,7 @@ public class WebConfig implements WebMvcConfigurer {
      */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 静态资源
+        // 静态资源 - 只处理 /static/** 路径
         registry.addResourceHandler("/static/**")
                 .addResourceLocations("classpath:/static/");
 

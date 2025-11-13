@@ -24,27 +24,28 @@ import com.sciz.server.infrastructure.shared.utils.JsonUtil;
 @Configuration
 public class SecurityConfig {
 
-    @Bean
-    public SaServletFilter saServletFilter() {
-        return new SaServletFilter()
-                .addInclude("/**")
-                // 认证相关接口：只放行真正不需要 token 的接口
-                .addExclude("/api/auth/login") // 登录
-                .addExclude("/api/auth/register") // 注册
-                .addExclude("/api/auth/reset-password") // 重置密码
-                .addExclude("/api/auth/captcha") // 获取验证码
-                .addExclude("/api/auth/department/label") // 获取行业部门标签
-                .addExclude("/api/auth/email-code") // 发送重置密码邮箱验证码
-                // 静态资源和文档
-                .addExclude("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**")
-                .addExclude("/webjars/**", "/static/**", "/favicon.ico")
-                // 其他所有接口都需要登录
-                .setAuth(obj -> SaRouter.match("/**").check(r -> StpUtil.checkLogin()))
-                .setError(e -> {
-                    // 统一未登录响应
-                    var result = Result.fail(ResultCode.UNAUTHORIZED);
-                    return Optional.ofNullable(JsonUtil.toJson(result))
-                            .orElse(result.getMessage());
-                });
-    }
+//    @Bean
+//    public SaServletFilter saServletFilter() {
+//        return new SaServletFilter()
+//                .addInclude("/**")
+//                // 认证相关接口：只放行真正不需要 token 的接口
+//                .addExclude("/api/auth/login") // 登录
+//                .addExclude("/api/auth/register") // 注册
+//                .addExclude("/api/auth/reset-password") // 重置密码
+//                .addExclude("/api/auth/captcha") // 获取验证码
+//                .addExclude("/api/auth/department/label") // 获取行业部门标签
+//                .addExclude("/api/auth/email-code") // 发送重置密码邮箱验证码
+//                // 静态资源和文档
+//                .addExclude("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**")
+//                .addExclude("/webjars/**", "/static/**", "/favicon.ico")
+//                .addExclude("/api/dify/**")
+//                // 其他所有接口都需要登录
+//                .setAuth(obj -> SaRouter.match("/**").check(r -> StpUtil.checkLogin()))
+//                .setError(e -> {
+//                    // 统一未登录响应
+//                    var result = Result.fail(ResultCode.UNAUTHORIZED);
+//                    return Optional.ofNullable(JsonUtil.toJson(result))
+//                            .orElse(result.getMessage());
+//                });
+//    }
 }

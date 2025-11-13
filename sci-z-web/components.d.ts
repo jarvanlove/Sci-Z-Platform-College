@@ -22,6 +22,7 @@ declare module 'vue' {
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
+    ElDatePicker: typeof import('element-plus/es')['ElDatePicker']
     ElDialog: typeof import('element-plus/es')['ElDialog']
     ElDropdown: typeof import('element-plus/es')['ElDropdown']
     ElDropdownItem: typeof import('element-plus/es')['ElDropdownItem']
@@ -39,6 +40,8 @@ declare module 'vue' {
     ElSubMenu: typeof import('element-plus/es')['ElSubMenu']
     ElTable: typeof import('element-plus/es')['ElTable']
     ElTableColumn: typeof import('element-plus/es')['ElTableColumn']
+    ElTag: typeof import('element-plus/es')['ElTag']
+    ElTooltip: typeof import('element-plus/es')['ElTooltip']
     FileUpload: typeof import('./src/components/Business/Form/FileUpload.vue')['default']
     FormActions: typeof import('./src/components/Business/Form/FormActions.vue')['default']
     FormSection: typeof import('./src/components/Business/Form/FormSection.vue')['default']
@@ -59,5 +62,10 @@ declare module 'vue' {
     StatCard: typeof import('./src/components/Business/Legacy/StatCard.vue')['default']
     StatusTag: typeof import('./src/components/Business/List/StatusTag.vue')['default']
     Timeline: typeof import('./src/components/Business/Detail/Timeline.vue')['default']
+    UserProfile: typeof import('./src/components/Business/User/UserProfile.vue')['default']
+    UserSecurity: typeof import('./src/components/Business/User/UserSecurity.vue')['default']
+  }
+  export interface ComponentCustomProperties {
+    vLoading: typeof import('element-plus/es')['ElLoadingDirective']
   }
 }
