@@ -1,8 +1,3 @@
-  const sizeValidation = validateFileSize(file, AVATAR_MAX_SIZE_MB)
-  if (!sizeValidation.passed) {
-    ElMessage.error(sizeValidation.reason)
-    return
-  }
 <!--
 /**
  * @description 用户中心 - 个人信息业务组件
@@ -14,7 +9,14 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">{{ t('user.profile.title') }}</h1>
+        <p class="page-subtitle">
+          {{ t('user.profile.contactSection') }} · {{ t('user.profile.accountSection') }}
+        </p>
       </div>
+      <el-button type="primary" :loading="loading" @click="loadProfile(true)">
+        <el-icon><Refresh /></el-icon>
+        {{ t('common.refresh') || 'Refresh' }}
+      </el-button>
     </div>
 
     <div class="profile-content">
@@ -159,8 +161,16 @@
 
           <!-- 表单操作 -->
           <div class="form-actions">
-            <BaseButton type="primary" size="large" :loading="saving" @click="handleSave">
+            <BaseButton
+              type="primary"
+              size="large"
+              :loading="saving"
+              @click="handleSave"
+            >
               {{ t('user.profile.save') }}
+            </BaseButton>
+            <BaseButton size="large" @click="handleReset">
+              {{ t('user.profile.reset') }}
             </BaseButton>
           </div>
         </el-form>
@@ -175,10 +185,11 @@
         </template>
 
         <div class="avatar-wrapper">
-          <div class="avatar-preview" @click="handlePreviewAvatar">
+          <div class="avatar-preview" @click="openFileDialog">
             <img :src="avatarPreview || defaultAvatar" alt="avatar" />
             <div class="avatar-overlay">
-              <span>{{ t('user.profile.clickPreview') }}</span>
+              <el-icon size="24"><Upload /></el-icon>
+              <span>{{ t('user.profile.clickUpload') }}</span>
             </div>
           </div>
 
@@ -206,57 +217,13 @@
       </BaseCard>
     </div>
   </div>
-
-  <el-dialog
-    v-model="cropperVisible"
-    width="480px"
-    :close-on-click-modal="false"
-    :destroy-on-close="true"
-    class="avatar-crop-dialog"
-    :title="t('user.profile.avatarCropTitle')"
-  >
-    <div class="avatar-cropper">
-      <div class="avatar-cropper__preview" ref="cropperContainerRef">
-        <img v-if="cropperImageSrc" :src="cropperImageSrc" alt="avatar preview" />
-      </div>
-      <div class="avatar-cropper__controls">
-        <el-button :icon="ZoomOut" circle @click="handleCropZoom(-0.1)" />
-        <el-button :icon="ZoomIn" circle @click="handleCropZoom(0.1)" />
-      </div>
-      <p class="avatar-cropper__tips">{{ t('user.profile.avatarCropTips') }}</p>
-    </div>
-    <template #footer>
-      <div class="avatar-cropper__actions">
-        <el-button type="primary" @click="handleCropConfirm">
-          {{ t('user.profile.cropConfirm') }}
-        </el-button>
-      </div>
-    </template>
-  </el-dialog>
-
-  <el-dialog
-    v-model="previewVisible"
-    width="420px"
-    :destroy-on-close="true"
-    class="avatar-preview-dialog"
-    :title="t('user.profile.avatarPreviewTitle')"
-  >
-    <div class="avatar-preview-wrapper">
-      <img :src="avatarPreview || defaultAvatar" alt="avatar preview" />
-    </div>
-    <template #footer>
-      <el-button type="primary" @click="previewVisible = false">
-        {{ t('common.confirm') }}
-      </el-button>
-    </template>
-  </el-dialog>
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted, nextTick, onBeforeUnmount, watch } from 'vue'
+import { computed, reactive, ref, onMounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { InfoFilled, Upload, Loading, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
+import { InfoFilled, Upload, Loading, Refresh } from '@element-plus/icons-vue'
 import { BaseButton, BaseCard } from '@/components/Common'
 import { getUserInfo, updateUserInfo, getProfileFields, uploadAvatar } from '@/api/User'
 import { previewFile } from '@/api/File'
@@ -290,6 +257,7 @@ const defaultAvatar = ref('https://dummyimage.com/160x160/f3f4f6/8c9eff&text=Ava
 
 const loading = ref(false)
 const saving = ref(false)
+const uploading = ref(false)
 
 const formData = reactive({
   username: '',
@@ -298,9 +266,10 @@ const formData = reactive({
   phone: '',
   department: '',
   title: '',
-  avatar: '',
-  avatarFileId: null
+  avatar: ''
 })
+
+const initialSnapshot = ref({})
 
 const verification = reactive({
   email: { loading: false, success: false, error: false, message: '' },
@@ -311,17 +280,6 @@ const departmentOptions = ref([])
 
 const avatarPreview = ref('')
 
-const profileFieldMap = ref({})
-
-const titleOptions = computed(() => {
-  const field = profileFieldMap.value?.title
-  if (!field?.options?.length) return []
-  return field.options.map((option) => ({
-    ...option,
-    value: option.value ?? option.optionValue
-  }))
-})
-
 const departmentLabel = computed(() => {
   const key = industryStore.departmentLabelKey
   return key ? t(key) : t('user.profile.department')
@@ -331,6 +289,14 @@ const departmentPlaceholder = computed(() => {
   const key = industryStore.departmentPlaceholderKey
   return key ? t(key) : t('user.profile.departmentPlaceholder')
 })
+
+const titleOptions = computed(() => [
+  { label: t('user.profile.titleOptionProfessor'), value: 'professor' },
+  { label: t('user.profile.titleOptionAssociateProfessor'), value: 'associate_professor' },
+  { label: t('user.profile.titleOptionLecturer'), value: 'lecturer' },
+  { label: t('user.profile.titleOptionResearcher'), value: 'researcher' },
+  { label: t('user.profile.titleOptionAssistantResearcher'), value: 'assistant_researcher' }
+])
 
 const emailReady = computed(() => validateEmail(formData.email) && !verification.email.loading)
 const phoneReady = computed(() => validatePhone(formData.phone) && !verification.phone.loading)
@@ -393,60 +359,11 @@ const loadDepartments = async () => {
     if (Array.isArray(list) && list.length) {
       departmentOptions.value = list.map((item) => ({
         label: item.label || item.name || item.title || item.value,
-        value: item.code || item.value || item.id || item.label
+        value: item.value || item.code || item.id || item.label
       }))
-      syncDepartmentValue()
     }
   } catch (error) {
     logger.warn('fetch departments failed', { error: error.message })
-  }
-}
-
-const loadProfileFields = async () => {
-  try {
-    const params = {}
-    if (industryStore.industryCode) {
-      params.industry = industryStore.industryCode
-    }
-    const response = await getProfileFields(params)
-    const payload = response?.data?.data || response?.data || response || {}
-    const list = Array.isArray(payload) ? payload : payload.profileFieldList || []
-    const normalizedMap = {}
-    list.forEach((field) => {
-      const code = field.fieldCode || field.code
-      if (!code) return
-      const options = Array.isArray(field.options)
-        ? field.options.map((option) => ({
-            label: option.optionLabel || option.label || option.name || option.value || '',
-            value: option.optionValue ?? option.value ?? option.code ?? option.label ?? '',
-            isDefault:
-              option.isDefault === 1 ||
-              option.isDefault === true ||
-              option.isDefault === '1'
-          }))
-        : []
-      normalizedMap[code] = {
-        label: field.fieldLabel || field.label || '',
-        type: field.fieldType || field.type || '',
-        required: field.isRequired === 1 || field.isRequired === true,
-        options
-      }
-    })
-    profileFieldMap.value = normalizedMap
-    logger.info('个人信息字段配置加载完成', normalizedMap)
-    syncTitleValue()
-  } catch (error) {
-    logger.warn('获取个人信息字段配置失败，使用默认配置', { error: error.message })
-    profileFieldMap.value = {}
-  }
-}
-
-const applyFieldDefaults = () => {
-  if (!formData.title && titleOptions.value.length) {
-    const defaultOption = titleOptions.value.find((item) => item.isDefault)
-    if (defaultOption) {
-      formData.title = defaultOption.value
-    }
   }
 }
 
@@ -456,7 +373,6 @@ const loadProfile = async (force = false) => {
     if (loading.value && !force) return
     loading.value = true
     await industryStore.fetchIndustryConfig(force)
-    await loadProfileFields()
     await loadDepartments()
     const response = await getUserInfo()
     logger.info('获取个人信息接口返回', response)
@@ -467,13 +383,9 @@ const loadProfile = async (force = false) => {
     formData.realName = data.realName || data.name || ''
     formData.email = data.email || ''
     formData.phone = data.phone || data.mobile || ''
-    formData.department = data.departmentCode || data.department || ''
-    formData.title = data.title || data.titleCode || data.position || ''
+    formData.department = data.department || data.departmentCode || ''
+    formData.title = data.title || data.position || ''
     formData.avatar = data.avatar || ''
-    formData.avatarFileId = data.avatarFileId || data.avatarId || null
-
-    syncDepartmentValue()
-    syncTitleValue()
 
     avatarPreview.value = formData.avatar
     
@@ -490,9 +402,10 @@ const loadProfile = async (force = false) => {
       logger.debug('loadProfile 已同步头像到 authStore', { avatar: formData.avatar })
     }
     
+    initialSnapshot.value = { ...formData }
+
     resetVerification('email')
     resetVerification('phone')
-    applyFieldDefaults()
   } catch (error) {
     logger.error('load profile failed', { error: error.message })
     ElMessage.error(t('user.profile.loadError'))
@@ -523,10 +436,9 @@ const handleSave = async () => {
       phone: formData.phone,
       department: formData.department,
       title: formData.title,
-      industryCode: industryStore.industryCode
+      industryCode: industryStore.industryCode,
+      avatar: formData.avatar
     }
-    logger.info('提交个人信息 payload', payload)
-    console.table?.(payload)
     await updateUserInfo(payload)
     await authStore.getUserInfo(true)
     
@@ -536,6 +448,7 @@ const handleSave = async () => {
       setUserInfo(authStore.userInfo)
     }
     
+    initialSnapshot.value = { ...formData }
     ElMessage.success(t('user.profile.saveSuccess'))
   } catch (error) {
     if (error !== 'cancel') {
@@ -544,6 +457,30 @@ const handleSave = async () => {
     }
   } finally {
     saving.value = false
+  }
+}
+
+const handleReset = async () => {
+  logger.info('重置个人信息表单')
+  try {
+    await ElMessageBox.confirm(
+      t('user.profile.resetConfirmMessage'),
+      t('user.profile.resetConfirmTitle'),
+      {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
+        type: 'warning'
+      }
+    )
+    Object.assign(formData, initialSnapshot.value)
+    formRef.value?.clearValidate()
+    resetVerification('email')
+    resetVerification('phone')
+    ElMessage.info(t('user.profile.resetSuccess'))
+  } catch (error) {
+    if (error !== 'cancel') {
+      logger.warn('reset cancelled', { error })
+    }
   }
 }
 
@@ -609,26 +546,6 @@ const openCropperDialog = async (file) => {
     initCropper()
   }
   reader.readAsDataURL(file)
-}
-
-const handleSelectAvatar = async (event) => {
-  const file = event.target?.files?.[0]
-  logger.info('选择头像文件', { hasFile: !!file })
-  if (!file) return
-
-  const typeValidation = validateFileType(file, IMAGE_FILE_EXTENSIONS)
-  if (!typeValidation.passed) {
-    ElMessage.error(typeValidation.reason || t('user.profile.invalidFormat'))
-    return
-  }
-
-  const sizeValidation = validateFileSize(file, AVATAR_MAX_SIZE_MB)
-  if (!sizeValidation.passed) {
-    ElMessage.error(sizeValidation.reason)
-    return
-  }
-
-  await openCropperDialog(file)
 }
 
 const uploadAvatarFile = async (file) => {
@@ -758,52 +675,35 @@ const handleCropConfirm = async () => {
   if (!cropperInstance || !pendingAvatarFile.value) return
   try {
     const canvas = cropperInstance.getCroppedCanvas({
-      width: 400,
-      height: 400,
+      width: 200,
+      height: 200,
+      imageSmoothingEnabled: true,
       imageSmoothingQuality: 'high'
     })
-    if (!canvas) {
-      throw new Error('cropper canvas missing')
-    }
-    const blob = await new Promise((resolve) =>
-      canvas.toBlob(resolve, pendingAvatarFile.value.type || 'image/png')
-    )
-    if (!blob) {
-      throw new Error('cropper toBlob failed')
-    }
-    const croppedFile = new File([blob], pendingAvatarFile.value.name, {
-      type: pendingAvatarFile.value.type || 'image/png'
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.9)
     })
-
-    await uploadAvatarFile(croppedFile)
+    const file = new File([blob], pendingAvatarFile.value.name, {
+      type: 'image/jpeg',
+      lastModified: Date.now()
+    })
     cropperVisible.value = false
+    destroyCropper()
+    await uploadAvatarFile(file)
   } catch (error) {
-    logger.error('crop avatar failed', { error: error.message })
+    logger.error('crop and upload failed', { error: error.message })
     ElMessage.error(t('user.profile.uploadError'))
   }
 }
 
-watch(cropperVisible, (visible) => {
-  if (!visible) {
-    destroyCropper()
-    cropperImageSrc.value = ''
-    pendingAvatarFile.value = null
-  }
-})
+const handleSelectAvatar = async (event) => {
+  const file = event.target?.files?.[0]
+  logger.info('选择头像文件', { hasFile: !!file })
+  if (!file) return
 
-watch(previewVisible, (visible) => {
-  if (!visible) {
-    resetPreviewUrl()
-  }
-})
-
-watch(() => departmentOptions.value, () => {
-  syncDepartmentValue()
-})
-
-watch(titleOptions, () => {
-  syncTitleValue()
-})
+  // 使用新的上传流程
+  await uploadAvatarFile(file)
+}
 
 const simulateVerify = async (type, successMessage, errorMessage) => {
   logger.info('执行模拟验证', { type })
@@ -836,98 +736,6 @@ onMounted(() => {
   logger.info('UserProfile component mounted，开始加载数据')
   loadProfile()
 })
-
-onBeforeUnmount(() => {
-  destroyCropper()
-  resetPreviewUrl()
-})
-
-const handlePreviewAvatar = async () => {
-  if (previewVisible.value) return
-  try {
-    if (formData.avatarFileId) {
-      const response = await previewFile(formData.avatarFileId)
-      const raw = response?.data ?? response
-      resetPreviewUrl()
-      let previewUrl = ''
-      if (raw instanceof Blob) {
-        if (raw.size === 0) {
-          throw new Error('empty preview blob')
-        }
-        const contentType = (raw.type || '').toLowerCase()
-        if (contentType.includes('application/json')) {
-          const text = await raw.text()
-          try {
-            const parsed = JSON.parse(text)
-            if (typeof parsed?.data === 'string') {
-              previewUrl = parsed.data
-            } else if (typeof parsed?.url === 'string') {
-              previewUrl = parsed.url
-            } else {
-              throw new Error('preview json missing url')
-            }
-          } catch (parseError) {
-            throw new Error('preview json parse failed')
-          }
-        } else {
-          previewUrl = URL.createObjectURL(raw)
-          previewObjectUrl.value = previewUrl
-        }
-      } else if (typeof raw === 'string') {
-        previewUrl = raw
-      } else if (raw?.data) {
-        if (raw.data instanceof Blob) {
-          if (raw.data.size === 0) {
-            throw new Error('empty preview blob')
-          }
-          previewUrl = URL.createObjectURL(raw.data)
-          previewObjectUrl.value = previewUrl
-        } else if (typeof raw.data === 'string') {
-          previewUrl = raw.data
-        }
-      }
-      if (!previewUrl) {
-        throw new Error('preview url not resolved')
-      }
-      avatarPreview.value = previewUrl
-    } else if (formData.avatar) {
-      avatarPreview.value = formData.avatar
-    } else {
-      avatarPreview.value = defaultAvatar.value
-    }
-    previewVisible.value = true
-  } catch (error) {
-    logger.error('avatar preview failed', { error: error.message })
-    ElMessage.error(t('user.profile.previewError'))
-    avatarPreview.value = formData.avatar || defaultAvatar.value
-    previewVisible.value = true
-  }
-}
-
-const syncDepartmentValue = () => {
-  if (!formData.department || departmentOptions.value.length === 0) return
-  const current = formData.department
-  const match = departmentOptions.value.find((option) => option.value === current)
-  if (match) return
-  const fallback = departmentOptions.value.find((option) => option.label === current)
-  if (fallback) {
-    formData.department = fallback.value
-  }
-}
-
-const syncTitleValue = () => {
-  if (!formData.title || titleOptions.value.length === 0) return
-  const current = formData.title
-  const match = titleOptions.value.find((option) => option.value === current || option.optionValue === current)
-  if (match) {
-    formData.title = match.value
-    return
-  }
-  const fallback = titleOptions.value.find((option) => option.label === current || option.optionLabel === current)
-  if (fallback) {
-    formData.title = fallback.value
-  }
-}
 </script>
 
 <style lang="scss" scoped>
@@ -1094,74 +902,6 @@ const syncTitleValue = () => {
   .form-actions {
     flex-direction: column;
     align-items: stretch;
-  }
-}
-
-:deep(.avatar-crop-dialog) {
-  .el-dialog__body {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    align-items: center;
-  }
-}
-
-.avatar-cropper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-
-  &__preview {
-    width: 320px;
-    height: 320px;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: var(--shadow-md);
-
-    img {
-      max-width: 100%;
-      display: block;
-    }
-  }
-
-  &__controls {
-    display: flex;
-    gap: 12px;
-  }
-
-  &__tips {
-    font-size: 12px;
-    color: var(--text-3);
-    margin: 0;
-  }
-
-  &__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    width: 100%;
-  }
-}
-
-:deep(.avatar-preview-dialog) {
-  .el-dialog__body {
-    display: flex;
-    justify-content: center;
-  }
-}
-
-.avatar-preview-wrapper {
-  width: 320px;
-  height: 320px;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: var(--shadow-md);
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
   }
 }
 </style>

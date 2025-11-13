@@ -738,6 +738,8 @@ CREATE TABLE IF NOT EXISTS sys_knowledge_base (
     project_id BIGINT,
     project_name VARCHAR(200),
     dify_kb_id VARCHAR(100),
+    dify_knowdata_id VARCHAR(100),
+    callback TEXT,
     is_shared SMALLINT DEFAULT 0,
     status VARCHAR(20) DEFAULT 'active',
     file_count INT DEFAULT 0,
@@ -757,6 +759,8 @@ COMMENT ON COLUMN sys_knowledge_base.owner_name IS '创建人姓名';
 COMMENT ON COLUMN sys_knowledge_base.project_id IS '关联项目ID';
 COMMENT ON COLUMN sys_knowledge_base.project_name IS '关联项目名称';
 COMMENT ON COLUMN sys_knowledge_base.dify_kb_id IS 'Dify知识库ID';
+COMMENT ON COLUMN sys_knowledge_base.dify_knowdata_id IS 'Dify知识库数据ID（Dify返回的id字段）';
+COMMENT ON COLUMN sys_knowledge_base.callback IS '回调数据（Dify API返回的完整JSON数据）';
 COMMENT ON COLUMN sys_knowledge_base.is_shared IS '是否共享';
 COMMENT ON COLUMN sys_knowledge_base.status IS '状态';
 COMMENT ON COLUMN sys_knowledge_base.file_count IS '文件数量';
@@ -802,6 +806,7 @@ CREATE TABLE IF NOT EXISTS sys_knowledge_file_relation (
     attachment_id BIGINT NOT NULL,
     file_name VARCHAR(255) NOT NULL,
     sort_order INT DEFAULT 0,
+    callback TEXT,
     is_deleted SMALLINT DEFAULT 0,
     created_by BIGINT,
     updated_by BIGINT,
@@ -815,6 +820,7 @@ COMMENT ON COLUMN sys_knowledge_file_relation.folder_id IS '文件夹ID（0为�
 COMMENT ON COLUMN sys_knowledge_file_relation.attachment_id IS '附件ID';
 COMMENT ON COLUMN sys_knowledge_file_relation.file_name IS '文件显示名称';
 COMMENT ON COLUMN sys_knowledge_file_relation.sort_order IS '排序号';
+COMMENT ON COLUMN sys_knowledge_file_relation.callback IS '回调数据（Dify API返回的完整JSON数据）';
 COMMENT ON COLUMN sys_knowledge_file_relation.is_deleted IS '逻辑删除标识：0=未删除，1=已删除';
 COMMENT ON COLUMN sys_knowledge_file_relation.created_time IS '创建时间';
 CREATE INDEX IF NOT EXISTS idx_sys_knowledge_file_relation_knowledge_id ON sys_knowledge_file_relation(knowledge_id);

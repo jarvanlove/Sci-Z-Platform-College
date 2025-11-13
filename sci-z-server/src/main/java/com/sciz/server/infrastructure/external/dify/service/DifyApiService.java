@@ -291,23 +291,44 @@ public class DifyApiService {
      * 存储文件到本地
      */
     private String storeFile(MultipartFile file) throws IOException {
-        // 从配置文件获取上传目录
-        String uploadDir = difyConfig.getUpload().getDir();
-        
-        // 确保目录以/结尾
-        if (!uploadDir.endsWith("/") && !uploadDir.endsWith("\\")) {
-            uploadDir += "/";
+        // 检查配置是否存在
+        if (difyConfig.getUpload() == null) {
+            throw new RuntimeException("Dify上传配置未设置，请在配置文件中添加 dify.upload 配置");
         }
         
-        // 创建上传目录
+        // 从配置文件获取上传目录，如果为空则使用默认值
+        String uploadDir = difyConfig.getUpload().getDir();
+        if (uploadDir == null || uploadDir.trim().isEmpty()) {
+            uploadDir = "upload"; // 默认上传目录
+            log.warn("⚠️ 未配置上传目录，使用默认目录: {}", uploadDir);
+        }
+        
+        // 如果是相对路径，转换为绝对路径（相对于项目根目录）
+        File uploadDirFile = new File(uploadDir);
+        if (!uploadDirFile.isAbsolute()) {
+            // 获取项目根目录
+            String projectRoot = System.getProperty("user.dir");
+            uploadDirFile = new File(projectRoot, uploadDir);
+            uploadDir = uploadDirFile.getAbsolutePath();
+        }
+        
+        // 确保目录以/结尾（Windows使用\）
+        String separator = File.separator;
+        if (!uploadDir.endsWith("/") && !uploadDir.endsWith("\\")) {
+            uploadDir += separator;
+        }
+        
+        // 创建上传目录（如果不存在）
         File directory = new File(uploadDir);
         if (!directory.exists()) {
             boolean created = directory.mkdirs();
             if (created) {
                 log.info("📁 创建上传目录: {}", uploadDir);
             } else {
-                log.warn("⚠️ 无法创建上传目录: {}", uploadDir);
+                throw new IOException("无法创建上传目录: " + uploadDir);
             }
+        } else if (!directory.isDirectory()) {
+            throw new IOException("上传路径已存在但不是目录: " + uploadDir);
         }
         // 验证文件大小
         if (difyConfig.getUpload().getMaxFileSize() != null && 

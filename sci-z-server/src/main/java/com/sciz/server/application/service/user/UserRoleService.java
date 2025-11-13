@@ -11,7 +11,6 @@ import java.util.List;
  * @date 2025-11-09 02:10
  */
 public interface UserRoleService {
-
     /**
      * 查询用户在指定行业下的角色ID列表
      *
@@ -20,7 +19,6 @@ public interface UserRoleService {
      * @return List<Long> 角色ID集合
      */
     List<Long> listUserRoleIds(Long userId, String industryType);
-
     /**
      * 更新用户在指定行业下的角色集合（全量替换）
      *

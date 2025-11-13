@@ -98,7 +98,7 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
         QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId)
                    .eq("is_active", true)
-                   .orderByDesc("create_time");
+                   .orderByDesc("created_time");
         return this.list(queryWrapper);
     }
 
@@ -108,7 +108,7 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
         queryWrapper.eq("user_id", userId)
                    .eq("key_type", keyType)
                    .eq("is_active", true)
-                   .orderByDesc("create_time");
+                   .orderByDesc("created_time");
         return this.list(queryWrapper);
     }
 
@@ -143,7 +143,7 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
         queryWrapper.eq("key_type", keyType)
                    .eq("resource_id", resourceId)
                    .eq("is_active", true)
-                   .orderByAsc("create_time");
+                   .orderByAsc("created_time");
         
         DifyApiKey defaultKey = this.getOne(queryWrapper);
         
