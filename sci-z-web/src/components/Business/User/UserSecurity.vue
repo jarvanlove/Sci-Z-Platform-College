@@ -8,7 +8,6 @@
   <div class="security-container">
     <div class="page-header">
       <h1 class="page-title">{{ t('user.security.title') }}</h1>
-      <p class="page-subtitle">{{ t('user.security.passwordStrengthHint') }}</p>
     </div>
 
     <div class="security-grid">
@@ -78,9 +77,6 @@
           >
             {{ t('user.security.submit') }}
           </BaseButton>
-          <BaseButton size="large" @click="handleResetPassword">
-            {{ t('user.security.reset') }}
-          </BaseButton>
         </div>
       </BaseCard>
 
@@ -103,7 +99,7 @@
             <el-option :label="t('user.security.abnormalLogin')" value="warning" />
           </el-select>
 
-          <el-date-picker
+          <BaseDatePicker
             v-model="logFilters.dateRange"
             type="daterange"
             unlink-panels
@@ -115,71 +111,43 @@
           />
         </div>
 
-        <el-table
+        <BaseTable
           :data="loginLogs"
-          style="width: 100%"
-          v-loading="logsLoading"
+          :columns="tableColumns"
+          :loading="logsLoading"
+          :pagination="pagination"
           :empty-text="t('common.noData')"
+          stripe
+          class="login-logs-table"
+          @current-change="handlePageChange"
+          @size-change="handlePageSizeChange"
         >
-          <el-table-column
-            :label="t('user.security.loginTime')"
-            prop="loginTime"
-            width="180"
-          >
-            <template #default="{ row }">
-              {{ formatDisplayTime(row.loginTime) }}
-            </template>
-          </el-table-column>
-          <el-table-column
-            prop="ip"
-            :label="t('user.security.loginIP')"
-            width="140"
-            show-overflow-tooltip
-          />
-          <el-table-column
-            prop="location"
-            :label="t('user.security.loginLocation')"
-            min-width="160"
-            show-overflow-tooltip
-          />
-          <el-table-column
-            prop="browser"
-            :label="t('user.security.browser')"
-            width="140"
-            show-overflow-tooltip
-          />
-          <el-table-column
-            prop="os"
-            :label="t('user.security.operatingSystem')"
-            width="140"
-            show-overflow-tooltip
-          />
-          <el-table-column
-            :label="t('user.security.loginStatus')"
-            width="140"
-            align="center"
-          >
-            <template #default="{ row }">
-              <el-tag
-                :type="statusTagType(row.status)"
-                effect="light"
-                size="small"
-              >
-                {{ statusText(row.status) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-        </el-table>
+          <!-- 登录时间列自定义 -->
+          <template #loginTime="{ row }">
+            {{ formatDisplayTime(row.loginTime) }}
+          </template>
 
-        <div class="pagination-wrapper">
-          <BasePagination
-            :current="pagination.current"
-            :size="pagination.size"
-            :total="pagination.total"
-            @change="handlePageChange"
-            @size-change="handlePageSizeChange"
-          />
-        </div>
+          <!-- 登录IP列自定义 -->
+          <template #loginIp="{ row }">
+            {{ row.loginIp || row.ip }}
+          </template>
+
+          <!-- 登录地点列自定义 -->
+          <template #loginLocation="{ row }">
+            {{ row.loginLocation || row.location }}
+          </template>
+
+          <!-- 登录状态列自定义 -->
+          <template #status="{ row }">
+            <el-tag
+              :type="statusTagType(row.status === 1 ? 'success' : row.status === 0 ? 'failed' : 'warning')"
+              effect="light"
+              size="small"
+            >
+              {{ statusText(row.status) || row.message }}
+            </el-tag>
+          </template>
+        </BaseTable>
       </BaseCard>
     </div>
   </div>
@@ -189,7 +157,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { BaseButton, BaseCard, BasePagination } from '@/components/Common'
+import { BaseButton, BaseCard, BaseTable, BaseDatePicker } from '@/components/Common'
 import { changePassword, getLoginLogs } from '@/api/User'
 import { useAuthStore } from '@/store/modules/auth'
 import { LOGIN_STATUS_TAG_CONFIG } from '@/utils/constants'
@@ -219,16 +187,8 @@ const passwordRules = {
   ],
   newPassword: [
     { required: true, message: t('user.security.newPasswordRequired'), trigger: 'blur' },
-    {
-      validator: (_, value, callback) => {
-        if (!validatePasswordLength(value, 6, 20)) {
-          callback(new Error(t('user.security.passwordMinLength')))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
+    { min: 6, max: 20, message: '密码长度为6-20个字符', trigger: 'blur' },
+    { pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{6,}$/, message: '密码必须包含大小写字母和数字', trigger: 'blur' }
   ],
   confirmPassword: [
     { required: true, message: t('user.security.confirmPasswordRequired'), trigger: 'blur' },
@@ -257,6 +217,45 @@ const logFilters = reactive({
   status: 'all',
   dateRange: []
 })
+
+// 表格列配置
+const tableColumns = computed(() => [
+  {
+    prop: 'loginTime',
+    label: t('user.security.loginTime'),
+    minWidth: 180
+  },
+  {
+    prop: 'loginIp',
+    label: t('user.security.loginIP'),
+    minWidth: 140,
+    showOverflowTooltip: true
+  },
+  {
+    prop: 'loginLocation',
+    label: t('user.security.loginLocation'),
+    minWidth: 160,
+    showOverflowTooltip: true
+  },
+  {
+    prop: 'browser',
+    label: t('user.security.browser'),
+    minWidth: 150,
+    showOverflowTooltip: true
+  },
+  {
+    prop: 'os',
+    label: t('user.security.operatingSystem'),
+    minWidth: 140,
+    showOverflowTooltip: true
+  },
+  {
+    prop: 'status',
+    label: t('user.security.loginStatus'),
+    minWidth: 120,
+    align: 'center'
+  }
+])
 
 const checkPasswordStrength = () => {
   const pwd = passwordForm.newPassword || ''
@@ -302,7 +301,7 @@ const passwordStrengthTips = computed(() => {
     case 3:
       return t('user.security.strongTips')
     default:
-      return t('user.security.passwordStrengthHint')
+      return ''
   }
 })
 
@@ -320,36 +319,39 @@ const handleChangePassword = async () => {
       }
     )
     changing.value = true
-    await changePassword({
+    const response = await changePassword({
       oldPassword: passwordForm.oldPassword,
       newPassword: passwordForm.newPassword,
       confirmPassword: passwordForm.confirmPassword
     })
-    ElMessage.success(t('user.security.changePasswordSuccess'))
+    // 后端响应格式：{ code: 200, message: "密码修改成功", data: null }
+    const successMessage = response?.data?.message || t('user.security.changePasswordSuccess')
+    ElMessage.success(successMessage)
     ElMessage.info(t('user.security.redirectToLogin'))
     await authStore.logout({ redirectPath: '/login', useReplace: true })
   } catch (error) {
     if (error !== 'cancel') {
       logger.error('change password failed', { error: error.message })
-      ElMessage.error(t('user.security.changePasswordError'))
+      // 后端错误响应格式：{ code: 2003, message: "原密码错误", data: null }
+      const errorMessage = error.response?.data?.message || t('user.security.changePasswordError')
+      ElMessage.error(errorMessage)
     }
   } finally {
     changing.value = false
   }
 }
 
-const handleResetPassword = () => {
-  logger.info('重置密码表单')
-  passwordFormRef.value?.resetFields()
-  passwordStrength.value = 0
-}
 
 const formatDisplayTime = (time) => {
   return formatDate(time, 'YYYY-MM-DD HH:mm:ss')
 }
 
 const statusText = (status) => {
-  switch (status) {
+  // 后端返回的是数字：1=成功，0=失败
+  const statusStr = typeof status === 'number' 
+    ? (status === 1 ? 'success' : status === 0 ? 'failed' : 'warning')
+    : status
+  switch (statusStr) {
     case 'success':
       return t('user.security.loginSuccess')
     case 'failed':
@@ -357,7 +359,7 @@ const statusText = (status) => {
     case 'warning':
       return t('user.security.abnormalLogin')
     default:
-      return status
+      return statusStr || ''
   }
 }
 
@@ -367,15 +369,19 @@ const statusTagType = (status) => {
 
 const buildLogParams = () => {
   const params = {
-    page: pagination.current,
-    size: pagination.size
+    pageNo: pagination.current,
+    pageSize: pagination.size,
+    sortBy: 'loginTime',
+    sortOrder: 'DESC'
   }
+  // 状态筛选：all -> null, success -> 1, failed -> 0, warning -> 0
   if (logFilters.status && logFilters.status !== 'all') {
-    params.status = logFilters.status
+    params.status = logFilters.status === 'success' ? 1 : 0
   }
+  // 日期范围筛选
   if (Array.isArray(logFilters.dateRange) && logFilters.dateRange.length === 2) {
-    params.startDate = formatDate(logFilters.dateRange[0], 'YYYY-MM-DD 00:00:00')
-    params.endDate = formatDate(logFilters.dateRange[1], 'YYYY-MM-DD 23:59:59')
+    params.startDate = formatDate(logFilters.dateRange[0], 'YYYY-MM-DD')
+    params.endDate = formatDate(logFilters.dateRange[1], 'YYYY-MM-DD')
   }
   return params
 }
@@ -385,13 +391,17 @@ const loadLoginLogs = async () => {
   try {
     logsLoading.value = true
     const response = await getLoginLogs(buildLogParams())
-    const payload = response?.data?.data || response?.data || response || {}
-    const list = payload.records || payload.list || payload.items || []
+    // 后端响应格式：{ code, message, data: { records, total, current, size, pages } }
+    const payload = response?.data?.data || response?.data || {}
+    const list = payload.records || []
     loginLogs.value = Array.isArray(list) ? list : []
-    pagination.total = payload.total || payload.count || loginLogs.value.length
+    // 更新分页信息
+    pagination.total = payload.total || 0
+    pagination.current = payload.current || pagination.current
+    pagination.size = payload.size || pagination.size
   } catch (error) {
     logger.error('load login logs failed', { error: error.message })
-    ElMessage.error(t('user.security.loadLogsError'))
+    ElMessage.error(error.response?.data?.message || t('user.security.loadLogsError'))
   } finally {
     logsLoading.value = false
   }
@@ -501,7 +511,7 @@ watch(
   position: relative;
   width: 100%;
   height: 6px;
-  background: #e5e7eb;
+  background: var(--border);
   border-radius: 4px;
   overflow: hidden;
   margin-top: 6px;
@@ -535,23 +545,29 @@ watch(
 }
 
 .form-actions {
-  margin-top: 24px;
+  margin-top: 32px;
   display: flex;
-  justify-content: center;
-  gap: 16px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
+  justify-content: flex-start;
+  gap: 12px;
+  padding-left: 120px; /* 与表单 label-width 对齐 */
 }
 
 .log-filters {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--hover);
+  border-radius: 8px;
 }
 
-.pagination-wrapper {
-  margin-top: 16px;
+.login-logs-table {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
 }
 
 @media (max-width: 768px) {

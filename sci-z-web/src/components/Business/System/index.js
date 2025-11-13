@@ -4,7 +4,7 @@
  */
 
 // 用户管理组件
-// export { default as SystemUser } from './SystemUser.vue'
+export { default as UserManagement } from './UserManagement.vue'
 
 // 角色权限组件
 // export { default as SystemRole } from './SystemRole.vue'

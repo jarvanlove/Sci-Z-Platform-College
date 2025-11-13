@@ -4,6 +4,7 @@ import com.sciz.server.application.service.user.AuthService;
 import com.sciz.server.domain.pojo.dto.request.user.EmailCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
 import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
+import com.sciz.server.domain.pojo.dto.request.user.ChangePasswordReq;
 import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.request.user.PhoneCodeSendReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
@@ -15,8 +16,6 @@ import com.sciz.server.domain.pojo.dto.response.user.CheckRoleResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckPermResp;
 import com.sciz.server.domain.pojo.dto.response.user.RefreshTokenResp;
 import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
-import com.sciz.server.domain.pojo.dto.request.user.UserInfoUpdateReq;
-import com.sciz.server.domain.pojo.dto.response.user.UserInfoUpdateResp;
 import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
 import com.sciz.server.infrastructure.shared.result.Result;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -92,6 +91,13 @@ public class AuthController {
         return Result.success(null, ResultCode.RESET_PASSWORD_SUCCESS.getMessage());
     }
 
+    @Operation(summary = "修改密码", description = "已登录用户修改密码，需要验证原密码")
+    @PutMapping("/change-password")
+    public Result<Void> changePassword(@RequestBody @Valid ChangePasswordReq req) {
+        authService.changePassword(req);
+        return Result.success(null, "密码修改成功");
+    }
+
     @Operation(summary = "行业部门标签", description = "获取当前行业下的部门标签列表")
     @GetMapping("/department/label")
     public Result<List<DepartmentLabelResp>> getDepartmentLabels() {
@@ -122,13 +128,6 @@ public class AuthController {
     @PostMapping("/profile")
     public Result<ProfileResp> profile() {
         var resp = authService.profile();
-        return Result.success(resp);
-    }
-
-    @Operation(summary = "保存个人信息", description = "更新当前登录用户的基础资料信息")
-    @PutMapping("/user/info")
-    public Result<UserInfoUpdateResp> updateUserInfo(@Valid @RequestBody UserInfoUpdateReq req) {
-        var resp = authService.updateUserInfo(req);
         return Result.success(resp);
     }
 

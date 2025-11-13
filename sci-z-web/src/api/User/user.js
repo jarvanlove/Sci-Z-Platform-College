@@ -23,12 +23,14 @@ export const getUserInfo = () => {
  * @param {string} data.realName - 真实姓名
  * @param {string} data.email - 邮箱
  * @param {string} data.phone - 手机号
- * @param {string} data.avatar - 头像
+ * @param {string} data.department - 所属院系
+ * @param {string} data.title - 职称/职务
+ * @param {string} data.industryCode - 行业编码
  * @returns {Promise} 更新用户信息响应
  */
 export const updateUserInfo = (data) => {
   return request({
-    url: USER_API.UPDATE_INFO,
+    url: USER_API.INFO,
     method: HTTP_METHODS.PUT,
     data
   })
@@ -58,7 +60,7 @@ export const getProfileFields = (params = {}) => {
  */
 export const changePassword = (data) => {
   return request({
-    url: USER_API.CHANGE_PASSWORD,
+    url: AUTH_API.CHANGE_PASSWORD,
     method: HTTP_METHODS.PUT,
     data
   })
@@ -83,19 +85,20 @@ export const uploadAvatar = (data) => {
 
 /**
  * 获取登录日志
- * @param {Object} params - 查询参数
- * @param {number} params.page - 页码
- * @param {number} params.size - 每页数量
- * @param {string} params.startDate - 开始日期
- * @param {string} params.endDate - 结束日期
- * @param {string} params.ip - IP地址
- * @param {string} params.status - 登录状态
+ * @param {Object} data - 查询参数（POST 请求体）
+ * @param {number} data.pageNo - 页码（从1开始）
+ * @param {number} data.pageSize - 每页数量
+ * @param {string} [data.sortBy] - 排序字段（loginTime/status），默认 loginTime
+ * @param {string} [data.sortOrder] - 排序方式（ASC/DESC），默认 DESC
+ * @param {number} [data.status] - 登录状态（0=失败，1=成功，null=全部）
+ * @param {string} [data.startDate] - 开始日期（格式：yyyy-MM-dd）
+ * @param {string} [data.endDate] - 结束日期（格式：yyyy-MM-dd）
  * @returns {Promise} 登录日志响应
  */
-export const getLoginLogs = (params) => {
+export const getLoginLogs = (data) => {
   return request({
     url: USER_API.LOGIN_LOGS,
-    method: HTTP_METHODS.GET,
-    params
+    method: HTTP_METHODS.POST,
+    data
   })
 }

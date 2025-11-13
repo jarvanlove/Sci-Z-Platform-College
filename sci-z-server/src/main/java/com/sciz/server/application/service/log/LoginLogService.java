@@ -1,7 +1,10 @@
 package com.sciz.server.application.service.log;
 
-import com.sciz.server.domain.pojo.entity.log.SysLoginLog;
+import com.sciz.server.domain.pojo.dto.request.log.LoginLogQueryReq;
+import com.sciz.server.domain.pojo.dto.response.log.LoginLogResp;
+import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.event.log.LoginLoggedEvent;
+import com.sciz.server.domain.pojo.entity.log.SysLoginLog;
 
 /**
  * 登录日志应用服务
@@ -28,4 +31,12 @@ public interface LoginLogService {
      * @return 日志ID
      */
     Long save(SysLoginLog entity);
+
+    /**
+     * 分页查询登录日志
+     *
+     * @param req LoginLogQueryReq 查询请求
+     * @return PageResult<LoginLogResp> 分页结果
+     */
+    PageResult<LoginLogResp> page(LoginLogQueryReq req);
 }

@@ -83,4 +83,22 @@ public class SysUserRoleRepoImpl implements SysUserRoleRepo {
                 .set(SysUserRole::getUpdatedTime, LocalDateTime.now())
                 .update();
     }
+
+    /**
+     * 根据角色ID查询用户ID列表
+     *
+     * @param roleId Long 角色ID
+     * @return List<Long> 用户ID列表
+     */
+    @Override
+    public List<Long> findUserIdsByRoleId(Long roleId) {
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysUserRole::getRoleId, roleId)
+                .eq(SysUserRole::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .list()
+                .stream()
+                .map(SysUserRole::getUserId)
+                .distinct()
+                .toList();
+    }
 }

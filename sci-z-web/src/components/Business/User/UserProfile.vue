@@ -258,12 +258,13 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { InfoFilled, Upload, Loading, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
 import { BaseButton, BaseCard } from '@/components/Common'
-import { getUserInfo, updateUserInfo, getProfileFields } from '@/api/User'
+import { getUserInfo, updateUserInfo, getProfileFields, uploadAvatar } from '@/api/User'
 import { previewFile } from '@/api/File'
 import { useAuthStore } from '@/store/modules/auth'
 import { useIndustryStore } from '@/store/modules/industry'
 import { validateChineseName, validateEmail, validatePhone } from '@/utils/validate'
 import { createLogger } from '@/utils/simpleLogger'
+import { setUserInfo } from '@/utils/auth'
 import {
   ATTACHMENT_CATEGORY,
   ATTACHMENT_RELATION,
@@ -272,7 +273,6 @@ import {
   validateFileSize,
   DEFAULT_AVATAR_MAX_SIZE_MB
 } from '@/constants/attachment'
-import { useFileUpload } from '@/composables/useFileUpload'
 import Cropper from 'cropperjs'
 import 'cropperjs/dist/cropper.css'
 
@@ -476,6 +476,20 @@ const loadProfile = async (force = false) => {
     syncTitleValue()
 
     avatarPreview.value = formData.avatar
+    
+    // 🔥 关键修复：同步更新 authStore 中的用户头像，确保 Header 中的头像也能正常显示
+    if (formData.avatar) {
+      // 确保 userInfo 存在
+      if (!authStore.userInfo) {
+        authStore.userInfo = {}
+      }
+      // 更新头像
+      authStore.userInfo.avatar = formData.avatar
+      // 同时更新本地存储的用户信息
+      setUserInfo(authStore.userInfo)
+      logger.debug('loadProfile 已同步头像到 authStore', { avatar: formData.avatar })
+    }
+    
     resetVerification('email')
     resetVerification('phone')
     applyFieldDefaults()
@@ -509,14 +523,19 @@ const handleSave = async () => {
       phone: formData.phone,
       department: formData.department,
       title: formData.title,
-      avatar: formData.avatar,
-      avatarFileId: formData.avatarFileId,
       industryCode: industryStore.industryCode
     }
     logger.info('提交个人信息 payload', payload)
     console.table?.(payload)
     await updateUserInfo(payload)
     await authStore.getUserInfo(true)
+    
+    // 确保头像同步更新到 authStore
+    if (authStore.userInfo && formData.avatar) {
+      authStore.userInfo.avatar = formData.avatar
+      setUserInfo(authStore.userInfo)
+    }
+    
     ElMessage.success(t('user.profile.saveSuccess'))
   } catch (error) {
     if (error !== 'cancel') {
@@ -539,28 +558,8 @@ const AVATAR_MAX_SIZE_MB = DEFAULT_AVATAR_MAX_SIZE_MB
 const previewVisible = ref(false)
 const previewObjectUrl = ref('')
 
-const fileUploader = useFileUpload({
-  maxSizeMB: AVATAR_MAX_SIZE_MB,
-  allowedExtensions: IMAGE_FILE_EXTENSIONS,
-  getExtraFormData: () => {
-    const extra = {}
-    const userId = authStore.userInfo?.id || authStore.userInfo?.userId
-    if (userId) {
-      extra.relationType = ATTACHMENT_RELATION.USER
-      extra.relationId = userId
-      const username = authStore.userInfo?.username
-      const realName = authStore.userInfo?.realName || authStore.userInfo?.name
-      const relationName = [username, realName].filter(Boolean).join(' / ')
-      if (relationName) {
-        extra.relationName = relationName
-      }
-    }
-    extra.attachmentType = ATTACHMENT_CATEGORY.IMAGE
-    extra.isPublic = '0'
-    return extra
-  }
-})
-const uploading = fileUploader.uploading
+// 头像上传状态
+const uploading = ref(false)
 
 const cropperVisible = ref(false)
 const cropperImageSrc = ref('')
@@ -633,24 +632,126 @@ const handleSelectAvatar = async (event) => {
 }
 
 const uploadAvatarFile = async (file) => {
-  const result = await fileUploader.uploadWithCheck(file)
-  if (!result) {
-    return
-  }
+  try {
+    // 1. 文件校验
+    const sizeValidation = validateFileSize(file, AVATAR_MAX_SIZE_MB)
+    if (!sizeValidation.passed) {
+      ElMessage.error(sizeValidation.reason)
+      return
+    }
+    const typeValidation = validateFileType(file, IMAGE_FILE_EXTENSIONS)
+    if (!typeValidation.passed) {
+      ElMessage.error(typeValidation.reason || t('user.profile.invalidFormat'))
+      return
+    }
 
-  const { fileInfo, reused } = result
-  const url = fileInfo?.previewUrl || fileInfo?.fileUrl || formData.avatar
-  if (!url) {
-    ElMessage.error(t('user.profile.uploadError'))
-    return
-  }
+    // 2. 计算 MD5
+    uploading.value = true
+    const SparkMD5 = (await import('spark-md5')).default
+    const computeFileMd5 = (file) =>
+      new Promise((resolve, reject) => {
+        const chunkSize = 2 * 1024 * 1024
+        const chunks = Math.ceil(file.size / chunkSize)
+        let currentChunk = 0
+        const spark = new SparkMD5.ArrayBuffer()
+        const reader = new FileReader()
 
-  formData.avatar = url
-  avatarPreview.value = url
-  formData.avatarFileId = fileInfo.id || fileInfo.fileId || fileInfo.attachmentId || null
-  pendingAvatarFile.value = null
-  ElMessage.success(reused ? t('user.profile.avatarReused') : t('user.profile.uploadSuccess'))
-  ElMessage.info(t('user.profile.avatarRememberSave'))
+        reader.onload = (event) => {
+          const result = event?.target?.result
+          if (result) {
+            spark.append(result)
+          }
+          currentChunk += 1
+          if (currentChunk < chunks) {
+            loadNextChunk()
+          } else {
+            resolve(spark.end())
+          }
+        }
+
+        reader.onerror = () => reject(new Error('md5 compute failed'))
+
+        const loadNextChunk = () => {
+          const start = currentChunk * chunkSize
+          const end = Math.min(start + chunkSize, file.size)
+          reader.readAsArrayBuffer(file.slice(start, end))
+        }
+
+        loadNextChunk()
+      })
+
+    let md5 = ''
+    let reused = false
+    let fileInfo = null
+
+    try {
+      md5 = await computeFileMd5(file)
+      // 3. 检查重复（调用 api/file/check-duplicate）
+      const { checkFileDuplicate } = await import('@/api/File')
+      const duplicateResponse = await checkFileDuplicate({
+        md5,
+        fileSize: file.size,
+        originalName: file.name
+      })
+      const duplicatePayload = duplicateResponse?.data ?? duplicateResponse
+      const duplicateData = duplicatePayload?.data ?? duplicatePayload
+      if (duplicateData?.exists && duplicateData.fileInfo) {
+        fileInfo = duplicateData.fileInfo
+        reused = true
+        ElMessage.success('文件已存在，已复用历史上传记录')
+      }
+    } catch (error) {
+      // MD5 计算或去重检查失败，继续上传
+      logger.debug('MD5 计算或去重检查失败，继续上传', { error: error.message })
+    }
+
+    // 4. 如果没有复用，调用 api/user/avatar 上传
+    if (!fileInfo) {
+      const form = new FormData()
+      form.append('file', file)
+      if (md5) {
+        form.append('md5', md5)
+      }
+      
+      const response = await uploadAvatar(form)
+      const payload = response?.data ?? response ?? {}
+      fileInfo = payload
+      reused = false
+    }
+
+    // 5. 处理上传结果
+    const url = fileInfo?.previewUrl || fileInfo?.fileUrl || fileInfo?.avatar || formData.avatar
+    if (!url) {
+      ElMessage.error(t('user.profile.uploadError'))
+      return
+    }
+
+    formData.avatar = url
+    avatarPreview.value = url
+    formData.avatarFileId = fileInfo.id || fileInfo.fileId || fileInfo.attachmentId || null
+    pendingAvatarFile.value = null
+    
+    // 🔥 关键修复：上传头像后立即同步到 authStore，确保 Header 中的头像也能显示
+    if (authStore.userInfo) {
+      authStore.userInfo.avatar = url
+      authStore.userInfo.avatarFileId = formData.avatarFileId
+      setUserInfo(authStore.userInfo)
+      logger.debug('头像上传后已同步到 authStore', { avatar: url, avatarFileId: formData.avatarFileId })
+    } else {
+      // 如果 userInfo 不存在，先初始化
+      authStore.userInfo = { avatar: url, avatarFileId: formData.avatarFileId }
+      setUserInfo(authStore.userInfo)
+      logger.debug('userInfo 不存在，已初始化并同步头像', { avatar: url, avatarFileId: formData.avatarFileId })
+    }
+    
+    ElMessage.success(reused ? t('user.profile.avatarReused') : t('user.profile.uploadSuccess'))
+    ElMessage.info(t('user.profile.avatarRememberSave'))
+  } catch (error) {
+    logger.error('upload avatar failed', { error: error.message })
+    ElMessage.error(error.response?.data?.message || t('user.profile.uploadError'))
+  } finally {
+    uploading.value = false
+  }
 }
 
 const handleCropConfirm = async () => {
@@ -879,7 +980,7 @@ const syncTitleValue = () => {
 }
 
 .readonly-input {
-  background-color: #f3f4f6 !important;
+  background-color: var(--hover) !important;
   cursor: not-allowed;
 }
 

@@ -21,7 +21,8 @@
       :height="height"
       :max-height="maxHeight"
       :row-key="rowKey"
-      :default-sort="defaultSort"
+      :default-sort="defaultSort || undefined"
+      :empty-text="emptyText"
       :selection-change="handleSelectionChange"
       @sort-change="handleSortChange"
       @row-click="handleRowClick"
@@ -74,7 +75,7 @@
       <!-- 操作列 -->
       <el-table-column
         v-if="$slots.actions"
-        label="操作"
+        :label="computedActionLabel"
         :width="actionWidth"
         :fixed="actionFixed"
         align="center"
@@ -87,15 +88,12 @@
 
     <!-- 分页组件 -->
     <div v-if="showPagination && pagination" class="base-table__pagination">
-      <el-pagination
-        v-model:current-page="pagination.current"
-        v-model:page-size="pagination.size"
+      <BasePagination
+        :current="pagination.current"
+        :size="pagination.size"
         :total="pagination.total"
-        :page-sizes="pageSizes"
-        :layout="paginationLayout"
-        :background="true"
+        @change="handleCurrentChange"
         @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
       />
     </div>
   </div>
@@ -103,6 +101,8 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import BasePagination from './BasePagination.vue'
 
 // Props 定义
 const props = defineProps({
@@ -177,6 +177,14 @@ const props = defineProps({
   paginationLayout: {
     type: String,
     default: 'total, sizes, prev, pager, next, jumper'
+  },
+  actionLabel: {
+    type: String,
+    default: null
+  },
+  emptyText: {
+    type: String,
+    default: '暂无数据'
   }
 })
 
@@ -190,8 +198,16 @@ const emit = defineEmits([
   'current-change'
 ])
 
+// 国际化
+const { t } = useI18n()
+
 // 响应式数据
 const selectedRows = ref([])
+
+// 计算属性
+const computedActionLabel = computed(() => {
+  return props.actionLabel || t('common.actions')
+})
 
 // 计算属性
 const getIndex = (index) => {
@@ -255,39 +271,86 @@ const handleCurrentChange = (current) => {
   &__table {
     background: var(--surface);
     border-radius: var(--radius-lg);
-    overflow: hidden;
+    overflow: visible;
+    width: 100% !important;
   }
 
   &__pagination {
     display: flex;
-    justify-content: center;
-    margin-top: var(--gap-lg);
-    padding: var(--gap-lg);
-    background: var(--surface);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
+    justify-content: flex-end;
+    margin-top: 16px;
   }
 }
 
-// 表格样式优化
+// 表格样式优化 - 暗色主题适配
 :deep(.el-table) {
+  background-color: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+
   .el-table__header {
-    background: #fafafa;
+    background-color: var(--surface) !important;
+  }
+
+  .el-table__header-wrapper {
+    overflow-x: auto;
+  }
+
+  .el-table__body-wrapper {
+    overflow-x: auto;
   }
 
   .el-table__header th {
-    background: #fafafa;
-    color: var(--text-2);
-    font-weight: 600;
-    border-bottom: 1px solid var(--border);
+    background-color: var(--surface) !important;
+    color: var(--text-2) !important;
+    font-weight: 600 !important;
+    font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.01em;
+    border-bottom: 1px solid var(--border) !important;
+    padding: 14px 16px !important;
   }
 
-  .el-table__body tr:hover > td {
-    background: var(--hover);
+  .el-table__body {
+    tr {
+      background-color: var(--surface) !important;
+      color: var(--text) !important;
+
+      &:hover > td {
+        background-color: var(--hover) !important;
+      }
+
+      &.el-table__row--striped {
+        background-color: var(--hover-light) !important;
+      }
+    }
+
+    td {
+      border-bottom: 1px solid var(--border) !important;
+      color: var(--text) !important;
+      padding: 12px 16px !important;
+    }
   }
 
-  .el-table__body td {
-    border-bottom: 1px solid #f5f5f5;
+  .el-table__empty-block {
+    background-color: var(--surface) !important;
+    color: var(--text-3) !important;
+  }
+
+  // 固定列样式
+  .el-table__fixed,
+  .el-table__fixed-right {
+    background-color: var(--surface) !important;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.12);
+  }
+
+  .el-table__fixed-right-patch {
+    background-color: var(--surface) !important;
+  }
+
+  &::before,
+  &::after {
+    background-color: var(--border) !important;
   }
 }
 </style>

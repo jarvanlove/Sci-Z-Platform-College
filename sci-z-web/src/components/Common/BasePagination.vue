@@ -9,81 +9,123 @@
   <div class="base-pagination">
     <!-- 分页信息 -->
     <div v-if="showInfo" class="base-pagination__info">
-      共 {{ total }} 条记录
+      {{ t('pagination.totalRecords', { total }) }}
     </div>
 
     <!-- 每页显示数量选择器 -->
     <div v-if="showSizeSelector" class="base-pagination__size-selector">
-      每页显示
-      <el-select
+      {{ t('pagination.pageSizeLabel') }}
+      <select
         v-model="pageSize"
         :disabled="disabled"
         @change="handleSizeChange"
         class="base-pagination__size-select"
       >
-        <el-option
+        <option
           v-for="size in pageSizes"
           :key="size"
-          :label="`${size} 条`"
           :value="size"
-        />
-      </el-select>
+        >
+          {{ t('pagination.pageSize', { size }) }}
+        </option>
+      </select>
     </div>
 
     <!-- 分页控制器 -->
     <div class="base-pagination__controls">
       <!-- 上一页按钮 -->
-      <el-button
+      <button
         :disabled="currentPage <= 1 || disabled"
         @click="handlePrevPage"
         class="base-pagination__btn"
+        :class="{ 'base-pagination__btn--disabled': currentPage <= 1 || disabled }"
       >
-        上一页
-      </el-button>
+        {{ t('pagination.prevPage') }}
+      </button>
 
       <!-- 页码按钮 -->
       <div class="base-pagination__pages">
-        <el-button
+        <!-- 第一页 -->
+        <button
+          v-if="showFirstPage"
+          :disabled="disabled"
+          @click="handlePageChange(1)"
+          class="base-pagination__page-btn"
+          :class="{ 'base-pagination__page-btn--active': currentPage === 1 }"
+        >
+          1
+        </button>
+
+        <!-- 前省略号 -->
+        <span v-if="showPrevEllipsis" class="base-pagination__ellipsis">...</span>
+
+        <!-- 中间页码 -->
+        <button
           v-for="page in visiblePages"
           :key="page"
-          :type="page === currentPage ? 'primary' : 'default'"
           :disabled="disabled"
           @click="handlePageChange(page)"
           class="base-pagination__page-btn"
           :class="{ 'base-pagination__page-btn--active': page === currentPage }"
         >
           {{ page }}
-        </el-button>
+        </button>
+
+        <!-- 后省略号 -->
+        <span v-if="showNextEllipsis" class="base-pagination__ellipsis">...</span>
+
+        <!-- 最后一页 -->
+        <button
+          v-if="showLastPage"
+          :disabled="disabled"
+          @click="handlePageChange(totalPages)"
+          class="base-pagination__page-btn"
+          :class="{ 'base-pagination__page-btn--active': currentPage === totalPages }"
+        >
+          {{ totalPages }}
+        </button>
       </div>
 
       <!-- 下一页按钮 -->
-      <el-button
+      <button
         :disabled="currentPage >= totalPages || disabled"
         @click="handleNextPage"
         class="base-pagination__btn"
+        :class="{ 'base-pagination__btn--disabled': currentPage >= totalPages || disabled }"
       >
-        下一页
-      </el-button>
+        {{ t('pagination.nextPage') }}
+      </button>
     </div>
 
     <!-- 快速跳转 -->
     <div v-if="showJumper" class="base-pagination__jumper">
-      跳至
-      <el-input-number
-        v-model="jumpPage"
+      {{ t('pagination.jumpTo') }}
+      <input
+        v-model.number="jumpPage"
+        type="number"
         :min="1"
         :max="totalPages"
         :disabled="disabled"
-        @change="handleJump"
+        @keyup.enter="handleJumpEnter"
         class="base-pagination__jumper-input"
       />
-      页
+      {{ t('pagination.pageUnit') }}
+      <button
+        class="base-pagination__jump-btn"
+        :disabled="disabled"
+        @click="handleJumpEnter"
+      >
+        {{ t('common.confirm') }}
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 // Props 定义
 const props = defineProps({
@@ -153,6 +195,7 @@ const visiblePages = computed(() => {
     let start = Math.max(1, current - half)
     let end = Math.min(total, start + maxVisible - 1)
 
+    // 调整起始位置
     if (end - start + 1 < maxVisible) {
       start = Math.max(1, end - maxVisible + 1)
     }
@@ -163,6 +206,30 @@ const visiblePages = computed(() => {
   }
 
   return pages
+})
+
+// 是否显示第一页
+const showFirstPage = computed(() => {
+  return visiblePages.value.length > 0 && visiblePages.value[0] > 1
+})
+
+// 是否显示前省略号
+const showPrevEllipsis = computed(() => {
+  return visiblePages.value.length > 0 && visiblePages.value[0] > 2
+})
+
+// 是否显示最后一页
+const showLastPage = computed(() => {
+  if (visiblePages.value.length === 0) return false
+  const lastVisiblePage = visiblePages.value[visiblePages.value.length - 1]
+  return lastVisiblePage < totalPages.value
+})
+
+// 是否显示后省略号
+const showNextEllipsis = computed(() => {
+  if (visiblePages.value.length === 0) return false
+  const lastVisiblePage = visiblePages.value[visiblePages.value.length - 1]
+  return lastVisiblePage < totalPages.value - 1
 })
 
 // 监听器
@@ -204,9 +271,13 @@ const handleNextPage = () => {
   }
 }
 
-const handleJump = (page) => {
+const handleJumpEnter = () => {
+  const page = parseInt(jumpPage.value)
   if (page && page >= 1 && page <= totalPages.value) {
     handlePageChange(page)
+  } else {
+    // 重置为当前页
+    jumpPage.value = currentPage.value
   }
 }
 </script>
@@ -216,14 +287,13 @@ const handleJump = (page) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--gap-lg);
-  padding: var(--gap-lg);
+  gap: 20px;
+  padding: 16px 0;
   background: var(--surface);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
+  border-radius: 6px;
 
   &__info {
-    font-size: var(--font-size-sm);
+    font-size: 14px;
     color: var(--text-2);
     white-space: nowrap;
   }
@@ -231,58 +301,209 @@ const handleJump = (page) => {
   &__size-selector {
     display: flex;
     align-items: center;
-    gap: var(--gap-sm);
-    font-size: var(--font-size-sm);
+    gap: 8px;
+    font-size: 14px;
     color: var(--text-2);
   }
 
   &__size-select {
-    width: 80px;
+    width: auto;
+    min-width: 80px;
+    margin: 0 8px;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--text-2);
+    background-color: var(--surface);
+    cursor: pointer;
+    transition: all 0.3s;
+
+    &:hover:not(:disabled) {
+      border-color: var(--color-primary);
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2);
+    }
+
+    &:disabled {
+      color: var(--disabled);
+      background-color: var(--hover);
+      cursor: not-allowed;
+    }
   }
 
   &__controls {
     display: flex;
     align-items: center;
-    gap: var(--gap-sm);
+    gap: 8px;
   }
 
   &__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     min-width: 32px;
     height: 32px;
-    padding: 0 var(--gap-sm);
-    font-size: var(--font-size-sm);
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--text-2);
+    background-color: var(--surface);
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+
+    &:hover:not(:disabled):not(.base-pagination__btn--disabled) {
+      color: var(--color-primary);
+      border-color: var(--color-primary);
+      background-color: var(--hover);
+    }
+
+    &--disabled,
+    &:disabled {
+      color: var(--disabled);
+      background-color: var(--surface);
+      border-color: var(--border);
+      cursor: not-allowed;
+
+      &:hover {
+        color: var(--disabled);
+        border-color: var(--border);
+        background-color: var(--surface);
+      }
+    }
   }
 
   &__pages {
     display: flex;
     align-items: center;
-    gap: var(--gap-xs);
+    gap: 4px;
   }
 
   &__page-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     min-width: 32px;
     height: 32px;
-    padding: 0 var(--gap-sm);
-    font-size: var(--font-size-sm);
-    border-radius: var(--radius-sm);
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--text-2);
+    background-color: var(--surface);
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+
+    &:hover:not(:disabled):not(.base-pagination__page-btn--active) {
+      color: var(--color-primary);
+      border-color: var(--color-primary);
+      background-color: var(--hover);
+    }
 
     &--active {
-      background: var(--color-primary);
-      border-color: var(--color-primary);
       color: var(--surface);
+      background-color: var(--color-primary);
+      border-color: var(--color-primary);
+
+      &:hover {
+        color: var(--surface);
+        background-color: var(--color-primary);
+        border-color: var(--color-primary);
+      }
     }
+
+    &:disabled {
+      color: var(--disabled);
+      background-color: var(--surface);
+      border-color: var(--border);
+      cursor: not-allowed;
+
+      &:hover {
+        color: var(--disabled);
+        border-color: var(--border);
+        background-color: var(--surface);
+      }
+    }
+  }
+
+  &__ellipsis {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    color: var(--disabled);
+    font-size: var(--font-size-sm);
   }
 
   &__jumper {
     display: flex;
     align-items: center;
-    gap: var(--gap-sm);
-    font-size: var(--font-size-sm);
+    gap: 8px;
+    margin-left: 20px;
+    font-size: 14px;
     color: var(--text-2);
   }
 
   &__jumper-input {
-    width: 60px;
+    width: 50px;
+    height: 32px;
+    margin: 0 8px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    text-align: center;
+    color: var(--text-2);
+    background-color: var(--surface);
+    transition: all 0.3s;
+
+    &:hover {
+      border-color: var(--color-primary);
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2);
+    }
+  }
+
+  &__jump-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    margin-left: 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--text-2);
+    background-color: var(--surface);
+    cursor: pointer;
+    transition: all 0.3s;
+
+    &:hover:not(:disabled) {
+      color: var(--color-primary);
+      border-color: var(--color-primary);
+      background-color: var(--hover);
+    }
+
+    &:disabled {
+      color: var(--disabled);
+      background-color: var(--surface);
+      border-color: var(--border);
+      cursor: not-allowed;
+    }
   }
 }
 

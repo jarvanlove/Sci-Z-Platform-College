@@ -9,6 +9,7 @@ import com.sciz.server.domain.pojo.dto.request.user.EmailCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
 import com.sciz.server.domain.pojo.dto.request.user.PhoneCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
+import com.sciz.server.domain.pojo.dto.request.user.ChangePasswordReq;
 import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
@@ -22,6 +23,9 @@ import com.sciz.server.domain.pojo.dto.response.user.RefreshTokenResp;
 import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserInfoUpdateResp;
 import com.sciz.server.domain.pojo.dto.request.user.UserInfoUpdateReq;
+import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
+import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
+import com.sciz.server.application.service.file.FileService;
 import com.sciz.server.domain.pojo.entity.user.SysDepartment;
 import com.sciz.server.domain.pojo.entity.user.SysProfileField;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
@@ -93,6 +97,7 @@ public class AuthServiceImpl implements AuthService {
     private final SysUserProfileRepo sysUserProfileRepo;
     private final AuthConverter authConverter;
     private final SmsService smsService;
+    private final FileService fileService;
 
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Shanghai");
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -109,7 +114,8 @@ public class AuthServiceImpl implements AuthService {
             SysProfileFieldRepo sysProfileFieldRepo,
             SysUserProfileRepo sysUserProfileRepo,
             AuthConverter authConverter,
-            SmsService smsService) {
+            SmsService smsService,
+            FileService fileService) {
         this.sysUserRepo = sysUserRepo;
         this.stringRedisTemplate = stringRedisTemplate;
         this.eventPublisher = eventPublisher;
@@ -122,10 +128,12 @@ public class AuthServiceImpl implements AuthService {
         this.sysUserProfileRepo = sysUserProfileRepo;
         this.authConverter = authConverter;
         this.smsService = smsService;
+        this.fileService = fileService;
     }
 
     /**
-     * 用户登录（验证码校验 → 账号锁定校验 → 用户有效性校验 → 密码校验 → 清理失败计数 → Sa-Token 登录 → 组装返回 → 发布事件）
+     * 用户登录（验证码校验 → 账号锁定校验 → 用户有效性校验 → 密码校验 → 清理失败计数 → Sa-Token 登录 → 写入登录用户上下文 →
+     * 组装返回 → 发布事件）
      *
      * @param loginReq LoginReq 登录请求（包含用户名、密码、验证码等）
      * @param request  HttpServletRequest 请求对象（用于获取客户端信息）
@@ -162,10 +170,7 @@ public class AuthServiceImpl implements AuthService {
         // 7. Sa-Token 登录
         var tokenInfo = performSaTokenLogin(user.getId(), rememberMe);
 
-        // 8. 缓存 token
-        cacheUserToken(user.getId(), tokenInfo);
-
-        // 9. 写入登录用户上下文
+        // 8. 写入登录用户上下文（使用 Sa-Token Session 机制）
         var industryType = industryConfigCache.get().getType();
         cacheLoginUserContext(user, industryType);
 
@@ -416,25 +421,6 @@ public class AuthServiceImpl implements AuthService {
         }
         StpUtil.login(userId, model);
         return StpUtil.getTokenInfo();
-    }
-
-    /**
-     * 缓存用户 token
-     */
-    private void cacheUserToken(Long userId, SaTokenInfo tokenInfo) {
-        try {
-            var tokenTtl = Math.max(StpUtil.getTokenTimeout(), 0);
-            var tokenKey = String.format(CacheConstant.AUTH_TOKEN_KEY, userId);
-            var tokenValue = tokenInfo.getTokenValue();
-
-            if (tokenTtl > 0) {
-                RedisUtil.set(stringRedisTemplate, tokenKey, tokenValue, Duration.ofSeconds(tokenTtl));
-            } else {
-                RedisUtil.set(stringRedisTemplate, tokenKey, tokenValue, null);
-            }
-        } catch (Exception e) {
-            log.warn(String.format("save token to cache failed, userId=%s, err=%s", userId, e.getMessage()));
-        }
     }
 
     /**
@@ -876,7 +862,7 @@ public class AuthServiceImpl implements AuthService {
 
     /**
      * 用户登出
-     * 注销当前登录会话，清理 token 和权限缓存
+     * 注销当前登录会话，清理权限缓存和登录用户上下文（Sa-Token 会自动清理 Redis 中的 token）
      */
     @Override
     public void logout() {
@@ -886,28 +872,14 @@ public class AuthServiceImpl implements AuthService {
 
         log.info(String.format("用户退出登录: userId=%s, industryType=%s", userId, industryType));
 
-        // 2. 清理 token 缓存
-        clearTokenCache(userId);
-
-        // 3. 清理权限缓存（roles、permissions、menus）
+        // 2. 清理权限缓存（roles、permissions、menus）
         clearPermissionCache(userId, industryType);
 
-        // 4. 清理登录用户上下文并调用 Sa-Token 登出
+        // 3. 清理登录用户上下文并调用 Sa-Token 登出（Sa-Token 会自动清理 Redis 中的 token）
         LoginUserUtil.clearCurrentUser();
         StpUtil.logout();
 
         log.info(String.format("用户退出登录成功: userId=%s", userId));
-    }
-
-    /**
-     * 清理用户 token 缓存
-     *
-     * @param userId Long 用户ID
-     */
-    private void clearTokenCache(Long userId) {
-        var tokenKey = String.format(CacheConstant.AUTH_TOKEN_KEY, userId);
-        RedisUtil.delete(stringRedisTemplate, tokenKey);
-        log.debug(String.format("清理 token 缓存: userId=%s", userId));
     }
 
     /**
@@ -1023,6 +995,51 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
+     * 修改密码：登录校验 → 校验原密码 → 校验新密码确认 → 更新密码
+     *
+     * @param req ChangePasswordReq 修改密码请求
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void changePassword(ChangePasswordReq req) {
+        // 1. 登录校验并获取用户ID
+        var userId = validateLoginAndGetUserId();
+        log.info(String.format("修改密码开始: userId=%s", userId));
+
+        // 2. 查询并校验用户有效性
+        var user = findAndValidateUser(userId);
+
+        // 3. 校验原密码
+        if (!bcryptMatches(req.oldPassword(), user.getPassword())) {
+            log.warn(String.format("修改密码失败，原密码错误: userId=%s", userId));
+            throw new BusinessException(ResultCode.USER_LOGIN_FAILED, "原密码错误");
+        }
+
+        // 4. 校验新密码与确认密码是否一致
+        if (!req.newPassword().equals(req.confirmPassword())) {
+            log.warn(String.format("修改密码失败，新密码与确认密码不一致: userId=%s", userId));
+            throw new BusinessException(ResultCode.BAD_REQUEST, "新密码与确认密码不一致");
+        }
+
+        // 5. 校验新密码不能与原密码相同
+        if (bcryptMatches(req.newPassword(), user.getPassword())) {
+            log.warn(String.format("修改密码失败，新密码不能与原密码相同: userId=%s", userId));
+            throw new BusinessException(ResultCode.BAD_REQUEST, "新密码不能与原密码相同");
+        }
+
+        // 6. 更新密码
+        user.setPassword(hashPassword(req.newPassword()));
+        user.setUpdatedTime(LocalDateTime.now(DEFAULT_ZONE));
+
+        if (!sysUserRepo.updateById(user)) {
+            log.error(String.format("修改密码更新数据库失败: userId=%s", userId));
+            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+        }
+
+        log.info(String.format("修改密码成功: userId=%s", userId));
+    }
+
+    /**
      * 用户注册:规格化入参 → 校验验证码 → 校验账号唯一性 → 校验院系有效性 → 构造实体并入库 → 返回注册结果
      *
      * @param registerReq RegisterReq 注册请求
@@ -1117,7 +1134,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 更新个人信息：登录校验 → 校验部门与行业 → 更新用户表 → 刷新会话缓存 → 返回最新用户信息
+     * 更新个人信息：登录校验 → 查询并校验用户 → 规格化并校验部门 → 更新用户基础信息 → 保存扩展属性 → 刷新会话缓存 → 返回最新用户信息
      *
      * @param req UserInfoUpdateReq 个人信息更新请求
      * @return UserInfoUpdateResp 更新后的个人信息
@@ -1125,55 +1142,198 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public UserInfoUpdateResp updateUserInfo(UserInfoUpdateReq req) {
+        // 1. 登录校验并获取用户ID
+        var userId = validateLoginAndGetUserId();
+
+        log.info(String.format("update user info start: userId=%s", userId));
+
+        // 2. 查询并校验用户有效性
+        var user = findAndValidateUser(userId);
+
+        // 3. 从行业缓存获取行业类型，规格化部门编码
+        var normalizedIndustry = industryConfigCache.get().getType();
+        var departmentCode = normalizeDepartmentCode(req.department());
+
+        // 4. 校验部门有效性
+        var department = validateDepartment(normalizedIndustry, departmentCode, userId);
+
+        // 5. 更新用户基础信息
+        updateUserBasicInfo(user, req, normalizedIndustry, department.getId());
+
+        // 6. 保存用户实体
+        saveUserEntity(user, userId);
+
+        // 7. 保存用户扩展属性（职称）
+        saveUserExtendedAttributes(userId, normalizedIndustry, req);
+
+        // 8. 构建用户信息响应
+        var userInfo = buildUserInfoResponse(user, normalizedIndustry);
+
+        // 9. 刷新登录用户上下文缓存
+        cacheLoginUserContext(user, normalizedIndustry);
+
+        log.info(String.format("update user info success: userId=%s", userId));
+        return new UserInfoUpdateResp(userInfo);
+    }
+
+    /**
+     * 校验登录状态并获取用户ID
+     *
+     * @return Long 用户ID
+     */
+    private Long validateLoginAndGetUserId() {
         if (!StpUtil.isLogin()) {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
         }
+        return StpUtil.getLoginIdAsLong();
+    }
 
-        var userId = StpUtil.getLoginIdAsLong();
-        log.info(String.format("update user info start: userId=%s", userId));
-
+    /**
+     * 查询并校验用户有效性
+     *
+     * @param userId Long 用户ID
+     * @return SysUser 用户实体
+     */
+    private SysUser findAndValidateUser(Long userId) {
         var user = Optional.ofNullable(sysUserRepo.findById(userId))
                 .filter(found -> !DeleteStatus.DELETED.getCode().equals(found.getIsDeleted()))
                 .orElseThrow(() -> new BusinessException(ResultCode.USER_NOT_FOUND));
+
         if (UserStatus.DISABLED.getCode().equals(user.getStatus())) {
             throw new BusinessException(ResultCode.USER_ACCOUNT_DISABLED);
         }
 
-        var normalizedIndustry = resolveIndustryType(req.industryCode());
-        var departmentCode = normalizeDepartmentCode(req.department());
-        var department = Optional.ofNullable(sysDepartmentRepo.findByCode(normalizedIndustry, departmentCode))
+        return user;
+    }
+
+    /**
+     * 校验部门有效性
+     *
+     * @param industryType   String 行业类型
+     * @param departmentCode String 部门编码
+     * @param userId         Long 用户ID
+     * @return SysDepartment 部门实体
+     */
+    private SysDepartment validateDepartment(String industryType, String departmentCode, Long userId) {
+        return Optional.ofNullable(sysDepartmentRepo.findByCode(industryType, departmentCode))
                 .orElseThrow(() -> {
                     log.warn(String.format("update user info department invalid: userId=%s, department=%s, industry=%s",
-                            userId, departmentCode, normalizedIndustry));
+                            userId, departmentCode, industryType));
                     return new BusinessException(ResultCode.BAD_REQUEST, "所属部门不存在或已停用");
                 });
+    }
 
+    /**
+     * 更新用户基础信息
+     * 仅更新基础信息，不包含头像（头像通过单独的 uploadAvatar 方法处理）
+     *
+     * @param user               SysUser 用户实体
+     * @param req                UserInfoUpdateReq 更新请求
+     * @param normalizedIndustry String 规格化后的行业类型
+     * @param departmentId       Long 部门ID
+     */
+    private void updateUserBasicInfo(SysUser user, UserInfoUpdateReq req, String normalizedIndustry,
+            Long departmentId) {
         user.setRealName(req.realName());
         user.setEmail(req.email());
         user.setPhone(req.phone());
         user.setIndustryType(normalizedIndustry);
-        user.setDepartmentId(department.getId());
-        user.setAvatarUrl(Optional.ofNullable(req.avatar())
-                .filter(StringUtils::hasText)
-                .map(String::trim)
-                .orElse(null));
+        user.setDepartmentId(departmentId);
         user.setUpdatedTime(LocalDateTime.now(DEFAULT_ZONE));
+    }
 
+    /**
+     * 保存用户实体
+     *
+     * @param user   SysUser 用户实体
+     * @param userId Long 用户ID
+     */
+    private void saveUserEntity(SysUser user, Long userId) {
         if (!sysUserRepo.updateById(user)) {
             log.error(String.format("update user info failed when updating record: userId=%s", userId));
             throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
         }
+    }
 
+    /**
+     * 保存用户扩展属性
+     * 仅保存职称，不包含头像文件ID（头像文件ID通过单独的 uploadAvatar 方法处理）
+     *
+     * @param userId             Long 用户ID
+     * @param normalizedIndustry String 规格化后的行业类型
+     * @param req                UserInfoUpdateReq 更新请求
+     */
+    private void saveUserExtendedAttributes(Long userId, String normalizedIndustry, UserInfoUpdateReq req) {
         saveUserTitle(userId, normalizedIndustry, req.title());
-        saveAvatarFileId(userId, req.avatarFileId());
+    }
 
+    /**
+     * 构建用户信息响应
+     *
+     * @param user               SysUser 用户实体
+     * @param normalizedIndustry String 规格化后的行业类型
+     * @return LoginUserInfoResp 用户信息响应
+     */
+    private LoginUserInfoResp buildUserInfoResponse(SysUser user, String normalizedIndustry) {
         var userInfo = authConverter.toLoginUserInfoResp(user);
         populateUserInfo(user, userInfo, normalizedIndustry);
+        return userInfo;
+    }
 
-        cacheLoginUserContext(user, normalizedIndustry);
-        log.info(String.format("update user info success: userId=%s", userId));
+    /**
+     * 上传用户头像：登录校验 → 调用文件服务上传 → 更新用户头像URL和附件ID → 刷新会话缓存
+     *
+     * @param req FileUploadReq 文件上传请求
+     * @return FileInfoResp 文件信息响应
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public FileInfoResp uploadAvatar(FileUploadReq req) {
+        // 1. 登录校验并获取用户ID
+        var userId = validateLoginAndGetUserId();
+        log.info(String.format("上传用户头像开始: userId=%s, fileName=%s", userId,
+                Optional.ofNullable(req.getFile())
+                        .map(file -> Optional.ofNullable(file.getOriginalFilename()).orElse("unknown"))
+                        .orElse("unknown")));
 
-        return new UserInfoUpdateResp(userInfo);
+        // 2. 查询并校验用户有效性
+        var user = findAndValidateUser(userId);
+
+        // 3. 调用文件服务上传（包含文件校验、上传、持久化等完整流程）
+        // 文件上传请求中的关联信息由前端传入，这里不再强制设置
+        var fileInfo = fileService.upload(req);
+
+        // 4. 更新用户头像URL和附件ID
+        updateUserAvatar(user, fileInfo, userId);
+
+        // 5. 刷新登录用户上下文缓存
+        var industryType = Optional.ofNullable(user.getIndustryType())
+                .orElseGet(() -> industryConfigCache.get().getType());
+        cacheLoginUserContext(user, industryType);
+
+        log.info(String.format("上传用户头像成功: userId=%s, avatarUrl=%s, avatarFileId=%s",
+                userId, fileInfo.previewUrl(), fileInfo.id()));
+        return fileInfo;
+    }
+
+    /**
+     * 更新用户头像URL和附件ID
+     *
+     * @param user     SysUser 用户实体
+     * @param fileInfo FileInfoResp 文件信息
+     * @param userId   Long 用户ID
+     */
+    private void updateUserAvatar(SysUser user, FileInfoResp fileInfo, Long userId) {
+        user.setAvatarUrl(fileInfo.previewUrl());
+        user.setUpdatedTime(LocalDateTime.now(DEFAULT_ZONE));
+
+        if (!sysUserRepo.updateById(user)) {
+            log.error(String.format("更新用户头像失败: userId=%s", userId));
+            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+        }
+
+        // 保存头像附件ID到扩展属性
+        saveAvatarFileId(userId, fileInfo.id());
     }
 
     /**
@@ -1303,7 +1463,8 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 缓存登录用户上下文
+     * 缓存登录用户上下文到 Sa-Token Session
+     * 使用 Sa-Token 的 Session 机制存储用户信息，服务重启后会自动从 Redis 恢复
      *
      * @param user         SysUser 用户实体
      * @param industryType String 行业类型
@@ -1321,6 +1482,7 @@ public class AuthServiceImpl implements AuthService {
                 departmentName,
                 user.getEmail(),
                 user.getPhone());
+        // 使用 LoginUserUtil 将用户上下文存储到 Sa-Token Session（自动持久化到 Redis）
         LoginUserUtil.cacheCurrentUser(context);
     }
 }

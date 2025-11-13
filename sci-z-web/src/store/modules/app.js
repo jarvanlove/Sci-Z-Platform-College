@@ -1,11 +1,46 @@
 import { defineStore } from 'pinia'
 
+const THEME_STORAGE_KEY = 'app_theme'
+
+// 应用主题到 DOM
+const applyTheme = (theme) => {
+  const html = document.documentElement
+  if (theme === 'dark') {
+    html.classList.add('dark')
+    html.setAttribute('data-theme', 'dark')
+  } else {
+    html.classList.remove('dark')
+    html.setAttribute('data-theme', 'light')
+  }
+}
+
+// 从 localStorage 读取主题
+const getStoredTheme = () => {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY)
+    if (stored === 'dark' || stored === 'light') {
+      return stored
+    }
+  } catch (error) {
+    console.warn('读取主题失败:', error)
+  }
+  // 默认使用系统偏好
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return 'dark'
+  }
+  return 'light'
+}
+
+// 初始化主题
+const initTheme = getStoredTheme()
+applyTheme(initTheme)
+
 export const useAppStore = defineStore('app', {
   state: () => ({
     // 侧边栏状态
     sidebarCollapsed: false,
-    // 主题模式
-    theme: 'light',
+    // 主题模式（从 localStorage 或系统偏好读取）
+    theme: initTheme,
     // 语言
     language: 'zh-CN',
     // 页面加载状态
@@ -32,12 +67,25 @@ export const useAppStore = defineStore('app', {
 
     // 切换主题
     toggleTheme() {
-      this.theme = this.theme === 'light' ? 'dark' : 'light'
+      const newTheme = this.theme === 'light' ? 'dark' : 'light'
+      this.setTheme(newTheme)
     },
 
     // 设置主题
     setTheme(theme) {
+      if (theme !== 'light' && theme !== 'dark') {
+        console.warn('无效的主题值:', theme)
+        return
+      }
       this.theme = theme
+      // 应用到 DOM
+      applyTheme(theme)
+      // 持久化到 localStorage
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, theme)
+      } catch (error) {
+        console.warn('保存主题失败:', error)
+      }
     },
 
     // 设置语言

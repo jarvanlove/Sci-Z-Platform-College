@@ -1,7 +1,10 @@
 package com.sciz.server.interfaces.controller;
 
+import com.sciz.server.application.service.log.LoginLogService;
+import com.sciz.server.application.service.user.AuthService;
 import com.sciz.server.application.service.user.RolePermissionService;
 import com.sciz.server.application.service.user.UserRoleService;
+import com.sciz.server.application.service.user.UserService;
 import com.sciz.server.domain.pojo.dto.request.system.RolePermissionUpdateReq;
 import com.sciz.server.domain.pojo.dto.request.system.UserRoleUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.user.IndustryConfigResp;
@@ -9,9 +12,25 @@ import com.sciz.server.domain.pojo.dto.response.user.IndustryProfileFieldOptionR
 import com.sciz.server.domain.pojo.dto.response.user.IndustryProfileFieldResp;
 import com.sciz.server.domain.pojo.dto.response.user.RolePermissionIdsResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserRoleIdsResp;
+import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
+import com.sciz.server.domain.pojo.dto.request.user.UserAdminResetPasswordReq;
+import com.sciz.server.domain.pojo.dto.request.user.UserCreateReq;
+import com.sciz.server.domain.pojo.dto.request.user.UserInfoUpdateReq;
+import com.sciz.server.domain.pojo.dto.request.user.UserListQueryReq;
+import com.sciz.server.domain.pojo.dto.request.user.UserUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
+import com.sciz.server.domain.pojo.dto.response.user.UserCreateResp;
+import com.sciz.server.domain.pojo.dto.response.user.UserInfoUpdateResp;
+import com.sciz.server.domain.pojo.dto.response.user.UserListResp;
+import com.sciz.server.domain.pojo.dto.response.user.UserUpdateResp;
+import com.sciz.server.domain.pojo.dto.request.log.LoginLogQueryReq;
+import com.sciz.server.domain.pojo.dto.response.log.LoginLogResp;
+import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.interfaces.converter.UserConverter;
 import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
+import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.Result;
+import com.sciz.server.infrastructure.shared.result.ResultCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +47,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ModelAttribute;
 
 /**
  * 用户与权限管理接口
@@ -46,6 +66,9 @@ public class UserController {
     private final RolePermissionService rolePermissionService;
     private final UserConverter userConverter;
     private final IndustryConfigCache industryConfigCache;
+    private final LoginLogService loginLogService;
+    private final AuthService authService;
+    private final UserService userService;
 
     @Operation(summary = "获取行业配置", description = "查询当前行业配置")
     @GetMapping("/industry/config")
@@ -216,7 +239,6 @@ public class UserController {
         return Result.success(null);
     }
 
-    // 用户（管理视角）
     /**
      * 查询用户角色ID集合
      *
@@ -246,40 +268,113 @@ public class UserController {
         return Result.success();
     }
 
-    @Operation(summary = "用户管理列表", description = "管理员查询用户列表")
-    @GetMapping("/users")
-    public Result<Object> listUsers() {
-        return Result.success(null);
+    /**
+     * 分页查询用户列表
+     *
+     * @param req UserListQueryReq 查询请求
+     * @return Result<PageResult<UserListResp>> 分页结果
+     */
+    @Operation(summary = "用户管理列表", description = "管理员分页查询用户列表，支持按关键字、角色、状态筛选")
+    @PostMapping("/users/list")
+    public Result<PageResult<UserListResp>> listUsers(@Valid @RequestBody UserListQueryReq req) {
+        var resp = userService.page(req);
+        return Result.success(resp);
     }
 
-    @Operation(summary = "创建用户", description = "管理员创建用户")
+    /**
+     * 创建用户
+     *
+     * @param req UserCreateReq 创建请求
+     * @return Result<UserCreateResp> 创建响应
+     */
+    @Operation(summary = "创建用户", description = "管理员创建用户，自动生成学工号")
     @PostMapping("/users")
-    public Result<Object> createUser(@RequestBody Object request) {
-        return Result.success(null);
+    public Result<UserCreateResp> createUser(@Valid @RequestBody UserCreateReq req) {
+        var resp = userService.create(req);
+        return Result.success(resp);
     }
 
-    @Operation(summary = "更新用户", description = "管理员更新用户")
+    /**
+     * 更新用户
+     *
+     * @param id  Long 用户ID
+     * @param req UserUpdateReq 更新请求
+     * @return Result<UserUpdateResp> 更新响应
+     */
+    @Operation(summary = "更新用户", description = "管理员更新用户信息（真实姓名、邮箱、手机号、部门、行业类型）")
     @PutMapping("/users/{id}")
-    public Result<Object> updateUser(@PathVariable Long id, @RequestBody Object request) {
-        return Result.success(null);
+    public Result<UserUpdateResp> updateUser(@PathVariable Long id, @Valid @RequestBody UserUpdateReq req) {
+        // 确保路径参数和请求体中的ID一致
+        if (!id.equals(req.id())) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "路径参数中的用户ID与请求体中的用户ID不一致");
+        }
+        var resp = userService.update(req);
+        return Result.success(resp);
     }
 
-    @Operation(summary = "删除用户", description = "管理员删除用户")
+    /**
+     * 删除用户
+     *
+     * @param id Long 用户ID
+     * @return Result<Void> 空结果
+     */
+    @Operation(summary = "删除用户", description = "管理员软删除用户")
     @DeleteMapping("/users/{id}")
     public Result<Void> deleteUser(@PathVariable Long id) {
-        return Result.success(null);
+        userService.deleteById(id);
+        return Result.success();
     }
 
-    // 日志
-    @Operation(summary = "登录日志", description = "查询登录日志")
-    @GetMapping("/logs/login")
-    public Result<Object> loginLogs(@RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return Result.success(null);
+    /**
+     * 禁用/启用用户
+     *
+     * @param id       Long 用户ID
+     * @param disabled boolean true=禁用，false=启用
+     * @return Result<Void> 空结果
+     */
+    @Operation(summary = "禁用/启用用户", description = "管理员禁用或启用用户")
+    @PutMapping("/users/{id}/status")
+    public Result<Void> disableUser(@PathVariable Long id, @RequestParam boolean disabled) {
+        userService.disableById(id, disabled);
+        return Result.success();
+    }
+
+    /**
+     * 管理员重置用户密码
+     *
+     * @param req UserAdminResetPasswordReq 重置密码请求
+     * @return Result<Void> 空结果
+     */
+    @Operation(summary = "重置用户密码", description = "管理员重置指定用户的密码，不需要验证码")
+    @PutMapping("/users/password/reset")
+    public Result<Void> adminResetPassword(@Valid @RequestBody UserAdminResetPasswordReq req) {
+        userService.adminResetPassword(req);
+        return Result.success();
+    }
+
+    @Operation(summary = "更新个人信息", description = "更新当前登录用户的基础资料信息（真实姓名、邮箱、手机号、部门、职称），不包含头像")
+    @PutMapping("/info")
+    public Result<UserInfoUpdateResp> updateUserInfo(@Valid @RequestBody UserInfoUpdateReq req) {
+        var resp = authService.updateUserInfo(req);
+        return Result.success(resp);
+    }
+
+    @Operation(summary = "上传用户头像", description = "上传用户头像文件，上传成功后自动更新用户头像URL")
+    @PostMapping("/avatar")
+    public Result<FileInfoResp> uploadAvatar(@Valid @ModelAttribute FileUploadReq req) {
+        var resp = authService.uploadAvatar(req);
+        return Result.success(resp, ResultCode.FILE_UPLOAD_SUCCESS.getMessage());
+    }
+
+    @Operation(summary = "登录日志", description = "分页查询当前登录用户的登录日志，支持按状态、日期范围筛选")
+    @PostMapping("/login/logs")
+    public Result<PageResult<LoginLogResp>> loginLogs(@Valid @RequestBody LoginLogQueryReq req) {
+        var resp = loginLogService.page(req);
+        return Result.success(resp);
     }
 
     @Operation(summary = "操作日志", description = "查询操作日志")
-    @GetMapping("/logs/operation")
+    @PostMapping("/operation/logs")
     public Result<Object> operationLogs(@RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         return Result.success(null);

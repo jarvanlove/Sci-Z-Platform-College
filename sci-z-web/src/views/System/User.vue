@@ -1,23 +1,16 @@
 <!--
 /**
- * @description 用户管理页面
- * 系统管理员管理用户信息
+ * @description 系统管理 - 用户管理页面
+ * 极薄包装层，仅负责路由挂载
  */
 -->
 <template>
-  <div class="system-user-page">
-    <h1>用户管理页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <UserManagement />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import { UserManagement } from '@/components/Business/System'
 </script>
 
 <style lang="scss" scoped>
-.system-user-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
 </style>

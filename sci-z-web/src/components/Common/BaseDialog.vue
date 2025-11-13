@@ -150,18 +150,32 @@ watch(visible, (newVal) => {
   }
 }
 
-// 覆盖 Element Plus Dialog 默认样式
+// 覆盖 Element Plus Dialog 遮罩层样式 - 暗色主题适配
+:deep(.el-overlay) {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  
+  &[data-theme='dark'],
+  &.dark {
+    background-color: rgba(0, 0, 0, 0.7) !important;
+  }
+}
+
+// 覆盖 Element Plus Dialog 默认样式 - 暗色主题适配
 :deep(.el-dialog) {
   // 弹窗圆角
   border-radius: 10px !important;
   overflow: hidden;
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
   
   // 标题样式
   .el-dialog__header {
     padding: 20px 20px 10px;
+    background-color: var(--surface) !important;
+    border-bottom: 1px solid var(--border) !important;
     
     .el-dialog__title {
-      color: #1E3A8A !important;
+      color: var(--color-primary) !important;
       font-size: 16px;
       font-weight: 600;
     }
@@ -169,11 +183,11 @@ watch(visible, (newVal) => {
     // 关闭按钮
     .el-dialog__headerbtn {
       .el-dialog__close {
-        color: #909399;
+        color: var(--text-3) !important;
         font-size: 18px;
         
         &:hover {
-          color: #1E3A8A;
+          color: var(--color-primary) !important;
         }
       }
     }
@@ -182,12 +196,15 @@ watch(visible, (newVal) => {
   // 内容区域
   .el-dialog__body {
     padding: 20px;
-    color: var(--text);
+    background-color: var(--surface) !important;
+    color: var(--text) !important;
   }
   
   // 底部按钮区域
   .el-dialog__footer {
     padding: 10px 20px 20px;
+    background-color: var(--surface) !important;
+    border-top: 1px solid var(--border) !important;
     
     // 按钮样式
     .el-button {
@@ -197,49 +214,68 @@ watch(visible, (newVal) => {
       
       // 取消按钮
       &--default {
-        color: #606266;
-        border-color: #DCDFE6;
-        background-color: #FFFFFF;
+        color: var(--text-2) !important;
+        border-color: var(--border) !important;
+        background-color: var(--surface) !important;
         
         &:hover {
-          color: #1E3A8A;
-          border-color: #1E3A8A;
-          background-color: #F5F7FA;
+          color: var(--text-2) !important;
+          border-color: var(--border-hover) !important;
+          background-color: var(--hover) !important;
+        }
+        
+        &:active {
+          color: var(--text-2) !important;
+          border-color: var(--border) !important;
+          background-color: var(--surface) !important;
         }
       }
       
       // 确认按钮
       &--primary {
-        background-color: #1E3A8A !important;
-        border-color: #1E3A8A !important;
-        color: #FFFFFF !important;
+        background-color: var(--color-primary) !important;
+        border-color: var(--color-primary) !important;
+        color: var(--surface) !important;
         
         &:hover {
-          background-color: #2952B8 !important;
-          border-color: #2952B8 !important;
+          background-color: var(--color-primary-dark) !important;
+          border-color: var(--color-primary-dark) !important;
+        }
+        
+        /* 暗色主题下确认按钮悬浮样式 */
+        [data-theme='dark'] &,
+        .dark & {
+          &:hover {
+            background-color: var(--color-primary-light) !important;
+            border-color: var(--color-primary-light) !important;
+          }
         }
         
         &:active {
-          background-color: #17306D !important;
-          border-color: #17306D !important;
+          background-color: var(--color-primary-dark) !important;
+          border-color: var(--color-primary-dark) !important;
         }
       }
     }
   }
 }
 
-// MessageBox 样式覆盖（用于 ElMessageBox.confirm 等）
+// MessageBox 样式覆盖（用于 ElMessageBox.confirm 等）- 暗色主题适配
 :deep(.el-message-box) {
   // 弹窗圆角
   border-radius: 10px !important;
   overflow: hidden;
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
   
   // 标题样式
   .el-message-box__header {
     padding-top: 20px;
+    background-color: var(--surface) !important;
+    border-bottom: 1px solid var(--border) !important;
     
     .el-message-box__title {
-      color: #1E3A8A !important;
+      color: var(--color-primary) !important;
       font-size: 16px;
       font-weight: 600;
     }
@@ -247,10 +283,10 @@ watch(visible, (newVal) => {
     // 关闭按钮
     .el-message-box__headerbtn {
       .el-message-box__close {
-        color: #909399;
+        color: var(--text-3) !important;
         
         &:hover {
-          color: #1E3A8A;
+          color: var(--color-primary) !important;
         }
       }
     }
@@ -259,15 +295,22 @@ watch(visible, (newVal) => {
   // 内容区域
   .el-message-box__content {
     padding: 20px;
+    background-color: var(--surface) !important;
     
     .el-message-box__message {
-      color: var(--text);
+      color: var(--text) !important;
+    }
+    
+    .el-message-box__icon {
+      color: var(--color-warning) !important;
     }
   }
   
   // 底部按钮
   .el-message-box__btns {
     padding: 10px 20px 20px;
+    background-color: var(--surface) !important;
+    border-top: 1px solid var(--border) !important;
     
     .el-button {
       border-radius: 6px !important;
@@ -276,31 +319,46 @@ watch(visible, (newVal) => {
       
       // 取消按钮
       &--default {
-        color: #606266;
-        border-color: #DCDFE6;
-        background-color: #FFFFFF;
+        color: var(--text-2) !important;
+        border-color: var(--border) !important;
+        background-color: var(--surface) !important;
         
         &:hover {
-          color: #1E3A8A;
-          border-color: #1E3A8A;
-          background-color: #F5F7FA;
+          color: var(--text-2) !important;
+          border-color: var(--border-hover) !important;
+          background-color: var(--hover) !important;
+        }
+        
+        &:active {
+          color: var(--text-2) !important;
+          border-color: var(--border) !important;
+          background-color: var(--surface) !important;
         }
       }
       
       // 确认按钮
       &--primary {
-        background-color: #1E3A8A !important;
-        border-color: #1E3A8A !important;
-        color: #FFFFFF !important;
+        background-color: var(--color-primary) !important;
+        border-color: var(--color-primary) !important;
+        color: var(--surface) !important;
         
         &:hover {
-          background-color: #2952B8 !important;
-          border-color: #2952B8 !important;
+          background-color: var(--color-primary-dark) !important;
+          border-color: var(--color-primary-dark) !important;
+        }
+        
+        /* 暗色主题下确认按钮悬浮样式 */
+        [data-theme='dark'] &,
+        .dark & {
+          &:hover {
+            background-color: var(--color-primary-light) !important;
+            border-color: var(--color-primary-light) !important;
+          }
         }
         
         &:active {
-          background-color: #17306D !important;
-          border-color: #17306D !important;
+          background-color: var(--color-primary-dark) !important;
+          border-color: var(--color-primary-dark) !important;
         }
       }
     }

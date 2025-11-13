@@ -4,6 +4,7 @@ import com.sciz.server.domain.pojo.dto.request.user.EmailCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
 import com.sciz.server.domain.pojo.dto.request.user.PhoneCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
+import com.sciz.server.domain.pojo.dto.request.user.ChangePasswordReq;
 import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
@@ -13,7 +14,9 @@ import com.sciz.server.domain.pojo.dto.response.user.CheckRoleResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckPermResp;
 import com.sciz.server.domain.pojo.dto.response.user.RefreshTokenResp;
 import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
+import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.request.user.UserInfoUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserInfoUpdateResp;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -117,10 +120,29 @@ public interface AuthService {
     void resetPassword(ResetPasswordReq req);
 
     /**
+     * 修改密码
+     * 已登录用户修改密码，需要验证原密码
+     *
+     * @param req ChangePasswordReq 修改密码请求
+     */
+    void changePassword(ChangePasswordReq req);
+
+    /**
      * 更新个人信息
+     * 仅更新基础信息（真实姓名、邮箱、手机号、部门、职称），不包含头像
      *
      * @param req UserInfoUpdateReq 个人信息更新请求
      * @return UserInfoUpdateResp 更新后的个人信息
      */
     UserInfoUpdateResp updateUserInfo(UserInfoUpdateReq req);
+
+    /**
+     * 上传用户头像
+     * 调用文件上传服务处理文件上传，然后更新用户头像URL和附件ID
+     * 入参和出参与 api/file/upload 保持一致
+     *
+     * @param req FileUploadReq 文件上传请求（
+     * @return FileInfoResp 文件信息响应
+     */
+    FileInfoResp uploadAvatar(FileUploadReq req);
 }

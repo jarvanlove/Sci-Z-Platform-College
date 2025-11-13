@@ -1,5 +1,6 @@
 package com.sciz.server.domain.pojo.repository.user;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
 
 /**
@@ -58,4 +59,17 @@ public interface SysUserRepo {
      * @return 是否更新成功
      */
     boolean updateById(SysUser entity);
+
+    /**
+     * 分页查询用户列表
+     *
+     * @param page    IPage<SysUser> 分页对象
+     * @param keyword String 搜索关键字（用户名/邮箱/手机号）
+     * @param roleId  Long 角色ID（null表示全部）
+     * @param status  Integer 用户状态（null表示全部）
+     * @param sortBy  String 排序字段
+     * @param asc     boolean 是否升序
+     * @return IPage<SysUser> 分页结果
+     */
+    IPage<SysUser> page(IPage<SysUser> page, String keyword, Long roleId, Integer status, String sortBy, boolean asc);
 }

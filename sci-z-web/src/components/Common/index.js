@@ -10,6 +10,8 @@ export { default as BaseDialog } from './BaseDialog.vue'
 export { default as BaseTable } from './BaseTable.vue'
 export { default as BasePagination } from './BasePagination.vue'
 export { default as BaseScrollbar } from './BaseScrollbar.vue'
+export { default as BaseDatePicker } from './BaseDatePicker.vue'
+export { default as BaseSwitch } from './BaseSwitch.vue'
 
 // 功能组件
 export { default as LanguageSwitcher } from './LanguageSwitcher.vue'

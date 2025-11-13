@@ -277,11 +277,22 @@ const router = createRouter({
   routes
 })
 
+// 登录/注册/忘记密码页面路径（不参与主题切换）
+const AUTH_PAGES = ['/login', '/register', '/reset-password']
+
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
   const publicPages = ['/login', '/register', '/reset-password']
   const authRequired = !publicPages.includes(to.path)
   const authStore = useAuthStore()
+
+  // 🔥 关键修复：登录/注册/忘记密码页面强制使用明亮主题
+  const isAuthPage = AUTH_PAGES.includes(to.path)
+  if (isAuthPage) {
+    const html = document.documentElement
+    html.classList.remove('dark')
+    html.setAttribute('data-theme', 'light')
+  }
 
   // 路由守卫日志
   routerLogger.info('路由守卫触发', {
@@ -309,14 +320,37 @@ router.beforeEach(async (to, from, next) => {
       try {
         const sessionValid = await authStore.verifyLoginStatus()
         if (!sessionValid) {
-          routerLogger.warn('服务端会话无效，重定向到登录页面', { targetPath: to.path })
-          ElMessage.error('登录状态已过期，请重新登录')
-          return next('/login')
+          // 如果是网络错误（后端服务未启动），允许继续访问，避免阻塞用户操作
+          // 检查最近 5 分钟内是否有网络错误
+          const now = Date.now()
+          const hasRecentNetworkError = authStore.lastNetworkError && 
+                                       (now - authStore.lastNetworkError) < 5 * 60 * 1000
+          if (hasRecentNetworkError) {
+            routerLogger.warn('网络错误，跳过登录状态校验，允许继续访问', { targetPath: to.path })
+            // 不阻止路由跳转，允许用户继续使用
+          } else {
+            routerLogger.warn('服务端会话无效，重定向到登录页面', { targetPath: to.path })
+            ElMessage.error('登录状态已过期，请重新登录')
+            return next('/login')
+          }
         }
       } catch (error) {
-        routerLogger.error('登录状态校验异常', { error: error.message })
-        ElMessage.error('校验登录状态失败，请重新登录')
-        return next('/login')
+        // 网络错误时，不阻止路由跳转
+        const isNetworkError = error.code === 'ECONNREFUSED' || 
+                               error.code === 'ECONNABORTED' || 
+                               error.message?.includes('timeout') ||
+                               !error.response
+        if (isNetworkError) {
+          routerLogger.warn('网络错误，跳过登录状态校验，允许继续访问', { 
+            error: error.message,
+            targetPath: to.path 
+          })
+          // 不阻止路由跳转
+        } else {
+          routerLogger.error('登录状态校验异常', { error: error.message })
+          ElMessage.error('校验登录状态失败，请重新登录')
+          return next('/login')
+        }
       }
     
     // 检查页面权限

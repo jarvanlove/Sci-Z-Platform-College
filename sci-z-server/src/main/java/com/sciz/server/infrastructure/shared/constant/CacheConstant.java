@@ -113,12 +113,6 @@ public class CacheConstant {
     public static final String AUTH_LOCK_KEY = "auth:lock:%s";
 
     /**
-     * 认证令牌缓存前缀（用于存储用户登录token）
-     * 格式：auth:token:{userId}
-     */
-    public static final String AUTH_TOKEN_KEY = "auth:token:%s";
-
-    /**
      * 最大登录失败次数（超过此次数将锁定账号）
      */
     public static final int MAX_LOGIN_FAIL_COUNT = 6;

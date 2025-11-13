@@ -33,6 +33,7 @@ export const AUTH_API = {
   SEND_SMS_CODE: buildApiUrl('/auth/sms-code'),
   REFRESH_TOKEN: buildApiUrl('/auth/refresh-token'),
   PROFILE: buildApiUrl('/auth/profile'),
+  CHANGE_PASSWORD: buildApiUrl('/auth/change-password'),  // 修改密码
   CHECK_LOGIN: buildApiUrl('/auth/check/login'),
   CHECK_ROLE: buildApiUrl('/auth/check/role'),
   CHECK_PERMISSION: buildApiUrl('/auth/check/perm'),
@@ -177,7 +178,9 @@ export const SYSTEM_API = {
   PERMISSIONS: buildApiUrl('/user/permissions'),
   PERMISSION_DETAIL: (id) => buildApiUrl(`/user/permissions/${id}`),
   USERS: buildApiUrl('/user/users'),
-  USER_DETAIL: (id) => buildApiUrl(`/user/users/${id}`)
+  USER_DETAIL: (id) => buildApiUrl(`/user/users/${id}`),
+  USER_STATUS: (id) => buildApiUrl(`/user/users/${id}/status`),  // 禁用/启用用户
+  RESET_PASSWORD: buildApiUrl('/user/users/password/reset')  // 管理员重置用户密码
 }
 
 // ================================
@@ -186,12 +189,10 @@ export const SYSTEM_API = {
 
 export const USER_API = {
   BASE_PATH: buildApiUrl('/user'),
-  INFO: buildApiUrl('/auth/user/info'),
-  UPDATE_INFO: buildApiUrl('/auth/user/info'),
+  INFO: buildApiUrl('/user/info'),  // 更新用户信息
   PROFILE_FIELDS: buildApiUrl('/user/profile/fields'),
-  CHANGE_PASSWORD: buildApiUrl('/user/password'),
   UPLOAD_AVATAR: buildApiUrl('/user/avatar'),
-  LOGIN_LOGS: buildApiUrl('/user/login-logs')
+  LOGIN_LOGS: buildApiUrl('/user/login/logs')  // 登录日志查询
 }
 
 // ================================

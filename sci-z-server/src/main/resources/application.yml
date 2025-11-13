@@ -81,7 +81,7 @@ sa-token: # Sa-Token 身份认证配置
   is-concurrent: true # 是否允许同账号多端并发登录
   is-share: true # 在多人登录同一账号时是否共用一个 Token（true 共用，false 每次生成新 Token）
   token-style: uuid # Token 生成风格
-  is-log: false # 是否打印 Sa-Token 日志
+  is-log: true # 是否打印 Sa-Token 日志
   is-read-cookie: true # 从 Cookie 读取 Token
   is-read-header: true # 从 Header 读取 Token
   is-read-body: false # 从 Body 读取 Token
@@ -90,6 +90,11 @@ sa-token: # Sa-Token 身份认证配置
   is-auto-renew: true # 是否在请求到达时自动续期（基于 timeout）
   auto-renew-timeout: 1800 # 自动续期步长（秒），例如 30 分钟
   is-renew-active-timeout: true # 每次请求是否续期 activity-timeout
+  # Redis 配置（sa-token-redis 依赖会自动使用项目的 spring.redis.* 配置）
+  # 可选配置：自定义 Redis key 前缀（默认使用 satoken: 前缀）
+  # redis:
+  #   database: 0 # Redis 数据库索引（默认使用 spring.redis.database）
+  #   key-prefix: "satoken:" # Redis key 前缀（默认：satoken:）
 
 # 邮箱服务商配置（按需启用并填写账号信息）
 mail:

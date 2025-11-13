@@ -104,6 +104,7 @@ export const useAuthStore = defineStore('auth', {
       rememberMe,
       sessionInfo: null,
       lastSessionCheck: 0,
+      lastNetworkError: 0, // 记录最后一次网络错误的时间
       refreshPromise: null
     }
   },
@@ -181,7 +182,12 @@ export const useAuthStore = defineStore('auth', {
         })
         
         this.token = token
-        this.userInfo = userInfo
+        // 🔥 关键修复：确保 userInfo 被正确设置，包括 avatar 和 avatarFileId
+        this.userInfo = userInfo ? {
+          ...userInfo,
+          avatar: userInfo.avatar || userInfo.avatarUrl || null,
+          avatarFileId: userInfo.avatarFileId || userInfo.avatarId || null
+        } : null
         this.permissions = permissions || []
         this.roles = roles || []
         this.menus = menus || [] // 方案一：直接从登录接口获取菜单数据
@@ -216,6 +222,21 @@ export const useAuthStore = defineStore('auth', {
         // 💾 保存上次登录的用户名（用于退出登录后自动填充）
         if (userInfo?.username) {
           saveLastUsername(userInfo.username)
+        }
+        
+        // 🔥 关键修复：登录成功后立即获取完整的用户信息（确保头像等字段完整）
+        // 因为登录接口可能不返回完整的用户信息（如头像），需要调用 profile 接口获取
+        try {
+          await this.getUserInfo(true)
+          authLogger.debug('登录后已获取完整用户信息', { 
+            avatar: this.userInfo?.avatar,
+            username: this.userInfo?.username 
+          })
+        } catch (getUserInfoError) {
+          // 如果获取失败，不影响登录流程，使用登录接口返回的数据
+          authLogger.warn('登录后获取完整用户信息失败，使用登录接口返回的数据', { 
+            error: getUserInfoError.message 
+          })
         }
         
         authLogger.info('🎉 登录成功', { 
@@ -271,26 +292,73 @@ export const useAuthStore = defineStore('auth', {
       try {
         const response = await fetchUserProfile()
         const payload = unwrapResponse(response) || {}
-        const { userInfo, permissions, roles, menus } = payload
         
-        this.userInfo = userInfo
+        // 🔥 关键修复：支持两种数据结构
+        // 1. 标准结构：{ userInfo: { avatar, username, ... }, permissions, roles, menus }
+        // 2. 扁平结构：{ avatar, username, ..., permissions, roles, menus }（用户信息直接在顶层）
+        let userInfo = payload.userInfo
+        
+        // 如果是扁平结构，从顶层字段构建 userInfo
+        if (!userInfo && (payload.username || payload.avatar || payload.email)) {
+          userInfo = {
+            ...this.userInfo, // 保留现有用户信息（避免覆盖）
+            username: payload.username || this.userInfo?.username,
+            avatar: payload.avatar || this.userInfo?.avatar,
+            email: payload.email || this.userInfo?.email,
+            phone: payload.phone || this.userInfo?.phone,
+            realName: payload.realName || payload.name || this.userInfo?.realName,
+            department: payload.department || payload.departmentCode || this.userInfo?.department,
+            title: payload.title || payload.titleCode || this.userInfo?.title,
+            avatarFileId: payload.avatarFileId || payload.avatarId || this.userInfo?.avatarFileId,
+            ...payload // 保留其他字段
+          }
+          authLogger.debug('检测到扁平结构，已构建 userInfo', { avatar: userInfo.avatar })
+        }
+        
+        // 合并更新用户信息（保留现有字段，只更新新字段）
+        if (userInfo) {
+          this.userInfo = {
+            ...this.userInfo,
+            ...userInfo
+          }
+          // 🔥 关键修复：确保 avatar 和 avatarFileId 被正确设置
+          if (userInfo.avatar !== undefined) {
+            this.userInfo.avatar = userInfo.avatar
+          }
+          if (userInfo.avatarFileId !== undefined || userInfo.avatarId !== undefined) {
+            this.userInfo.avatarFileId = userInfo.avatarFileId || userInfo.avatarId
+          }
+          authLogger.debug('更新后的用户信息', { 
+            avatar: this.userInfo?.avatar,
+            avatarFileId: this.userInfo?.avatarFileId,
+            username: this.userInfo?.username 
+          })
+        }
 
-        if (Array.isArray(permissions) && permissions.length > 0) {
-          this.permissions = permissions
+        if (Array.isArray(payload.permissions) && payload.permissions.length > 0) {
+          this.permissions = payload.permissions
           setPermissions(this.permissions)
         }
         
-        if (Array.isArray(roles) && roles.length > 0) {
-          this.roles = roles
+        if (Array.isArray(payload.roles) && payload.roles.length > 0) {
+          this.roles = payload.roles
           setRoles(this.roles)
         }
         
-        if (Array.isArray(menus) && menus.length > 0) {
-          this.menus = menus
+        if (Array.isArray(payload.menus) && payload.menus.length > 0) {
+          this.menus = payload.menus
           setMenus(this.menus)
         }
 
-        setUserInfo(userInfo)
+        // 保存更新后的用户信息（确保头像信息被持久化）
+        if (userInfo) {
+          // 🔥 关键修复：确保保存完整的用户信息，包括头像
+          setUserInfo(this.userInfo)
+          authLogger.debug('用户信息已保存到 localStorage', { 
+            avatar: this.userInfo?.avatar,
+            avatarFileId: this.userInfo?.avatarFileId
+          })
+        }
         setPermissions(this.permissions)
         setRoles(this.roles)
         setMenus(this.menus)
@@ -344,6 +412,28 @@ export const useAuthStore = defineStore('auth', {
         
         return true
       } catch (error) {
+        // 对于网络错误（如后端服务未启动），更新 lastSessionCheck 避免频繁调用
+        // 但延长检查间隔，避免在服务恢复前一直重试
+        const isNetworkError = error.code === 'ECONNREFUSED' || 
+                               error.code === 'ECONNABORTED' || 
+                               error.message?.includes('timeout') ||
+                               !error.response
+        
+        if (isNetworkError) {
+          // 网络错误时，延长检查间隔到 5 分钟，避免频繁闪烁
+          const extendedInterval = 5 * 60 * 1000
+          this.lastNetworkError = now
+          if (!this.lastSessionCheck || now - this.lastSessionCheck < extendedInterval) {
+            this.lastSessionCheck = now
+            authLogger.debug('网络错误，延长检查间隔', { 
+              error: error.message,
+              lastSessionCheck: this.lastSessionCheck 
+            })
+            // 网络错误时不抛出异常，返回 false 但不影响路由跳转
+            return false
+          }
+        }
+        
         authLogger.error('登录状态校验失败', { error: error.message })
         throw error
       }
@@ -465,6 +555,16 @@ export const useAuthStore = defineStore('auth', {
         authLogger.error('退出登录失败', { error: error.message })
       } finally {
         this.resetState({ clearRemember })
+        
+        // 🔥 关键修复：退出登录后重置主题为明亮主题
+        try {
+          const appStoreModule = await import('@/store/modules/app')
+          const appStore = appStoreModule.useAppStore()
+          appStore.setTheme('light')
+          authLogger.debug('退出登录后已重置主题为明亮主题')
+        } catch (error) {
+          authLogger.warn('退出登录后重置主题失败', { error: error.message })
+        }
 
         if (redirect && typeof window !== 'undefined') {
           try {
@@ -513,6 +613,7 @@ export const useAuthStore = defineStore('auth', {
       this.roles = []
       this.sessionInfo = null
       this.lastSessionCheck = 0
+      this.lastNetworkError = 0
       this.refreshPromise = null
       
       if (clearRemember) {
@@ -520,11 +621,17 @@ export const useAuthStore = defineStore('auth', {
         localStorage.removeItem(REMEMBER_ME_KEY)
       }
       
+      // 🔥 关键修复：确保完全清除用户信息，避免头像残留
       removeToken()
       removeUserInfo()
       removePermissions()
       removeRoles()
       removeMenus()
+      
+      authLogger.debug('状态已重置，用户信息已清除', { 
+        hasUserInfo: !!this.userInfo,
+        hasToken: !!this.token
+      })
     },
 
     // 初始化权限（登录成功后调用）

@@ -1,9 +1,15 @@
 package com.sciz.server.application.service.log.impl;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.application.service.log.LoginLogService;
+import com.sciz.server.domain.pojo.dto.request.log.LoginLogQueryReq;
+import com.sciz.server.domain.pojo.dto.response.log.LoginLogResp;
 import com.sciz.server.domain.pojo.entity.log.SysLoginLog;
 import com.sciz.server.domain.pojo.repository.log.LoginLogRepo;
 import com.sciz.server.infrastructure.shared.event.log.LoginLoggedEvent;
+import com.sciz.server.infrastructure.shared.result.PageResult;
+import com.sciz.server.infrastructure.shared.utils.LoginUserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -48,6 +54,41 @@ public class LoginLogServiceImpl implements LoginLogService {
     @Override
     public Long save(SysLoginLog entity) {
         return repository.save(entity);
+    }
+
+    @Override
+    public PageResult<LoginLogResp> page(LoginLogQueryReq req) {
+        // 获取当前登录用户ID
+        var userId = LoginUserUtil.requireCurrentUserId();
+        log.debug(String.format("查询登录日志: userId=%s", userId));
+
+        var baseQuery = req.toBaseQuery();
+        var page = new Page<SysLoginLog>(baseQuery.pageNo(), baseQuery.pageSize());
+
+        var asc = "ASC".equalsIgnoreCase(baseQuery.sortOrder());
+        var sortBy = Optional.ofNullable(baseQuery.sortBy()).orElse("loginTime");
+
+        IPage<SysLoginLog> logPage = repository.page(page, userId, req.status(), req.startDate(), req.endDate(), sortBy,
+                asc);
+
+        var records = logPage.getRecords().stream()
+                .map(log -> new LoginLogResp(
+                        log.getId(),
+                        log.getUserId(),
+                        log.getUsername(),
+                        log.getLoginIp(),
+                        log.getLoginLocation(),
+                        log.getBrowser(),
+                        log.getOs(),
+                        log.getStatus(),
+                        log.getMessage(),
+                        log.getLoginTime()))
+                .toList();
+
+        Page<LoginLogResp> resultPage = new Page<>(logPage.getCurrent(), logPage.getSize());
+        resultPage.setRecords(records);
+        resultPage.setTotal(logPage.getTotal());
+        return PageResult.of(resultPage);
     }
 
     /**

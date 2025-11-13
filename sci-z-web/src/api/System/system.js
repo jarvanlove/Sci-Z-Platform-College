@@ -209,20 +209,21 @@ export const deletePermission = (id) => {
 
 /**
  * 获取用户管理列表
- * @param {Object} params - 查询参数
- * @param {number} params.page - 页码
- * @param {number} params.size - 每页数量
- * @param {string} params.keyword - 关键词搜索
- * @param {number} params.departmentId - 部门ID
- * @param {number} params.roleId - 角色ID
- * @param {string} params.status - 状态筛选
+ * @param {Object} data - 查询参数
+ * @param {number} data.pageNo - 页码
+ * @param {number} data.pageSize - 每页数量
+ * @param {string} data.sortBy - 排序字段
+ * @param {string} data.sortOrder - 排序方向 (ASC/DESC)
+ * @param {string} data.keyword - 关键词搜索（可选）
+ * @param {number} data.roleId - 角色ID（可选）
+ * @param {number} data.status - 状态（可选，1=正常，0=禁用）
  * @returns {Promise} 用户列表响应
  */
-export const getUsers = (params) => {
+export const getUsers = (data) => {
   return request({
-    url: SYSTEM_API.USERS,
-    method: HTTP_METHODS.GET,
-    params
+    url: `${SYSTEM_API.USERS}/list`,
+    method: HTTP_METHODS.POST,
+    data
   })
 }
 
@@ -248,26 +249,66 @@ export const createUser = (data) => {
 
 /**
  * 更新用户
- * @param {number} id - 用户ID
+ * @param {number} id - 用户ID（路径参数）
  * @param {Object} data - 用户数据
+ * @param {number} data.id - 用户ID（必须与路径参数中的id一致）
+ * @param {string} data.realName - 真实姓名（必填，最大长度50字符）
+ * @param {string} data.email - 邮箱（必填，必须是有效邮箱格式，最大长度100字符）
+ * @param {string} data.phone - 手机号（必填，必须是大陆11位手机号，1开头）
+ * @param {number} data.departmentId - 部门ID（必填）
+ * @param {string} data.industryType - 行业类型（必填）
  * @returns {Promise} 更新用户响应
  */
 export const updateUser = (id, data) => {
   return request({
     url: SYSTEM_API.USER_DETAIL(id),
     method: HTTP_METHODS.PUT,
-    data
+    data: {
+      ...data,
+      id // 确保请求体中包含id，且与路径参数一致
+    }
   })
 }
 
 /**
- * 删除用户
- * @param {number} id - 用户ID
+ * 删除用户（软删除）
+ * @param {number} id - 用户ID（路径参数）
  * @returns {Promise} 删除用户响应
  */
 export const deleteUser = (id) => {
   return request({
     url: SYSTEM_API.USER_DETAIL(id),
     method: HTTP_METHODS.DELETE
+  })
+}
+
+/**
+ * 禁用/启用用户
+ * @param {number} id - 用户ID（路径参数）
+ * @param {boolean} disabled - true=禁用, false=启用
+ * @returns {Promise} 操作响应
+ */
+export const updateUserStatus = (id, disabled) => {
+  return request({
+    url: SYSTEM_API.USER_STATUS(id),
+    method: HTTP_METHODS.PUT,
+    params: {
+      disabled
+    }
+  })
+}
+
+/**
+ * 管理员重置用户密码
+ * @param {Object} data - 重置密码数据
+ * @param {number} data.userId - 用户ID
+ * @param {string} data.newPassword - 新密码（必填，长度6-32个字符）
+ * @returns {Promise} 重置密码响应
+ */
+export const resetUserPassword = (data) => {
+  return request({
+    url: SYSTEM_API.RESET_PASSWORD,
+    method: HTTP_METHODS.PUT,
+    data
   })
 }

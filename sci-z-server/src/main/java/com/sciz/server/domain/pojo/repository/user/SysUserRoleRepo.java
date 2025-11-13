@@ -42,4 +42,12 @@ public interface SysUserRoleRepo {
      * @param ids List<Long> 主键ID列表
      */
     void markDeletedByIds(List<Long> ids);
+
+    /**
+     * 根据角色ID查询用户ID列表
+     *
+     * @param roleId Long 角色ID
+     * @return List<Long> 用户ID列表
+     */
+    List<Long> findUserIdsByRoleId(Long roleId);
 }

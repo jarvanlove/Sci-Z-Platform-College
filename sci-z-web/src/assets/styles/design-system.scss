@@ -35,6 +35,7 @@
   --text-2: #4b5563;
   --text-3: #6b7280;
   --hover: #eef2ff;
+  --hover-light: rgba(0, 0, 0, 0.02);
   --disabled: #9ca3af;
 
   /* 间距系统 */
@@ -71,6 +72,43 @@
   --line-height-tight: 1.25;
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.75;
+}
+
+// ================================
+// 3. 暗色主题变量
+// ================================
+
+[data-theme='dark'],
+.dark {
+  /* 主色调 - 暗色主题下使用更亮的蓝色 */
+  --color-primary: #60a5fa;
+  --color-primary-light: #93c5fd;
+  --color-primary-lighter: #bfdbfe;
+  --color-primary-lightest: #dbeafe;
+  --color-primary-dark: #3b82f6;
+
+  /* 辅助色 */
+  --color-accent: #8fa8ff;
+  --color-accent-light: #a5b8ff;
+  --color-accent-dark: #6b8cff;
+
+  /* 功能色 */
+  --color-info: #60a5fa;
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+
+  /* 中性色 - 暗色主题 */
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --border: #334155;
+  --border-hover: #475569;
+  --text: #f1f5f9;
+  --text-2: #cbd5e1;
+  --text-3: #94a3b8;
+  --hover: #1e3a8a;
+  --hover-light: rgba(30, 58, 138, 0.2);
+  --disabled: #64748b;
 }
 
 // ================================
@@ -218,6 +256,26 @@ body {
   box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3) !important;
 }
 
+/* 暗色主题下主要按钮悬浮样式 */
+[data-theme='dark'] .el-button--primary:hover,
+.dark .el-button--primary:hover {
+  background-color: var(--color-primary-light) !important;
+  border-color: var(--color-primary-light) !important;
+  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.3) !important;
+}
+
+/* 确保 BaseButton 组件中的按钮样式正确应用 */
+.base-button.el-button--primary:hover {
+  background-color: var(--color-primary-dark) !important;
+  border-color: var(--color-primary-dark) !important;
+}
+
+[data-theme='dark'] .base-button.el-button--primary:hover,
+.dark .base-button.el-button--primary:hover {
+  background-color: var(--color-primary-light) !important;
+  border-color: var(--color-primary-light) !important;
+}
+
 .el-button--primary:active {
   transform: translateY(0) !important;
   box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3) !important;
@@ -234,8 +292,16 @@ body {
 }
 
 .el-button--default:hover {
-  background-color: #f9fafb !important;
-  border-color: var(--disabled) !important;
+  background-color: var(--hover) !important;
+  border-color: var(--border-hover) !important;
+  color: var(--text-2) !important;
+}
+
+/* 暗色主题下次要按钮悬浮样式 */
+[data-theme='dark'] .el-button--default:hover,
+.dark .el-button--default:hover {
+  background-color: var(--hover) !important;
+  border-color: var(--border-hover) !important;
   color: var(--text-2) !important;
 }
 
@@ -373,27 +439,27 @@ body {
   .el-input__wrapper {
     border: 1px solid var(--border) !important;
     border-radius: var(--radius-md) !important;
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    background-color: var(--surface) !important;
+    background: var(--surface) !important;
     transition: all 0.2s ease !important;
     box-shadow: none !important;
   }
   
-  /* 确保输入框内部背景为白色 */
+  /* 确保输入框内部背景使用主题变量 */
   .el-input__inner {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    background-color: var(--surface) !important;
+    background: var(--surface) !important;
   }
   
   /* 覆盖Element Plus可能的默认背景色 */
   &.el-input--large .el-input__wrapper {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    background-color: var(--surface) !important;
+    background: var(--surface) !important;
   }
   
   &.el-input--large .el-input__inner {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    background-color: var(--surface) !important;
+    background: var(--surface) !important;
   }
   
   /* 强制覆盖所有可能的背景色 */
@@ -401,16 +467,16 @@ body {
   .el-input__wrapper:hover,
   .el-input__wrapper.is-focus,
   .el-input__wrapper.is-disabled {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    background-color: var(--surface) !important;
+    background: var(--surface) !important;
   }
   
   .el-input__inner,
   .el-input__inner:hover,
   .el-input__inner:focus,
   .el-input__inner.is-disabled {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    background-color: transparent !important;
+    background: transparent !important;
   }
   
   .el-input__wrapper:hover {
@@ -466,8 +532,8 @@ body {
   .el-select__wrapper {
     border: 1px solid var(--border) !important;
     border-radius: var(--radius-md) !important;
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    background-color: var(--surface) !important;
+    background: var(--surface) !important;
     transition: all 0.2s ease !important;
     box-shadow: none !important;
   }
@@ -492,6 +558,92 @@ body {
     font-size: var(--font-size-base) !important;
     font-weight: 500 !important;
   }
+  
+  /* 下拉箭头颜色 */
+  .el-select__caret {
+    color: var(--text-2) !important;
+  }
+}
+
+// ================================
+// 选择器下拉菜单暗色主题适配（与日历弹窗保持一致）
+// ================================
+
+/* Element Plus 选择器下拉菜单暗色主题 */
+.el-select-dropdown {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  
+  .el-select-dropdown__item {
+    background-color: var(--surface) !important;
+    color: var(--text) !important;
+    
+    &:hover {
+      background-color: var(--hover) !important;
+      color: var(--text) !important;
+    }
+    
+    &.selected {
+      background-color: var(--hover) !important;
+      color: var(--color-primary) !important;
+      font-weight: 500 !important;
+    }
+    
+    &.is-disabled {
+      color: var(--disabled) !important;
+      cursor: not-allowed !important;
+    }
+  }
+  
+  .el-select-dropdown__empty {
+    color: var(--text-3) !important;
+  }
+  
+  .el-scrollbar__bar {
+    &.is-vertical {
+      .el-scrollbar__thumb {
+        background-color: rgba(255, 255, 255, 0.2) !important;
+      }
+    }
+  }
+}
+
+// ================================
+// 下拉菜单暗色主题适配（与选择器下拉菜单保持一致）
+// ================================
+
+/* Element Plus 下拉菜单暗色主题 */
+.el-dropdown-menu {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  padding: 4px 0 !important;
+  border-radius: 8px !important;
+  
+  .el-dropdown-menu__item {
+    background-color: var(--surface) !important;
+    color: var(--text-2) !important;
+    
+    &:hover {
+      background-color: var(--hover) !important;
+      color: var(--color-primary) !important;
+    }
+    
+    &.is-divided {
+      border-top: 1px solid var(--border) !important;
+      margin-top: 4px !important;
+      padding-top: 4px !important;
+    }
+    
+    .el-icon {
+      color: var(--text-2) !important;
+    }
+    
+    &:hover .el-icon {
+      color: var(--color-primary) !important;
+    }
+  }
 }
 
 /* 文本域统一样式 */
@@ -499,8 +651,8 @@ body {
   .el-textarea__inner {
     border: 1px solid var(--border) !important;
     border-radius: var(--radius-md) !important;
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    background-color: var(--surface) !important;
+    background: var(--surface) !important;
     color: var(--text) !important;
     font-size: var(--font-size-base) !important;
     font-weight: 500 !important;
@@ -529,8 +681,8 @@ body {
   .el-input__wrapper {
     border: 1px solid var(--border) !important;
     border-radius: var(--radius-md) !important;
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    background-color: var(--surface) !important;
+    background: var(--surface) !important;
     transition: all 0.2s ease !important;
     box-shadow: none !important;
   }
@@ -543,6 +695,423 @@ body {
   .el-input__wrapper.is-focus {
     border-color: var(--color-primary) !important;
     box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2) !important;
+  }
+  
+  /* 确保输入框文字颜色正确 */
+  .el-input__inner {
+    color: var(--text) !important;
+    background-color: transparent !important;
+  }
+  
+  /* 日期范围选择器的分隔符 */
+  .el-range-separator {
+    color: var(--text-2) !important;
+  }
+  
+  /* 日期范围选择器的图标 */
+  .el-range__icon {
+    color: var(--text-2) !important;
+  }
+  
+  /* 前缀和后缀图标 */
+  .el-input__prefix,
+  .el-input__suffix {
+    color: var(--text-2) !important;
+  }
+}
+
+// ================================
+// 日期选择器弹窗暗色主题适配（全局样式）
+// ================================
+
+/* Element Plus 日期选择器弹窗暗色主题（与下拉框保持一致） */
+/* 使用多种选择器确保样式生效，包括 .el-popper（Element Plus 可能使用的类名） */
+[data-theme='dark'] .el-picker__popper,
+.dark .el-picker__popper,
+.el-picker__popper[data-theme='dark'],
+.el-picker__popper.dark,
+[data-theme='dark'] .el-popper.is-pure,
+.dark .el-popper.is-pure,
+.el-popper.is-pure[data-theme='dark'],
+.el-popper.is-pure.dark,
+[data-theme='dark'] .el-popper,
+.dark .el-popper {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  
+  .el-picker-panel {
+    background-color: var(--surface) !important;
+    border: none !important;
+    color: var(--text) !important;
+    
+    .el-picker-panel__header {
+      background-color: var(--surface) !important;
+      border-bottom: 1px solid var(--border) !important;
+      
+      /* 左侧箭头按钮（与下拉框箭头颜色一致） */
+      .el-picker-panel__icon-btn {
+        color: var(--text-2) !important;
+        
+        &:hover {
+          color: var(--color-primary) !important;
+        }
+      }
+      
+      .el-picker-panel__header-label {
+        color: var(--text) !important;
+        
+        &:hover {
+          color: var(--color-primary) !important;
+        }
+      }
+    }
+    
+    .el-picker-panel__body {
+      background-color: var(--surface) !important;
+      
+      .el-date-table {
+        background-color: var(--surface) !important;
+        
+        th {
+          color: var(--text-2) !important;
+          background-color: var(--surface) !important;
+        }
+        
+        td {
+          background-color: var(--surface) !important;
+          
+          &.available {
+            color: var(--text) !important;
+            
+            span {
+              color: var(--text) !important;
+            }
+            
+            &:hover {
+              color: var(--color-primary) !important;
+              
+              span {
+                color: var(--color-primary) !important;
+              }
+            }
+          }
+          
+          &.current:not(.disabled) {
+            color: var(--color-primary) !important;
+          }
+          
+          &.today {
+            span {
+              color: var(--color-primary) !important;
+              font-weight: 600;
+            }
+          }
+          
+          &.selected {
+            span {
+              background-color: var(--color-primary) !important;
+              color: var(--surface) !important;
+            }
+          }
+          
+          &.in-range {
+            background-color: var(--hover-light) !important;
+          }
+          
+          &.start-date,
+          &.end-date {
+            span {
+              background-color: var(--color-primary) !important;
+              color: var(--surface) !important;
+            }
+          }
+        }
+      }
+      
+      .el-month-table,
+      .el-year-table {
+        background-color: var(--surface) !important;
+        
+        td {
+          background-color: var(--surface) !important;
+          
+          .cell {
+            color: var(--text) !important;
+            background-color: var(--surface) !important;
+            
+            &:hover {
+              color: var(--color-primary) !important;
+              background-color: var(--hover) !important;
+            }
+          }
+          
+          &.current:not(.disabled) {
+            .cell {
+              color: var(--color-primary) !important;
+            }
+          }
+          
+          &.today {
+            .cell {
+              color: var(--color-primary) !important;
+              font-weight: 600;
+            }
+          }
+        }
+      }
+    }
+    
+    .el-picker-panel__footer {
+      background-color: var(--surface) !important;
+      border-top: 1px solid var(--border) !important;
+      
+      /* 确保按钮区域背景也是暗色 */
+      .el-picker-panel__link-btn {
+        background-color: var(--surface) !important;
+        color: var(--text) !important;
+      }
+      
+      .el-button {
+        color: var(--text) !important;
+        border-color: var(--border) !important;
+        background-color: var(--surface) !important;
+        
+        &:hover {
+          color: var(--color-primary) !important;
+          border-color: var(--color-primary) !important;
+        }
+        
+        &.el-button--primary {
+          background-color: var(--color-primary) !important;
+          border-color: var(--color-primary) !important;
+          color: var(--surface) !important;
+        }
+      }
+    }
+  }
+}
+
+/* 🔥 额外添加：直接针对 .el-popper 和 .el-picker-panel 的暗色主题样式（确保覆盖所有情况） */
+[data-theme='dark'] .el-popper .el-picker-panel,
+.dark .el-popper .el-picker-panel,
+[data-theme='dark'] .el-picker-panel,
+.dark .el-picker-panel {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  
+  .el-picker-panel__header,
+  .el-picker-panel__body,
+  .el-picker-panel__footer {
+    background-color: var(--surface) !important;
+  }
+  
+  .el-date-table,
+  .el-month-table,
+  .el-year-table {
+    background-color: var(--surface) !important;
+    
+    th,
+    td {
+      background-color: var(--surface) !important;
+      color: var(--text) !important;
+    }
+    
+    /* 确保日期单元格内的 span 也有正确的背景色 */
+    td span {
+      background-color: transparent !important;
+    }
+    
+    /* 选中和悬浮状态的 span */
+    td.selected span,
+    td.start-date span,
+    td.end-date span {
+      background-color: var(--color-primary) !important;
+      color: var(--surface) !important;
+    }
+  }
+}
+
+// ================================
+// 11. 表格统一样式（暗色主题适配）
+// ================================
+
+/* Element Plus 表格统一样式 */
+.el-table {
+  background-color: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+  
+  /* 表格头部 - 使用更柔和的背景色，避免视觉疲劳 */
+  .el-table__header-wrapper {
+    .el-table__header {
+      th {
+        background-color: var(--surface) !important;
+        color: var(--text-2) !important;
+        border-bottom-color: var(--border) !important;
+        font-weight: 500 !important;
+      }
+    }
+  }
+  
+  /* 表格主体 */
+  .el-table__body-wrapper {
+    .el-table__body {
+      tr {
+        background-color: var(--surface) !important;
+        color: var(--text) !important;
+        
+        &:hover {
+          background-color: var(--hover) !important;
+        }
+      }
+      
+      /* 条纹样式 - 使用深灰色背景（暗色主题下） */
+      tr.el-table__row--striped {
+        background-color: rgba(15, 23, 42, 0.5) !important;
+        color: var(--text) !important;
+        
+        td {
+          background-color: rgba(15, 23, 42, 0.5) !important;
+          color: var(--text) !important;
+        }
+      }
+      
+      /* 明亮主题下的条纹样式 */
+      [data-theme='light'] &,
+      &:not([data-theme='dark']):not(.dark) {
+        tr.el-table__row--striped {
+          background-color: var(--hover-light) !important;
+          
+          td {
+            background-color: var(--hover-light) !important;
+          }
+        }
+      }
+      
+      /* 悬浮行样式（暗色主题下使用深色背景，不是白色） */
+      tr:hover {
+        background-color: var(--hover) !important;
+        color: var(--text) !important;
+        
+        td {
+          background-color: var(--hover) !important;
+          color: var(--text) !important;
+        }
+      }
+      
+      td {
+        border-bottom-color: var(--border) !important;
+        color: var(--text) !important;
+      }
+    }
+  }
+  
+  /* 空状态 */
+  .el-table__empty-block {
+    background-color: var(--surface) !important;
+    color: var(--text-3) !important;
+  }
+  
+  /* 边框 */
+  &::before {
+    background-color: var(--border) !important;
+  }
+  
+  &::after {
+    background-color: var(--border) !important;
+  }
+  
+  /* 固定列阴影 */
+  .el-table__fixed,
+  .el-table__fixed-right {
+    &::before {
+      background-color: var(--border) !important;
+    }
+  }
+}
+
+// ================================
+// 12. 标签统一样式（暗色主题适配）
+// ================================
+
+/* Element Plus 标签统一样式 */
+.el-tag {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+  
+  /* 成功标签 */
+  &.el-tag--success {
+    background-color: var(--color-success) !important;
+    border-color: var(--color-success) !important;
+    color: var(--surface) !important;
+  }
+  
+  /* 警告标签 */
+  &.el-tag--warning {
+    background-color: var(--color-warning) !important;
+    border-color: var(--color-warning) !important;
+    color: var(--surface) !important;
+  }
+  
+  /* 危险标签 */
+  &.el-tag--danger {
+    background-color: var(--color-error) !important;
+    border-color: var(--color-error) !important;
+    color: var(--surface) !important;
+  }
+  
+  /* 信息标签 */
+  &.el-tag--info {
+    background-color: var(--color-info) !important;
+    border-color: var(--color-info) !important;
+    color: var(--surface) !important;
+  }
+  
+  /* 主要标签 */
+  &.el-tag--primary {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: var(--surface) !important;
+  }
+  
+  /* light 效果 */
+  &.el-tag--light {
+    background-color: transparent !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+    
+    &.el-tag--success {
+      background-color: rgba(22, 163, 74, 0.15) !important;
+      border-color: var(--color-success) !important;
+      color: var(--color-success) !important;
+    }
+    
+    &.el-tag--warning {
+      background-color: rgba(251, 191, 36, 0.15) !important;
+      border-color: var(--color-warning) !important;
+      color: var(--color-warning) !important;
+    }
+    
+    &.el-tag--danger {
+      background-color: rgba(248, 113, 113, 0.15) !important;
+      border-color: var(--color-error) !important;
+      color: var(--color-error) !important;
+    }
+    
+    &.el-tag--info {
+      background-color: rgba(96, 165, 250, 0.15) !important;
+      border-color: var(--color-info) !important;
+      color: var(--color-info) !important;
+    }
+    
+    &.el-tag--primary {
+      background-color: rgba(30, 58, 138, 0.15) !important;
+      border-color: var(--color-primary) !important;
+      color: var(--color-primary) !important;
+    }
   }
 }
 
@@ -577,6 +1146,29 @@ body {
   margin-top: var(--gap-2xl);
   padding-top: var(--gap-xl);
   border-top: 1px solid var(--border);
+}
+
+// ================================
+// 12. 表单标签统一样式（暗色主题适配）
+// ================================
+
+/* Element Plus 表单标签统一样式 */
+.el-form-item__label {
+  color: var(--text-2) !important;
+  font-weight: 500 !important;
+  font-size: var(--font-size-base) !important;
+}
+
+/* Element Plus 表单错误提示 */
+.el-form-item__error {
+  color: var(--color-error) !important;
+}
+
+/* Element Plus 表单帮助文本 */
+.el-form-item__content {
+  .el-form-item__error {
+    color: var(--color-error) !important;
+  }
 }
 
 // ================================

@@ -8,15 +8,13 @@ import org.springframework.util.StringUtils;
 
 /**
  * 个人信息更新请求
+ * 仅包含基础信息，不包含头像（头像通过单独的 /user/avatar 接口上传）
  *
- * @param realName     String 真实姓名
- * @param email        String 邮箱
- * @param phone        String 手机号
- * @param department   String 部门编码
- * @param title        String 职称编码
- * @param avatar       String 头像地址
- * @param avatarFileId Long 头像附件ID
- * @param industryCode String 行业编码
+ * @param realName   String 真实姓名
+ * @param email      String 邮箱
+ * @param phone      String 手机号
+ * @param department String 部门编码
+ * @param title      String 职称编码
  *
  * @author JiaWen.Wu
  * @className UserInfoUpdateReq
@@ -31,13 +29,7 @@ public record UserInfoUpdateReq(
 
         @NotBlank(message = "所属部门不能为空") String department,
 
-        @NotBlank(message = "职称不能为空") String title,
-
-        String avatar,
-
-        Long avatarFileId,
-
-        @NotBlank(message = "行业编码不能为空") String industryCode) {
+        @NotBlank(message = "职称不能为空") String title) {
 
     public UserInfoUpdateReq {
         realName = normalize(realName);
@@ -45,8 +37,6 @@ public record UserInfoUpdateReq(
         phone = normalize(phone);
         department = normalize(department);
         title = normalize(title);
-        avatar = normalize(avatar);
-        industryCode = normalize(industryCode);
     }
 
     private static String normalize(String value) {

@@ -1,11 +1,19 @@
 package com.sciz.server.domain.pojo.repository.user.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
 import com.sciz.server.domain.pojo.mapper.user.SysUserMapper;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
+import com.sciz.server.domain.pojo.repository.user.SysUserRoleRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+
+import java.util.List;
+import java.util.Optional;
 
 /**
  * 用户仓储实现
@@ -18,9 +26,11 @@ import org.springframework.stereotype.Repository;
 public class SysUserRepoImpl implements SysUserRepo {
 
     private final SysUserMapper mapper;
+    private final SysUserRoleRepo sysUserRoleRepo;
 
-    public SysUserRepoImpl(SysUserMapper mapper) {
+    public SysUserRepoImpl(SysUserMapper mapper, SysUserRoleRepo sysUserRoleRepo) {
         this.mapper = mapper;
+        this.sysUserRoleRepo = sysUserRoleRepo;
     }
 
     /**
@@ -100,5 +110,65 @@ public class SysUserRepoImpl implements SysUserRepo {
     @Override
     public boolean updateById(SysUser entity) {
         return mapper.updateById(entity) > 0;
+    }
+
+    /**
+     * 分页查询用户列表
+     *
+     * @param page    IPage<SysUser> 分页对象
+     * @param keyword String 搜索关键字（用户名/邮箱/手机号）
+     * @param roleId  Long 角色ID（null表示全部）
+     * @param status  Integer 用户状态（null表示全部）
+     * @param sortBy  String 排序字段
+     * @param asc     boolean 是否升序
+     * @return IPage<SysUser> 分页结果
+     */
+    @Override
+    public IPage<SysUser> page(IPage<SysUser> page, String keyword, Long roleId, Integer status, String sortBy,
+            boolean asc) {
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+
+        // 只查询未删除的用户
+        wrapper.eq(SysUser::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 关键字搜索（用户名/邮箱/手机号）
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(SysUser::getUsername, keyword)
+                    .or()
+                    .like(SysUser::getEmail, keyword)
+                    .or()
+                    .like(SysUser::getPhone, keyword));
+        }
+
+        // 状态筛选
+        Optional.ofNullable(status)
+                .ifPresent(value -> wrapper.eq(SysUser::getStatus, value));
+
+        // 角色筛选（通过关联表查询用户ID列表，然后使用 IN 查询）
+        if (roleId != null) {
+            var userIds = sysUserRoleRepo.findUserIdsByRoleId(roleId);
+            if (CollectionUtils.isEmpty(userIds)) {
+                // 如果该角色下没有用户，返回空结果
+                page.setRecords(List.of());
+                page.setTotal(0);
+                return page;
+            }
+            wrapper.in(SysUser::getId, userIds);
+        }
+
+        // 排序
+        if (StringUtils.hasText(sortBy)) {
+            switch (sortBy) {
+                case "createTime", "createdTime" -> wrapper.orderBy(true, asc, SysUser::getCreatedTime);
+                case "username" -> wrapper.orderBy(true, asc, SysUser::getUsername);
+                case "realName" -> wrapper.orderBy(true, asc, SysUser::getRealName);
+                case "status" -> wrapper.orderBy(true, asc, SysUser::getStatus);
+                default -> wrapper.orderBy(true, false, SysUser::getCreatedTime);
+            }
+        } else {
+            wrapper.orderBy(true, false, SysUser::getCreatedTime);
+        }
+
+        return mapper.selectPage(page, wrapper);
     }
 }

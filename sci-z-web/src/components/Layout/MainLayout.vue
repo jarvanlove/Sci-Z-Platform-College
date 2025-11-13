@@ -35,11 +35,10 @@ import Sidebar from './Sidebar.vue'
   flex: 1;
   overflow: auto;
   background: var(--bg);
-  padding: 24px;
+  padding: 16px;
   
   .content-wrapper {
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;
     min-height: calc(100vh - 108px); // 减去 header 和 padding
   }
 }
@@ -47,7 +46,7 @@ import Sidebar from './Sidebar.vue'
 // 响应式设计
 @media (max-width: 768px) {
   .main-content {
-    padding: 16px;
+    padding: 12px;
     
     .content-wrapper {
       min-height: calc(100vh - 88px);

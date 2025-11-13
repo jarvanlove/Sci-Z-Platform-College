@@ -115,14 +115,17 @@ Vue 3 + TypeScript 专家、UI 设计师
   - `components/Business/Legacy/`：旧版仪表盘/统计相关组件，逐步迁移但仍保留复用。
   - `components/Business/List/`：列表页基础组件（筛选表单、表格、状态标签、行内操作按钮）。
 - **通用组件 (`components/Common/`)**：
-  - `BaseButton.vue`：二次封装按钮，统一主题色、尺寸、加载态。
+  - `BaseButton.vue`：二次封装按钮，统一主题色、尺寸、加载态，覆盖 Element Plus 按钮样式。
   - `BaseCard.vue`：标准卡片容器，提供标题/内容插槽与统一样式。
-  - `BaseDialog.vue`：通用弹窗，内置标题、页脚、快捷关闭等逻辑。
-  - `BasePagination.vue`：分页器封装，兼容后端分页字段与事件。
+  - `BaseDialog.vue`：通用弹窗，封装 el-dialog，内置标题、页脚、快捷关闭等逻辑，覆盖 Element Plus 弹窗样式。
+  - `BasePagination.vue`：分页器封装，完全自定义实现（不使用 el-pagination），兼容后端分页字段与事件，支持省略号、第一页/最后一页显示，支持国际化。
+  - `BaseDatePicker.vue`：通用日期选择器组件，封装 el-date-picker，支持中文显示和多语言切换（zh-CN/en-US/ja-JP/ko-KR），覆盖日历弹窗暗色主题样式。
   - `BaseScrollbar.vue`：自定义滚动容器，统一不同浏览器滚动体验。
-  - `BaseTable.vue`：通用表格，整合列配置、加载态、空状态等。
+  - `BaseTable.vue`：通用表格，封装 el-table，整合列配置、加载态、空状态等，覆盖表格暗色主题样式。
   - `LanguageSwitcher.vue`：语言切换入口，驱动 `i18n` 国际化。
   - `AgreementNotice.vue`：协议提醒/确认组件，常用于登录注册场景。
+  
+  **注意**：目前 `el-select`、`el-input`、`el-textarea` 等组件尚未封装为自定义组件，但已在 `src/assets/styles/design-system.scss` 中通过全局样式覆盖了 Element Plus 的默认样式，确保暗色主题适配。后续可根据需要创建 `BaseSelect`、`BaseInput` 等封装组件。
 
 ### 7. 组件化思想
 - **能复用就抽象**：前端实现优先考虑可复用的“组件 + 工具 + 常量”组合，再由页面进行装配；不要在业务页面内散写重复逻辑。

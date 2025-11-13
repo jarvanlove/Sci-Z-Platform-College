@@ -7,7 +7,7 @@
 <template>
   <el-dropdown @command="handleLanguageChange" trigger="click">
     <el-button type="text" class="language-switcher">
-      <el-icon><Globe /></el-icon>
+      <el-icon><Document /></el-icon>
       <span>{{ currentLocaleName }}</span>
       <el-icon class="el-icon--right"><ArrowDown /></el-icon>
     </el-button>
@@ -30,6 +30,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Document, ArrowDown } from '@element-plus/icons-vue'
 import { supportedLocales, setLocale, getCurrentLocale } from '@/locales'
 
 const { t } = useI18n()

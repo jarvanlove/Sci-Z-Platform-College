@@ -83,8 +83,8 @@ const filteredMenus = computed(() => {
 .layout-sidebar {
   width: 240px;
   height: 100vh;
-  background: #ffffff;
-  border-right: none;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
   transition: width 0.3s ease;
   overflow: hidden;
 
@@ -103,7 +103,7 @@ const filteredMenus = computed(() => {
       font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
       font-size: 15px !important;
       font-weight: 400 !important;
-      color: #374151 !important;
+      color: var(--text-2) !important;
       padding: 0 20px !important;
       height: 48px !important;
       line-height: 48px !important;
@@ -117,13 +117,13 @@ const filteredMenus = computed(() => {
       }
       
       &:hover {
-        background-color: #f8fafc !important;
-        color: #1e3a8a !important;
+        background-color: var(--hover) !important;
+        color: var(--color-primary) !important;
       }
       
       &.is-active {
-        background-color: #1e3a8a !important;
-        color: #ffffff !important;
+        background-color: var(--color-primary) !important;
+        color: var(--surface) !important;
         font-weight: 600 !important;
         border-radius: 12px !important;
         margin: 2px 8px !important;
@@ -135,7 +135,7 @@ const filteredMenus = computed(() => {
       font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
       font-size: 15px !important;
       font-weight: 400 !important;
-      color: #374151 !important;
+      color: var(--text-2) !important;
       padding: 0 20px !important;
       letter-spacing: 0.01em !important;
       height: 48px !important;
@@ -147,8 +147,8 @@ const filteredMenus = computed(() => {
       }
       
       &:hover {
-        background-color: #f8fafc !important;
-        color: #1e3a8a !important;
+        background-color: var(--hover) !important;
+        color: var(--color-primary) !important;
       }
     }
 
@@ -157,7 +157,7 @@ const filteredMenus = computed(() => {
       font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
       font-size: 14px !important;
       font-weight: 400 !important;
-      color: #6b7280 !important;
+      color: var(--text-3) !important;
       padding: 0 20px 0 44px !important;
       height: 40px !important;
       line-height: 40px !important;
@@ -171,13 +171,13 @@ const filteredMenus = computed(() => {
       }
       
       &:hover {
-        background-color: #f0f9ff !important;
-        color: #1e3a8a !important;
+        background-color: var(--hover) !important;
+        color: var(--color-primary) !important;
       }
       
       &.is-active {
-        background-color: #1e3a8a !important;
-        color: #ffffff !important;
+        background-color: var(--color-primary) !important;
+        color: var(--surface) !important;
         font-weight: 600 !important;
         border-radius: 12px !important;
         margin: 2px 8px !important;
@@ -189,7 +189,7 @@ const filteredMenus = computed(() => {
       font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
       font-size: 14px !important;
       font-weight: 400 !important;
-      color: #6b7280 !important;
+      color: var(--text-3) !important;
       padding: 0 20px 0 44px !important;
       height: 40px !important;
       line-height: 40px !important;
@@ -198,13 +198,13 @@ const filteredMenus = computed(() => {
       background-color: transparent !important;
 
       &:hover {
-        background-color: #f0f9ff !important;
-        color: #1e3a8a !important;
+        background-color: var(--hover) !important;
+        color: var(--color-primary) !important;
       }
 
       &.is-active {
-        background-color: #1e3a8a !important;
-        color: #ffffff !important;
+        background-color: var(--color-primary) !important;
+        color: var(--surface) !important;
         font-weight: 600 !important;
         border-radius: 12px !important;
         margin: 2px 8px !important;

@@ -78,4 +78,12 @@ const handleClick = (event) => {
     width: 100%;
   }
 }
+
+// 确保 BaseButton 的样式优先级足够高
+:deep(.el-button) {
+  &.base-button {
+    // 主要按钮样式已在全局 design-system.scss 中定义
+    // 这里确保样式正确应用
+  }
+}
 </style>
