@@ -2,6 +2,7 @@ package com.sciz.server.application.service.user;
 
 import com.sciz.server.domain.pojo.dto.request.user.EmailCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
+import com.sciz.server.domain.pojo.dto.request.user.PhoneCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
 import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
@@ -12,6 +13,8 @@ import com.sciz.server.domain.pojo.dto.response.user.CheckRoleResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckPermResp;
 import com.sciz.server.domain.pojo.dto.response.user.RefreshTokenResp;
 import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
+import com.sciz.server.domain.pojo.dto.request.user.UserInfoUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.user.UserInfoUpdateResp;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
@@ -93,11 +96,18 @@ public interface AuthService {
     CheckPermResp checkPermission(String permissionCode, String industryType);
 
     /**
-     * 发送重置密码邮箱验证码
+     * 发送邮箱验证码
      *
      * @param req EmailCodeSendReq 请求参数
      */
-    void sendResetPasswordEmailCode(EmailCodeSendReq req);
+    void sendEmailVerificationCode(EmailCodeSendReq req);
+
+    /**
+     * 发送短信验证码
+     *
+     * @param req PhoneCodeSendReq 请求参数
+     */
+    void sendSmsVerificationCode(PhoneCodeSendReq req);
 
     /**
      * 重置密码
@@ -105,4 +115,12 @@ public interface AuthService {
      * @param req ResetPasswordReq 重置密码请求
      */
     void resetPassword(ResetPasswordReq req);
+
+    /**
+     * 更新个人信息
+     *
+     * @param req UserInfoUpdateReq 个人信息更新请求
+     * @return UserInfoUpdateResp 更新后的个人信息
+     */
+    UserInfoUpdateResp updateUserInfo(UserInfoUpdateReq req);
 }

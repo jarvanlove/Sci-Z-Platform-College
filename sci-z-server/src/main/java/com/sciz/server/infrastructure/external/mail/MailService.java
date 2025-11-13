@@ -1,5 +1,7 @@
 package com.sciz.server.infrastructure.external.mail;
 
+import com.sciz.server.infrastructure.shared.enums.MailProviderType;
+
 /**
  * 邮件发送服务
  *
@@ -10,10 +12,11 @@ package com.sciz.server.infrastructure.external.mail;
 public interface MailService {
 
     /**
-     * 发送重置密码验证码邮件
+     * 发送邮箱验证码邮件
      *
-     * @param toEmail String 收件人邮箱
-     * @param code    String 验证码
+     * @param provider MailProviderType 邮箱服务商
+     * @param toEmail  String 收件人邮箱
+     * @param code     String 验证码
      */
-    void sendResetPasswordCodeMail(String toEmail, String code);
+    void sendEmailVerificationCode(MailProviderType provider, String toEmail, String code);
 }

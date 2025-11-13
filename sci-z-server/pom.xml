@@ -27,6 +27,8 @@
     <langchain4j.version>0.34.0</langchain4j.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <ip2region.version>2.7.0</ip2region.version>
+    <aliyun.core.version>4.5.16</aliyun.core.version>
+    <aliyun.dysmsapi.version>2.1.0</aliyun.dysmsapi.version>
   </properties>
 
   <dependencies>
@@ -125,7 +127,19 @@
       <artifactId>spring-boot-starter-mail</artifactId>
     </dependency>
 
-   <!-- jBCrypt 密码哈希 -->
+    <!-- 阿里云短信 SDK -->
+    <dependency>
+      <groupId>com.aliyun</groupId>
+      <artifactId>aliyun-java-sdk-core</artifactId>
+      <version>${aliyun.core.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.aliyun</groupId>
+      <artifactId>aliyun-java-sdk-dysmsapi</artifactId>
+      <version>${aliyun.dysmsapi.version}</version>
+    </dependency>
+
+    <!-- jBCrypt 密码哈希 -->
     <dependency>
       <groupId>org.mindrot</groupId>
       <artifactId>jbcrypt</artifactId>

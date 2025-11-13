@@ -80,10 +80,12 @@ export const downloadFile = (id) => {
  * @param {number} id - 文件ID
  * @returns {Promise} 文件预览响应
  */
-export const previewFile = (id) => {
+export const previewFile = (id, options = {}) => {
   return request({
     url: FILE_API.PREVIEW(id),
-    method: HTTP_METHODS.GET
+    method: HTTP_METHODS.GET,
+    responseType: 'blob',
+    ...options
   })
 }
 

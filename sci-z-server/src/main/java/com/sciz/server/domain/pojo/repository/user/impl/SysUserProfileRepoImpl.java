@@ -1,5 +1,6 @@
 package com.sciz.server.domain.pojo.repository.user.impl;
 
+import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.sciz.server.domain.pojo.entity.user.SysUserProfile;
 import com.sciz.server.domain.pojo.mapper.user.SysUserProfileMapper;
 import com.sciz.server.domain.pojo.repository.user.SysUserProfileRepo;
@@ -31,5 +32,19 @@ public class SysUserProfileRepoImpl implements SysUserProfileRepo {
     public Long save(SysUserProfile entity) {
         int rows = mapper.insert(entity);
         return rows > 0 ? entity.getId() : null;
+    }
+
+    @Override
+    public SysUserProfile findByUserIdAndAttribute(Long userId, String attributeName) {
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysUserProfile::getUserId, userId)
+                .eq(SysUserProfile::getAttributeName, attributeName)
+                .eq(SysUserProfile::getIsDeleted, 0)
+                .one();
+    }
+
+    @Override
+    public boolean updateById(SysUserProfile entity) {
+        return mapper.updateById(entity) > 0;
     }
 }

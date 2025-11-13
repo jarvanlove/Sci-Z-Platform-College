@@ -43,6 +43,11 @@ public class LoginUserInfoResp {
     private String department;
 
     /**
+     * 职称编码
+     */
+    private String title;
+
+    /**
      * 角色编码（主角色）
      */
     private String role;
@@ -58,7 +63,17 @@ public class LoginUserInfoResp {
     private String industry;
 
     /**
+     * 行业编码
+     */
+    private String industryCode;
+
+    /**
      * 头像URL
      */
     private String avatar;
+
+    /**
+     * 头像文件ID
+     */
+    private Long avatarFileId;
 }

@@ -36,7 +36,10 @@ public interface AuthConverter {
     @Mapping(target = "role", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "industry", ignore = true)
-    @Mapping(target = "avatar", ignore = true)
+    @Mapping(target = "industryCode", ignore = true)
+    @Mapping(target = "avatar", source = "avatarUrl")
+    @Mapping(target = "avatarFileId", ignore = true)
+    @Mapping(target = "title", ignore = true)
     LoginUserInfoResp toLoginUserInfoResp(SysUser user);
 
     /**

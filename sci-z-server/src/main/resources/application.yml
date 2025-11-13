@@ -4,8 +4,6 @@ spring: # Spring 根配置
     name: sci-z-server # 应用名称（用于日志/监控展示）
   profiles: # 环境配置
     active: dev # 默认激活的环境：dev | prod
-  mvc: # Spring MVC 配置
-    static-path-pattern: /static/** # 静态资源路径模式，确保只处理 /static/** 路径
   mail:
     host: ${SPRING_MAIL_HOST:smtp.example.com} # 邮件服务器地址（支持环境变量覆盖）
     port: ${SPRING_MAIL_PORT:587} # 邮件服务器端口（默认 587，支持 TLS）
@@ -103,34 +101,4 @@ sa-token: # Sa-Token 身份认证配置
   is-auto-renew: true # 是否在请求到达时自动续期（基于 timeout）
   auto-renew-timeout: 1800 # 自动续期步长（秒），例如 30 分钟
   is-renew-active-timeout: true # 每次请求是否续期 activity-timeout
-
-# Spring Boot Actuator 健康检查配置（环境差异通过 profile 覆盖）
-management: # Actuator 管理端点配置
-  endpoints: # 端点配置
-    web: # Web 端点配置
-      exposure: # 暴露配置
-        include: health,info # 默认只暴露 health 和 info 端点
-  endpoint: # 单个端点配置
-    health: # 健康检查端点
-      show-details: when-authorized # 默认只在授权时显示详情（环境配置可覆盖）
-  health: # 健康检查配置
-    defaults: # 默认健康检查
-      enabled: true # 启用健康检查
-    mail: # 邮件健康检查配置
-      enabled: false # 禁用邮件健康检查（避免默认配置导致连接失败）
-
-# Dify 配置（全局默认，环境差异通过 profile 覆盖）
-dify: # Dify API 配置
-  upload: # 文件上传配置（全局默认）
-    dir: upload # 上传文件存储目录（相对路径，相对于项目根目录）
-    max-file-size: 104857600 # 最大文件大小（字节），100MB = 100 * 1024 * 1024
-    allowed-extensions: .pdf,.doc,.docx,.txt,.md,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif # 允许的文件扩展名（逗号分隔）
-  chatbot: # Chatbot 模型配置（全局默认）
-    model: # 模型配置
-      provider: langgenius/tongyi/tongyi # 模型提供商
-      name: qwen3-next-80b-a3b-instruct # 模型名称
-      mode: chat # 模型模式（chat/completion）
-    reranking-model: # 重排序模型配置
-      reranking-provider-name: langgenius/tongyi/tongyi # 重排序提供商名称
-      reranking-model-name: gte-rerank # 重排序模型名称
 

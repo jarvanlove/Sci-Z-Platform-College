@@ -240,6 +240,60 @@ public XxxResp create(XxxCreateReq req) { return resp; }
 
 Service 写操作加`@Transactional(rollbackFor = Exception.class)`
 
+### 登录用户上下文（按需调用）
+
+- 登录成功后系统会自动写入 `LoginUserContext`，登出时清理，旧 token 需重新登录才会刷新上下文
+- 业务代码可按需引入 `LoginUserUtil` 获取当前登录用户信息（如用户 ID、姓名、行业类型、部门等）
+- 使用示例：
+
+```java
+import com.sciz.server.infrastructure.shared.utils.LoginUserUtil;
+
+var currentUser = LoginUserUtil.requireCurrentUser();
+Long userId = currentUser.userId();
+String realName = currentUser.realName();
+String industryType = currentUser.industryType();
+Long departmentId = currentUser.departmentId();
+```
+
+- 若只需用户 ID，可调用 `LoginUserUtil.requireCurrentUserId()`；如需判空处理，可使用 `LoginUserUtil.getCurrentUser()` 返回 `Optional<LoginUserContext>`
+- 当用户资料在业务流程中发生修改时，可在处理完成后调用 `LoginUserUtil.cacheCurrentUser(updatedContext)` 以刷新会话缓存
+
+### Record 查询 DTO 规范
+
+- 公共分页/排序参数统一由 `BaseQueryReq` 提供，保持默认值和合法性校验
+- 业务查询 DTO（如文件列表）优先使用 `record` + 组合方式复用 `BaseQueryReq`，示例：
+
+```java
+public record FileListQueryReq(
+        Integer pageNo,
+        Integer pageSize,
+        String sortBy,
+        String sortOrder,
+        String relationType,
+        Long relationId,
+        String attachmentType,
+        Integer isPublic,
+        Long uploaderId,
+        String keyword) {
+
+    public FileListQueryReq {
+        var base = BaseQueryReq.of(pageNo, pageSize, sortBy, sortOrder);
+        pageNo = base.pageNo();
+        pageSize = base.pageSize();
+        sortBy = base.sortBy();
+        sortOrder = base.sortOrder();
+        isPublic = isPublic == null ? 0 : isPublic;
+    }
+
+    public BaseQueryReq toBaseQuery() {
+        return BaseQueryReq.of(pageNo, pageSize, sortBy, sortOrder);
+    }
+}
+```
+
+- Service 层通过 `req.toBaseQuery()` 获取分页对象，避免重复写分页逻辑；若需默认分页可直接使用 `BaseQueryReq.defaultPage()`
+
 ### Java 版本规范 ⚠️ 重中之重
 
 **项目使用 Java 21，所有新编写的代码必须严格遵循 Java 21 最佳实践**

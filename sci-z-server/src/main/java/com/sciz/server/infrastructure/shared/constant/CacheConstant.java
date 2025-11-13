@@ -161,30 +161,55 @@ public class CacheConstant {
      */
     public static final int CAPTCHA_REQUIRED_FAIL_COUNT = 5;
 
-    // ==================== 重置密码邮箱验证码缓存常量 ====================
+    // ==================== 邮箱验证码缓存常量 ====================
     /**
-     * 重置密码邮箱验证码缓存键
-     * 格式：auth:reset:email:{email}
+     * 邮箱验证码缓存键
+     * 格式：auth:verification:email:{email}
      */
-    public static final String RESET_PASSWORD_EMAIL_CODE_KEY = "auth:reset:email:%s";
+    public static final String AUTH_EMAIL_VERIFICATION_CODE_KEY = "auth:verification:email:%s";
 
     /**
-     * 重置密码邮箱验证码发送频率限制键
-     * 格式：auth:reset:limit:{email}
+     * 邮箱验证码发送频率限制键
+     * 格式：auth:verification:limit:{email}
      */
-    public static final String RESET_PASSWORD_EMAIL_CODE_RATE_LIMIT_KEY = "auth:reset:limit:%s";
+    public static final String AUTH_EMAIL_VERIFICATION_RATE_LIMIT_KEY = "auth:verification:limit:%s";
 
     /**
-     * 重置密码邮箱验证码过期时间（秒）
+     * 邮箱验证码过期时间（秒）
      * 默认：10分钟
      */
-    public static final Long RESET_PASSWORD_EMAIL_CODE_EXPIRE = 10L * 60L;
+    public static final Long AUTH_EMAIL_VERIFICATION_CODE_EXPIRE = 10L * 60L;
 
     /**
-     * 重置密码邮箱验证码发送间隔（秒）
+     * 邮箱验证码发送间隔（秒）
      * 默认：60秒
      */
-    public static final Long RESET_PASSWORD_EMAIL_CODE_INTERVAL = 60L;
+    public static final Long AUTH_EMAIL_VERIFICATION_CODE_INTERVAL = 60L;
+
+    // ==================== 短信验证码缓存常量 ====================
+    /**
+     * 短信验证码缓存键
+     * 格式：auth:verification:sms:{phone}
+     */
+    public static final String AUTH_SMS_VERIFICATION_CODE_KEY = "auth:verification:sms:%s";
+
+    /**
+     * 短信验证码发送频率限制键
+     * 格式：auth:verification:sms:limit:{phone}
+     */
+    public static final String AUTH_SMS_VERIFICATION_RATE_LIMIT_KEY = "auth:verification:sms:limit:%s";
+
+    /**
+     * 短信验证码过期时间（秒）
+     * 默认：10分钟
+     */
+    public static final Long AUTH_SMS_VERIFICATION_CODE_EXPIRE = 10L * 60L;
+
+    /**
+     * 短信验证码发送间隔（秒）
+     * 默认：60秒
+     */
+    public static final Long AUTH_SMS_VERIFICATION_CODE_INTERVAL = 60L;
 
     // ==================== 行业配置相关缓存常量 ====================
     /**

@@ -219,9 +219,14 @@ const handleLogout = async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  
+
   &:hover {
     background-color: var(--hover);
+    color: var(--color-primary);
+
+    .el-icon {
+      color: var(--color-primary);
+    }
   }
 }
 </style>

@@ -7,24 +7,34 @@ import com.sciz.server.application.service.user.AuthService;
 import com.sciz.server.application.service.user.PermissionService;
 import com.sciz.server.domain.pojo.dto.request.user.EmailCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
+import com.sciz.server.domain.pojo.dto.request.user.PhoneCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.RegisterReq;
 import com.sciz.server.domain.pojo.dto.request.user.ResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.response.user.CaptchaResp;
 import com.sciz.server.domain.pojo.dto.response.user.LoginResp;
+import com.sciz.server.domain.pojo.dto.response.user.LoginUserInfoResp;
+import com.sciz.server.domain.pojo.dto.response.user.LoginUserContext;
 import com.sciz.server.domain.pojo.dto.response.user.ProfileResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckLoginResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckRoleResp;
 import com.sciz.server.domain.pojo.dto.response.user.CheckPermResp;
 import com.sciz.server.domain.pojo.dto.response.user.RefreshTokenResp;
 import com.sciz.server.domain.pojo.dto.response.user.RegisterResp;
+import com.sciz.server.domain.pojo.dto.response.user.UserInfoUpdateResp;
+import com.sciz.server.domain.pojo.dto.request.user.UserInfoUpdateReq;
 import com.sciz.server.domain.pojo.entity.user.SysDepartment;
+import com.sciz.server.domain.pojo.entity.user.SysProfileField;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
+import com.sciz.server.domain.pojo.entity.user.SysUserProfile;
 import com.sciz.server.domain.pojo.entity.user.SysUserRole;
 import com.sciz.server.domain.pojo.repository.user.SysDepartmentRepo;
+import com.sciz.server.domain.pojo.repository.user.SysProfileFieldRepo;
 import com.sciz.server.domain.pojo.repository.user.SysRoleRepo;
+import com.sciz.server.domain.pojo.repository.user.SysUserProfileRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRoleRepo;
 import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
+import com.sciz.server.infrastructure.external.sms.SmsService;
 import com.sciz.server.infrastructure.shared.constant.CacheConstant;
 import com.sciz.server.infrastructure.shared.constant.SystemConstant;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
@@ -32,12 +42,13 @@ import com.sciz.server.infrastructure.shared.enums.EnableStatus;
 import com.sciz.server.infrastructure.shared.enums.LoginStatus;
 import com.sciz.server.infrastructure.shared.enums.UserStatus;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
-import com.sciz.server.infrastructure.shared.event.user.UserResetPwdEmailCodeEvent;
+import com.sciz.server.infrastructure.shared.event.user.UserEmailVerificationEvent;
 import com.sciz.server.infrastructure.shared.event.log.LoginLoggedEvent;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.infrastructure.shared.utils.CaptchaUtil;
 import com.sciz.server.infrastructure.shared.utils.ClientInfoUtil;
+import com.sciz.server.infrastructure.shared.utils.LoginUserUtil;
 import com.sciz.server.infrastructure.shared.utils.RedisUtil;
 import com.sciz.server.interfaces.converter.AuthConverter;
 
@@ -78,19 +89,27 @@ public class AuthServiceImpl implements AuthService {
     private final SysDepartmentRepo sysDepartmentRepo;
     private final SysRoleRepo sysRoleRepo;
     private final SysUserRoleRepo sysUserRoleRepo;
+    private final SysProfileFieldRepo sysProfileFieldRepo;
+    private final SysUserProfileRepo sysUserProfileRepo;
     private final AuthConverter authConverter;
+    private final SmsService smsService;
 
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Shanghai");
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String PROFILE_TITLE_CODE = "title";
+    private static final String PROFILE_AVATAR_FILE_ID_CODE = "avatar_file_id";
 
     public AuthServiceImpl(SysUserRepo sysUserRepo, StringRedisTemplate stringRedisTemplate,
             EventPublisher eventPublisher,
-            com.sciz.server.application.service.user.PermissionService permissionService,
+            PermissionService permissionService,
             IndustryConfigCache industryConfigCache,
             SysDepartmentRepo sysDepartmentRepo,
             SysRoleRepo sysRoleRepo,
             SysUserRoleRepo sysUserRoleRepo,
-            AuthConverter authConverter) {
+            SysProfileFieldRepo sysProfileFieldRepo,
+            SysUserProfileRepo sysUserProfileRepo,
+            AuthConverter authConverter,
+            SmsService smsService) {
         this.sysUserRepo = sysUserRepo;
         this.stringRedisTemplate = stringRedisTemplate;
         this.eventPublisher = eventPublisher;
@@ -99,7 +118,10 @@ public class AuthServiceImpl implements AuthService {
         this.sysDepartmentRepo = sysDepartmentRepo;
         this.sysRoleRepo = sysRoleRepo;
         this.sysUserRoleRepo = sysUserRoleRepo;
+        this.sysProfileFieldRepo = sysProfileFieldRepo;
+        this.sysUserProfileRepo = sysUserProfileRepo;
         this.authConverter = authConverter;
+        this.smsService = smsService;
     }
 
     /**
@@ -143,11 +165,14 @@ public class AuthServiceImpl implements AuthService {
         // 8. 缓存 token
         cacheUserToken(user.getId(), tokenInfo);
 
-        // 9. 组装返回结果
+        // 9. 写入登录用户上下文
         var industryType = industryConfigCache.get().getType();
+        cacheLoginUserContext(user, industryType);
+
+        // 10. 组装返回结果
         var loginResp = buildLoginResponse(user, tokenInfo, industryType, rememberMe);
 
-        // 10. 发布登录日志事件
+        // 11. 发布登录日志事件
         publishLoginLogEvent(user, request);
 
         log.info(String.format("login success, userId=%s, username=%s", user.getId(), user.getUsername()));
@@ -428,11 +453,7 @@ public class AuthServiceImpl implements AuthService {
 
         // 设置用户信息（基础字段由转换器生成，其余业务字段由当前方法补齐）
         var userInfo = authConverter.toLoginUserInfoResp(user);
-        userInfo.setDepartment(getDepartmentName(user.getDepartmentId()));
-        userInfo.setRole(permissionService.getPrimaryRoleCode(user.getId(), industryType));
-        userInfo.setStatus(getUserStatusDescription(user.getStatus()));
-        userInfo.setIndustry(industryType);
-        userInfo.setAvatar(user.getAvatarUrl());
+        populateUserInfo(user, userInfo, industryType);
         resp.setUserInfo(userInfo);
 
         // 设置角色/权限/菜单
@@ -451,6 +472,158 @@ public class AuthServiceImpl implements AuthService {
                 .flatMap(id -> Optional.ofNullable(sysDepartmentRepo.findById(id)))
                 .map(SysDepartment::getDepartmentName)
                 .orElse("");
+    }
+
+    /**
+     * 填充用户基础信息的扩展属性
+     *
+     * @param user         SysUser 用户实体
+     * @param userInfo     LoginUserInfoResp 用户信息
+     * @param industryType String 行业类型
+     */
+    private void populateUserInfo(SysUser user, LoginUserInfoResp userInfo, String industryType) {
+        if (userInfo == null) {
+            return;
+        }
+        userInfo.setDepartment(getDepartmentName(user.getDepartmentId()));
+        userInfo.setRole(permissionService.getPrimaryRoleCode(user.getId(), industryType));
+        userInfo.setStatus(getUserStatusDescription(user.getStatus()));
+        userInfo.setIndustry(industryType);
+        userInfo.setIndustryCode(industryType);
+        userInfo.setAvatar(user.getAvatarUrl());
+        userInfo.setTitle(loadUserProfileAttribute(user.getId(), PROFILE_TITLE_CODE));
+        userInfo.setAvatarFileId(loadUserProfileAttributeAsLong(user.getId(), PROFILE_AVATAR_FILE_ID_CODE));
+    }
+
+    /**
+     * 读取用户扩展属性值
+     *
+     * @param userId        Long 用户ID
+     * @param attributeCode String 属性编码
+     * @return String 属性值
+     */
+    private String loadUserProfileAttribute(Long userId, String attributeCode) {
+        return Optional.ofNullable(sysUserProfileRepo.findByUserIdAndAttribute(userId, attributeCode))
+                .map(SysUserProfile::getAttributeValue)
+                .orElse(null);
+    }
+
+    /**
+     * 读取用户扩展属性（Long）
+     *
+     * @param userId        Long 用户ID
+     * @param attributeCode String 属性编码
+     * @return Long 属性值
+     */
+    private Long loadUserProfileAttributeAsLong(Long userId, String attributeCode) {
+        return Optional.ofNullable(loadUserProfileAttribute(userId, attributeCode))
+                .filter(StringUtils::hasText)
+                .map(value -> {
+                    try {
+                        return Long.parseLong(value);
+                    } catch (NumberFormatException ignored) {
+                        return null;
+                    }
+                })
+                .orElse(null);
+    }
+
+    /**
+     * 保存用户职称信息（基于扩展字段模板）
+     *
+     * @param userId       Long 用户ID
+     * @param industryType String 行业类型
+     * @param titleCode    String 职称编码
+     */
+    private void saveUserTitle(Long userId, String industryType, String titleCode) {
+        var profileField = findProfileFieldByCode(industryType, PROFILE_TITLE_CODE)
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "当前行业未配置职称字段"));
+        validateProfileOption(profileField, titleCode);
+        upsertUserProfileAttribute(userId, profileField.getFieldCode(), titleCode, profileField.getFieldType());
+    }
+
+    /**
+     * 保存头像附件ID
+     *
+     * @param userId       Long 用户ID
+     * @param avatarFileId Long 头像附件ID
+     */
+    private void saveAvatarFileId(Long userId, Long avatarFileId) {
+        var value = Optional.ofNullable(avatarFileId)
+                .map(String::valueOf)
+                .orElse(null);
+        upsertUserProfileAttribute(userId, PROFILE_AVATAR_FILE_ID_CODE, value, "number");
+    }
+
+    /**
+     * 创建或更新扩展属性
+     *
+     * @param userId         Long 用户ID
+     * @param attributeCode  String 属性编码
+     * @param attributeValue String 属性值
+     * @param attributeType  String 属性类型
+     */
+    private void upsertUserProfileAttribute(Long userId, String attributeCode, String attributeValue,
+            String attributeType) {
+        if (!StringUtils.hasText(attributeCode)) {
+            return;
+        }
+        var normalizedType = StringUtils.hasText(attributeType) ? attributeType : "text";
+        var now = LocalDateTime.now(DEFAULT_ZONE);
+        var existing = sysUserProfileRepo.findByUserIdAndAttribute(userId, attributeCode);
+        if (existing != null) {
+            existing.setAttributeValue(attributeValue);
+            existing.setAttributeType(normalizedType);
+            existing.setUpdatedTime(now);
+            existing.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
+            sysUserProfileRepo.updateById(existing);
+            return;
+        }
+        var profile = new SysUserProfile();
+        profile.setUserId(userId);
+        profile.setAttributeName(attributeCode);
+        profile.setAttributeValue(attributeValue);
+        profile.setAttributeType(normalizedType);
+        profile.setIsRequired(0);
+        profile.setSortOrder(0);
+        profile.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
+        profile.setCreatedTime(now);
+        profile.setUpdatedTime(now);
+        sysUserProfileRepo.save(profile);
+    }
+
+    /**
+     * 根据编码查找扩展字段
+     *
+     * @param industryType String 行业类型
+     * @param fieldCode    String 字段编码
+     * @return Optional<SysProfileField> 扩展字段
+     */
+    private Optional<SysProfileField> findProfileFieldByCode(String industryType, String fieldCode) {
+        return sysProfileFieldRepo.listEnabledByIndustry(industryType)
+                .stream()
+                .filter(field -> fieldCode.equals(field.getFieldCode()))
+                .findFirst();
+    }
+
+    /**
+     * 校验扩展字段选项
+     *
+     * @param field       SysProfileField 扩展字段
+     * @param optionValue String 选项值
+     */
+    private void validateProfileOption(SysProfileField field, String optionValue) {
+        if (!StringUtils.hasText(optionValue) || !"select".equalsIgnoreCase(field.getFieldType())) {
+            return;
+        }
+        var options = sysProfileFieldRepo.listOptionsByFieldIds(List.of(field.getId()));
+        var matched = Optional.ofNullable(options)
+                .orElse(List.of())
+                .stream()
+                .anyMatch(option -> optionValue.equals(option.getOptionValue()));
+        if (!matched) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "职称编码不存在或已禁用");
+        }
     }
 
     /**
@@ -518,11 +691,11 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 生成六位邮箱验证码
+     * 生成六位验证码
      *
-     * @return String 邮箱验证码
+     * @return String 数字验证码
      */
-    private String generateEmailCode() {
+    private String generateVerificationCode() {
         return String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
     }
 
@@ -531,8 +704,8 @@ public class AuthServiceImpl implements AuthService {
      *
      * @param email String 邮箱
      */
-    private void ensureEmailCodeRateLimit(String email) {
-        var limitKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_RATE_LIMIT_KEY, email);
+    private void ensureEmailVerificationRateLimit(String email) {
+        var limitKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_RATE_LIMIT_KEY, email);
         var exists = RedisUtil.get(stringRedisTemplate, limitKey);
         if (StringUtils.hasText(exists)) {
             log.warn(String.format("邮箱验证码发送频繁: email=%s", email));
@@ -546,14 +719,14 @@ public class AuthServiceImpl implements AuthService {
      * @param email     String 邮箱
      * @param emailCode String 验证码
      */
-    private void cacheEmailCode(String email, String emailCode) {
-        var cacheKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_KEY, email);
+    private void cacheEmailVerificationCode(String email, String emailCode) {
+        var cacheKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_CODE_KEY, email);
         RedisUtil.set(stringRedisTemplate, cacheKey, emailCode,
-                Duration.ofSeconds(CacheConstant.RESET_PASSWORD_EMAIL_CODE_EXPIRE));
+                Duration.ofSeconds(CacheConstant.AUTH_EMAIL_VERIFICATION_CODE_EXPIRE));
 
-        var limitKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_RATE_LIMIT_KEY, email);
+        var limitKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_RATE_LIMIT_KEY, email);
         RedisUtil.set(stringRedisTemplate, limitKey, "1",
-                Duration.ofSeconds(CacheConstant.RESET_PASSWORD_EMAIL_CODE_INTERVAL));
+                Duration.ofSeconds(CacheConstant.AUTH_EMAIL_VERIFICATION_CODE_INTERVAL));
     }
 
     /**
@@ -562,12 +735,12 @@ public class AuthServiceImpl implements AuthService {
      * @param email     String 邮箱
      * @param emailCode String 验证码
      */
-    private void validateEmailCode(String email, String emailCode) {
+    private void validateEmailVerificationCode(String email, String emailCode) {
         if (!StringUtils.hasText(emailCode)) {
             throw new BusinessException(ResultCode.EMAIL_CODE_INVALID);
         }
 
-        var cacheKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_KEY, email);
+        var cacheKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_CODE_KEY, email);
         var cachedCode = RedisUtil.get(stringRedisTemplate, cacheKey);
         if (!StringUtils.hasText(cachedCode)) {
             throw new BusinessException(ResultCode.EMAIL_CODE_EXPIRED);
@@ -583,11 +756,72 @@ public class AuthServiceImpl implements AuthService {
      *
      * @param email String 邮箱
      */
-    private void clearEmailCode(String email) {
-        var cacheKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_KEY, email);
-        var limitKey = String.format(CacheConstant.RESET_PASSWORD_EMAIL_CODE_RATE_LIMIT_KEY, email);
+    private void clearEmailVerificationCode(String email) {
+        var cacheKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_CODE_KEY, email);
+        var limitKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_RATE_LIMIT_KEY, email);
         RedisUtil.delete(stringRedisTemplate, cacheKey);
         RedisUtil.delete(stringRedisTemplate, limitKey);
+    }
+
+    /**
+     * 校验短信验证码发送频率
+     *
+     * @param phone String 手机号
+     */
+    private void ensureSmsVerificationRateLimit(String phone) {
+        var limitKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_RATE_LIMIT_KEY, phone);
+        var exists = RedisUtil.get(stringRedisTemplate, limitKey);
+        if (StringUtils.hasText(exists)) {
+            log.warn(String.format("短信验证码发送频繁: phone=%s", phone));
+            throw new BusinessException(ResultCode.SMS_CODE_RATE_LIMITED);
+        }
+    }
+
+    /**
+     * 缓存短信验证码
+     *
+     * @param phone   String 手机号
+     * @param smsCode String 验证码
+     */
+    private void cacheSmsVerificationCode(String phone, String smsCode) {
+        var cacheKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_CODE_KEY, phone);
+        RedisUtil.set(stringRedisTemplate, cacheKey, smsCode,
+                Duration.ofSeconds(CacheConstant.AUTH_SMS_VERIFICATION_CODE_EXPIRE));
+
+        var limitKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_RATE_LIMIT_KEY, phone);
+        RedisUtil.set(stringRedisTemplate, limitKey, "1",
+                Duration.ofSeconds(CacheConstant.AUTH_SMS_VERIFICATION_CODE_INTERVAL));
+    }
+
+    /**
+     * 发送短信验证码：规格化手机号 → 校验图形验证码 → 校验账号存在 → 校验发送频率 → 生成并缓存验证码 → 调用短信服务
+     *
+     * @param req PhoneCodeSendReq 请求参数
+     */
+    @Override
+    public void sendSmsVerificationCode(PhoneCodeSendReq req) {
+        var phone = Optional.ofNullable(req.phone())
+                .map(this::normalizePhone)
+                .filter(StringUtils::hasText)
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "手机号不能为空"));
+
+        log.info(String.format("发送短信验证码: phone=%s", phone));
+
+        validateCaptchaStrict(req.captcha(), req.captchaKey());
+
+        var user = Optional.ofNullable(sysUserRepo.findByPhone(phone))
+                .orElseThrow(() -> {
+                    log.warn(String.format("发送短信验证码失败，手机号不存在: phone=%s", phone));
+                    return new BusinessException(ResultCode.PHONE_NOT_FOUND);
+                });
+
+        ensureSmsVerificationRateLimit(phone);
+
+        var verificationCode = generateVerificationCode();
+        cacheSmsVerificationCode(phone, verificationCode);
+        smsService.sendVerificationCode(phone, verificationCode);
+
+        log.info(String.format("短信验证码发送成功: userId=%s, phone=%s", user.getId(), phone));
     }
 
     /**
@@ -599,6 +833,18 @@ public class AuthServiceImpl implements AuthService {
     private String normalizeEmail(String email) {
         return Optional.ofNullable(email)
                 .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .orElse(null);
+    }
+
+    /**
+     * 规格化手机号
+     *
+     * @param phone String 手机号
+     * @return String 规格化后的手机号
+     */
+    private String normalizePhone(String phone) {
+        return Optional.ofNullable(phone)
+                .map(String::trim)
                 .orElse(null);
     }
 
@@ -646,7 +892,8 @@ public class AuthServiceImpl implements AuthService {
         // 3. 清理权限缓存（roles、permissions、menus）
         clearPermissionCache(userId, industryType);
 
-        // 4. 调用 Sa-Token 登出
+        // 4. 清理登录用户上下文并调用 Sa-Token 登出
+        LoginUserUtil.clearCurrentUser();
         StpUtil.logout();
 
         log.info(String.format("用户退出登录成功: userId=%s", userId));
@@ -704,34 +951,38 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 发送重置密码邮箱验证码：规格化邮箱 → 校验图形验证码 → 校验账号存在 → 校验发送频率 → 生成并缓存验证码 → 发布通知事件
+     * 发送邮箱验证码：规格化邮箱 → 校验图形验证码 → 校验账号存在 → 校验发送频率 → 生成并缓存验证码 → 发布通知事件
      *
      * @param req EmailCodeSendReq 请求参数（包含邮箱、图形验证码、图形验证码标识）
      */
     @Override
-    public void sendResetPasswordEmailCode(EmailCodeSendReq req) {
+    public void sendEmailVerificationCode(EmailCodeSendReq req) {
         var email = Optional.ofNullable(req.email())
                 .map(this::normalizeEmail)
                 .filter(StringUtils::hasText)
                 .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "邮箱不能为空"));
 
-        log.info(String.format("发送重置密码邮箱验证码: email=%s", email));
+        log.info(String.format("发送邮箱验证码: email=%s", email));
 
         validateCaptchaStrict(req.captcha(), req.captchaKey());
 
         var user = Optional.ofNullable(sysUserRepo.findByEmail(email))
                 .orElseThrow(() -> {
-                    log.warn(String.format("发送重置密码验证码失败，邮箱不存在: email=%s", email));
+                    log.warn(String.format("发送邮箱验证码失败，邮箱不存在: email=%s", email));
                     return new BusinessException(ResultCode.EMAIL_NOT_FOUND);
                 });
 
-        ensureEmailCodeRateLimit(email);
+        ensureEmailVerificationRateLimit(email);
 
-        var emailCode = generateEmailCode();
-        cacheEmailCode(email, emailCode);
+        var verificationCode = generateVerificationCode();
+        cacheEmailVerificationCode(email, verificationCode);
 
-        log.info(String.format("重置密码邮箱验证码生成成功: email=%s, code=%s", email, emailCode));
-        var event = new UserResetPwdEmailCodeEvent(user.getId(), email, emailCode);
+        var mailProvider = Optional.ofNullable(req.provider())
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "邮箱服务商不能为空"));
+
+        log.info(String.format("邮箱验证码生成成功: email=%s, provider=%s, code=%s",
+                email, mailProvider, verificationCode));
+        var event = new UserEmailVerificationEvent(user.getId(), email, verificationCode, mailProvider);
         eventPublisher.publishAsync(event);
     }
 
@@ -757,7 +1008,7 @@ public class AuthServiceImpl implements AuthService {
                     return new BusinessException(ResultCode.EMAIL_NOT_FOUND);
                 });
 
-        validateEmailCode(email, req.emailCode());
+        validateEmailVerificationCode(email, req.emailCode());
 
         user.setPassword(hashPassword(req.newPassword()));
         user.setUpdatedTime(LocalDateTime.now());
@@ -767,7 +1018,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
         }
 
-        clearEmailCode(email);
+        clearEmailVerificationCode(email);
         log.info(String.format("重置密码成功: userId=%s, email=%s", user.getId(), email));
     }
 
@@ -846,11 +1097,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseGet(() -> industryConfigCache.get().getType());
 
         var userInfo = authConverter.toLoginUserInfoResp(user);
-        userInfo.setDepartment(getDepartmentName(user.getDepartmentId()));
-        userInfo.setRole(permissionService.getPrimaryRoleCode(user.getId(), industryType));
-        userInfo.setStatus(getUserStatusDescription(user.getStatus()));
-        userInfo.setIndustry(industryType);
-        userInfo.setAvatar(user.getAvatarUrl());
+        populateUserInfo(user, userInfo, industryType);
 
         var roles = permissionService.findRoleCodes(user.getId(), industryType);
         var permissions = permissionService.findPermissionCodes(user.getId(), industryType);
@@ -867,6 +1114,66 @@ public class AuthServiceImpl implements AuthService {
                 permissions,
                 menus,
                 tokenTimeout);
+    }
+
+    /**
+     * 更新个人信息：登录校验 → 校验部门与行业 → 更新用户表 → 刷新会话缓存 → 返回最新用户信息
+     *
+     * @param req UserInfoUpdateReq 个人信息更新请求
+     * @return UserInfoUpdateResp 更新后的个人信息
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public UserInfoUpdateResp updateUserInfo(UserInfoUpdateReq req) {
+        if (!StpUtil.isLogin()) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+
+        var userId = StpUtil.getLoginIdAsLong();
+        log.info(String.format("update user info start: userId=%s", userId));
+
+        var user = Optional.ofNullable(sysUserRepo.findById(userId))
+                .filter(found -> !DeleteStatus.DELETED.getCode().equals(found.getIsDeleted()))
+                .orElseThrow(() -> new BusinessException(ResultCode.USER_NOT_FOUND));
+        if (UserStatus.DISABLED.getCode().equals(user.getStatus())) {
+            throw new BusinessException(ResultCode.USER_ACCOUNT_DISABLED);
+        }
+
+        var normalizedIndustry = resolveIndustryType(req.industryCode());
+        var departmentCode = normalizeDepartmentCode(req.department());
+        var department = Optional.ofNullable(sysDepartmentRepo.findByCode(normalizedIndustry, departmentCode))
+                .orElseThrow(() -> {
+                    log.warn(String.format("update user info department invalid: userId=%s, department=%s, industry=%s",
+                            userId, departmentCode, normalizedIndustry));
+                    return new BusinessException(ResultCode.BAD_REQUEST, "所属部门不存在或已停用");
+                });
+
+        user.setRealName(req.realName());
+        user.setEmail(req.email());
+        user.setPhone(req.phone());
+        user.setIndustryType(normalizedIndustry);
+        user.setDepartmentId(department.getId());
+        user.setAvatarUrl(Optional.ofNullable(req.avatar())
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .orElse(null));
+        user.setUpdatedTime(LocalDateTime.now(DEFAULT_ZONE));
+
+        if (!sysUserRepo.updateById(user)) {
+            log.error(String.format("update user info failed when updating record: userId=%s", userId));
+            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+        }
+
+        saveUserTitle(userId, normalizedIndustry, req.title());
+        saveAvatarFileId(userId, req.avatarFileId());
+
+        var userInfo = authConverter.toLoginUserInfoResp(user);
+        populateUserInfo(user, userInfo, normalizedIndustry);
+
+        cacheLoginUserContext(user, normalizedIndustry);
+        log.info(String.format("update user info success: userId=%s", userId));
+
+        return new UserInfoUpdateResp(userInfo);
     }
 
     /**
@@ -972,6 +1279,20 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
+     * 规格化部门编码
+     *
+     * @param departmentCode String 部门编码
+     * @return String 规格化后的部门编码
+     */
+    private String normalizeDepartmentCode(String departmentCode) {
+        return Optional.ofNullable(departmentCode)
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .map(value -> value.toUpperCase(Locale.ROOT))
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "所属部门不能为空"));
+    }
+
+    /**
      * 解析行业类型
      *
      * @param industryType String 行业类型
@@ -981,4 +1302,25 @@ public class AuthServiceImpl implements AuthService {
         return StringUtils.hasText(industryType) ? industryType : industryConfigCache.get().getType();
     }
 
+    /**
+     * 缓存登录用户上下文
+     *
+     * @param user         SysUser 用户实体
+     * @param industryType String 行业类型
+     */
+    private void cacheLoginUserContext(SysUser user, String industryType) {
+        if (user == null) {
+            return;
+        }
+        var departmentName = getDepartmentName(user.getDepartmentId());
+        var context = LoginUserContext.of(user.getId(),
+                user.getUsername(),
+                user.getRealName(),
+                industryType,
+                user.getDepartmentId(),
+                departmentName,
+                user.getEmail(),
+                user.getPhone());
+        LoginUserUtil.cacheCurrentUser(context);
+    }
 }

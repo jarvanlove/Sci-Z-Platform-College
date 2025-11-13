@@ -35,6 +35,20 @@ export const updateUserInfo = (data) => {
 }
 
 /**
+ * 获取个人信息可配置字段（含下拉选项）
+ * @param {Object} params - 查询参数
+ * @param {string} [params.industry] - 行业编码
+ * @returns {Promise} 字段定义响应
+ */
+export const getProfileFields = (params = {}) => {
+  return request({
+    url: USER_API.PROFILE_FIELDS,
+    method: HTTP_METHODS.GET,
+    params
+  })
+}
+
+/**
  * 修改密码
  * @param {Object} data - 密码数据
  * @param {string} data.oldPassword - 旧密码
