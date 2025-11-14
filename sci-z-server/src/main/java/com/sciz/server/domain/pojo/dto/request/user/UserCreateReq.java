@@ -16,7 +16,6 @@ import org.springframework.util.StringUtils;
  * @param phone        String 手机号（大陆11位）
  * @param password     String 初始密码（6-32位）
  * @param departmentId Long 部门ID
- * @param industryType String 行业类型
  *
  * @author JiaWen.Wu
  * @className UserCreateReq
@@ -33,9 +32,7 @@ public record UserCreateReq(
 
         @NotBlank(message = "初始密码不能为空") @Size(min = 6, max = 32, message = "密码长度必须在6-32个字符之间") String password,
 
-        @NotNull(message = "部门ID不能为空") Long departmentId,
-
-        @NotBlank(message = "行业类型不能为空") String industryType) {
+        @NotNull(message = "部门ID不能为空") Long departmentId) {
 
     public UserCreateReq {
         username = normalize(username);
@@ -43,7 +40,6 @@ public record UserCreateReq(
         email = normalize(email);
         phone = normalize(phone);
         password = normalize(password);
-        industryType = normalize(industryType);
     }
 
     private static String normalize(String value) {

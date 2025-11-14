@@ -2,7 +2,9 @@ package com.sciz.server.interfaces.converter;
 
 import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
 import com.sciz.server.domain.pojo.entity.file.SysAttachment;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 
 /**
  * 文件转换器
@@ -15,8 +17,8 @@ import org.springframework.stereotype.Component;
  * @className FileConverter
  * @date 2025-11-12 17:30
  */
-@Component
-public class FileConverter {
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+public interface FileConverter {
 
     /**
      * SysAttachment → FileInfoResp
@@ -24,27 +26,7 @@ public class FileConverter {
      * @param entity SysAttachment 实体
      * @return FileInfoResp 响应
      */
-    public FileInfoResp toInfoResp(SysAttachment entity) {
-        if (entity == null) {
-            return null;
-        }
-        return new FileInfoResp(
-                entity.getId(),
-                entity.getFileName(),
-                entity.getOriginalName(),
-                entity.getFileType(),
-                entity.getFileExtension(),
-                entity.getFileSize(),
-                entity.getMimeType(),
-                entity.getFileUrl(),
-                entity.getFilePath(),
-                entity.getMd5Hash(),
-                entity.getIsPublic(),
-                entity.getDownloadCount(),
-                entity.getUploaderId(),
-                entity.getUploaderName(),
-                entity.getUploadTime(),
-                null,
-                null);
-    }
+    @Mapping(target = "bucketName", ignore = true)
+    @Mapping(target = "previewUrl", ignore = true)
+    FileInfoResp toInfoResp(SysAttachment entity);
 }

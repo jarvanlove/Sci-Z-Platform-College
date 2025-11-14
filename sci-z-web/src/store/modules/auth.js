@@ -211,7 +211,7 @@ export const useAuthStore = defineStore('auth', {
         setToken(token, shouldRemember)
         
         // 保存用户信息和权限数据（始终使用 localStorage）
-        setUserInfo(userInfo)
+        setUserInfo(this.userInfo)
         setPermissions(this.permissions)
         setRoles(this.roles)
         setMenus(this.menus)
@@ -317,16 +317,42 @@ export const useAuthStore = defineStore('auth', {
         
         // 合并更新用户信息（保留现有字段，只更新新字段）
         if (userInfo) {
+          let normalizedAvatar
+          if (userInfo.avatar !== undefined) {
+            normalizedAvatar =
+              typeof userInfo.avatar === 'string' && userInfo.avatar.trim() === ''
+                ? null
+                : userInfo.avatar
+          } else if (userInfo.avatarUrl !== undefined) {
+            normalizedAvatar =
+              typeof userInfo.avatarUrl === 'string' && userInfo.avatarUrl.trim() === ''
+                ? null
+                : userInfo.avatarUrl
+          }
+
+          let normalizedAvatarId
+          if (userInfo.avatarFileId !== undefined) {
+            normalizedAvatarId =
+              typeof userInfo.avatarFileId === 'string' && userInfo.avatarFileId.trim() === ''
+                ? null
+                : userInfo.avatarFileId
+          } else if (userInfo.avatarId !== undefined) {
+            normalizedAvatarId =
+              typeof userInfo.avatarId === 'string' && userInfo.avatarId.trim() === ''
+                ? null
+                : userInfo.avatarId
+          }
+
           this.userInfo = {
             ...this.userInfo,
             ...userInfo
           }
-          // 🔥 关键修复：确保 avatar 和 avatarFileId 被正确设置
-          if (userInfo.avatar !== undefined) {
-            this.userInfo.avatar = userInfo.avatar
+
+          if (normalizedAvatar !== undefined) {
+            this.userInfo.avatar = normalizedAvatar || this.userInfo.avatar || null
           }
-          if (userInfo.avatarFileId !== undefined || userInfo.avatarId !== undefined) {
-            this.userInfo.avatarFileId = userInfo.avatarFileId || userInfo.avatarId
+          if (normalizedAvatarId !== undefined) {
+            this.userInfo.avatarFileId = normalizedAvatarId || this.userInfo.avatarFileId || null
           }
           authLogger.debug('更新后的用户信息', { 
             avatar: this.userInfo?.avatar,

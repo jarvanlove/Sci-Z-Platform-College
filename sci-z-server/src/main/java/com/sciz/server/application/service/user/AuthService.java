@@ -83,20 +83,18 @@ public interface AuthService {
     /**
      * 校验当前登录用户是否拥有指定角色
      *
-     * @param roleCode     String 角色编码
-     * @param industryType String 行业类型（可选，默认当前行业）
+     * @param roleCode String 角色编码
      * @return CheckRoleResp 角色校验结果
      */
-    CheckRoleResp checkRole(String roleCode, String industryType);
+    CheckRoleResp checkRole(String roleCode);
 
     /**
      * 校验当前登录用户是否拥有指定权限
      *
      * @param permissionCode String 权限编码
-     * @param industryType   String 行业类型（可选，默认当前行业）
      * @return CheckPermResp 权限校验结果
      */
-    CheckPermResp checkPermission(String permissionCode, String industryType);
+    CheckPermResp checkPermission(String permissionCode);
 
     /**
      * 发送邮箱验证码

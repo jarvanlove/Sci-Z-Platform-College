@@ -11,7 +11,6 @@ import com.sciz.server.domain.pojo.dto.response.user.UserCreateResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserListResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserUpdateResp;
 import com.sciz.server.domain.pojo.entity.user.SysDepartment;
-import com.sciz.server.domain.pojo.entity.user.SysRole;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
 import com.sciz.server.domain.pojo.repository.user.SysDepartmentRepo;
 import com.sciz.server.domain.pojo.repository.user.SysRoleRepo;
@@ -86,7 +85,10 @@ public class UserServiceImpl implements UserService {
         var realName = req.realName().trim();
         var email = req.email().trim().toLowerCase(Locale.ROOT);
         var phone = req.phone().trim();
-        var industryType = req.industryType().trim().toLowerCase(Locale.ROOT);
+        var industryType = Optional.ofNullable(industryConfigCache.get())
+                .map(IndustryConfigCache.IndustryView::getType)
+                .map(type -> type.trim().toLowerCase(Locale.ROOT))
+                .orElseThrow(() -> new BusinessException(ResultCode.SERVER_ERROR, "行业配置未初始化"));
         var departmentId = req.departmentId();
 
         log.info(String.format("创建用户开始: username=%s, email=%s, phone=%s, departmentId=%s, industryType=%s",
@@ -341,7 +343,10 @@ public class UserServiceImpl implements UserService {
         var realName = req.realName().trim();
         var email = req.email().trim().toLowerCase(Locale.ROOT);
         var phone = req.phone().trim();
-        var industryType = req.industryType().trim().toLowerCase(Locale.ROOT);
+        var industryType = Optional.ofNullable(industryConfigCache.get())
+                .map(IndustryConfigCache.IndustryView::getType)
+                .map(type -> type.trim().toLowerCase(Locale.ROOT))
+                .orElseThrow(() -> new BusinessException(ResultCode.SERVER_ERROR, "行业配置未初始化"));
         var departmentId = req.departmentId();
 
         log.info(String.format("更新用户开始: userId=%s, email=%s, phone=%s, departmentId=%s, industryType=%s",

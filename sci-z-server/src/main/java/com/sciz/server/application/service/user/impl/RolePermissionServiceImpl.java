@@ -11,6 +11,7 @@ import com.sciz.server.domain.pojo.repository.user.SysPermissionRepo;
 import com.sciz.server.domain.pojo.repository.user.SysRolePermissionRepo;
 import com.sciz.server.domain.pojo.repository.user.SysRoleRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRoleRepo;
+import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import com.sciz.server.infrastructure.shared.enums.EnableStatus;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
@@ -45,9 +46,11 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     private final SysRoleRepo roleRepo;
     private final SysUserRoleRepo userRoleRepo;
     private final PermissionService permissionService;
+    private final IndustryConfigCache industryConfigCache;
 
     @Override
-    public List<Long> listPermissionIds(Long roleId, String industryType) {
+    public List<Long> listPermissionIds(Long roleId) {
+        var industryType = industryConfigCache.get().getType();
         var roleList = roleRepo.findByIds(List.of(roleId));
         if (CollectionUtils.isEmpty(roleList)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, String.format("角色不存在: roleId=%s", roleId));
@@ -70,7 +73,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Transactional(rollbackFor = Exception.class)
     public void updateRolePermissions(RolePermissionUpdateReq req) {
         var roleId = req.roleId();
-        var industryType = req.industryType();
+        var industryType = industryConfigCache.get().getType();
         var permissionIdList = Optional.ofNullable(req.permissionIdList())
                 .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "权限列表不能为空"));
 

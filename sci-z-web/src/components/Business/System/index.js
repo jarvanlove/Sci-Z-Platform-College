@@ -13,4 +13,4 @@ export { default as UserManagement } from './UserManagement.vue'
 // export { default as SystemConfig } from './SystemConfig.vue'
 
 // 日志管理组件
-// export { default as SystemLogs } from './SystemLogs.vue'
+export { default as SystemLogs } from './LogManagement.vue'

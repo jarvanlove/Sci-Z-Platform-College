@@ -19,7 +19,7 @@ public interface RolePermissionService {
      * @param industryType String 行业类型
      * @return List<Long> 权限ID列表
      */
-    List<Long> listPermissionIds(Long roleId, String industryType);
+    List<Long> listPermissionIds(Long roleId);
 
     /**
      * 更新角色权限（全量替换）

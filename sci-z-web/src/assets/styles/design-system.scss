@@ -431,6 +431,65 @@ body {
 }
 
 // ================================
+// 7.5. 开关统一样式
+// ================================
+
+/* Element Plus 开关统一样式 - 与 BaseSwitch 组件保持一致 */
+.el-switch {
+  .el-switch__core {
+    background-color: var(--border) !important;
+    border-color: var(--border) !important;
+    width: 40px !important;
+    height: 20px !important;
+    transition: all 0.3s ease !important;
+    
+    &::after {
+      background-color: var(--surface) !important;
+      width: 16px !important;
+      height: 16px !important;
+      transition: all 0.3s ease !important;
+    }
+  }
+  
+  &.is-checked {
+    .el-switch__core {
+      background-color: var(--color-primary) !important;
+      border-color: var(--color-primary) !important;
+      
+      &::after {
+        left: calc(100% - 18px) !important;
+      }
+    }
+  }
+  
+  &:hover:not(.is-disabled) {
+    .el-switch__core {
+      border-color: var(--color-primary) !important;
+      
+      &:not(.is-checked) {
+        background-color: var(--border-hover) !important;
+      }
+      
+      &.is-checked {
+        background-color: var(--color-primary-dark) !important;
+        border-color: var(--color-primary-dark) !important;
+      }
+    }
+  }
+  
+  /* 暗色主题下开关悬浮样式 */
+  [data-theme='dark'] &:hover:not(.is-disabled) .el-switch__core.is-checked,
+  .dark &:hover:not(.is-disabled) .el-switch__core.is-checked {
+    background-color: var(--color-primary-light) !important;
+    border-color: var(--color-primary-light) !important;
+  }
+  
+  &.is-disabled {
+    opacity: 0.5;
+  }
+}
+
+// ================================
 // 8. 表单统一样式
 // ================================
 
@@ -975,6 +1034,9 @@ body {
         td {
           background-color: rgba(15, 23, 42, 0.5) !important;
           color: var(--text) !important;
+          /* 确保 stripe 行的内容可以被滚动隐藏 - 强制设置 */
+          overflow: visible !important;
+          position: relative !important;
         }
       }
       
@@ -986,6 +1048,9 @@ body {
           
           td {
             background-color: var(--hover-light) !important;
+            /* 确保 stripe 行的内容可以被滚动隐藏 - 强制设置 */
+            overflow: visible !important;
+            position: relative !important;
           }
         }
       }

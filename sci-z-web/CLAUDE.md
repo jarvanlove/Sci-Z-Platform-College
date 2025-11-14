@@ -63,6 +63,10 @@ Vue 3 + TypeScript 专家、UI 设计师
 - 注册表单中的“所属院系/科室/部门”文案及部门列表必须根据 `industryStore.departmentLabelKey`、`departmentPlaceholderKey` 动态渲染，确保行业切换后展示正确。
 - 若需要支持新的行业类型，需同步扩展 `industryStore` 中的映射以及对应的 i18n 文案。
 
+### 接口调用节奏补充（系统管理 - 用户管理）
+
+- 基本原则：接口调用需与页面资源需求一一对应，懒加载可缓存的数据，杜绝进入菜单即全量请求。
+- `GET /api/system/industry/config`：进入页面时调用一次（`industryStore.fetchIndustryConfig()`），同步行业文案与部门映射。
 ---
 
 ## 四、前端架构落地规范（重点）

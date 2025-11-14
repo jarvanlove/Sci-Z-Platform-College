@@ -14,6 +14,7 @@
 
     <!-- 表格主体 -->
     <el-table
+      ref="tableRef"
       :data="data"
       :loading="loading"
       :stripe="stripe"
@@ -100,7 +101,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BasePagination from './BasePagination.vue'
 
@@ -203,6 +204,8 @@ const { t } = useI18n()
 
 // 响应式数据
 const selectedRows = ref([])
+const tableRef = ref(null)
+let cleanupScrollSync = null
 
 // 计算属性
 const computedActionLabel = computed(() => {
@@ -253,6 +256,104 @@ const handleSizeChange = (size) => {
 const handleCurrentChange = (current) => {
   emit('current-change', current)
 }
+
+// 同步表头和表体的滚动
+const syncScroll = () => {
+  if (!tableRef.value) return
+  
+  // 获取表格的 DOM 元素
+  const tableEl = tableRef.value.$el || tableRef.value
+  if (!tableEl) return
+  
+  const headerWrapper = tableEl.querySelector('.el-table__header-wrapper')
+  const bodyWrapper = tableEl.querySelector('.el-table__body-wrapper')
+  
+  if (!headerWrapper || !bodyWrapper) return
+  
+  // 获取所有滚动容器（包括固定列）
+  const getAllScrollContainers = () => {
+    const containers = [headerWrapper, bodyWrapper]
+    
+    // 查找所有固定列的滚动容器 - 使用更全面的选择器
+    const fixedRightBody = tableEl.querySelector('.el-table__fixed-right .el-table__fixed-body-wrapper')
+    const fixedRightHeader = tableEl.querySelector('.el-table__fixed-right .el-table__fixed-header-wrapper')
+    const fixedBody = tableEl.querySelector('.el-table__fixed .el-table__fixed-body-wrapper')
+    const fixedHeader = tableEl.querySelector('.el-table__fixed .el-table__fixed-header-wrapper')
+    
+    if (fixedRightBody) containers.push(fixedRightBody)
+    if (fixedRightHeader) containers.push(fixedRightHeader)
+    if (fixedBody) containers.push(fixedBody)
+    if (fixedHeader) containers.push(fixedHeader)
+    
+    return containers.filter(Boolean)
+  }
+  
+  const allContainers = getAllScrollContainers()
+  
+  if (allContainers.length === 0) return
+  
+  // 防止循环触发
+  let isScrolling = false
+  
+  // 同步所有容器的滚动位置 - 强制同步，不检查条件
+  const syncAllContainers = (sourceScrollLeft) => {
+    allContainers.forEach(container => {
+      // 强制设置，确保所有容器都同步
+      if (container.scrollLeft !== sourceScrollLeft) {
+        container.scrollLeft = sourceScrollLeft
+      }
+    })
+  }
+  
+  // 为每个容器添加滚动监听
+  const scrollHandlers = allContainers.map(container => {
+    const handleScroll = () => {
+      if (isScrolling) return
+      isScrolling = true
+      requestAnimationFrame(() => {
+        syncAllContainers(container.scrollLeft)
+        isScrolling = false
+      })
+    }
+    
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return { container, handler: handleScroll }
+  })
+  
+  // 返回清理函数
+  return () => {
+    scrollHandlers.forEach(({ container, handler }) => {
+      container.removeEventListener('scroll', handler)
+    })
+  }
+}
+
+// 生命周期
+onMounted(() => {
+  // 延迟初始化，确保固定列已经渲染完成
+  nextTick(() => {
+    // 使用更长的延迟，确保所有 DOM 都已渲染
+    setTimeout(() => {
+      if (tableRef.value) {
+        cleanupScrollSync = syncScroll()
+        // 如果第一次没找到固定列，再试一次
+        if (!cleanupScrollSync) {
+          setTimeout(() => {
+            if (tableRef.value) {
+              cleanupScrollSync = syncScroll()
+            }
+          }, 200)
+        }
+      }
+    }, 200)
+  })
+})
+
+onUnmounted(() => {
+  if (cleanupScrollSync) {
+    cleanupScrollSync()
+  }
+})
 </script>
 
 <style lang="scss" scoped>
@@ -293,11 +394,164 @@ const handleCurrentChange = (current) => {
   }
 
   .el-table__header-wrapper {
-    overflow-x: auto;
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    // 使用自定义滚动条样式
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: var(--border) transparent; /* Firefox */
+    -ms-overflow-style: -ms-autohiding-scrollbar; /* IE 10+ */
+    
+    &::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: transparent;
+      border-radius: 4px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+      transition: all 0.3s ease;
+      
+      &:hover {
+        background: var(--border-hover);
+      }
+    }
   }
 
   .el-table__body-wrapper {
-    overflow-x: auto;
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    // 使用自定义滚动条样式
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: var(--border) transparent; /* Firefox */
+    -ms-overflow-style: -ms-autohiding-scrollbar; /* IE 10+ */
+    
+    &::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: transparent;
+      border-radius: 4px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+      transition: all 0.3s ease;
+      
+      &:hover {
+        background: var(--border-hover);
+      }
+    }
+  }
+  
+  // 确保表格内容可以超出容器宽度，触发横向滚动
+  // 同时确保表头和表体的列宽一致
+  .el-table__header,
+  .el-table__body {
+    width: 100% !important;
+    min-width: 100%;
+    // 不设置 table-layout: fixed，让 Element Plus 自动计算列宽
+    // Element Plus 会自动同步表头和表体的列宽
+  }
+  
+  // 确保表头和表体的列宽完全一致
+  .el-table__header-wrapper,
+  .el-table__body-wrapper {
+    // 确保滚动容器宽度一致
+    width: 100%;
+  }
+  
+  // 确保所有行都能正确滚动 - 统一处理，不区分 stripe 行
+  .el-table__body {
+    tr {
+      td {
+        position: relative;
+        white-space: nowrap;
+        // 不设置 overflow，让父容器的滚动来控制隐藏
+        overflow: visible !important;
+      }
+    }
+  }
+  
+  // 固定列也需要支持滚动
+  .el-table__fixed,
+  .el-table__fixed-right {
+    .el-table__fixed-body-wrapper {
+      overflow-x: auto !important;
+      overflow-y: hidden;
+      // 使用自定义滚动条样式
+      scrollbar-width: thin; /* Firefox */
+      scrollbar-color: var(--border) transparent; /* Firefox */
+      -ms-overflow-style: -ms-autohiding-scrollbar; /* IE 10+ */
+      
+      &::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      
+      &::-webkit-scrollbar-track {
+        background: transparent;
+        border-radius: 4px;
+      }
+      
+      &::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+        transition: all 0.3s ease;
+        
+        &:hover {
+          background: var(--border-hover);
+        }
+      }
+    }
+    
+    .el-table__fixed-header-wrapper {
+      overflow-x: auto !important;
+      overflow-y: hidden;
+      // 使用自定义滚动条样式
+      scrollbar-width: thin; /* Firefox */
+      scrollbar-color: var(--border) transparent; /* Firefox */
+      -ms-overflow-style: -ms-autohiding-scrollbar; /* IE 10+ */
+      
+      &::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      
+      &::-webkit-scrollbar-track {
+        background: transparent;
+        border-radius: 4px;
+      }
+      
+      &::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+        transition: all 0.3s ease;
+        
+        &:hover {
+          background: var(--border-hover);
+        }
+      }
+    }
+    
+    // 确保固定列中的所有行都能正确滚动 - 统一处理
+    .el-table__fixed-body-wrapper {
+      tr {
+        td {
+          position: relative;
+          white-space: nowrap;
+          // 确保内容可以被滚动隐藏
+          overflow: visible !important;
+        }
+      }
+    }
   }
 
   .el-table__header th {
@@ -309,6 +563,8 @@ const handleCurrentChange = (current) => {
     letter-spacing: 0.01em;
     border-bottom: 1px solid var(--border) !important;
     padding: 14px 16px !important;
+    // 确保表头列宽与表体一致
+    box-sizing: border-box;
   }
 
   .el-table__body {
@@ -322,6 +578,12 @@ const handleCurrentChange = (current) => {
 
       &.el-table__row--striped {
         background-color: var(--hover-light) !important;
+        
+        // 确保 stripe 行的内容可以被滚动隐藏 - 强制设置
+        td {
+          overflow: visible !important;
+          position: relative !important;
+        }
       }
     }
 
@@ -329,6 +591,11 @@ const handleCurrentChange = (current) => {
       border-bottom: 1px solid var(--border) !important;
       color: var(--text) !important;
       padding: 12px 16px !important;
+      position: relative;
+      white-space: nowrap;
+      // 确保表体列宽与表头一致
+      box-sizing: border-box;
+      // 不设置 overflow，让父容器的滚动来控制隐藏
     }
   }
 
@@ -342,6 +609,28 @@ const handleCurrentChange = (current) => {
   .el-table__fixed-right {
     background-color: var(--surface) !important;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.12);
+    
+    // 确保固定列中的 stripe 行背景色正确，并且能正确滚动
+    .el-table__fixed-body-wrapper {
+      tr.el-table__row--striped {
+        background-color: var(--hover-light) !important;
+        
+        td {
+          background-color: var(--hover-light) !important;
+          // 确保 stripe 行的内容可以被滚动隐藏 - 强制设置
+          overflow: visible !important;
+          position: relative !important;
+        }
+      }
+      
+      tr {
+        td {
+          position: relative;
+          white-space: nowrap;
+          // 不设置 overflow，让父容器的滚动来控制隐藏
+        }
+      }
+    }
   }
 
   .el-table__fixed-right-patch {

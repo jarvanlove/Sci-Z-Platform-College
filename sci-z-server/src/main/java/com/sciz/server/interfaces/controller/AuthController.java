@@ -140,17 +140,15 @@ public class AuthController {
 
     @Operation(summary = "角色校验", description = "校验当前登录用户是否拥有指定角色")
     @GetMapping("/check/role")
-    public Result<CheckRoleResp> checkRole(@RequestParam("roleCode") String roleCode,
-            @RequestParam(value = "industryType", required = false) String industryType) {
-        var resp = authService.checkRole(roleCode, industryType);
+    public Result<CheckRoleResp> checkRole(@RequestParam("roleCode") String roleCode) {
+        var resp = authService.checkRole(roleCode);
         return Result.success(resp);
     }
 
     @Operation(summary = "权限校验", description = "校验当前登录用户是否拥有指定权限码")
     @GetMapping("/check/perm")
-    public Result<CheckPermResp> checkPermission(@RequestParam("permissionCode") String permissionCode,
-            @RequestParam(value = "industryType", required = false) String industryType) {
-        var resp = authService.checkPermission(permissionCode, industryType);
+    public Result<CheckPermResp> checkPermission(@RequestParam("permissionCode") String permissionCode) {
+        var resp = authService.checkPermission(permissionCode);
         return Result.success(resp);
     }
 }

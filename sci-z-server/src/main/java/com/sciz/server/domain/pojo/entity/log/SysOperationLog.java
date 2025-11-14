@@ -96,6 +96,12 @@ public class SysOperationLog extends BaseEntity {
     private String os;
 
     /**
+     * 日志级别
+     */
+    @TableField("log_level")
+    private String logLevel;
+
+    /**
      * 操作状态（0:失败,1:成功）
      */
     @TableField("status")
@@ -106,6 +112,12 @@ public class SysOperationLog extends BaseEntity {
      */
     @TableField("error_message")
     private String errorMessage;
+
+    /**
+     * 详细信息
+     */
+    @TableField("detail_info")
+    private String detailInfo;
 
     /**
      * 执行时长（毫秒）

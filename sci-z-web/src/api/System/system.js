@@ -221,7 +221,7 @@ export const deletePermission = (id) => {
  */
 export const getUsers = (data) => {
   return request({
-    url: `${SYSTEM_API.USERS}/list`,
+    url: SYSTEM_API.USER_LIST,
     method: HTTP_METHODS.POST,
     data
   })
@@ -236,12 +236,11 @@ export const getUsers = (data) => {
  * @param {string} data.realName - 真实姓名
  * @param {string} data.password - 密码
  * @param {number} data.departmentId - 部门ID
- * @param {number} data.roleId - 角色ID
  * @returns {Promise} 创建用户响应
  */
 export const createUser = (data) => {
   return request({
-    url: SYSTEM_API.USERS,
+    url: SYSTEM_API.USER_CREATE,
     method: HTTP_METHODS.POST,
     data
   })
@@ -256,7 +255,6 @@ export const createUser = (data) => {
  * @param {string} data.email - 邮箱（必填，必须是有效邮箱格式，最大长度100字符）
  * @param {string} data.phone - 手机号（必填，必须是大陆11位手机号，1开头）
  * @param {number} data.departmentId - 部门ID（必填）
- * @param {string} data.industryType - 行业类型（必填）
  * @returns {Promise} 更新用户响应
  */
 export const updateUser = (id, data) => {
@@ -309,6 +307,25 @@ export const resetUserPassword = (data) => {
   return request({
     url: SYSTEM_API.RESET_PASSWORD,
     method: HTTP_METHODS.PUT,
+    data
+  })
+}
+
+/**
+ * 获取操作日志列表
+ * @param {Object} data - 查询参数
+ * @param {number} data.pageNo - 页码
+ * @param {number} data.pageSize - 每页数量
+ * @param {string} [data.level] - 日志级别
+ * @param {string} [data.user] - 操作用户
+ * @param {string} [data.startTime] - 开始时间
+ * @param {string} [data.endTime] - 结束时间
+ * @returns {Promise} 日志列表响应
+ */
+export const getOperationLogs = (data) => {
+  return request({
+    url: SYSTEM_API.OPERATION_LOGS,
+    method: HTTP_METHODS.POST,
     data
   })
 }

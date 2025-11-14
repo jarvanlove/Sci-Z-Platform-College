@@ -177,6 +177,17 @@ public final class DateUtil {
     }
 
     /**
+     * 计算两个日期时间之间的毫秒数
+     *
+     * @param startDateTime 开始日期时间
+     * @param endDateTime   结束日期时间
+     * @return 毫秒数
+     */
+    public static long millisBetween(LocalDateTime startDateTime, LocalDateTime endDateTime) {
+        return ChronoUnit.MILLIS.between(startDateTime, endDateTime);
+    }
+
+    /**
      * 添加天数
      *
      * @param date 日期

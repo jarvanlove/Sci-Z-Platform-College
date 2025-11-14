@@ -65,4 +65,20 @@ public class SysRoleRepoImpl implements SysRoleRepo {
                 .eq(SysRole::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
                 .one();
     }
+
+    /**
+     * 查询指定行业下的角色列表
+     *
+     * @param industryType String 行业类型
+     * @return List<SysRole> 角色列表
+     */
+    @Override
+    public List<SysRole> listByIndustryType(String industryType) {
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysRole::getIndustryType, industryType)
+                .eq(SysRole::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .orderByAsc(SysRole::getSortOrder)
+                .orderByAsc(SysRole::getId)
+                .list();
+    }
 }

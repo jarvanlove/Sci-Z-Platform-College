@@ -25,20 +25,24 @@
           </template>
         </el-input>
         
+        <!-- 角色筛选暂时下线，统一到角色管理绑定，保留结构以便后续恢复 -->
+        <!--
         <el-select
           v-model="searchForm.role"
           :placeholder="t('system.user.selectRole')"
           clearable
           style="width: 150px"
+          @visible-change="handleRoleFilterVisible"
         >
           <el-option :label="t('common.all')" value="" />
           <el-option
             v-for="role in roleOptions"
             :key="role.id"
-            :label="role.name"
+            :label="role.roleName || role.name"
             :value="role.id"
           />
         </el-select>
+        -->
         
         <el-select
           v-model="searchForm.status"
@@ -169,10 +173,10 @@
             :placeholder="t('system.user.phonePlaceholder')"
           />
         </el-form-item>
-        <el-form-item :label="t('system.user.department')" prop="departmentId">
+        <el-form-item :label="departmentFieldLabel" prop="departmentId">
           <el-select
             v-model="formData.departmentId"
-            :placeholder="t('system.user.departmentPlaceholder')"
+            :placeholder="departmentFieldPlaceholder"
             style="width: 100%"
             filterable
           >
@@ -184,6 +188,8 @@
             />
           </el-select>
         </el-form-item>
+        <!-- 角色暂不在此维护，后续由角色管理绑定 -->
+        <!--
         <el-form-item :label="t('system.user.role')" prop="roleId">
           <el-select
             v-model="formData.roleId"
@@ -193,11 +199,12 @@
             <el-option
               v-for="role in roleOptions"
               :key="role.id"
-              :label="role.name"
+              :label="role.roleName || role.name"
               :value="role.id"
             />
           </el-select>
         </el-form-item>
+        -->
         <el-form-item :label="t('common.status')" prop="status">
           <BaseSwitch
             v-model="formData.status"
@@ -265,12 +272,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import { BaseButton, BaseCard, BaseTable, BaseDialog, BaseSwitch } from '@/components/Common'
-import { getUsers, createUser, updateUser, deleteUser, updateUserStatus, getRoles, resetUserPassword, getDepartments } from '@/api/System/system'
+import { getUsers, createUser, updateUser, deleteUser, updateUserStatus, resetUserPassword } from '@/api/System/system'
 import { validateEmail, validatePhone, validateUsername, validateChineseName } from '@/utils/validate'
 import { formatDate } from '@/utils/date'
 import { createLogger } from '@/utils/simpleLogger'
@@ -297,7 +304,6 @@ const resetPasswordForm = reactive({
 // 搜索表单
 const searchForm = reactive({
   keyword: '',
-  role: '',
   status: ''
 })
 
@@ -317,7 +323,6 @@ const formData = reactive({
   phone: '',
   departmentId: null,
   industryType: '',
-  roleId: null,
   status: 'active',
   password: ''
 })
@@ -325,11 +330,23 @@ const formData = reactive({
 // 用户列表
 const userList = ref([])
 
-// 角色选项
-const roleOptions = ref([])
-
-// 部门选项
 const departmentOptions = ref([])
+const departmentsLoaded = ref(false)
+
+const departmentFieldLabel = computed(() => {
+  const key = industryStore.departmentLabelKey || 'system.user.department'
+  return t(key)
+})
+
+const departmentFieldPlaceholder = computed(() => {
+  const key = industryStore.departmentPlaceholderKey || 'system.user.departmentPlaceholder'
+  return t(key)
+})
+
+const getSelectedDepartmentName = () => {
+  const target = departmentOptions.value.find((dept) => dept.id === formData.departmentId)
+  return target?.name || ''
+}
 
 // 表格列配置
 const tableColumns = computed(() => [
@@ -382,6 +399,16 @@ const tableColumns = computed(() => [
     showOverflowTooltip: true
   }
 ])
+
+const ensureDepartmentOptions = async (force = false) => {
+  if (!departmentsLoaded.value || force) {
+    await loadDepartments(force)
+  }
+}
+
+const ensureFormOptions = async (force = false) => {
+  await ensureDepartmentOptions(force)
+}
 
 // 重置密码表单验证规则
 const resetPasswordRules = computed(() => ({
@@ -438,6 +465,7 @@ const formRules = computed(() => ({
     }
   ],
   phone: [
+    { required: true, message: t('system.user.phoneRequired'), trigger: 'blur' },
     {
       validator: (rule, value, callback) => {
         if (value && !validatePhone(value)) {
@@ -451,9 +479,6 @@ const formRules = computed(() => ({
   ],
   departmentId: [
     { required: true, message: t('system.user.departmentRequired'), trigger: 'change' }
-  ],
-  roleId: [
-    { required: true, message: t('system.user.roleRequired'), trigger: 'change' }
   ],
   password: [
     {
@@ -530,27 +555,80 @@ const formatDisplayTime = (time) => {
   return formatDate(time, 'YYYY-MM-DD HH:mm:ss')
 }
 
-// 加载角色列表
-const loadRoles = async () => {
-  try {
-    const response = await getRoles({ page: 1, size: 100 })
-    const data = response?.data?.data || response?.data || {}
-    roleOptions.value = data.records || data.list || []
-    logger.info('Roles loaded', { count: roleOptions.value.length })
-  } catch (error) {
-    logger.error('Failed to load roles', error)
+const findDepartmentOption = (value) => {
+  if (value === undefined || value === null || value === '') return null
+  const valueStr = String(value)
+  return departmentOptions.value.find((option) => {
+    if (!option) return false
+    const candidates = [
+      option.id,
+      option.numericId,
+      option.code,
+      option.name,
+      typeof option.id === 'number' ? String(option.id) : undefined,
+      typeof option.numericId === 'number' ? String(option.numericId) : undefined,
+      option.code ? String(option.code) : undefined,
+      option.name ? String(option.name) : undefined
+    ].filter((item) => item !== undefined && item !== null)
+    return candidates.some((candidate) => String(candidate) === valueStr)
+  })
+}
+
+const syncDepartmentValue = (value = formData.departmentId) => {
+  if (value === undefined || value === null || value === '') return
+  const match = findDepartmentOption(value)
+  if (match) {
+    formData.departmentId = match.id
   }
 }
 
-// 加载部门列表
-const loadDepartments = async () => {
+const loadDepartments = async (force = false) => {
+  if (departmentsLoaded.value && !force) return
   try {
-    const response = await getDepartments({ page: 1, size: 1000 })
-    const data = response?.data?.data || response?.data || {}
-    departmentOptions.value = data.records || data.list || []
-    logger.info('Departments loaded', { count: departmentOptions.value.length })
+    const list = await industryStore.fetchDepartmentLabels()
+    if (Array.isArray(list)) {
+      departmentOptions.value = list.map((item) => {
+        const numericId = item.id ?? item.departmentId ?? null
+        const code =
+          item.code ||
+          item.value ||
+          (typeof numericId === 'number' ? String(numericId) : '') ||
+          item.label ||
+          ''
+        return {
+          id: numericId ?? code,
+          numericId,
+          code,
+          name: item.label || item.name || item.title || item.value
+        }
+      })
+    } else {
+      departmentOptions.value = []
+    }
+    departmentsLoaded.value = true
+    logger.info('Department labels loaded', { count: departmentOptions.value.length })
+    syncDepartmentValue()
   } catch (error) {
-    logger.error('Failed to load departments', error)
+    departmentOptions.value = []
+    logger.error('Failed to load department labels', error)
+    throw error
+  }
+}
+
+const resolveDepartmentPayload = () => {
+  const selected = findDepartmentOption(formData.departmentId)
+  const departmentId =
+    typeof selected?.numericId === 'number'
+      ? selected.numericId
+      : typeof formData.departmentId === 'number'
+        ? formData.departmentId
+        : undefined
+  const departmentCode =
+    selected?.code ||
+    (typeof formData.departmentId === 'string' ? formData.departmentId : undefined)
+  return {
+    departmentId,
+    departmentCode
   }
 }
 
@@ -574,9 +652,6 @@ const loadUsers = async () => {
     // 只有用户选择时才传这些参数
     if (searchForm.keyword) {
       requestData.keyword = searchForm.keyword
-    }
-    if (searchForm.role) {
-      requestData.roleId = searchForm.role
     }
     if (searchForm.status) {
       // 将 active/inactive 转换为 1/0
@@ -607,20 +682,33 @@ const handleSearch = () => {
 
 const handleReset = () => {
   searchForm.keyword = ''
-  searchForm.role = ''
   searchForm.status = ''
   pagination.current = 1
   loadUsers()
   ElMessage.success(t('common.resetSuccess'))
 }
 
-const handleAdd = () => {
+const handleAdd = async () => {
+  try {
+    await ensureFormOptions(!departmentsLoaded.value)
+  } catch (error) {
+    logger.error('Failed to prepare form options', error)
+    ElMessage.error(t('common.operationFailed'))
+    return
+  }
   isEdit.value = false
   resetForm()
   showDialog.value = true
 }
 
-const handleEdit = (user) => {
+const handleEdit = async (user) => {
+  try {
+    await ensureFormOptions(!departmentsLoaded.value)
+  } catch (error) {
+    logger.error('Failed to prepare form options', error)
+    ElMessage.error(t('common.operationFailed'))
+    return
+  }
   isEdit.value = true
   Object.assign(formData, {
     id: user.id,
@@ -630,10 +718,37 @@ const handleEdit = (user) => {
     phone: user.phone,
     departmentId: user.departmentId || user.department?.id || null,
     industryType: user.industryType || industryStore.industryCode || '',
-    roleId: user.roleId || user.role?.id,
-    status: user.status,
+    status: user.status === 1 || user.status === 'active' ? 'active' : 'inactive',
     password: ''
   })
+  const departmentChain = [
+    user.departmentCode,
+    user.department?.code,
+    user.departmentId,
+    user.department?.id,
+    user.departmentName,
+    user.department?.name
+  ].filter((item) => item !== undefined && item !== null && item !== '')
+
+  for (const candidate of departmentChain) {
+    syncDepartmentValue(candidate)
+    if (findDepartmentOption(candidate)) break
+  }
+
+  if (!findDepartmentOption(formData.departmentId)) {
+    const fallbackName =
+      user.departmentName || user.department?.name || user.departmentCode || ''
+    if (fallbackName) {
+      const fallbackOption = {
+        id: fallbackName,
+        numericId: typeof user.departmentId === 'number' ? user.departmentId : undefined,
+        code: user.departmentCode || fallbackName,
+        name: fallbackName
+      }
+      departmentOptions.value = [fallbackOption, ...departmentOptions.value]
+      formData.departmentId = fallbackOption.id
+    }
+  }
   showDialog.value = true
 }
 
@@ -755,28 +870,30 @@ const handleSubmit = async () => {
     logger.info('Submit user form', { isEdit: isEdit.value, userId: formData.id })
 
     if (isEdit.value) {
-      // 更新用户：根据API文档，需要 id, realName, email, phone, departmentId, industryType
+      // 更新用户：根据API文档，需要 id, realName, email, phone, departmentId
+      const departmentPayload = resolveDepartmentPayload()
       const submitData = {
         id: formData.id, // 必须与路径参数一致
         realName: formData.realName,
         email: formData.email,
         phone: formData.phone,
-        departmentId: formData.departmentId,
-        industryType: formData.industryType || industryStore.industryCode || 'default'
+        departmentId: departmentPayload.departmentId ?? formData.departmentId,
+        departmentCode: departmentPayload.departmentCode
       }
       await updateUser(formData.id, submitData)
       ElMessage.success(t('system.user.updateSuccess'))
       logger.info('User updated successfully', { userId: formData.id })
     } else {
       // 新增用户：保持原有数据结构
+      const departmentPayload = resolveDepartmentPayload()
       const submitData = {
         username: formData.username,
         realName: formData.realName,
         email: formData.email,
         phone: formData.phone,
-        departmentId: formData.departmentId,
-        roleId: formData.roleId,
-        status: formData.status,
+        departmentId: departmentPayload.departmentId ?? formData.departmentId,
+        departmentCode: departmentPayload.departmentCode,
+        industryType: formData.industryType || industryStore.industryCode || 'default',
         password: formData.password
       }
       await createUser(submitData)
@@ -810,7 +927,6 @@ const resetForm = () => {
     phone: '',
     departmentId: null,
     industryType: industryStore.industryCode || 'default',
-    roleId: null,
     status: 'active',
     password: ''
   })
@@ -827,10 +943,17 @@ const handlePageSizeChange = (size) => {
   loadUsers()
 }
 
+watch(
+  () => departmentOptions.value,
+  () => {
+    syncDepartmentValue()
+  },
+  { deep: true }
+)
+
 // 生命周期
 onMounted(async () => {
   await industryStore.fetchIndustryConfig()
-  await Promise.all([loadRoles(), loadDepartments()])
   loadUsers()
 })
 </script>
@@ -901,17 +1024,10 @@ onMounted(async () => {
     min-width: 100%;
   }
   
-  // 优化表格单元格间距
+  // 业务特定样式：用户管理表格的特定样式
+  // 注意：通用表格样式已在 BaseTable.vue 中定义
   :deep(.el-table) {
-    width: 100% !important;
-    
-    // 确保表头和表体宽度一致
-    .el-table__header-wrapper,
-    .el-table__body-wrapper {
-      width: 100% !important;
-    }
-    
-    // 表头样式
+    // 表头样式（业务特定）
     .el-table__header {
       th {
         padding: 14px 16px !important;
@@ -925,40 +1041,60 @@ onMounted(async () => {
       }
     }
     
-    // 表体样式
+    // 表体样式（业务特定）
     .el-table__body {
       td {
         padding: 12px 16px !important;
         font-size: 14px;
         color: var(--text);
         white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        // 确保所有行的内容都可以被滚动隐藏
+        overflow: visible !important;
+        position: relative !important;
         
         .cell {
           padding: 0 !important;
           line-height: 1.6;
           white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          // 确保 cell 内容可以被滚动隐藏
+          overflow: visible !important;
+          position: relative !important;
+        }
+      }
+      
+      // 确保 stripe 行也能正确滚动隐藏 - 强制设置
+      tr.el-table__row--striped {
+        td {
+          overflow: visible !important;
+          position: relative !important;
+          
+          .cell {
+            overflow: visible !important;
+            position: relative !important;
+          }
         }
       }
     }
     
-    // 优化表格行高
-    .el-table__row {
-      height: auto;
-    }
-    
-    // 操作列固定右侧
+    // 操作列固定右侧（业务特定）
     .el-table__fixed-right {
       right: 0 !important;
       box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-    }
-    
-    // 确保固定列可见
-    .el-table__fixed-right-patch {
-      background-color: var(--surface) !important;
+      
+      // 确保固定列中的 stripe 行也能正确滚动隐藏 - 强制设置
+      .el-table__fixed-body-wrapper {
+        tr.el-table__row--striped {
+          td {
+            overflow: visible !important;
+            position: relative !important;
+            
+            .cell {
+              overflow: visible !important;
+              position: relative !important;
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -5,19 +5,12 @@
  */
 -->
 <template>
-  <div class="system-logs-page">
-    <h1>日志管理页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <SystemLogs />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import { SystemLogs } from '@/components/Business/System'
 </script>
 
 <style lang="scss" scoped>
-.system-logs-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
 </style>

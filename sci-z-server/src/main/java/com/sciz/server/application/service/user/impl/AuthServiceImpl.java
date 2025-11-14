@@ -1382,18 +1382,17 @@ public class AuthServiceImpl implements AuthService {
     /**
      * 校验当前登录用户是否拥有指定角色：规格化角色编码 → 根据行业类型查询角色列表并判断是否命中
      *
-     * @param roleCode     String 角色编码
-     * @param industryType String 行业类型（可为空，为空时使用当前行业配置）
+     * @param roleCode String 角色编码
      * @return CheckRoleResp 角色校验结果
      */
     @Override
-    public CheckRoleResp checkRole(String roleCode, String industryType) {
+    public CheckRoleResp checkRole(String roleCode) {
         if (!StringUtils.hasText(roleCode)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "roleCode 不能为空");
         }
 
         var normalizedRoleCode = roleCode.trim();
-        var normalizedIndustry = resolveIndustryType(industryType);
+        var normalizedIndustry = resolveIndustryType();
         var hasRole = hasLoginAnd(() -> {
             var userId = StpUtil.getLoginIdAsLong();
             List<String> roleCodes = permissionService.findRoleCodes(userId, normalizedIndustry);
@@ -1407,16 +1406,15 @@ public class AuthServiceImpl implements AuthService {
      * 校验当前登录用户是否拥有指定权限：规格化权限编码 → 根据行业类型查询权限列表并判断是否命中
      *
      * @param permissionCode String 权限编码
-     * @param industryType   String 行业类型（可为空，为空时使用当前行业配置）
      * @return CheckPermResp 权限校验结果
      */
     @Override
-    public CheckPermResp checkPermission(String permissionCode, String industryType) {
+    public CheckPermResp checkPermission(String permissionCode) {
         if (!StringUtils.hasText(permissionCode)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "permissionCode 不能为空");
         }
         var normalizedPermissionCode = permissionCode.trim();
-        var normalizedIndustry = resolveIndustryType(industryType);
+        var normalizedIndustry = resolveIndustryType();
         var hasPermission = hasLoginAnd(() -> {
             var userId = StpUtil.getLoginIdAsLong();
             List<String> permissionCodes = permissionService.findPermissionCodes(userId, normalizedIndustry);
@@ -1453,13 +1451,12 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 解析行业类型
+     * 获取当前行业类型
      *
-     * @param industryType String 行业类型
-     * @return String 解析后的行业类型
+     * @return String 当前行业类型
      */
-    private String resolveIndustryType(String industryType) {
-        return StringUtils.hasText(industryType) ? industryType : industryConfigCache.get().getType();
+    private String resolveIndustryType() {
+        return industryConfigCache.get().getType();
     }
 
     /**

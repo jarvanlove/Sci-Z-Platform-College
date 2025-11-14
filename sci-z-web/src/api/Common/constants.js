@@ -188,10 +188,12 @@ export const SYSTEM_API = {
   PERMISSIONS_TREE: buildApiUrl('/user/permissions/tree'),
   PERMISSIONS: buildApiUrl('/user/permissions'),
   PERMISSION_DETAIL: (id) => buildApiUrl(`/user/permissions/${id}`),
-  USERS: buildApiUrl('/user/users'),
+  USER_LIST: buildApiUrl('/user/users/list'),
+  USER_CREATE: buildApiUrl('/user/users/create'),
   USER_DETAIL: (id) => buildApiUrl(`/user/users/${id}`),
   USER_STATUS: (id) => buildApiUrl(`/user/users/${id}/status`),  // 禁用/启用用户
-  RESET_PASSWORD: buildApiUrl('/user/users/password/reset')  // 管理员重置用户密码
+  RESET_PASSWORD: buildApiUrl('/user/users/password/reset'),  // 管理员重置用户密码
+  OPERATION_LOGS: buildApiUrl('/user/operation/logs')
 }
 
 // ================================

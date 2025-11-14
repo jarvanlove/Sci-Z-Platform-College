@@ -7,6 +7,7 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    '副本': typeof import('./src/components/Business/User/UserProfile - 副本.vue')['default']
     ActionButtons: typeof import('./src/components/Business/List/ActionButtons.vue')['default']
     AgreementNotice: typeof import('./src/components/Common/AgreementNotice.vue')['default']
     AttachmentList: typeof import('./src/components/Business/Detail/AttachmentList.vue')['default']
@@ -33,11 +34,9 @@ declare module 'vue' {
     ElFormItem: typeof import('element-plus/es')['ElFormItem']
     ElIcon: typeof import('element-plus/es')['ElIcon']
     ElInput: typeof import('element-plus/es')['ElInput']
-    ElInputNumber: typeof import('element-plus/es')['ElInputNumber']
     ElMenu: typeof import('element-plus/es')['ElMenu']
     ElMenuItem: typeof import('element-plus/es')['ElMenuItem']
     ElOption: typeof import('element-plus/es')['ElOption']
-    ElPagination: typeof import('element-plus/es')['ElPagination']
     ElSelect: typeof import('element-plus/es')['ElSelect']
     ElSubMenu: typeof import('element-plus/es')['ElSubMenu']
     ElSwitch: typeof import('element-plus/es')['ElSwitch']
@@ -52,6 +51,7 @@ declare module 'vue' {
     InfoCard: typeof import('./src/components/Business/Detail/InfoCard.vue')['default']
     LanguageSwitcher: typeof import('./src/components/Common/LanguageSwitcher.vue')['default']
     LoginForm: typeof import('./src/components/Business/Auth/LoginForm.vue')['default']
+    LogManagement: typeof import('./src/components/Business/System/LogManagement.vue')['default']
     MainLayout: typeof import('./src/components/Layout/MainLayout.vue')['default']
     ProgressBar: typeof import('./src/components/Business/Detail/ProgressBar.vue')['default']
     QuickActions: typeof import('./src/components/Business/Legacy/QuickActions.vue')['default']

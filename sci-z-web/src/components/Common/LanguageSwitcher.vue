@@ -7,7 +7,9 @@
 <template>
   <el-dropdown @command="handleLanguageChange" trigger="click">
     <el-button type="text" class="language-switcher">
-      <el-icon><Document /></el-icon>
+      <el-icon class="language-icon">
+        <SwitchFilled />
+      </el-icon>
       <span>{{ currentLocaleName }}</span>
       <el-icon class="el-icon--right"><ArrowDown /></el-icon>
     </el-button>
@@ -30,7 +32,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Document, ArrowDown } from '@element-plus/icons-vue'
+import { SwitchFilled, ArrowDown } from '@element-plus/icons-vue'
 import { supportedLocales, setLocale, getCurrentLocale } from '@/locales'
 
 const { t } = useI18n()
@@ -55,13 +57,22 @@ const handleLanguageChange = (locale) => {
 .language-switcher {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 8px 14px;
   color: var(--text);
+  border-radius: 999px;
+  background-color: transparent;
+  transition: all 0.2s ease;
   
   &:hover {
     color: var(--color-primary);
+    background-color: var(--hover);
   }
+}
+
+.language-icon {
+  font-size: 16px;
+  color: var(--color-primary);
 }
 
 .locale-flag {

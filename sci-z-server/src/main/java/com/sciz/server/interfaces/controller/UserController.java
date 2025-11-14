@@ -1,6 +1,7 @@
 package com.sciz.server.interfaces.controller;
 
 import com.sciz.server.application.service.log.LoginLogService;
+import com.sciz.server.application.service.log.OperationLogService;
 import com.sciz.server.application.service.user.AuthService;
 import com.sciz.server.application.service.user.RolePermissionService;
 import com.sciz.server.application.service.user.UserRoleService;
@@ -12,6 +13,7 @@ import com.sciz.server.domain.pojo.dto.response.user.IndustryProfileFieldOptionR
 import com.sciz.server.domain.pojo.dto.response.user.IndustryProfileFieldResp;
 import com.sciz.server.domain.pojo.dto.response.user.RolePermissionIdsResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserRoleIdsResp;
+import com.sciz.server.domain.pojo.dto.response.user.RoleListResp;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.request.user.UserAdminResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.request.user.UserCreateReq;
@@ -25,6 +27,8 @@ import com.sciz.server.domain.pojo.dto.response.user.UserListResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserUpdateResp;
 import com.sciz.server.domain.pojo.dto.request.log.LoginLogQueryReq;
 import com.sciz.server.domain.pojo.dto.response.log.LoginLogResp;
+import com.sciz.server.domain.pojo.dto.request.log.OperationLogQueryReq;
+import com.sciz.server.domain.pojo.dto.response.log.OperationLogResp;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.interfaces.converter.UserConverter;
 import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
@@ -67,6 +71,7 @@ public class UserController {
     private final UserConverter userConverter;
     private final IndustryConfigCache industryConfigCache;
     private final LoginLogService loginLogService;
+    private final OperationLogService operationLogService;
     private final AuthService authService;
     private final UserService userService;
 
@@ -101,11 +106,6 @@ public class UserController {
         return Result.success(resp);
     }
 
-    /**
-     * 行业扩展字段
-     *
-     * @return Result<List<IndustryProfileFieldResp>> 扩展字段配置
-     */
     @Operation(summary = "行业扩展字段", description = "获取当前行业下的用户扩展字段列表（含选项）")
     @GetMapping("/profile/fields")
     public Result<List<IndustryProfileFieldResp>> listProfileFields() {
@@ -130,41 +130,11 @@ public class UserController {
         return Result.success(respList);
     }
 
-    @Operation(summary = "更新行业配置", description = "更新行业配置")
-    @PutMapping("/industry/config")
-    public Result<Object> updateIndustryConfig(@RequestBody Object request) {
-        return Result.success(null);
-    }
-
-    @Operation(summary = "获取部门列表", description = "按行业查询部门列表")
-    @GetMapping("/departments")
-    public Result<Object> listDepartments(@RequestParam(required = false) String industryType) {
-        return Result.success(null);
-    }
-
-    @Operation(summary = "创建部门", description = "创建部门")
-    @PostMapping("/departments")
-    public Result<Object> createDepartment(@RequestBody Object request) {
-        return Result.success(null);
-    }
-
-    @Operation(summary = "更新部门", description = "更新部门")
-    @PutMapping("/departments/{id}")
-    public Result<Object> updateDepartment(@PathVariable Long id, @RequestBody Object request) {
-        return Result.success(null);
-    }
-
-    @Operation(summary = "删除部门", description = "删除部门")
-    @DeleteMapping("/departments/{id}")
-    public Result<Void> deleteDepartment(@PathVariable Long id) {
-        return Result.success(null);
-    }
-
-    // 角色
     @Operation(summary = "获取角色列表", description = "查询角色列表")
     @GetMapping("/roles")
-    public Result<Object> listRoles() {
-        return Result.success(null);
+    public Result<List<RoleListResp>> listRoles() {
+        var roles = userRoleService.listRoles();
+        return Result.success(roles);
     }
 
     @Operation(summary = "创建角色", description = "创建角色")
@@ -185,28 +155,14 @@ public class UserController {
         return Result.success(null);
     }
 
-    /**
-     * 查询角色权限ID集合
-     *
-     * @param roleId       Long 角色ID
-     * @param industryType String 行业类型
-     * @return Result<List<Long>> 权限ID集合
-     */
     @Operation(summary = "角色权限列表", description = "查询角色在指定行业下的权限ID集合")
     @GetMapping("/roles/{roleId}/permissions")
-    public Result<RolePermissionIdsResp> listRolePermissionIds(@PathVariable Long roleId,
-            @RequestParam String industryType) {
-        var permissionIds = rolePermissionService.listPermissionIds(roleId, industryType);
+    public Result<RolePermissionIdsResp> listRolePermissionIds(@PathVariable Long roleId) {
+        var permissionIds = rolePermissionService.listPermissionIds(roleId);
         var resp = userConverter.toRolePermissionIdsResp(permissionIds);
         return Result.success(resp);
     }
 
-    /**
-     * 更新角色权限
-     *
-     * @param req RolePermissionUpdateReq 更新请求
-     * @return Result<Void> 空结果
-     */
     @Operation(summary = "更新角色权限", description = "全量替换角色在指定行业下绑定的权限集合")
     @PostMapping("/roles/permissions")
     public Result<Void> updateRolePermissions(@Valid @RequestBody RolePermissionUpdateReq req) {
@@ -214,10 +170,9 @@ public class UserController {
         return Result.success();
     }
 
-    // 权限
     @Operation(summary = "获取权限树", description = "获取权限树结构")
     @GetMapping("/permissions/tree")
-    public Result<Object> getPermissionTree(@RequestParam(required = false) String industryType) {
+    public Result<Object> getPermissionTree() {
         return Result.success(null);
     }
 
@@ -239,17 +194,10 @@ public class UserController {
         return Result.success(null);
     }
 
-    /**
-     * 查询用户角色ID集合
-     *
-     * @param userId       Long 用户ID
-     * @param industryType String 行业类型
-     * @return Result<List<Long>> 角色ID集合
-     */
     @Operation(summary = "用户角色列表", description = "查询用户在指定行业下的角色ID集合")
     @GetMapping("/users/{userId}/roles")
-    public Result<UserRoleIdsResp> listUserRoleIds(@PathVariable Long userId,
-            @RequestParam String industryType) {
+    public Result<UserRoleIdsResp> listUserRoleIds(@PathVariable Long userId) {
+        var industryType = industryConfigCache.get().getType();
         var roleIds = userRoleService.listUserRoleIds(userId, industryType);
         var resp = userConverter.toUserRoleIdsResp(roleIds);
         return Result.success(resp);
@@ -281,14 +229,8 @@ public class UserController {
         return Result.success(resp);
     }
 
-    /**
-     * 创建用户
-     *
-     * @param req UserCreateReq 创建请求
-     * @return Result<UserCreateResp> 创建响应
-     */
     @Operation(summary = "创建用户", description = "管理员创建用户，自动生成学工号")
-    @PostMapping("/users")
+    @PostMapping("/users/create")
     public Result<UserCreateResp> createUser(@Valid @RequestBody UserCreateReq req) {
         var resp = userService.create(req);
         return Result.success(resp);
@@ -373,11 +315,18 @@ public class UserController {
         return Result.success(resp);
     }
 
-    @Operation(summary = "操作日志", description = "查询操作日志")
+    @Operation(summary = "操作日志", description = "系统操作日志分页查询")
     @PostMapping("/operation/logs")
-    public Result<Object> operationLogs(@RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return Result.success(null);
+    public Result<PageResult<OperationLogResp>> operationLogs(@Valid @RequestBody OperationLogQueryReq req) {
+        var resp = operationLogService.page(req);
+        return Result.success(resp);
+    }
+
+    @Operation(summary = "操作日志详情", description = "查询指定操作日志的详细信息")
+    @GetMapping("/operation/logs/{logId}")
+    public Result<OperationLogResp> operationLogDetail(@PathVariable Long logId) {
+        var resp = operationLogService.findDetail(logId);
+        return Result.success(resp);
     }
 
 }

@@ -64,17 +64,20 @@ const handleChange = (value) => {
 
 <style lang="scss" scoped>
 // 覆盖 Element Plus Switch 样式，使其背景颜色与确认按钮一致
+// 使用更高优先级的选择器确保样式生效
 :deep(.el-switch) {
   .el-switch__core {
     background-color: var(--border) !important;
     border-color: var(--border) !important;
     width: 40px !important;
     height: 20px !important;
+    transition: all 0.3s ease !important;
     
     &::after {
       background-color: var(--surface) !important;
       width: 16px !important;
       height: 16px !important;
+      transition: all 0.3s ease !important;
     }
   }
   
@@ -115,5 +118,6 @@ const handleChange = (value) => {
     opacity: 0.5;
   }
 }
+
 </style>
 

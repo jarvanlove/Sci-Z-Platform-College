@@ -63,11 +63,15 @@ llm: # LLM(OpenAI) 生产环境配置
     timeout-seconds: 60 # 接口超时(s)
 
 # Actuator（prod）：最小暴露，仅 health、info；健康详情不展示
+# 健康检查端点可用于：
+# 1. 负载均衡器（Nginx、HAProxy）的健康检查
+# 2. 监控系统（Prometheus、Zabbix）的指标采集
+# 3. 运维人员手动检查服务状态
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info # 生产环境仅暴露健康检查和基本信息
   endpoint:
     health:
-      show-details: never
+      show-details: never # 生产环境不显示详细信息（避免泄露敏感信息）

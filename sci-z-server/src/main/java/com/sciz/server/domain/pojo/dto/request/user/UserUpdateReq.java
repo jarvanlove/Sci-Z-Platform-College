@@ -15,7 +15,6 @@ import org.springframework.util.StringUtils;
  * @param email        String 邮箱
  * @param phone        String 手机号（大陆11位）
  * @param departmentId Long 部门ID
- * @param industryType String 行业类型
  *
  * @author JiaWen.Wu
  * @className UserUpdateReq
@@ -30,15 +29,12 @@ public record UserUpdateReq(
 
         @NotBlank(message = "手机号不能为空") @Pattern(regexp = "^1\\d{10}$", message = "手机号格式不正确，请输入大陆手机号") String phone,
 
-        @NotNull(message = "部门ID不能为空") Long departmentId,
-
-        @NotBlank(message = "行业类型不能为空") String industryType) {
+        @NotNull(message = "部门ID不能为空") Long departmentId) {
 
     public UserUpdateReq {
         realName = normalize(realName);
         email = normalize(email);
         phone = normalize(phone);
-        industryType = normalize(industryType);
     }
 
     private static String normalize(String value) {
