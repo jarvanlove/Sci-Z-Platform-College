@@ -59,23 +59,18 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @RequiredArgsConstructor
 public class FileServiceImpl implements FileService {
-
     private static final int DEFAULT_PREVIEW_EXPIRE_SECONDS = 600;
     private static final DateTimeFormatter DATE_FOLDER_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter
             .ofPattern(SystemConstant.DATE_TIME_FORMAT);
-
     private final MinioClient minioClient;
     private final SysAttachmentRepo sysAttachmentRepo;
     private final SysAttachmentRelationRepo sysAttachmentRelationRepo;
     private final FileConverter fileConverter;
     private final EventPublisher eventPublisher;
-
     @Value("${minio.bucket:sciz-files}")
     private String bucketName;
-
     private final AtomicBoolean bucketInitialized = new AtomicBoolean(false);
-
     /**
      * 单文件上传
      *
@@ -87,29 +82,22 @@ public class FileServiceImpl implements FileService {
     public FileInfoResp upload(FileUploadReq req) {
         // 1. 参数校验
         validateUploadRequest(req);
-
         // 2. 解析附件分类并校验关联信息
         var category = normalizeAttachmentCategory(req.getAttachmentType());
         req.setAttachmentType(category.getCode());
         validateRelationParams(req);
-
         // 3. 获取当前用户
         var currentUser = LoginUserUtil.requireCurrentUser();
         log.info(String.format("文件上传开始: originalName=%s, uploaderId=%s",
                 req.getFile().getOriginalFilename(), currentUser.userId()));
-
         // 4. 确保存储桶可用
         ensureBucket();
-
         // 5. 构建附件实体
         var attachment = buildAttachment(req, currentUser.userId(), currentUser.realName(), category);
-
         // 6. 上传至对象存储
         uploadToObjectStorage(req, attachment);
-
         // 7. 持久化附件记录
         var attachmentId = persistAttachment(attachment);
-
         // 8. 记录业务关联（可选）
         saveRelationIfNecessary(req, attachmentId);
 

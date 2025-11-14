@@ -97,6 +97,7 @@ public class HealthCheckConfig {
 
     /**
      * Kafka 健康检查
+     * 使用较短的超时时间，避免启动时长时间等待
      */
     @Bean
     public HealthIndicator kafkaHealthIndicator() {
@@ -106,8 +107,15 @@ public class HealthCheckConfig {
                 props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers);
                 props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
                 props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-                props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
-                props.put(ProducerConfig.CONNECTIONS_MAX_IDLE_MS_CONFIG, 10000);
+                
+                // 缩短超时时间，快速失败
+                props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 2000); // 请求超时 2 秒
+                props.put(ProducerConfig.CONNECTIONS_MAX_IDLE_MS_CONFIG, 5000); // 连接最大空闲时间 5 秒
+                props.put(ProducerConfig.METADATA_MAX_AGE_CONFIG, 10000); // 元数据最大年龄 10 秒
+                
+                // 减少重连和重试时间
+                props.put(ProducerConfig.RECONNECT_BACKOFF_MS_CONFIG, 50); // 重连退避时间 50ms
+                props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100); // 重试退避时间 100ms
                 
                 try (KafkaProducer<String, String> producer = new KafkaProducer<>(props)) {
                     // 尝试发送一个测试消息到健康检查主题（如果主题不存在会失败，但不影响连接检查）
@@ -121,7 +129,7 @@ public class HealthCheckConfig {
                         .withDetail("bootstrap_servers", kafkaBootstrapServers)
                         .build();
             } catch (Exception e) {
-                logger.error("Kafka 健康检查失败", e);
+                logger.warn("Kafka 健康检查失败: {}", e.getMessage());
                 return Health.down()
                         .withDetail("message_queue", "Kafka")
                         .withDetail("status", "Connection failed")

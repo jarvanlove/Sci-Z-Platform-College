@@ -158,6 +158,7 @@ public class StartupHealthCheckListener implements ApplicationListener<Applicati
 
     /**
      * 检查 Kafka 连接
+     * 使用较短的超时时间，避免启动时长时间等待
      */
     private HealthCheckResult checkKafka() {
         try {
@@ -167,8 +168,15 @@ public class StartupHealthCheckListener implements ApplicationListener<Applicati
             props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
             props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-            props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
-            props.put(ProducerConfig.CONNECTIONS_MAX_IDLE_MS_CONFIG, 10000);
+            
+            // 缩短超时时间，快速失败
+            props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 2000); // 请求超时 2 秒
+            props.put(ProducerConfig.CONNECTIONS_MAX_IDLE_MS_CONFIG, 5000); // 连接最大空闲时间 5 秒
+            props.put(ProducerConfig.METADATA_MAX_AGE_CONFIG, 10000); // 元数据最大年龄 10 秒
+            
+            // 减少重连和重试时间
+            props.put(ProducerConfig.RECONNECT_BACKOFF_MS_CONFIG, 50); // 重连退避时间 50ms
+            props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100); // 重试退避时间 100ms
             
             try (KafkaProducer<String, String> producer = new KafkaProducer<>(props)) {
                 producer.send(new ProducerRecord<>("__health_check__", "test"));
@@ -180,7 +188,7 @@ public class StartupHealthCheckListener implements ApplicationListener<Applicati
             details.put("状态", "已连接");
             return HealthCheckResult.success(details);
         } catch (Exception e) {
-            logger.error("Kafka 连接检查失败", e);
+            logger.warn("Kafka 连接检查失败: {}", e.getMessage());
             return HealthCheckResult.failure("Kafka 连接失败: " + e.getMessage());
         }
     }

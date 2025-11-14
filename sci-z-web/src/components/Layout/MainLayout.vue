@@ -5,7 +5,9 @@
       <Sidebar />
       <main class="main-content">
         <div class="content-wrapper">
-          <router-view />
+          <slot>
+            <router-view />
+          </slot>
         </div>
       </main>
     </div>

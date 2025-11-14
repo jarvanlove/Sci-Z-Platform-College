@@ -6,7 +6,7 @@
 -->
 <template>
   <div class="declaration-list-page">
-    <h1>申报列表页面</h1>
+    <h1>申报列表页面333333333333333333</h1>
     <p>待根据原型图开发</p>
   </div>
 </template>

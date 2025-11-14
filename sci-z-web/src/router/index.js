@@ -376,13 +376,22 @@ router.afterEach((to, from, failure) => {
     routerLogger.error('路由解析失败', { 
       to: to.path, 
       from: from.path, 
-      failure: failure.message 
+      failure: failure.message,
+      error: failure
     })
   } else {
+    const matchedRoute = to.matched[to.matched.length - 1]
+    const componentName = matchedRoute?.components?.default?.name || 
+                          matchedRoute?.components?.default?.__name ||
+                          matchedRoute?.name ||
+                          'Unknown'
+    
     routerLogger.info('路由解析成功', { 
       to: to.path, 
       from: from.path,
-      component: to.matched[0]?.components?.default?.name || 'Unknown'
+      routeName: to.name,
+      component: componentName,
+      matchedRoutes: to.matched.map(r => r.name || r.path)
     })
   }
 })

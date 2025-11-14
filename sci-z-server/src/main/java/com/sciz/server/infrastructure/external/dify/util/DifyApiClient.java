@@ -239,7 +239,6 @@ public class DifyApiClient {
             
             return null;
         };
-        
         restTemplate.execute(url, httpMethod, 
                 request -> {
                     // 设置请求头

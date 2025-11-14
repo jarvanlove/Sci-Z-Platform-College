@@ -577,6 +577,8 @@ export default {
     chat: {
       title: 'AI对话',
       newChat: '新建对话',
+      startNewChat: '开始新对话',
+      selectOrCreateChat: '请选择一个对话或创建新对话',
       clear: '清空',
       settings: '设置',
       user: '用户',
@@ -595,7 +597,11 @@ export default {
       settingsComingSoon: '设置功能即将上线',
       model: '模型',
       copied: '已复制',
-      copyError: '复制失败'
+      copyError: '复制失败',
+      chatCreated: '对话创建成功',
+      createError: '创建对话失败',
+      pin: '置顶',
+      unpin: '取消置顶'
     },
     knowledge: {
       searchKb: '搜索知识库',
