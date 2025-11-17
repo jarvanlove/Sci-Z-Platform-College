@@ -113,8 +113,29 @@ export const REPORT_API = {
 
 export const AI_API = {
   BASE_PATH: buildApiUrl('/ai'),
+  // AI会话管理接口
+  CONVERSATION_BASE: buildApiUrl('/ai/conversation'),
+  CONVERSATION_CREATE: buildApiUrl('/ai/conversation'),
+  CONVERSATION_UPDATE: buildApiUrl('/ai/conversation'),
+  CONVERSATION_DETAIL: (id) => buildApiUrl(`/ai/conversation/${id}`),
+  CONVERSATION_DELETE: (id) => buildApiUrl(`/ai/conversation/${id}`),
+  CONVERSATION_BATCH_DELETE: buildApiUrl('/ai/conversation/batch'),
+  CONVERSATION_PAGE: buildApiUrl('/ai/conversation/page'),
+  CONVERSATION_LIST: buildApiUrl('/ai/conversation/list'),
+  CONVERSATION_PINNED: (id) => buildApiUrl(`/ai/conversation/${id}/pinned`),
+  // AI消息管理接口
+  MESSAGE_BASE: buildApiUrl('/ai/message'),
+  MESSAGE_CREATE: buildApiUrl('/ai/message'),
+  MESSAGE_UPDATE: buildApiUrl('/ai/message'),
+  MESSAGE_DETAIL: (id) => buildApiUrl(`/ai/message/${id}`),
+  MESSAGE_DELETE: (id) => buildApiUrl(`/ai/message/${id}`),
+  MESSAGE_BATCH_DELETE: buildApiUrl('/ai/message/batch'),
+  MESSAGE_PAGE: buildApiUrl('/ai/message/page'),
+  MESSAGE_LIST: (conversationId) => buildApiUrl(`/ai/message/list/${conversationId}`),
+  MESSAGE_DELETE_BY_CONVERSATION: (conversationId) => buildApiUrl(`/ai/message/conversation/${conversationId}`),
+  // 旧接口（保留兼容）
   CONVERSATIONS: buildApiUrl('/ai/chat/conversations'),
-  CONVERSATION_DETAIL: (id) => buildApiUrl(`/ai/chat/conversations/${id}`),
+  CONVERSATION_DETAIL_OLD: (id) => buildApiUrl(`/ai/chat/conversations/${id}`),
   MESSAGES: buildApiUrl('/ai/chat/messages'),
   MESSAGES_BY_CONVERSATION: (id) => buildApiUrl(`/ai/chat/messages/${id}`),
   DELETE_MESSAGE: (id) => buildApiUrl(`/ai/chat/messages/${id}`),

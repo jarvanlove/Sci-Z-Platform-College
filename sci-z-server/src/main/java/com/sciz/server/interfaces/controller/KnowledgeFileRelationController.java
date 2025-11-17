@@ -86,14 +86,16 @@ public class KnowledgeFileRelationController {
     /**
      * 分页查询知识库文件关联列表
      *
-     * @param req 查询请求
+     * @param req 查询请求（支持单个knowledgeId或批量knowledgeIds查询）
      * @return 分页结果
      */
-    @Operation(summary = "分页查询知识库文件关联列表", description = "根据知识库ID分页查询文件关联列表")
+    @Operation(summary = "分页查询知识库文件关联列表", description = "根据知识库ID或知识库ID列表分页查询文件关联列表，支持单个或批量查询")
     @GetMapping
     public Result<PageResult<KnowledgeFileRelationResp>> pageFileRelations(KnowledgeFileRelationQueryReq req) {
         PageResult<KnowledgeFileRelationResp> result = fileRelationService.page(req);
         return Result.success(result);
     }
+
+    
 }
 

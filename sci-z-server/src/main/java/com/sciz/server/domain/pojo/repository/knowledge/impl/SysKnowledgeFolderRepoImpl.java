@@ -14,13 +14,10 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public class SysKnowledgeFolderRepoImpl implements SysKnowledgeFolderRepo {
-
     private final SysKnowledgeFolderMapper mapper;
-
     public SysKnowledgeFolderRepoImpl(SysKnowledgeFolderMapper mapper) {
         this.mapper = mapper;
     }
-
     @Override
     public Long save(SysKnowledgeFolder entity) {
         int rows = mapper.insert(entity);

@@ -269,6 +269,16 @@ public enum ResultCode {
     CONVERSATION_NOT_FOUND(7001, "对话不存在"),
 
     /**
+     * AI会话不存在
+     */
+    AI_CONVERSATION_NOT_FOUND(7002, "AI会话不存在"),
+
+    /**
+     * AI消息不存在
+     */
+    AI_MESSAGE_NOT_FOUND(7003, "AI消息不存在"),
+
+    /**
      * 对话创建成功
      */
     CONVERSATION_CREATE_SUCCESS(7100, "对话创建成功"),
@@ -287,6 +297,36 @@ public enum ResultCode {
      * 消息发送成功
      */
     MESSAGE_SEND_SUCCESS(7103, "消息发送成功"),
+
+    /**
+     * AI会话创建成功
+     */
+    AI_CONVERSATION_CREATE_SUCCESS(7104, "AI会话创建成功"),
+
+    /**
+     * AI会话更新成功
+     */
+    AI_CONVERSATION_UPDATE_SUCCESS(7105, "AI会话更新成功"),
+
+    /**
+     * AI会话删除成功
+     */
+    AI_CONVERSATION_DELETE_SUCCESS(7106, "AI会话删除成功"),
+
+    /**
+     * AI消息创建成功
+     */
+    AI_MESSAGE_CREATE_SUCCESS(7107, "AI消息创建成功"),
+
+    /**
+     * AI消息更新成功
+     */
+    AI_MESSAGE_UPDATE_SUCCESS(7108, "AI消息更新成功"),
+
+    /**
+     * AI消息删除成功
+     */
+    AI_MESSAGE_DELETE_SUCCESS(7109, "AI消息删除成功"),
 
     // ==================== 文件相关错误码 (8000-8999) ====================
     /**

@@ -336,6 +336,16 @@ import {
   streamKnowledgeChatbot
 } from '@/api/Knowledge/knowledge'
 import {
+  // 新接口
+  createAiConversation,
+  updateAiConversation,
+  deleteAiConversation,
+  pageAiConversations,
+  listAiConversations,
+  listAiMessages,
+  createAiMessage,
+  updateAiConversationPinnedStatus,
+  // 旧接口（保留兼容）
   getConversations,
   createConversation,
   updateConversation,
@@ -409,7 +419,8 @@ const hasKnowledgeBaseSelected = computed(() => {
 const loadChats = async () => {
   try {
     logger.info('加载对话列表')
-    const response = await getConversations({ page: 1, size: 100 })
+    // 使用新接口：分页查询会话列表
+    const response = await pageAiConversations({ pageNo: 1, pageSize: 100 })
     if (response.code === 200 && response.data) {
       chats.value = response.data.records || response.data.list || []
       // 按置顶状态和更新时间排序
@@ -420,7 +431,19 @@ const loadChats = async () => {
     }
   } catch (error) {
     logger.error('加载对话列表失败', error)
-    chats.value = []
+    // 如果新接口失败，尝试使用旧接口
+    try {
+      const fallbackResponse = await getConversations({ page: 1, size: 100 })
+      if (fallbackResponse.code === 200 && fallbackResponse.data) {
+        chats.value = fallbackResponse.data.records || fallbackResponse.data.list || []
+        sortChats()
+      } else {
+        chats.value = []
+      }
+    } catch (fallbackError) {
+      logger.error('使用旧接口加载对话列表也失败', fallbackError)
+      chats.value = []
+    }
   }
 }
 
@@ -463,13 +486,29 @@ const createNewChat = async () => {
 
     // 调用API创建对话
     try {
-      const response = await createConversation({ title: '' })
+      // 使用新接口：创建AI会话
+      const response = await createAiConversation({ title: '' })
       if (response.code === 200 && response.data) {
         newChat.id = response.data.id
-        newChat.createdAt = response.data.createdAt
+        newChat.createdAt = response.data.createdTime || response.data.createdAt
+        newChat.pinned = response.data.isPinned === 1
+        newChat.isNew = false // 创建成功，标记为非新会话
+        logger.info('创建新会话成功', { conversationId: response.data.id })
       }
     } catch (error) {
-      logger.warn('创建对话API调用失败，使用本地ID', error)
+      logger.warn('创建对话API调用失败，尝试使用旧接口', error)
+      // 如果新接口失败，尝试使用旧接口
+      try {
+        const fallbackResponse = await createConversation({ title: '' })
+        if (fallbackResponse.code === 200 && fallbackResponse.data) {
+          newChat.id = fallbackResponse.data.id
+          newChat.createdAt = fallbackResponse.data.createdAt
+          newChat.isNew = false // 创建成功，标记为非新会话
+        }
+      } catch (fallbackError) {
+        logger.warn('使用旧接口创建对话也失败，使用本地ID', fallbackError)
+        // 如果都失败，保持 isNew = true，在发送第一条消息时会再次尝试创建
+      }
     }
 
     chats.value.unshift(newChat)
@@ -506,14 +545,16 @@ const loadMessages = async (chatId) => {
     } else {
       // 尝试从API加载
       try {
-        const response = await getConversationMessages(chatId, { page: 1, size: 100 })
+        // 使用新接口：查询会话的所有消息列表
+        const response = await listAiMessages(chatId)
         if (response.code === 200 && response.data) {
-          const apiMessages = (response.data.records || response.data.list || []).map(msg => ({
+          const apiMessages = (response.data.records || response.data.list || response.data || []).map(msg => ({
             id: msg.id,
             type: msg.role === 'user' ? 'user' : 'ai',
             content: msg.content || '',
-            timestamp: new Date(msg.createdAt || msg.timestamp),
-            documents: msg.documents || []
+            timestamp: new Date(msg.sendTime || msg.createdTime || msg.createdAt || msg.timestamp),
+            documents: msg.sources ? (typeof msg.sources === 'string' ? JSON.parse(msg.sources) : msg.sources) : [],
+            conversationId: msg.conversationId
           }))
           messages.value = apiMessages
           // 更新本地存储
@@ -523,8 +564,28 @@ const loadMessages = async (chatId) => {
           }
         }
       } catch (error) {
-        logger.warn('从API加载消息失败，使用本地存储', error)
-        messages.value = []
+        logger.warn('从新API加载消息失败，尝试使用旧接口', error)
+        // 如果新接口失败，尝试使用旧接口
+        try {
+          const fallbackResponse = await getConversationMessages(chatId, { page: 1, size: 100 })
+          if (fallbackResponse.code === 200 && fallbackResponse.data) {
+            const apiMessages = (fallbackResponse.data.records || fallbackResponse.data.list || []).map(msg => ({
+              id: msg.id,
+              type: msg.role === 'user' ? 'user' : 'ai',
+              content: msg.content || '',
+              timestamp: new Date(msg.createdAt || msg.timestamp),
+              documents: msg.documents || []
+            }))
+            messages.value = apiMessages
+            if (chat) {
+              chat.messages = apiMessages
+              saveChatsToStorage()
+            }
+          }
+        } catch (fallbackError) {
+          logger.warn('使用旧接口加载消息也失败，使用本地存储', fallbackError)
+          messages.value = []
+        }
       }
     }
     nextTick(() => {
@@ -623,16 +684,60 @@ const sendKbMessage = async () => {
 
   const userMessageId = Date.now()
   
+  // 确保有会话ID
+  let conversationId = currentChat.value?.id
+  if (!conversationId || currentChat.value?.isNew) {
+    // 如果没有会话ID或是新会话，需要先创建会话
+    try {
+      const createResp = await createAiConversation({ title: '' })
+      if (createResp.code === 200 && createResp.data) {
+        conversationId = createResp.data.id
+        if (currentChat.value) {
+          currentChat.value.id = conversationId
+          currentChat.value.isNew = false
+          currentChat.value.createdAt = createResp.data.createdTime || createResp.data.createdAt
+          currentChat.value.pinned = createResp.data.isPinned === 1
+        }
+        logger.info('创建新会话成功', { conversationId })
+      }
+    } catch (error) {
+      logger.error('创建会话失败', error)
+      ElMessage.error('创建会话失败，消息将仅保存在本地')
+    }
+  }
+  
   // 添加用户消息
   const userMessage = {
     id: userMessageId,
     type: 'user',
     content: userMessageContent,
     timestamp: new Date(),
-    attachments: attachments.value.length > 0 ? [...attachments.value] : []
+    attachments: attachments.value.length > 0 ? [...attachments.value] : [],
+    conversationId: conversationId
   }
 
   messages.value.push(userMessage)
+  
+  // 保存用户消息到后端
+  if (conversationId) {
+    try {
+      const messageResp = await createAiMessage({
+        conversationId: String(conversationId),
+        role: 'user',
+        content: text, // 保存原始文本，不包含@知识库标记
+        sendTime: new Date().toISOString()
+      })
+      if (messageResp.code === 200 && messageResp.data) {
+        // 更新消息ID为后端返回的ID
+        userMessage.id = messageResp.data.id
+        userMessage.timestamp = new Date(messageResp.data.sendTime || messageResp.data.createdTime)
+        logger.info('保存用户消息成功', { messageId: messageResp.data.id })
+      }
+    } catch (error) {
+      logger.warn('保存用户消息到后端失败', error)
+      // 继续执行，不影响前端显示
+    }
+  }
   
   // 保存到当前对话
   if (currentChat.value) {
@@ -649,10 +754,19 @@ const sendKbMessage = async () => {
       currentChat.value.isNew = false
       
       // 调用API更新对话标题
-      try {
-        await updateConversation(currentChat.value.id, { title: currentChat.value.title })
-      } catch (error) {
-        logger.warn('更新对话标题失败', error)
+      if (conversationId) {
+        try {
+          // 使用新接口：更新AI会话
+          await updateAiConversation({ id: String(conversationId), title: currentChat.value.title })
+        } catch (error) {
+          logger.warn('更新对话标题失败，尝试使用旧接口', error)
+          // 如果新接口失败，尝试使用旧接口
+          try {
+            await updateConversation(conversationId, { title: currentChat.value.title })
+          } catch (fallbackError) {
+            logger.warn('使用旧接口更新对话标题也失败', fallbackError)
+          }
+        }
       }
     }
     
@@ -706,17 +820,58 @@ const sendKbMessage = async () => {
           nextTick(scrollKbToBottom)
         }
       },
-      onEnd: (data) => {
+      onEnd: async (data) => {
         // 消息结束，保存会话ID和文档片段
         const message = messages.value.find(m => m.id === aiMessageId)
         if (message) {
           message.streaming = false
           message.documents = data.documents || []
-          message.conversationId = data.conversationId
+          message.conversationId = data.conversationId || currentChat.value?.id
         }
+        
+        // 更新会话ID（Dify返回的会话ID）
         if (data.conversationId) {
           currentConversationId.value = data.conversationId
         }
+        
+        // 保存AI消息到后端
+        const conversationId = currentChat.value?.id || data.conversationId
+        if (conversationId && message && message.content) {
+          try {
+            // 将文档片段转换为JSON字符串
+            const sourcesJson = message.documents && message.documents.length > 0
+              ? JSON.stringify(message.documents.map(doc => ({
+                  document_id: doc.documentId || doc.id,
+                  document_name: doc.name,
+                  dataset_name: doc.datasetName,
+                  content: doc.content,
+                  score: doc.score,
+                  segment_id: doc.segmentId
+                })))
+              : null
+            
+            const messageResp = await createAiMessage({
+              conversationId: String(conversationId),
+              role: 'assistant',
+              content: message.content,
+              difyMessageId: data.messageId || null,
+              sources: sourcesJson,
+              confidence: null,
+              sendTime: new Date().toISOString()
+            })
+            
+            if (messageResp.code === 200 && messageResp.data) {
+              // 更新消息ID为后端返回的ID
+              message.id = messageResp.data.id
+              message.timestamp = new Date(messageResp.data.sendTime || messageResp.data.createdTime)
+              logger.info('保存AI消息成功', { messageId: messageResp.data.id })
+            }
+          } catch (error) {
+            logger.warn('保存AI消息到后端失败', error)
+            // 继续执行，不影响前端显示
+          }
+        }
+        
         isGenerating.value = false
         currentAbortController.value = null
         
@@ -731,7 +886,7 @@ const sendKbMessage = async () => {
         
         nextTick(scrollKbToBottom)
         logger.info('流式问答完成', { 
-          conversationId: data.conversationId,
+          conversationId: data.conversationId || conversationId,
           messageId: data.messageId,
           documentCount: (data.documents || []).length
         })
@@ -1127,9 +1282,16 @@ const editChatTitle = async (chat) => {
       chat.title = newTitle.trim()
       // 调用API更新对话标题
       try {
-        await updateConversation(chat.id, { title: chat.title })
+        // 使用新接口：更新AI会话
+        await updateAiConversation({ id: chat.id, title: chat.title })
       } catch (error) {
-        logger.warn('更新对话标题失败', error)
+        logger.warn('更新对话标题失败，尝试使用旧接口', error)
+        // 如果新接口失败，尝试使用旧接口
+        try {
+          await updateConversation(chat.id, { title: chat.title })
+        } catch (fallbackError) {
+          logger.warn('使用旧接口更新对话标题也失败', fallbackError)
+        }
       }
       saveChatsToStorage()
       ElMessage.success('标题修改成功')
@@ -1146,9 +1308,16 @@ const togglePinChat = async (chat) => {
   
   // 调用API更新置顶状态
   try {
-    await updateConversation(chat.id, { pinned: chat.pinned })
+    // 使用新接口：更新AI会话置顶状态
+    await updateAiConversationPinnedStatus(chat.id, chat.pinned ? 1 : 0)
   } catch (error) {
-    logger.warn('更新置顶状态失败', error)
+    logger.warn('更新置顶状态失败，尝试使用旧接口', error)
+    // 如果新接口失败，尝试使用旧接口
+    try {
+      await updateConversation(chat.id, { pinned: chat.pinned })
+    } catch (fallbackError) {
+      logger.warn('使用旧接口更新置顶状态也失败', fallbackError)
+    }
   }
   
   ElMessage.success(chat.pinned ? '对话已置顶' : '已取消置顶')
@@ -1168,9 +1337,16 @@ const deleteChatConfirm = async (chat) => {
     
     // 调用API删除对话
     try {
-      await deleteConversation(chat.id)
+      // 使用新接口：删除AI会话
+      await deleteAiConversation(chat.id)
     } catch (error) {
-      logger.warn('删除对话API调用失败', error)
+      logger.warn('删除对话API调用失败，尝试使用旧接口', error)
+      // 如果新接口失败，尝试使用旧接口
+      try {
+        await deleteConversation(chat.id)
+      } catch (fallbackError) {
+        logger.warn('使用旧接口删除对话也失败', fallbackError)
+      }
     }
     
     const index = chats.value.findIndex(c => c.id === chat.id)
@@ -1218,11 +1394,23 @@ onMounted(async () => {
       })
     ])
     
+    // 如果没有当前对话，自动选择第一个对话或创建新对话
+    if (!currentChat.value) {
+      if (chats.value.length > 0) {
+        // 如果有已有对话，选择第一个
+        await selectChat(chats.value[0])
+      } else {
+        // 如果没有对话，自动创建一个新对话
+        await createNewChat()
+      }
+    }
+    
     document.addEventListener('click', handleClickOutside)
     
     logger.info('AI对话页面初始化完成', {
       chatsCount: chats.value.length,
-      kbCount: knowledgeBaseList.value.length
+      kbCount: knowledgeBaseList.value.length,
+      hasCurrentChat: !!currentChat.value
     })
   } catch (error) {
     logger.error('AI对话页面初始化失败', error)

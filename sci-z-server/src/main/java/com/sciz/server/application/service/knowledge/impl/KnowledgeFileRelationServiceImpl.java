@@ -1,6 +1,7 @@
 package com.sciz.server.application.service.knowledge.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.application.service.knowledge.KnowledgeFileRelationService;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationCreateReq;
@@ -25,11 +26,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-
 /**
  * 知识库文件关联应用服务实现类
  *
@@ -41,7 +40,6 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationService {
-
     private final SysKnowledgeFileRelationRepo fileRelationRepo;
     private final KnowledgeFileRelationConverter converter;
     private final SysKnowledgeBaseRepo knowledgeBaseRepo;
@@ -231,31 +229,62 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
      */
     @Override
     public PageResult<KnowledgeFileRelationResp> page(KnowledgeFileRelationQueryReq req) {
-        log.info(String.format("分页查询知识库文件关联: knowledgeId=%s, folderId=%s, page=%s, size=%s", 
-                req.getKnowledgeId(), req.getFolderId(), req.getPage(), req.getSize()));
+        log.info(String.format("分页查询知识库文件关联: knowledgeId=%s, knowledgeIds=%s, folderId=%s, page=%s, size=%s", 
+                req.getKnowledgeId(), req.getKnowledgeIds(), req.getFolderId(), req.getPage(), req.getSize()));
 
-        // 1. 检查知识库ID
-        if (req.getKnowledgeId() == null || req.getKnowledgeId().trim().isEmpty()) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "知识库ID不能为空");
+        // 1. 检查知识库ID（支持单个或批量）
+        List<Long> knowledgeIdList = new ArrayList<>();
+        
+        // 优先使用 knowledgeIds（批量查询）
+        if (req.getKnowledgeIds() != null && !req.getKnowledgeIds().isEmpty()) {
+            try {
+                knowledgeIdList = req.getKnowledgeIds().stream()
+                        .map(id -> {
+                            try {
+                                return Long.parseLong(id);
+                            } catch (NumberFormatException e) {
+                                throw new BusinessException(ResultCode.BAD_REQUEST, "无效的知识库ID格式: " + id);
+                            }
+                        })
+                        .toList();
+            } catch (BusinessException e) {
+                throw e;
+            }
+        } 
+        // 如果没有批量ID，使用单个ID（兼容旧接口）
+        else if (req.getKnowledgeId() != null && !req.getKnowledgeId().trim().isEmpty()) {
+            try {
+                Long knowledgeId = Long.parseLong(req.getKnowledgeId());
+                knowledgeIdList.add(knowledgeId);
+            } catch (NumberFormatException e) {
+                throw new BusinessException(ResultCode.BAD_REQUEST, "无效的知识库ID格式: " + req.getKnowledgeId());
+            }
+        } else {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "知识库ID或知识库ID列表不能为空");
         }
 
-        // 2. 转换 String 类型字段为 Long
-        Long knowledgeId;
+        // 2. 转换文件夹ID
         Long folderId = null;
-        try {
-            knowledgeId = Long.parseLong(req.getKnowledgeId());
-            if (req.getFolderId() != null && !req.getFolderId().trim().isEmpty()) {
+        if (req.getFolderId() != null && !req.getFolderId().trim().isEmpty()) {
+            try {
                 folderId = Long.parseLong(req.getFolderId());
+            } catch (NumberFormatException e) {
+                throw new BusinessException(ResultCode.BAD_REQUEST, "无效的文件夹ID格式: " + req.getFolderId());
             }
-        } catch (NumberFormatException e) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "无效的ID格式");
         }
 
         // 3. 创建分页对象
         Page<SysKnowledgeFileRelation> pageParam = new Page<>(req.getPage(), req.getSize());
 
-        // 4. 执行分页查询
-        var pageResult = fileRelationRepo.pageByKnowledgeId(pageParam, knowledgeId, folderId);
+        // 4. 执行分页查询（支持单个或多个知识库ID）
+        IPage<SysKnowledgeFileRelation> pageResult;
+        if (knowledgeIdList.size() == 1) {
+            // 单个知识库ID，使用原有方法
+            pageResult = fileRelationRepo.pageByKnowledgeId(pageParam, knowledgeIdList.get(0), folderId);
+        } else {
+            // 多个知识库ID，使用新方法
+            pageResult = fileRelationRepo.pageByKnowledgeIds(pageParam, knowledgeIdList, folderId);
+        }
 
         // 5. 转换为响应DTO列表
         var respList = converter.toRespList(pageResult.getRecords());
@@ -268,18 +297,21 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
                 pageResult.getSize()
         );
 
-        log.info(String.format("分页查询知识库文件关联成功: total=%s, current=%s, size=%s", 
-                result.getTotal(), result.getCurrent(), result.getSize()));
+        log.info(String.format("分页查询知识库文件关联成功: total=%s, current=%s, size=%s, knowledgeIdCount=%s", 
+                result.getTotal(), result.getCurrent(), result.getSize(), knowledgeIdList.size()));
 
-        // 7. 更新 Chatbot 应用的知识库ID配置
-        try {
-            Long userId = StpUtil.getLoginIdAsLong();
-            updateChatbotKnowledgeBaseIdByUserId(userId, knowledgeId);
-            log.info(String.format("更新Chatbot知识库ID成功: userId=%s, knowledgeId=%s", userId, knowledgeId));
-        } catch (Exception updateException) {
-            // 更新失败不影响查询，只记录日志
-            log.warn(String.format("更新Chatbot知识库ID失败: knowledgeId=%s, err=%s", 
-                    knowledgeId, updateException.getMessage()), updateException);
+        // 7. 更新 Chatbot 应用的知识库ID配置（只更新第一个知识库，避免重复更新）
+        if (!knowledgeIdList.isEmpty()) {
+            try {
+                Long userId = StpUtil.getLoginIdAsLong();
+                Long firstKnowledgeId = knowledgeIdList.get(0);
+                updateChatbotKnowledgeBaseIdByUserId(userId, firstKnowledgeId);
+                log.info(String.format("更新Chatbot知识库ID成功: userId=%s, knowledgeId=%s", userId, firstKnowledgeId));
+            } catch (Exception updateException) {
+                // 更新失败不影响查询，只记录日志
+                log.warn(String.format("更新Chatbot知识库ID失败: knowledgeId=%s, err=%s", 
+                        knowledgeIdList.get(0), updateException.getMessage()), updateException);
+            }
         }
 
         return result;
