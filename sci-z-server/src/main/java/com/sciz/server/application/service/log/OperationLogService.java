@@ -4,8 +4,9 @@ import com.sciz.server.domain.pojo.dto.request.log.OperationLogQueryReq;
 import com.sciz.server.domain.pojo.dto.response.log.OperationLogResp;
 import com.sciz.server.domain.pojo.entity.log.SysOperationLog;
 import com.sciz.server.infrastructure.shared.event.log.OperationLoggedEvent;
-import com.sciz.server.infrastructure.shared.event.log.SystemOperationLoggedEvent;
 import com.sciz.server.infrastructure.shared.result.PageResult;
+
+import java.util.List;
 
 /**
  * 操作日志应用服务
@@ -49,10 +50,10 @@ public interface OperationLogService {
     OperationLogResp findDetail(Long logId);
 
     /**
-     * 从系统操作事件保存日志
+     * 批量保存操作日志
      *
-     * @param event SystemOperationLoggedEvent 事件
-     * @return 日志ID
+     * @param events List<OperationLoggedEvent> 事件列表
+     * @return boolean 是否全部保存成功
      */
-    Long saveFromSystemEvent(SystemOperationLoggedEvent event);
+    boolean saveBatch(List<OperationLoggedEvent> events);
 }

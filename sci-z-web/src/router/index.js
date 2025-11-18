@@ -320,22 +320,26 @@ router.beforeEach(async (to, from, next) => {
       try {
         const sessionValid = await authStore.verifyLoginStatus()
         if (!sessionValid) {
-          // 如果是网络错误（后端服务未启动），允许继续访问，避免阻塞用户操作
-          // 检查最近 5 分钟内是否有网络错误
+          // 检查最近 5 分钟内是否有网络错误（后端服务未启动）
           const now = Date.now()
           const hasRecentNetworkError = authStore.lastNetworkError && 
                                        (now - authStore.lastNetworkError) < 5 * 60 * 1000
           if (hasRecentNetworkError) {
-            routerLogger.warn('网络错误，跳过登录状态校验，允许继续访问', { targetPath: to.path })
-            // 不阻止路由跳转，允许用户继续使用
+            // 网络错误时，允许继续访问，避免阻塞用户操作
+            routerLogger.warn('网络错误，跳过登录状态校验，允许继续访问', { 
+              targetPath: to.path,
+              lastNetworkError: new Date(authStore.lastNetworkError).toLocaleTimeString()
+            })
+            // 不阻止路由跳转，允许用户继续使用（前端可以独立开发调试）
           } else {
+            // 非网络错误的情况，说明服务端会话已失效
             routerLogger.warn('服务端会话无效，重定向到登录页面', { targetPath: to.path })
             ElMessage.error('登录状态已过期，请重新登录')
             return next('/login')
           }
         }
       } catch (error) {
-        // 网络错误时，不阻止路由跳转
+        // verifyLoginStatus 在网络错误时不会抛出异常，这里主要处理其他类型的错误
         const isNetworkError = error.code === 'ECONNREFUSED' || 
                                error.code === 'ECONNABORTED' || 
                                error.message?.includes('timeout') ||

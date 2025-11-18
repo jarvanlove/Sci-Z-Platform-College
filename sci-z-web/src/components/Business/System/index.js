@@ -7,10 +7,10 @@
 export { default as UserManagement } from './UserManagement.vue'
 
 // 角色权限组件
-// export { default as SystemRole } from './SystemRole.vue'
+export { default as RoleManagement } from './RoleManagement.vue'
 
 // 系统配置组件
-// export { default as SystemConfig } from './SystemConfig.vue'
+export { default as SystemConfig } from './SystemConfig.vue'
 
 // 日志管理组件
 export { default as SystemLogs } from './LogManagement.vue'

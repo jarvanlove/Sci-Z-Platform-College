@@ -49,24 +49,21 @@ export const DECLARATION_DEPARTMENT_OPTIONS = [
 export const LOG_LEVELS = {
   INFO: 'INFO',
   WARN: 'WARN',
-  ERROR: 'ERROR',
-  DEBUG: 'DEBUG'
+  ERROR: 'ERROR'
 }
 
 // 日志级别选项
 export const LOG_LEVEL_OPTIONS = [
   { label: 'INFO', value: 'INFO' },
   { label: 'WARN', value: 'WARN' },
-  { label: 'ERROR', value: 'ERROR' },
-  { label: 'DEBUG', value: 'DEBUG' }
+  { label: 'ERROR', value: 'ERROR' }
 ]
 
 // 日志级别标签类型配置
 export const LOG_LEVEL_TAG_CONFIG = {
   [LOG_LEVELS.INFO]: { type: 'success', text: 'INFO' },
   [LOG_LEVELS.WARN]: { type: 'warning', text: 'WARN' },
-  [LOG_LEVELS.ERROR]: { type: 'danger', text: 'ERROR' },
-  [LOG_LEVELS.DEBUG]: { type: 'info', text: 'DEBUG' }
+  [LOG_LEVELS.ERROR]: { type: 'danger', text: 'ERROR' }
 }
 
 // 登录状态标签类型配置（用户中心-安全设置）
@@ -133,7 +130,24 @@ export const PAGINATION = {
   PAGE_SIZE_OPTIONS: [10, 20, 50, 100]
 }
 
-// 权限常量
+// ================================
+// 废弃：权限和路由常量
+// ================================
+// 注意：以下常量已废弃，不再使用
+// 原因：
+// 1. 权限数据现在由后端接口动态返回，不再使用前端硬编码的常量
+// 2. 路由路径在路由配置中直接使用字符串，保持灵活性
+// 3. 权限检查使用后端返回的动态权限列表（如 'menu:dashboard:view'）
+//
+// 如需使用权限常量，建议：
+// - 在路由配置的 meta.permission 中直接使用字符串（如 'menu:dashboard:view'）
+// - 在权限指令中使用后端返回的权限字符串
+// - 如需类型安全，可在 TypeScript 类型定义中声明权限字符串联合类型
+
+/**
+ * @deprecated 权限常量已废弃，权限数据由后端接口动态返回
+ * 使用方式：在路由配置的 meta.permission 中直接使用字符串，如 'menu:dashboard:view'
+ */
 export const PERMISSIONS = {
   // 菜单权限
   DASHBOARD_VIEW: 'menu:dashboard:view',
@@ -156,7 +170,10 @@ export const PERMISSIONS = {
   SYSTEM_LOGS: 'menu:system:logs'
 }
 
-// 路由常量
+/**
+ * @deprecated 路由常量已废弃，路由路径在路由配置中直接使用字符串
+ * 使用方式：在路由配置中直接使用字符串路径，如 path: '/login'
+ */
 export const ROUTES = {
   LOGIN: '/login',
   REGISTER: '/register',

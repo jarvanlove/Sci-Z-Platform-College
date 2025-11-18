@@ -12,7 +12,7 @@ import com.sciz.server.domain.pojo.repository.user.SysRoleRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRoleRepo;
 import com.sciz.server.infrastructure.shared.constant.CacheConstant;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
-import com.sciz.server.infrastructure.shared.enums.PermissionType;
+import com.sciz.server.infrastructure.shared.enums.PermissionStatus;
 import com.sciz.server.infrastructure.shared.utils.RedisUtil;
 import com.sciz.server.infrastructure.shared.utils.JsonUtil;
 
@@ -341,7 +341,7 @@ public class PermissionServiceImpl implements PermissionService {
                         .map(type -> type.equals(perm.getIndustryType()))
                         .orElse(true))
                 .filter(perm -> Optional.ofNullable(perm.getPermissionType())
-                        .map(type -> PermissionType.MENU.getCode().equals(type))
+                        .map(type -> PermissionStatus.MENU.getCode().equals(type))
                         .orElse(false))
                 .toList();
     }

@@ -54,4 +54,21 @@ public interface SysOperationLogRepo {
      * @return SysOperationLog 日志
      */
     SysOperationLog findById(Long id);
+
+    /**
+     * 批量保存操作日志
+     *
+     * @param entities List<SysOperationLog> 日志实体列表
+     * @return boolean 是否全部保存成功
+     */
+    boolean saveBatch(java.util.List<SysOperationLog> entities);
+
+    /**
+     * 根据ID更新响应结果
+     *
+     * @param id             Long 日志ID
+     * @param responseResult String 响应结果
+     * @return boolean 是否更新成功
+     */
+    boolean updateResponseResultById(Long id, String responseResult);
 }

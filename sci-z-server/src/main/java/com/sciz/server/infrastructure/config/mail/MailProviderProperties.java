@@ -1,6 +1,6 @@
 package com.sciz.server.infrastructure.config.mail;
 
-import com.sciz.server.infrastructure.shared.enums.MailProviderType;
+import com.sciz.server.infrastructure.shared.enums.MailProviderStatus;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
@@ -16,9 +16,9 @@ import org.springframework.util.StringUtils;
  * @date 2025-11-11 20:30
  */
 @ConfigurationProperties(prefix = "mail")
-public record MailProviderProperties(Map<MailProviderType, ProviderConfig> providers) {
+public record MailProviderProperties(Map<MailProviderStatus, ProviderConfig> providers) {
 
-    public MailProviderProperties(Map<MailProviderType, ProviderConfig> providers) {
+    public MailProviderProperties(Map<MailProviderStatus, ProviderConfig> providers) {
         this.providers = CollectionUtils.isEmpty(providers)
                 ? Map.of()
                 : new EnumMap<>(providers);
@@ -30,7 +30,7 @@ public record MailProviderProperties(Map<MailProviderType, ProviderConfig> provi
      * @param type MailProviderType 服务商类型
      * @return Optional<ProviderConfig> 配置
      */
-    public Optional<ProviderConfig> findProvider(MailProviderType type) {
+    public Optional<ProviderConfig> findProvider(MailProviderStatus type) {
         return Optional.ofNullable(providers.get(type))
                 .filter(ProviderConfig::enabled);
     }

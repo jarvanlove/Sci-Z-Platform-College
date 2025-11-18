@@ -7,6 +7,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.Random;
+import java.util.stream.IntStream;
 
 /**
  * 验证码工具类
@@ -63,12 +64,12 @@ public final class CaptchaUtil {
      * @return String 验证码文本
      */
     public static String generateText(int length) {
-        var sb = new StringBuilder();
-        for (int i = 0; i < length; i++) {
-            var index = RANDOM.nextInt(CHAR_SET.length());
-            sb.append(CHAR_SET.charAt(index));
-        }
-        return sb.toString();
+        return IntStream.range(0, length)
+                .mapToObj(i -> {
+                    var index = RANDOM.nextInt(CHAR_SET.length());
+                    return String.valueOf(CHAR_SET.charAt(index));
+                })
+                .collect(java.util.stream.Collectors.joining());
     }
 
     /**
@@ -124,13 +125,14 @@ public final class CaptchaUtil {
      */
     private static void drawInterferenceLines(Graphics2D g, int width, int height) {
         g.setColor(Color.LIGHT_GRAY);
-        for (int i = 0; i < 5; i++) {
-            var x1 = RANDOM.nextInt(width);
-            var y1 = RANDOM.nextInt(height);
-            var x2 = RANDOM.nextInt(width);
-            var y2 = RANDOM.nextInt(height);
-            g.drawLine(x1, y1, x2, y2);
-        }
+        IntStream.range(0, 5)
+                .forEach(i -> {
+                    var x1 = RANDOM.nextInt(width);
+                    var y1 = RANDOM.nextInt(height);
+                    var x2 = RANDOM.nextInt(width);
+                    var y2 = RANDOM.nextInt(height);
+                    g.drawLine(x1, y1, x2, y2);
+                });
     }
 
     /**
@@ -140,20 +142,21 @@ public final class CaptchaUtil {
         g.setFont(new Font("Arial", Font.BOLD, 28));
         var charWidth = width / text.length();
 
-        for (int i = 0; i < text.length(); i++) {
-            // 随机颜色
-            g.setColor(new Color(RANDOM.nextInt(100), RANDOM.nextInt(100), RANDOM.nextInt(100)));
+        IntStream.range(0, text.length())
+                .forEach(index -> {
+                    // 随机颜色
+                    g.setColor(new Color(RANDOM.nextInt(100), RANDOM.nextInt(100), RANDOM.nextInt(100)));
 
-            // 随机旋转角度（-15° ~ 15°）
-            var angle = (RANDOM.nextDouble() - 0.5) * 30;
-            g.rotate(Math.toRadians(angle), charWidth * i + charWidth / 2, height / 2);
+                    // 随机旋转角度（-15° ~ 15°）
+                    var angle = (RANDOM.nextDouble() - 0.5) * 30;
+                    g.rotate(Math.toRadians(angle), charWidth * index + charWidth / 2, height / 2);
 
-            // 绘制字符
-            g.drawString(String.valueOf(text.charAt(i)), charWidth * i + 10, height / 2 + 10);
+                    // 绘制字符
+                    g.drawString(String.valueOf(text.charAt(index)), charWidth * index + 10, height / 2 + 10);
 
-            // 恢复旋转
-            g.rotate(-Math.toRadians(angle), charWidth * i + charWidth / 2, height / 2);
-        }
+                    // 恢复旋转
+                    g.rotate(-Math.toRadians(angle), charWidth * index + charWidth / 2, height / 2);
+                });
     }
 
     /**

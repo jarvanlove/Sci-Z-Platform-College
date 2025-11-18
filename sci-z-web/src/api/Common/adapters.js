@@ -84,7 +84,9 @@ export class DataAdapter {
       departmentId: userData.departmentId || userData.deptId,
       departmentName: userData.departmentName || userData.deptName,
       roleId: userData.roleId,
-      roleName: userData.roleName || userData.role,
+      // 支持新的 roleNames 数组格式，兼容旧的 roleName 字符串
+      roleNames: userData.roleNames || (userData.roleName ? [userData.roleName] : (userData.role ? [userData.role] : [])),
+      roleName: userData.roleName || userData.role, // 保留向后兼容
       status: userData.status || userData.state,
       createdAt: userData.createdAt || userData.createTime,
       updatedAt: userData.updatedAt || userData.updateTime,

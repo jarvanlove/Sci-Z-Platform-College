@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 /**
  * @author JiaWen.Wu
@@ -132,15 +133,16 @@ public class LogAspect {
         Object[] copy = Optional.ofNullable(args)
                 .map(original -> Arrays.copyOf(original, original.length))
                 .orElseGet(() -> new Object[0]);
-        for (int i = 0; i < copy.length; i++) {
-            Object val = copy[i];
-            if (val instanceof CharSequence) {
-                String s = String.valueOf(val);
-                if (looksSensitive(s)) {
-                    copy[i] = maskString(s);
-                }
-            }
-        }
+        IntStream.range(0, copy.length)
+                .forEach(index -> {
+                    Object val = copy[index];
+                    if (val instanceof CharSequence) {
+                        String s = String.valueOf(val);
+                        if (looksSensitive(s)) {
+                            copy[index] = maskString(s);
+                        }
+                    }
+                });
         return copy;
     }
 

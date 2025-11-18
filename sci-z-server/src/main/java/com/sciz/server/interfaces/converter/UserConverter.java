@@ -2,6 +2,7 @@ package com.sciz.server.interfaces.converter;
 
 import com.sciz.server.domain.pojo.dto.request.user.UserCreateReq;
 import com.sciz.server.domain.pojo.dto.response.user.RolePermissionIdsResp;
+import com.sciz.server.domain.pojo.dto.response.user.RoleUserIdsResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserCreateResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserRoleIdsResp;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
@@ -43,6 +44,17 @@ public interface UserConverter {
     default RolePermissionIdsResp toRolePermissionIdsResp(List<Long> permissionIds) {
         return new RolePermissionIdsResp(
                 Optional.ofNullable(permissionIds).map(List::copyOf).orElseGet(List::of));
+    }
+
+    /**
+     * 用户ID列表 → RoleUserIdsResp
+     *
+     * @param userIds List<Long> 用户ID列表
+     * @return RoleUserIdsResp 响应
+     */
+    default RoleUserIdsResp toRoleUserIdsResp(List<Long> userIds) {
+        return new RoleUserIdsResp(
+                Optional.ofNullable(userIds).map(List::copyOf).orElseGet(List::of));
     }
 
     /**

@@ -5,5 +5,6 @@
 
 export * from './auth'
 
-// TODO: 后端开发完成后，取消注释以下导出
-// export { getPermissions, getMenus } from './auth'
+// 注意：getPermissions 和 getMenus 已实现，但当前通过登录接口和 getUserInfo 接口
+// 一次性返回权限和菜单数据，这两个独立接口保留用于特殊场景（如单独刷新权限/菜单）
+export { getPermissions, getMenus } from './auth'

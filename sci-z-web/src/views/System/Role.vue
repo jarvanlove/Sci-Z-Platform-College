@@ -2,22 +2,13 @@
 /**
  * @description 角色权限页面
  * 系统管理员管理角色和权限
+ * 视图层仅负责路由挂载，业务逻辑在 RoleManagement 组件中
  */
 -->
 <template>
-  <div class="system-role-page">
-    <h1>角色权限页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <RoleManagement />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import RoleManagement from '@/components/Business/System/RoleManagement.vue'
 </script>
-
-<style lang="scss" scoped>
-.system-role-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
-</style>

@@ -27,4 +27,12 @@ public interface SysPermissionRepo {
      * @return List<SysPermission> 权限集合
      */
     List<SysPermission> findByIds(List<Long> ids);
+
+    /**
+     * 查询指定行业下的权限列表
+     *
+     * @param industryType String 行业类型
+     * @return List<SysPermission> 权限列表
+     */
+    List<SysPermission> listByIndustryType(String industryType);
 }

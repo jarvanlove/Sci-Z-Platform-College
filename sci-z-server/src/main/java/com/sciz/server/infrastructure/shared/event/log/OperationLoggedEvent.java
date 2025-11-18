@@ -6,16 +6,20 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * 操作日志事件（用于异步落库 sys_operation_log）
- * 
+ * 系统操作日志事件
+ *
  * @author JiaWen.Wu
  * @className OperationLoggedEvent
- * @date 2025-10-29 14:00
+ * @date 2025-11-14 21:00
  */
 @Getter
 @Setter
 public class OperationLoggedEvent extends DomainEvent {
 
+    /**
+     * 日志级别（INFO/WARN/ERROR）
+     */
+    private String level;
     /**
      * 用户ID
      */
@@ -25,11 +29,15 @@ public class OperationLoggedEvent extends DomainEvent {
      */
     private String username;
     /**
-     * 业务操作名称/描述
+     * 操作名称
      */
     private String operation;
     /**
-     * 方法标识（类名#方法名 或 HTTP 方法）
+     * 详细描述
+     */
+    private String detail;
+    /**
+     * 请求方法
      */
     private String method;
     /**
@@ -37,11 +45,11 @@ public class OperationLoggedEvent extends DomainEvent {
      */
     private String requestUrl;
     /**
-     * 请求参数（已脱敏）
+     * 请求参数
      */
     private String requestParams;
     /**
-     * 响应结果（已脱敏/截断）
+     * 响应结果
      */
     private String responseResult;
     /**
@@ -61,6 +69,10 @@ public class OperationLoggedEvent extends DomainEvent {
      */
     private String os;
     /**
+     * 执行耗时（毫秒）
+     */
+    private Integer executionTime;
+    /**
      * 操作状态（1成功 0失败）
      */
     private Integer status;
@@ -69,39 +81,12 @@ public class OperationLoggedEvent extends DomainEvent {
      */
     private String errorMessage;
     /**
-     * 执行耗时（毫秒）
-     */
-    private Integer executionTime;
-    /**
      * TraceId（链路追踪）
      */
     private String traceId;
 
     public OperationLoggedEvent() {
         super();
-    }
-
-    public OperationLoggedEvent(Long userId, String username, String operation, String method,
-            String requestUrl, String requestParams, String responseResult,
-            String ipAddress, String location, String browser, String os,
-            Integer status, String errorMessage, Integer executionTime,
-            String traceId) {
-        super();
-        this.userId = userId;
-        this.username = username;
-        this.operation = operation;
-        this.method = method;
-        this.requestUrl = requestUrl;
-        this.requestParams = requestParams;
-        this.responseResult = responseResult;
-        this.ipAddress = ipAddress;
-        this.location = location;
-        this.browser = browser;
-        this.os = os;
-        this.status = status;
-        this.errorMessage = errorMessage;
-        this.executionTime = executionTime;
-        this.traceId = traceId;
     }
 
     @Override
@@ -113,6 +98,6 @@ public class OperationLoggedEvent extends DomainEvent {
 
     @Override
     public String getAggregateType() {
-        return "OperationLog";
+        return "SystemOperationLog";
     }
 }

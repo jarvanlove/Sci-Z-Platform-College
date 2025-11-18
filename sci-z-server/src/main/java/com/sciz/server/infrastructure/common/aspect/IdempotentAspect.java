@@ -13,12 +13,14 @@ import org.springframework.stereotype.Component;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * @author JiaWen.Wu
@@ -137,17 +139,9 @@ public class IdempotentAspect {
     private String ArraysHash(Object[] args) {
         return Optional.ofNullable(args)
                 .filter(array -> array.length > 0)
-                .map(array -> {
-                    StringBuilder sb = new StringBuilder("(");
-                    for (int i = 0; i < array.length; i++) {
-                        sb.append(Objects.toString(array[i]));
-                        if (i < array.length - 1) {
-                            sb.append(',');
-                        }
-                    }
-                    sb.append(')');
-                    return sb.toString();
-                })
+                .map(array -> Arrays.stream(array)
+                        .map(Objects::toString)
+                        .collect(Collectors.joining(",", "(", ")")))
                 .orElse("()");
     }
 

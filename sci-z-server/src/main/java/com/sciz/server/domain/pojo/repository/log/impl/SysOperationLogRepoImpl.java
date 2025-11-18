@@ -7,7 +7,9 @@ import com.sciz.server.domain.pojo.entity.log.SysOperationLog;
 import com.sciz.server.domain.pojo.mapper.log.SysOperationLogMapper;
 import com.sciz.server.domain.pojo.repository.log.SysOperationLogRepo;
 import com.sciz.server.infrastructure.shared.enums.LogLevelStatus;
+import java.util.List;
 import java.time.LocalDateTime;
+import java.util.stream.IntStream;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
@@ -74,6 +76,43 @@ public class SysOperationLogRepoImpl implements SysOperationLogRepo {
         SFunction<SysOperationLog, ?> sortColumn = resolveSortColumn(sortBy);
         wrapper.orderBy(true, asc, sortColumn);
         return mapper.selectPage(page, wrapper);
+    }
+
+    @Override
+    public boolean saveBatch(List<SysOperationLog> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return true;
+        }
+
+        try {
+            int batchSize = 500;
+            int totalBatches = (entities.size() + batchSize - 1) / batchSize;
+            IntStream.range(0, totalBatches)
+                    .mapToObj(batchIndex -> {
+                        int start = batchIndex * batchSize;
+                        int end = Math.min(start + batchSize, entities.size());
+                        return entities.subList(start, end);
+                    })
+                    .forEach(batch -> batch.forEach(mapper::insert));
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean updateResponseResultById(Long id, String responseResult) {
+        if (id == null) {
+            return false;
+        }
+        try {
+            var entity = new SysOperationLog();
+            entity.setId(id);
+            entity.setResponseResult(responseResult);
+            return mapper.updateById(entity) > 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private SFunction<SysOperationLog, ?> resolveSortColumn(String sortBy) {

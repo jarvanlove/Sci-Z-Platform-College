@@ -3,6 +3,7 @@ package com.sciz.server.application.service.user.impl;
 import com.sciz.server.application.service.user.PermissionService;
 import com.sciz.server.application.service.user.RolePermissionService;
 import com.sciz.server.domain.pojo.dto.request.system.RolePermissionUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.system.PermissionTreeResp;
 import com.sciz.server.domain.pojo.entity.user.SysPermission;
 import com.sciz.server.domain.pojo.entity.user.SysRole;
 import com.sciz.server.domain.pojo.entity.user.SysRolePermission;
@@ -17,6 +18,7 @@ import com.sciz.server.infrastructure.shared.enums.EnableStatus;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -169,5 +171,83 @@ public class RolePermissionServiceImpl implements RolePermissionService {
         for (SysUserRole userRole : userRoles) {
             permissionService.refreshUserAuthCache(userRole.getUserId(), industryType);
         }
+    }
+
+    @Override
+    public List<PermissionTreeResp> getPermissionTree() {
+        var industryType = industryConfigCache.get().getType();
+        var permissions = Optional.ofNullable(permissionRepo.listByIndustryType(industryType))
+                .orElseGet(List::of);
+
+        if (CollectionUtils.isEmpty(permissions)) {
+            return List.of();
+        }
+
+        // 构建权限树（使用可变结构）
+        var idToNode = new HashMap<Long, PermissionTreeResp>();
+        var idToChildren = new HashMap<Long, List<PermissionTreeResp>>();
+
+        // 第一遍：构建所有节点
+        for (var perm : permissions) {
+            var node = new PermissionTreeResp(
+                    perm.getId(),
+                    perm.getParentId(),
+                    perm.getPermissionName(),
+                    perm.getPermissionCode(),
+                    perm.getPermissionType(),
+                    perm.getPath(),
+                    perm.getIcon(),
+                    perm.getSortOrder(),
+                    perm.getStatus(),
+                    null); // children 稍后设置
+            idToNode.put(perm.getId(), node);
+            idToChildren.put(perm.getId(), new ArrayList<>());
+        }
+
+        // 第二遍：构建父子关系
+        var roots = new ArrayList<PermissionTreeResp>();
+        for (var perm : permissions) {
+            var parentId = perm.getParentId();
+            var node = idToNode.get(perm.getId());
+            if (Optional.ofNullable(parentId).filter(id -> id != 0 && idToNode.containsKey(id)).isEmpty()) {
+                roots.add(node);
+            } else {
+                var children = idToChildren.get(parentId);
+                children.add(node);
+            }
+        }
+
+        // 第三遍：构建完整的树（递归设置 children）
+        var buildTree = new java.util.function.Function<PermissionTreeResp, PermissionTreeResp>() {
+            @Override
+            public PermissionTreeResp apply(PermissionTreeResp node) {
+                var children = idToChildren.get(node.id());
+                var sortedChildren = children.stream()
+                        .sorted((a, b) -> Integer.compare(
+                                Optional.ofNullable(a.sortOrder()).orElse(0),
+                                Optional.ofNullable(b.sortOrder()).orElse(0)))
+                        .map(this)
+                        .toList();
+                return new PermissionTreeResp(
+                        node.id(),
+                        node.parentId(),
+                        node.permissionName(),
+                        node.permissionCode(),
+                        node.permissionType(),
+                        node.path(),
+                        node.icon(),
+                        node.sortOrder(),
+                        node.status(),
+                        sortedChildren);
+            }
+        };
+
+        // 按 sortOrder 排序并构建树
+        return roots.stream()
+                .sorted((a, b) -> Integer.compare(
+                        Optional.ofNullable(a.sortOrder()).orElse(0),
+                        Optional.ofNullable(b.sortOrder()).orElse(0)))
+                .map(buildTree)
+                .toList();
     }
 }

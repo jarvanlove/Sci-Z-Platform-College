@@ -7,18 +7,7 @@
 <template>
   <div class="log-management-container">
     <div class="page-header">
-      <div>
-        <h1 class="page-title">{{ t('system.logs.title') }}</h1>
-        <p class="page-subtitle">{{ t('system.logs.subtitle') }}</p>
-      </div>
-      <div class="header-actions">
-        <BaseButton type="primary" :loading="exporting" @click="handleExport">
-          {{ t('system.logs.exportLogs') }}
-        </BaseButton>
-        <BaseButton type="danger" :loading="clearing" @click="handleClear">
-          {{ t('system.logs.clearLogs') }}
-        </BaseButton>
-      </div>
+      <h1 class="page-title">{{ t('system.logs.title') }}</h1>
     </div>
 
     <BaseCard>
@@ -36,7 +25,7 @@
             <el-option
               v-for="option in levelOptions"
               :key="option.value"
-              :label="t(`system.logs.levelLabel.${option.value.toLowerCase()}`)"
+              :label="option.label"
               :value="option.value"
             />
           </el-select>
@@ -44,7 +33,7 @@
 
         <div class="filter-item">
           <span class="filter-label">{{ t('system.logs.dateRange') }}</span>
-          <el-date-picker
+          <BaseDatePicker
             v-model="searchForm.dateRange"
             type="datetimerange"
             range-separator="~"
@@ -69,85 +58,43 @@
           </el-input>
         </div>
 
-        <BaseButton type="primary" :loading="loading" @click="handleSearch">
+        <el-button type="primary" :loading="loading" @click="handleSearch">
+          <el-icon><Search /></el-icon>
           {{ t('common.search') }}
-        </BaseButton>
-        <BaseButton @click="handleReset">
+        </el-button>
+        <el-button @click="handleReset">
+          <el-icon><Refresh /></el-icon>
           {{ t('common.reset') }}
-        </BaseButton>
+        </el-button>
       </div>
 
-      <el-table
+      <BaseTable
         :data="logs"
-        v-loading="loading"
+        :columns="tableColumns"
+        :loading="loading"
+        :pagination="pagination"
+        :action-width="140"
+        action-fixed="right"
+        :empty-text="t('common.noData')"
         stripe
         class="log-table"
-        :empty-text="t('common.noData')"
-      >
-        <el-table-column
-          prop="timestamp"
-          :label="t('system.logs.time')"
-          min-width="180"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="level"
-          :label="t('system.logs.level')"
-          width="110"
-          align="center"
-        >
-          <template #default="{ row }">
-            <el-tag :type="getLevelTagType(row.level)">
-              {{ row.level || '-' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="user"
-          :label="t('system.logs.user')"
-          min-width="120"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="operation"
-          :label="t('system.logs.operation')"
-          min-width="220"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="ip"
-          :label="t('system.logs.ipAddress')"
-          width="140"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="detail"
-          :label="t('system.logs.detail')"
-          min-width="260"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          :label="t('common.actions')"
-          width="140"
-          fixed="right"
-          align="center"
-        >
-          <template #default="{ row }">
-            <BaseButton size="small" @click="handleViewDetail(row)">
-              {{ t('system.logs.viewDetail') }}
-            </BaseButton>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <BasePagination
-        :current="pagination.current"
-        :size="pagination.size"
-        :total="pagination.total"
-        :disabled="loading"
-        @change="handlePageChange"
+        @current-change="handlePageChange"
         @size-change="handlePageSizeChange"
-      />
+      >
+        <!-- 日志级别列自定义 -->
+        <template #level="{ row }">
+          <el-tag :type="getLevelTagType(row.level)">
+            {{ row.level || '-' }}
+          </el-tag>
+        </template>
+
+        <!-- 操作列 -->
+        <template #actions="{ row }">
+          <el-button size="small" @click="handleViewDetail(row)">
+            {{ t('system.logs.viewDetail') }}
+          </el-button>
+        </template>
+      </BaseTable>
     </BaseCard>
 
     <el-dialog
@@ -168,6 +115,10 @@
             </el-tag>
           </div>
         </div>
+        <div class="detail-row" v-if="currentLog.userId">
+          <div class="detail-label">{{ t('system.logs.userId') }}</div>
+          <div class="detail-value">{{ currentLog.userId }}</div>
+        </div>
         <div class="detail-row">
           <div class="detail-label">{{ t('system.logs.user') }}</div>
           <div class="detail-value">{{ currentLog.user || '-' }}</div>
@@ -177,20 +128,52 @@
           <div class="detail-value">{{ currentLog.department }}</div>
         </div>
         <div class="detail-row">
+          <div class="detail-label">{{ t('system.logs.operation') }}</div>
+          <div class="detail-value">{{ currentLog.operation || '-' }}</div>
+        </div>
+        <div class="detail-row" v-if="currentLog.method">
+          <div class="detail-label">{{ t('system.logs.method') }}</div>
+          <div class="detail-value">{{ currentLog.method }}</div>
+        </div>
+        <div class="detail-row" v-if="currentLog.requestUrl">
+          <div class="detail-label">{{ t('system.logs.requestUrl') }}</div>
+          <div class="detail-value code-block">{{ currentLog.requestUrl }}</div>
+        </div>
+        <div class="detail-row">
           <div class="detail-label">{{ t('system.logs.ipAddress') }}</div>
           <div class="detail-value">{{ currentLog.ip || '-' }}</div>
         </div>
+        <div class="detail-row" v-if="currentLog.location">
+          <div class="detail-label">{{ t('system.logs.location') }}</div>
+          <div class="detail-value">{{ currentLog.location }}</div>
+        </div>
+        <div class="detail-row" v-if="currentLog.browser">
+          <div class="detail-label">{{ t('system.logs.browser') }}</div>
+          <div class="detail-value">{{ currentLog.browser }}</div>
+        </div>
+        <div class="detail-row" v-if="currentLog.os">
+          <div class="detail-label">{{ t('system.logs.os') }}</div>
+          <div class="detail-value">{{ currentLog.os }}</div>
+        </div>
         <div class="detail-row" v-if="currentLog.userAgent">
           <div class="detail-label">{{ t('system.logs.userAgent') }}</div>
-          <div class="detail-value">{{ currentLog.userAgent }}</div>
+          <div class="detail-value code-block">{{ currentLog.userAgent }}</div>
         </div>
-        <div class="detail-row">
-          <div class="detail-label">{{ t('system.logs.operation') }}</div>
-          <div class="detail-value">{{ currentLog.operation || '-' }}</div>
+        <div class="detail-row" v-if="currentLog.status !== '' && currentLog.status !== null && currentLog.status !== undefined">
+          <div class="detail-label">{{ t('system.logs.status') }}</div>
+          <div class="detail-value">{{ currentLog.status }}</div>
+        </div>
+        <div class="detail-row" v-if="currentLog.executionTime !== '' && currentLog.executionTime !== null && currentLog.executionTime !== undefined">
+          <div class="detail-label">{{ t('system.logs.executionTime') }}</div>
+          <div class="detail-value">{{ currentLog.executionTime }}ms</div>
         </div>
         <div class="detail-row">
           <div class="detail-label">{{ t('system.logs.detail') }}</div>
           <div class="detail-value">{{ currentLog.detail || '-' }}</div>
+        </div>
+        <div class="detail-row" v-if="currentLog.errorMessage">
+          <div class="detail-label">{{ t('system.logs.errorMessage') }}</div>
+          <div class="detail-value code-block error-message">{{ currentLog.errorMessage }}</div>
         </div>
         <div class="detail-row" v-if="currentLog.requestParams">
           <div class="detail-label">{{ t('system.logs.requestParams') }}</div>
@@ -202,9 +185,9 @@
         </div>
       </div>
       <template #footer>
-        <BaseButton @click="detailVisible = false">
+        <el-button @click="detailVisible = false">
           {{ t('common.close') }}
-        </BaseButton>
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -213,9 +196,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
-import { BaseCard, BaseButton, BasePagination } from '@/components/Common'
+import { ElMessage } from 'element-plus'
+import { Search, Refresh } from '@element-plus/icons-vue'
+import { BaseCard, BaseTable, BaseDatePicker } from '@/components/Common'
 import { getOperationLogs } from '@/api/System/system'
 import { LOG_LEVEL_OPTIONS, LOG_LEVEL_TAG_CONFIG, PAGINATION } from '@/utils/constants'
 import { formatDate } from '@/utils/date'
@@ -225,8 +208,6 @@ const { t } = useI18n()
 const logger = createLogger('LogManagement')
 
 const loading = ref(false)
-const exporting = ref(false)
-const clearing = ref(false)
 const logs = ref([])
 const detailVisible = ref(false)
 const currentLog = ref(null)
@@ -248,6 +229,41 @@ const levelOptions = LOG_LEVEL_OPTIONS
 const normalizedLogs = computed(() => logs.value || [])
 
 const getLevelTagType = (level) => LOG_LEVEL_TAG_CONFIG[level]?.type || 'info'
+
+// 表格列配置
+const tableColumns = computed(() => [
+  {
+    prop: 'timestamp',
+    label: t('system.logs.time'),
+    minWidth: 180
+  },
+  {
+    prop: 'level',
+    label: t('system.logs.level'),
+    width: 110,
+    align: 'center'
+  },
+  {
+    prop: 'user',
+    label: t('system.logs.user'),
+    minWidth: 120
+  },
+  {
+    prop: 'operation',
+    label: t('system.logs.operation'),
+    minWidth: 220
+  },
+  {
+    prop: 'ip',
+    label: t('system.logs.ipAddress'),
+    width: 140
+  },
+  {
+    prop: 'detail',
+    label: t('system.logs.detail'),
+    minWidth: 260
+  }
+])
 
 const buildQueryParams = () => {
   const payload = {
@@ -278,18 +294,31 @@ const normalizeLogItem = (item, index) => {
     }
   }
 
+  // 处理 logLevel 对象（可能包含 code 和 description）
+  const logLevelObj = item.logLevel || {}
+  const level = item.level || logLevelObj.code || 'INFO'
+
   return {
     id: item.id || item.logId || index,
-    level: item.level || item.logLevel || 'INFO',
+    userId: item.userId || '',
+    level: level,
     user: item.user || item.username || item.operator || '',
     department: item.department || item.departmentName || '',
     operation: item.operation || item.action || item.event || '',
+    method: item.method || '',
+    requestUrl: item.requestUrl || '',
     ip: item.ip || item.ipAddress || '',
-    detail: item.detail || item.description || '',
+    location: item.location || '',
+    browser: item.browser || '',
+    os: item.os || '',
+    status: item.status !== undefined && item.status !== null ? item.status : '',
+    executionTime: item.executionTime !== undefined && item.executionTime !== null ? item.executionTime : '',
+    detail: item.detail || item.detailInfo || item.description || '',
+    errorMessage: item.errorMessage || '',
     timestamp: formatDate(item.timestamp || item.operateTime || item.createdTime || item.createTime, 'YYYY-MM-DD HH:mm:ss'),
     userAgent: item.userAgent || '',
     requestParams: stringify(item.requestParams || item.requestBody),
-    response: stringify(item.response || item.responseBody),
+    response: stringify(item.response || item.responseResult || item.responseBody),
     raw: item
   }
 }
@@ -348,75 +377,7 @@ const handleViewDetail = (row) => {
   detailVisible.value = true
 }
 
-const handleExport = async () => {
-  try {
-    exporting.value = true
-    const response = await getOperationLogs({
-      ...buildQueryParams(),
-      pageNo: 1,
-      pageSize: Math.max(pagination.total, pagination.size)
-    })
-    const payload = response?.data?.data || response?.data || {}
-    const list = Array.isArray(payload.records) ? payload.records : payload.list || []
-    const exportData = list.map(normalizeLogItem)
-    if (!exportData.length) {
-      ElMessage.info(t('system.logs.exportEmpty'))
-      return
-    }
-    const headers = [
-      t('system.logs.time'),
-      t('system.logs.level'),
-      t('system.logs.user'),
-      t('system.logs.operation'),
-      t('system.logs.ipAddress'),
-      t('system.logs.detail')
-    ]
-    const csvRows = exportData.map((item) =>
-      [item.timestamp, item.level, item.user, item.operation, item.ip, item.detail]
-        .map((value) => `"${(value || '').replace(/"/g, '""')}"`)
-        .join(',')
-    )
-    const csvContent = [headers.join(','), ...csvRows].join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `operation-logs-${formatDate(new Date(), 'YYYYMMDDHHmmss')}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-    ElMessage.success(t('system.logs.exportSuccess'))
-  } catch (error) {
-    logger.error('导出日志失败', { error: error.message })
-    ElMessage.error(t('system.logs.exportFailed'))
-  } finally {
-    exporting.value = false
-  }
-}
 
-const handleClear = async () => {
-  try {
-    await ElMessageBox.confirm(
-      t('system.logs.clearConfirm'),
-      t('system.logs.clearLogs'),
-      {
-        confirmButtonText: t('common.confirm'),
-        cancelButtonText: t('common.cancel'),
-        type: 'warning'
-      }
-    )
-    clearing.value = true
-    // TODO: 接入后端清空日志接口
-    await new Promise((resolve) => setTimeout(resolve, 600))
-    ElMessage.info(t('system.logs.clearPending'))
-  } catch (error) {
-    if (error !== 'cancel') {
-      logger.error('清空日志操作失败', { error: error.message })
-      ElMessage.error(t('system.logs.clearFailed'))
-    }
-  } finally {
-    clearing.value = false
-  }
-}
 
 onMounted(() => {
   loadLogs()
@@ -430,27 +391,13 @@ onMounted(() => {
   gap: 20px;
 
   .page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
+    margin-bottom: 20px;
 
     .page-title {
       margin: 0;
       font-size: 24px;
       font-weight: 600;
       color: var(--text-1);
-    }
-
-    .page-subtitle {
-      margin: 4px 0 0;
-      font-size: 14px;
-      color: var(--text-3);
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 12px;
     }
   }
 
@@ -517,6 +464,13 @@ onMounted(() => {
     font-size: 13px;
     line-height: 1.6;
     white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .error-message {
+    color: var(--color-error);
+    background: rgba(220, 38, 38, 0.1);
+    border-color: var(--color-error);
   }
 }
 

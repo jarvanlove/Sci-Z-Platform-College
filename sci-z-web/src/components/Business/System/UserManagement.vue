@@ -55,18 +55,18 @@
           <el-option :label="t('common.inactive')" value="inactive" />
         </el-select>
         
-        <BaseButton type="primary" :loading="loading" @click="handleSearch">
+        <el-button type="primary" :loading="loading" @click="handleSearch">
           <el-icon><Search /></el-icon>
           {{ t('common.search') }}
-        </BaseButton>
-        <BaseButton @click="handleReset">
+        </el-button>
+        <el-button @click="handleReset">
           <el-icon><Refresh /></el-icon>
           {{ t('common.reset') }}
-        </BaseButton>
-        <BaseButton type="primary" @click="handleAdd">
+        </el-button>
+        <el-button type="primary" @click="handleAdd">
           <el-icon><Plus /></el-icon>
           {{ t('system.user.addUser') }}
-        </BaseButton>
+        </el-button>
       </div>
 
       <!-- 用户列表表格 -->
@@ -85,9 +85,17 @@
       >
         <!-- 角色列自定义 -->
         <template #role="{ row }">
-          <span class="role-tag" :class="getRoleClass(row.role || row.roleName)">
-            {{ getRoleText(row.role || row.roleName) }}
-          </span>
+          <div v-if="getRoleNames(row).length > 0" class="role-tags-container">
+            <span
+              v-for="(roleName, index) in getRoleNames(row)"
+              :key="index"
+              class="role-tag"
+              :class="getRoleClass(roleName)"
+            >
+              {{ getRoleText(roleName) }}
+            </span>
+          </div>
+          <span v-else class="role-empty">—</span>
         </template>
 
         <!-- 状态列自定义 -->
@@ -105,31 +113,45 @@
         <!-- 操作列 -->
         <template #actions="{ row }">
           <div class="action-buttons">
-            <button
-              class="action-btn btn-primary"
-              @click="handleEdit(row)"
-            >
-              {{ t('common.edit') }}
-            </button>
-            <button
-              class="action-btn btn-warning"
-              @click="handleResetPassword(row)"
-            >
-              {{ t('system.user.resetPassword') }}
-            </button>
-            <button
-              class="action-btn"
-              :class="(row.status === 1 || row.status === 'active') ? 'btn-info' : 'btn-success'"
-              @click="handleToggleStatus(row)"
-            >
-              {{ (row.status === 1 || row.status === 'active') ? t('common.disable') : t('common.enable') }}
-            </button>
-            <button
-              class="action-btn btn-danger"
-              @click="handleDelete(row)"
-            >
-              {{ t('common.delete') }}
-            </button>
+            <div class="action-row">
+              <button
+                class="action-btn btn-primary"
+                @click="handleEdit(row)"
+              >
+                {{ t('common.edit') }}
+              </button>
+              <button
+                class="action-btn btn-warning"
+                @click="handleResetPassword(row)"
+              >
+                {{ t('system.user.resetPassword') }}
+              </button>
+            </div>
+            <div class="action-row">
+              <button
+                class="action-btn btn-warning"
+                @click="handleBindRoles(row)"
+              >
+                {{ t('system.user.bindRoles') }}
+              </button>
+              <button
+                class="action-btn"
+                :class="(row.status === 1 || row.status === 'active') ? 'btn-info' : 'btn-success'"
+                @click="handleToggleStatus(row)"
+              >
+                {{ (row.status === 1 || row.status === 'active') ? t('common.disable') : t('common.enable') }}
+              </button>
+            </div>
+            <div class="action-row">
+              <button
+                class="action-btn btn-danger"
+                :disabled="isAdminUser(row)"
+                :title="isAdminUser(row) ? t('system.user.cannotDeleteAdmin') : ''"
+                @click="handleDelete(row)"
+              >
+                {{ t('common.delete') }}
+              </button>
+            </div>
           </div>
         </template>
       </BaseTable>
@@ -173,18 +195,19 @@
             :placeholder="t('system.user.phonePlaceholder')"
           />
         </el-form-item>
-        <el-form-item :label="departmentFieldLabel" prop="departmentId">
+        <el-form-item :label="departmentFieldLabel" prop="departmentCode">
           <el-select
-            v-model="formData.departmentId"
+            v-model="formData.departmentCode"
             :placeholder="departmentFieldPlaceholder"
             style="width: 100%"
             filterable
+            @change="() => formRef?.clearValidate('departmentCode')"
           >
             <el-option
               v-for="dept in departmentOptions"
-              :key="dept.id"
+              :key="dept.code"
               :label="dept.name"
-              :value="dept.id"
+              :value="dept.code"
             />
           </el-select>
         </el-form-item>
@@ -268,6 +291,79 @@
         </BaseButton>
       </template>
     </BaseDialog>
+
+    <!-- 绑定角色对话框 -->
+    <el-dialog
+      v-model="showBindRolesDialog"
+      :title="t('system.user.bindRoles')"
+      width="1000px"
+      @close="handleBindRolesDialogClose"
+    >
+      <div class="bind-roles-container">
+        <!-- 当前用户信息 -->
+        <div class="bind-roles-user-info">
+          <strong>{{ t('system.user.user') }}：</strong>
+          <span class="user-name">{{ currentUser?.realName || currentUser?.username }}</span>
+        </div>
+
+        <!-- 搜索区域 -->
+        <div class="bind-roles-search">
+          <el-input
+            v-model="roleSearchKeyword"
+            :placeholder="t('system.user.searchRolePlaceholder')"
+            clearable
+            style="width: 100%"
+            @keyup.enter="handleSearchRoles"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <el-button type="primary" @click="handleSearchRoles">
+            <el-icon><Search /></el-icon>
+            {{ t('common.search') }}
+          </el-button>
+        </div>
+
+        <!-- 角色列表表格 -->
+        <BaseTable
+          ref="bindRolesTableRef"
+          :data="availableRoleList"
+          :columns="availableRoleTableColumns"
+          :loading="availableRoleLoading"
+          :pagination="availableRolePagination"
+          :selectable="true"
+          row-key="id"
+          :empty-text="t('common.noData')"
+          stripe
+          class="bind-roles-table"
+          @selection-change="handleAvailableRoleSelectionChange"
+          @current-change="handleAvailableRolePageChange"
+          @size-change="handleAvailableRolePageSizeChange"
+        >
+          <!-- 状态列自定义 -->
+          <template #status="{ row }">
+            <span class="status-tag" :class="getStatusClass(row.status)">
+              {{ getStatusText(row.status) }}
+            </span>
+          </template>
+        </BaseTable>
+      </div>
+
+      <template #footer>
+        <div class="bind-roles-footer">
+          <span class="selected-count">
+            {{ t('system.user.selectedRoles', { count: selectedRoleIds.length }) }}
+          </span>
+          <div>
+            <BaseButton @click="showBindRolesDialog = false">{{ t('common.cancel') }}</BaseButton>
+            <BaseButton type="primary" @click="handleConfirmBindRoles" :loading="submitting">
+              {{ t('common.confirm') }}
+            </BaseButton>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -277,7 +373,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import { BaseButton, BaseCard, BaseTable, BaseDialog, BaseSwitch } from '@/components/Common'
-import { getUsers, createUser, updateUser, deleteUser, updateUserStatus, resetUserPassword } from '@/api/System/system'
+import { getUsers, createUser, updateUser, deleteUser, updateUserStatus, resetUserPassword, getRoles, getUserRoles, updateUserRoles } from '@/api/System/system'
 import { validateEmail, validatePhone, validateUsername, validateChineseName } from '@/utils/validate'
 import { formatDate } from '@/utils/date'
 import { createLogger } from '@/utils/simpleLogger'
@@ -301,6 +397,15 @@ const resetPasswordForm = reactive({
   newPassword: ''
 })
 
+// 绑定角色相关
+const showBindRolesDialog = ref(false)
+const availableRoleLoading = ref(false)
+const roleSearchKeyword = ref('')
+const availableRoleList = ref([])
+const selectedRoleIds = ref([])
+const bindRolesTableRef = ref(null)
+const currentUser = ref(null)
+
 // 搜索表单
 const searchForm = reactive({
   keyword: '',
@@ -310,7 +415,14 @@ const searchForm = reactive({
 // 分页
 const pagination = reactive({
   current: 1,
-  size: 20,
+  size: 10,
+  total: 0
+})
+
+// 角色分页
+const availableRolePagination = reactive({
+  current: 1,
+  size: 10,
   total: 0
 })
 
@@ -321,7 +433,7 @@ const formData = reactive({
   realName: '',
   email: '',
   phone: '',
-  departmentId: null,
+  departmentCode: '',
   industryType: '',
   status: 'active',
   password: ''
@@ -344,9 +456,16 @@ const departmentFieldPlaceholder = computed(() => {
 })
 
 const getSelectedDepartmentName = () => {
-  const target = departmentOptions.value.find((dept) => dept.id === formData.departmentId)
+  const target = departmentOptions.value.find((dept) => dept.code === formData.departmentCode)
   return target?.name || ''
 }
+
+// 可选角色表格列配置
+const availableRoleTableColumns = computed(() => [
+  { prop: 'roleName', label: t('system.role.roleName'), width: 150, align: 'center' },
+  { prop: 'description', label: t('system.role.roleDescription'), minWidth: 200, align: 'center', showOverflowTooltip: true },
+  { prop: 'status', label: t('common.status'), width: 100, align: 'center' }
+])
 
 // 表格列配置
 const tableColumns = computed(() => [
@@ -365,7 +484,7 @@ const tableColumns = computed(() => [
   {
     prop: 'employeeId',
     label: industryStore.employeeIdLabel || t('system.user.employeeId'),
-    width: 250,
+    width: 240,
     showOverflowTooltip: true
   },
   {
@@ -377,13 +496,13 @@ const tableColumns = computed(() => [
   {
     prop: 'departmentName',
     label: t(industryStore.departmentLabelKey || 'system.user.department'),
-    width: 160,
+    width: 140,
     showOverflowTooltip: true
   },
   {
     prop: 'role',
     label: industryStore.roleLabel || t('system.user.role'),
-    width: 120,
+    width: 200,
     align: 'center'
   },
   {
@@ -477,7 +596,7 @@ const formRules = computed(() => ({
       trigger: 'blur'
     }
   ],
-  departmentId: [
+  departmentCode: [
     { required: true, message: t('system.user.departmentRequired'), trigger: 'change' }
   ],
   password: [
@@ -511,6 +630,23 @@ const dialogTitle = computed(() =>
 )
 
 // 方法
+// 获取角色名称数组（支持 roleNames 数组和旧的 roleName 字符串）
+const getRoleNames = (row) => {
+  // 优先使用 roleNames 数组
+  if (Array.isArray(row.roleNames) && row.roleNames.length > 0) {
+    return row.roleNames.filter(name => name && name.trim())
+  }
+  // 兼容旧的 roleName 字符串
+  if (row.roleName && typeof row.roleName === 'string') {
+    return [row.roleName]
+  }
+  // 兼容旧的 role 字段
+  if (row.role && typeof row.role === 'string') {
+    return [row.role]
+  }
+  return []
+}
+
 const getRoleClass = (role) => {
   // 支持后端返回的roleName字段（字符串）
   if (typeof role === 'string') {
@@ -555,30 +691,36 @@ const formatDisplayTime = (time) => {
   return formatDate(time, 'YYYY-MM-DD HH:mm:ss')
 }
 
+// 判断是否为管理员用户（不允许删除）
+const isAdminUser = (user) => {
+  return user.username === 'admin' || user.realName === '系统管理员'
+}
+
 const findDepartmentOption = (value) => {
   if (value === undefined || value === null || value === '') return null
   const valueStr = String(value)
   return departmentOptions.value.find((option) => {
     if (!option) return false
+    // 优先匹配 code，因为现在使用 departmentCode
     const candidates = [
-      option.id,
-      option.numericId,
       option.code,
       option.name,
-      typeof option.id === 'number' ? String(option.id) : undefined,
-      typeof option.numericId === 'number' ? String(option.numericId) : undefined,
+      option.id,
+      option.numericId,
       option.code ? String(option.code) : undefined,
-      option.name ? String(option.name) : undefined
+      option.name ? String(option.name) : undefined,
+      typeof option.id === 'number' ? String(option.id) : undefined,
+      typeof option.numericId === 'number' ? String(option.numericId) : undefined
     ].filter((item) => item !== undefined && item !== null)
     return candidates.some((candidate) => String(candidate) === valueStr)
   })
 }
 
-const syncDepartmentValue = (value = formData.departmentId) => {
+const syncDepartmentValue = (value = formData.departmentCode) => {
   if (value === undefined || value === null || value === '') return
   const match = findDepartmentOption(value)
-  if (match) {
-    formData.departmentId = match.id
+  if (match && match.code) {
+    formData.departmentCode = match.code
   }
 }
 
@@ -616,18 +758,10 @@ const loadDepartments = async (force = false) => {
 }
 
 const resolveDepartmentPayload = () => {
-  const selected = findDepartmentOption(formData.departmentId)
-  const departmentId =
-    typeof selected?.numericId === 'number'
-      ? selected.numericId
-      : typeof formData.departmentId === 'number'
-        ? formData.departmentId
-        : undefined
-  const departmentCode =
-    selected?.code ||
-    (typeof formData.departmentId === 'string' ? formData.departmentId : undefined)
+  // 现在直接使用 departmentCode（string类型）
+  const selected = findDepartmentOption(formData.departmentCode)
+  const departmentCode = selected?.code || formData.departmentCode || ''
   return {
-    departmentId,
     departmentCode
   }
 }
@@ -710,46 +844,80 @@ const handleEdit = async (user) => {
     return
   }
   isEdit.value = true
+  
+  // 先设置基本信息
   Object.assign(formData, {
     id: user.id,
     username: user.username,
     realName: user.realName,
     email: user.email,
     phone: user.phone,
-    departmentId: user.departmentId || user.department?.id || null,
     industryType: user.industryType || industryStore.industryCode || '',
     status: user.status === 1 || user.status === 'active' ? 'active' : 'inactive',
     password: ''
   })
+  
+  // 处理部门回显：优先使用 departmentCode（string类型）
   const departmentChain = [
     user.departmentCode,
     user.department?.code,
-    user.departmentId,
-    user.department?.id,
+    user.departmentId, // 兼容旧数据
+    user.department?.id, // 兼容旧数据
     user.departmentName,
     user.department?.name
   ].filter((item) => item !== undefined && item !== null && item !== '')
-
+  
+  // 尝试在选项中找到匹配项
+  let matched = false
   for (const candidate of departmentChain) {
-    syncDepartmentValue(candidate)
-    if (findDepartmentOption(candidate)) break
-  }
-
-  if (!findDepartmentOption(formData.departmentId)) {
-    const fallbackName =
-      user.departmentName || user.department?.name || user.departmentCode || ''
-    if (fallbackName) {
-      const fallbackOption = {
-        id: fallbackName,
-        numericId: typeof user.departmentId === 'number' ? user.departmentId : undefined,
-        code: user.departmentCode || fallbackName,
-        name: fallbackName
-      }
-      departmentOptions.value = [fallbackOption, ...departmentOptions.value]
-      formData.departmentId = fallbackOption.id
+    const match = findDepartmentOption(candidate)
+    if (match && match.code) {
+      formData.departmentCode = match.code
+      matched = true
+      logger.debug('Department matched', {
+        candidate,
+        matchedCode: match.code,
+        matchedName: match.name
+      })
+      break
     }
   }
+  
+  // 如果找不到匹配项，但有部门名称，创建一个临时选项
+  if (!matched && (user.departmentName || user.department?.name)) {
+    const fallbackName = user.departmentName || user.department?.name
+    const fallbackCode = user.departmentCode || user.department?.code || `TEMP_${Date.now()}`
+    const fallbackOption = {
+      id: fallbackCode,
+      numericId: null,
+      code: fallbackCode,
+      name: fallbackName
+    }
+    departmentOptions.value = [fallbackOption, ...departmentOptions.value]
+    formData.departmentCode = fallbackOption.code
+    logger.debug('Created fallback department option', {
+      fallbackOption,
+      formDataDepartmentCode: formData.departmentCode
+    })
+  } else if (!matched) {
+    // 如果没有任何部门信息，设置为空字符串，让用户选择
+    formData.departmentCode = ''
+    logger.warn('No department found, setting to empty', {
+      user,
+      availableOptions: departmentOptions.value.map(d => ({ code: d.code, name: d.name }))
+    })
+  }
+  
   showDialog.value = true
+  // 等待 DOM 更新后清除验证状态，确保部门选择正确回显
+  await nextTick()
+  // 再次等待，确保 el-select 已经渲染完成
+  setTimeout(() => {
+    if (formRef.value) {
+      formRef.value.clearValidate('departmentCode')
+      formRef.value.clearValidate()
+    }
+  }, 100)
 }
 
 const handleResetPassword = (user) => {
@@ -776,8 +944,16 @@ const handleConfirmResetPassword = async () => {
     })
 
     // 调用新的API：PUT /api/user/users/password/reset
+    // 确保 userId 是数字类型，避免后端 JSON 解析错误
+    const userId = typeof currentResetUser.value.id === 'number' 
+      ? currentResetUser.value.id 
+      : Number(currentResetUser.value.id)
+    if (isNaN(userId) || !isFinite(userId)) {
+      throw new Error('用户ID无效')
+    }
+    
     await resetUserPassword({
-      userId: currentResetUser.value.id,
+      userId: userId,
       newPassword: resetPasswordForm.newPassword.trim()
     })
 
@@ -810,7 +986,11 @@ const handleToggleStatus = async (user) => {
     await ElMessageBox.confirm(
       t('system.user.toggleStatusConfirm', { action, name: user.realName || user.username }),
       t('system.user.toggleStatus'),
-      { type: 'warning' }
+      {
+        type: 'warning',
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel')
+      }
     )
 
     logger.info('Toggle user status', {
@@ -820,8 +1000,13 @@ const handleToggleStatus = async (user) => {
     })
 
     // 使用新的API：PUT /api/user/users/{id}/status?disabled=true/false
+    // 确保 user.id 是数字类型，避免后端解析错误
+    const userId = typeof user.id === 'number' ? user.id : Number(user.id)
+    if (isNaN(userId) || !isFinite(userId)) {
+      throw new Error('用户ID无效')
+    }
     const disabled = isActive // status=1 -> disabled=true, status=0 -> disabled=false
-    await updateUserStatus(user.id, disabled)
+    await updateUserStatus(userId, disabled)
 
     ElMessage.success(t('system.user.toggleStatusSuccess', { action }))
     logger.info('User status toggled successfully', {
@@ -839,16 +1024,30 @@ const handleToggleStatus = async (user) => {
 }
 
 const handleDelete = async (user) => {
+  if (isAdminUser(user)) {
+    ElMessage.warning(t('system.user.cannotDeleteAdmin'))
+    return
+  }
+
   try {
     await ElMessageBox.confirm(
       t('system.user.deleteConfirm', { name: user.realName || user.username }),
       t('system.user.deleteUser'),
-      { type: 'warning' }
+      {
+        type: 'warning',
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel')
+      }
     )
 
     logger.info('Delete user', { userId: user.id, username: user.username })
 
-    await deleteUser(user.id)
+    // 确保 user.id 是数字类型，避免后端解析错误
+    const userId = typeof user.id === 'number' ? user.id : Number(user.id)
+    if (isNaN(userId) || !isFinite(userId)) {
+      throw new Error('用户ID无效')
+    }
+    await deleteUser(userId)
 
     ElMessage.success(t('system.user.deleteSuccess'))
     logger.info('User deleted successfully', { userId: user.id })
@@ -870,31 +1069,45 @@ const handleSubmit = async () => {
     logger.info('Submit user form', { isEdit: isEdit.value, userId: formData.id })
 
     if (isEdit.value) {
-      // 更新用户：根据API文档，需要 id, realName, email, phone, departmentId
+      // 更新用户：根据API文档，需要 id, realName, email, phone, departmentCode（string类型）
+      // 确保所有 ID 都是数字类型，避免后端 JSON 解析错误
+      const userId = typeof formData.id === 'number' ? formData.id : Number(formData.id)
+      if (isNaN(userId) || !isFinite(userId)) {
+        throw new Error('用户ID无效')
+      }
+      
       const departmentPayload = resolveDepartmentPayload()
       const submitData = {
-        id: formData.id, // 必须与路径参数一致
+        id: userId, // 必须与路径参数一致，且必须是数字
         realName: formData.realName,
         email: formData.email,
         phone: formData.phone,
-        departmentId: departmentPayload.departmentId ?? formData.departmentId,
-        departmentCode: departmentPayload.departmentCode
+        departmentCode: departmentPayload.departmentCode // 必须传递 departmentCode（string类型）
       }
-      await updateUser(formData.id, submitData)
+      // departmentCode 是必填字段，如果为空则报错
+      if (!submitData.departmentCode || submitData.departmentCode.trim() === '') {
+        ElMessage.error(t('system.user.departmentRequired'))
+        throw new Error('部门代码不能为空')
+      }
+      await updateUser(userId, submitData)
       ElMessage.success(t('system.user.updateSuccess'))
       logger.info('User updated successfully', { userId: formData.id })
     } else {
-      // 新增用户：保持原有数据结构
+      // 新增用户：使用 departmentCode（string类型）
       const departmentPayload = resolveDepartmentPayload()
       const submitData = {
         username: formData.username,
         realName: formData.realName,
         email: formData.email,
         phone: formData.phone,
-        departmentId: departmentPayload.departmentId ?? formData.departmentId,
-        departmentCode: departmentPayload.departmentCode,
+        departmentCode: departmentPayload.departmentCode, // 使用 departmentCode（string类型）
         industryType: formData.industryType || industryStore.industryCode || 'default',
         password: formData.password
+      }
+      // departmentCode 是必填字段，如果为空则报错
+      if (!submitData.departmentCode || submitData.departmentCode.trim() === '') {
+        ElMessage.error(t('system.user.departmentRequired'))
+        throw new Error('部门代码不能为空')
       }
       await createUser(submitData)
       ElMessage.success(t('system.user.createSuccess'))
@@ -925,7 +1138,7 @@ const resetForm = () => {
     realName: '',
     email: '',
     phone: '',
-    departmentId: null,
+    departmentCode: '',
     industryType: industryStore.industryCode || 'default',
     status: 'active',
     password: ''
@@ -941,6 +1154,173 @@ const handlePageSizeChange = (size) => {
   pagination.size = size
   pagination.current = 1
   loadUsers()
+}
+
+// 绑定角色相关方法
+const handleBindRoles = async (user) => {
+  currentUser.value = user
+  showBindRolesDialog.value = true
+  availableRolePagination.current = 1
+  roleSearchKeyword.value = ''
+  selectedRoleIds.value = []
+  
+  // 先加载角色列表
+  await loadAvailableRoles()
+  
+  // 然后加载已绑定的角色ID，用于回显
+  await loadUserRoleIds(user.id)
+}
+
+const loadAvailableRoles = async () => {
+  try {
+    availableRoleLoading.value = true
+    logger.info('Loading available roles', { userId: currentUser.value?.id })
+
+    const requestData = {
+      pageNo: availableRolePagination.current,
+      pageSize: availableRolePagination.size,
+      sortBy: 'sortOrder',
+      sortOrder: 'ASC'
+    }
+
+    // 如果有搜索关键词，添加到请求参数
+    if (roleSearchKeyword.value) {
+      requestData.keyword = roleSearchKeyword.value
+    }
+
+    const response = await getRoles(requestData)
+    const data = response?.data?.data || response?.data || {}
+
+    availableRoleList.value = (data.records || []).map((role) => ({
+      id: role.id,
+      roleName: role.roleName,
+      roleCode: role.roleCode,
+      description: role.description,
+      status: role.status !== undefined ? role.status : 1 // 默认启用状态（1=启用，0=禁用）
+    }))
+
+    availableRolePagination.total = data.total || 0
+    availableRolePagination.current = data.current || data.pageNo || availableRolePagination.current
+    availableRolePagination.size = data.size || data.pageSize || availableRolePagination.size
+
+    logger.info('Available roles loaded successfully', { count: availableRoleList.value.length })
+  } catch (error) {
+    logger.error('Failed to load available roles', error)
+    ElMessage.error(error.response?.data?.message || t('system.user.loadAvailableRolesError'))
+    availableRoleList.value = []
+    availableRolePagination.total = 0
+  } finally {
+    availableRoleLoading.value = false
+  }
+}
+
+const handleSearchRoles = () => {
+  availableRolePagination.current = 1
+  loadAvailableRoles()
+}
+
+const handleAvailableRoleSelectionChange = (selection) => {
+  selectedRoleIds.value = selection.map((role) => role.id)
+  logger.info('Role selection changed', { 
+    count: selectedRoleIds.value.length, 
+    selectedIds: selectedRoleIds.value 
+  })
+}
+
+/**
+ * 加载用户绑定的角色ID集合（用于回显）
+ */
+const loadUserRoleIds = async (userId) => {
+  try {
+    logger.info('Loading user role IDs for echo', { userId })
+    
+    const response = await getUserRoles(userId)
+    const roleIdList = response?.data?.data?.roleIdList || response?.data?.roleIdList || []
+    
+    // 设置已选中的角色ID
+    selectedRoleIds.value = roleIdList
+    
+    // 等待表格渲染完成后，设置选中状态
+    await nextTick()
+    if (bindRolesTableRef.value && bindRolesTableRef.value.tableRef) {
+      const elTable = bindRolesTableRef.value.tableRef
+      // 遍历角色列表，选中已绑定的角色
+      availableRoleList.value.forEach(role => {
+        if (roleIdList.includes(role.id)) {
+          elTable.toggleRowSelection(role, true)
+        }
+      })
+    }
+    
+    logger.info('User role IDs loaded for echo', { 
+      userId, 
+      count: roleIdList.length,
+      roleIds: roleIdList 
+    })
+  } catch (error) {
+    logger.error('Failed to load user role IDs', error)
+    // 回显失败不影响功能，只记录日志
+  }
+}
+
+/**
+ * 确认绑定角色到用户
+ * 调用接口：POST /api/user/users/roles
+ * 请求体：{ userId: number, roleIdList: number[] }
+ */
+const handleConfirmBindRoles = async () => {
+  if (selectedRoleIds.value.length === 0) {
+    ElMessage.warning(t('system.user.noRolesSelected'))
+    return
+  }
+
+  try {
+    submitting.value = true
+    const userId = currentUser.value.id
+    
+    logger.info('Binding roles to user', {
+      userId,
+      roleIds: selectedRoleIds.value,
+      api: 'POST /api/user/users/roles'
+    })
+
+    await updateUserRoles({
+      userId,
+      roleIdList: selectedRoleIds.value
+    })
+
+    ElMessage.success(t('system.user.bindRolesSuccess'))
+    showBindRolesDialog.value = false
+    submitting.value = false
+    selectedRoleIds.value = []
+
+    // 重新加载用户列表（更新角色信息）
+    await loadUsers()
+  } catch (error) {
+    submitting.value = false
+    logger.error('Failed to bind roles to user', error)
+    ElMessage.error(error.response?.data?.message || t('system.user.bindRolesFailed'))
+  }
+}
+
+const handleBindRolesDialogClose = () => {
+  currentUser.value = null
+  availableRoleList.value = []
+  roleSearchKeyword.value = ''
+  selectedRoleIds.value = []
+  availableRolePagination.current = 1
+  availableRolePagination.total = 0
+}
+
+const handleAvailableRolePageChange = (page) => {
+  availableRolePagination.current = page
+  loadAvailableRoles()
+}
+
+const handleAvailableRolePageSizeChange = (size) => {
+  availableRolePagination.size = size
+  availableRolePagination.current = 1
+  loadAvailableRoles()
 }
 
 watch(
@@ -1017,12 +1397,18 @@ onMounted(async () => {
   // 确保表格充分利用宽度
   :deep(.base-table) {
     width: 100%;
+    display: flex;
+    flex-direction: column;
   }
   
   :deep(.base-table__table) {
     width: 100% !important;
     min-width: 100%;
+    flex: 1;
+    overflow: auto;
   }
+  
+  // Element Plus 表格会自动处理表头和表体的对齐，不需要额外样式
   
   // 业务特定样式：用户管理表格的特定样式
   // 注意：通用表格样式已在 BaseTable.vue 中定义
@@ -1101,9 +1487,16 @@ onMounted(async () => {
 
 .action-buttons {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   justify-content: center;
-  flex-wrap: wrap;
+  align-items: center;
+  
+  .action-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
 }
 
 .action-btn {
@@ -1116,11 +1509,21 @@ onMounted(async () => {
   background: none;
   white-space: nowrap;
   
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    
+    &:hover {
+      background: none;
+      color: inherit;
+    }
+  }
+  
   &.btn-primary {
     color: var(--color-primary);
     border-color: var(--color-primary);
     
-    &:hover {
+    &:hover:not(:disabled) {
       background: var(--color-primary);
       color: var(--surface);
     }
@@ -1130,7 +1533,7 @@ onMounted(async () => {
     color: #f59e0b;
     border-color: #f59e0b;
     
-    &:hover {
+    &:hover:not(:disabled) {
       background: #f59e0b;
       color: var(--surface);
     }
@@ -1140,7 +1543,7 @@ onMounted(async () => {
     color: var(--text-3);
     border-color: var(--text-3);
     
-    &:hover {
+    &:hover:not(:disabled) {
       background: var(--text-3);
       color: var(--surface);
     }
@@ -1150,7 +1553,7 @@ onMounted(async () => {
     color: #16a34a;
     border-color: #16a34a;
     
-    &:hover {
+    &:hover:not(:disabled) {
       background: #16a34a;
       color: var(--surface);
     }
@@ -1160,7 +1563,7 @@ onMounted(async () => {
     color: #dc2626;
     border-color: #dc2626;
     
-    &:hover {
+    &:hover:not(:disabled) {
       background: #dc2626;
       color: var(--surface);
     }
@@ -1168,33 +1571,63 @@ onMounted(async () => {
 }
 
 // 角色和状态标签样式 - 参考原型图
+.role-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-width: 150px;
+  max-width: 100%;
+}
+
 .role-tag {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   padding: 4px 12px;
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
+  width: auto;
+  min-width: 70px;
+  max-width: 120px;
+  flex-shrink: 0;
+  text-align: center;
   
   &.role-admin {
-    background: #fee2e2;
-    color: #dc2626;
+    background: #fecaca;
+    color: #b91c1c;
   }
   
   &.role-teacher {
-    background: #dbeafe;
-    color: #1e3a8a;
+    background: #bfdbfe;
+    color: #1e40af;
   }
   
   &.role-student {
-    background: #dbeafe;
-    color: #2563eb;
+    background: #bfdbfe;
+    color: #1d4ed8;
   }
   
   &.role-default {
-    background: var(--hover);
-    color: var(--text-2);
+    background: #e5e7eb;
+    color: #374151;
   }
+}
+
+.role-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+  font-size: 20px;
+  font-weight: 300;
+  width: 100%;
+  min-height: 40px;
+  letter-spacing: 1px;
 }
 
 .status-tag {
@@ -1213,6 +1646,69 @@ onMounted(async () => {
   &.status-disabled {
     background: #fee2e2;
     color: #dc2626;
+  }
+}
+
+// 绑定角色对话框样式
+.bind-roles-container {
+  // 当前用户信息
+  .bind-roles-user-info {
+    margin-bottom: var(--gap-lg);
+    font-size: var(--font-size-base);
+    color: var(--text-1);
+
+    strong {
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+
+    .user-name {
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+  }
+
+  // 搜索区域
+  .bind-roles-search {
+    display: flex;
+    gap: var(--gap-md);
+    margin-bottom: var(--gap-lg);
+    align-items: center;
+  }
+
+  // 角色表格
+  .bind-roles-table {
+    width: 100%;
+    
+    :deep(.base-table) {
+      width: 100%;
+    }
+    
+    :deep(.el-table) {
+      width: 100%;
+    }
+    
+    // 确保表格内容居中
+    :deep(.el-table__cell) {
+      text-align: center;
+    }
+    
+    // 表头也居中
+    :deep(.el-table__header-wrapper .el-table__cell) {
+      text-align: center;
+    }
+  }
+}
+
+// 绑定角色对话框底部
+.bind-roles-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .selected-count {
+    color: var(--text-2);
+    font-size: var(--font-size-sm);
   }
 }
 

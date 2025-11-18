@@ -16,7 +16,7 @@
     <div v-if="showSizeSelector" class="base-pagination__size-selector">
       {{ t('pagination.pageSizeLabel') }}
       <select
-        v-model="pageSize"
+        :value="pageSize"
         :disabled="disabled"
         @change="handleSizeChange"
         class="base-pagination__size-select"
@@ -251,7 +251,12 @@ const handlePageChange = (page) => {
   }
 }
 
-const handleSizeChange = (size) => {
+const handleSizeChange = (event) => {
+  // 确保从 event.target.value 获取值并转换为数字
+  const size = Number(event.target.value)
+  if (isNaN(size) || size <= 0) {
+    return
+  }
   pageSize.value = size
   currentPage.value = 1
   jumpPage.value = 1

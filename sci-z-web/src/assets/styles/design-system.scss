@@ -239,14 +239,18 @@ body {
 // 5. 按钮统一样式
 // ================================
 
-/* 主要按钮 */
+/* 主要按钮 - 参考原型图样式 */
 .el-button--primary {
   background-color: var(--color-primary) !important;
   border-color: var(--color-primary) !important;
   color: var(--surface) !important;
-  border-radius: var(--radius-md) !important;
+  border-radius: var(--radius-lg) !important;
   font-weight: 500 !important;
+  font-size: 14px !important;
+  padding: 8px 20px !important;
+  border: 1px solid !important;
   transition: all 0.2s ease !important;
+  box-shadow: none !important;
 }
 
 .el-button--primary:hover {
@@ -281,20 +285,23 @@ body {
   box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3) !important;
 }
 
-/* 次要按钮 */
+/* 次要按钮 - 参考原型图样式 */
 .el-button--default {
   background-color: var(--surface) !important;
   border-color: var(--border) !important;
   color: var(--text-3) !important;
-  border-radius: var(--radius-md) !important;
+  border-radius: var(--radius-lg) !important;
   font-weight: 500 !important;
+  font-size: 14px !important;
+  padding: 8px 20px !important;
+  border: 1px solid !important;
   transition: all 0.2s ease !important;
 }
 
 .el-button--default:hover {
-  background-color: var(--hover) !important;
-  border-color: var(--border-hover) !important;
-  color: var(--text-2) !important;
+  background-color: #f9fafb !important;
+  border-color: #9ca3af !important;
+  color: #374151 !important;
 }
 
 /* 暗色主题下次要按钮悬浮样式 */

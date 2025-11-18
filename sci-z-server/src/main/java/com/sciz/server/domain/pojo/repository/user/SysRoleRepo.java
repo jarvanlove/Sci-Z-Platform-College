@@ -1,5 +1,6 @@
 package com.sciz.server.domain.pojo.repository.user;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.sciz.server.domain.pojo.entity.user.SysRole;
 import java.util.List;
 
@@ -44,4 +45,42 @@ public interface SysRoleRepo {
      * @return List<SysRole> 角色列表
      */
     List<SysRole> listByIndustryType(String industryType);
+
+    /**
+     * 根据ID查询角色
+     *
+     * @param id Long 角色ID
+     * @return SysRole 角色实体
+     */
+    SysRole findById(Long id);
+
+    /**
+     * 根据ID更新角色
+     *
+     * @param entity SysRole 角色实体
+     * @return boolean 是否更新成功
+     */
+    boolean updateById(SysRole entity);
+
+    /**
+     * 根据ID软删除角色
+     *
+     * @param id Long 角色ID
+     * @return boolean 是否删除成功
+     */
+    boolean deleteById(Long id);
+
+    /**
+     * 分页查询角色列表
+     *
+     * @param page         IPage<SysRole> 分页对象
+     * @param industryType String 行业类型
+     * @param keyword      String 搜索关键字（角色名称/角色编码）
+     * @param status       Integer 角色状态（null表示全部）
+     * @param sortBy       String 排序字段
+     * @param asc          boolean 是否升序
+     * @return IPage<SysRole> 分页结果
+     */
+    IPage<SysRole> page(IPage<SysRole> page, String industryType, String keyword, Integer status, String sortBy,
+            boolean asc);
 }

@@ -406,6 +406,17 @@ export const useAuthStore = defineStore('auth', {
       }
       
       const now = Date.now()
+      
+      // 如果最近 5 分钟内发生过网络错误，直接跳过请求，避免频繁尝试
+      const NETWORK_ERROR_COOLDOWN = 5 * 60 * 1000 // 5 分钟冷却期
+      if (!force && this.lastNetworkError && (now - this.lastNetworkError) < NETWORK_ERROR_COOLDOWN) {
+        authLogger.debug('最近发生过网络错误，跳过登录状态校验', {
+          lastNetworkError: this.lastNetworkError,
+          cooldownRemaining: Math.ceil((NETWORK_ERROR_COOLDOWN - (now - this.lastNetworkError)) / 1000) + 's'
+        })
+        return false // 返回 false 但不影响路由跳转（由路由守卫处理）
+      }
+      
       if (!force && this.lastSessionCheck && now - this.lastSessionCheck < SESSION_CHECK_INTERVAL) {
         authLogger.debug('使用缓存的登录状态校验结果', {
           lastSessionCheck: this.lastSessionCheck,
@@ -418,6 +429,9 @@ export const useAuthStore = defineStore('auth', {
         const response = await checkLoginStatus()
         const payload = unwrapResponse(response) || {}
         const isLoggedIn = payload?.login ?? payload?.isLogin ?? payload?.isLoggedIn ?? false
+        
+        // 请求成功时，清除网络错误标记
+        this.lastNetworkError = 0
         
         if (!isLoggedIn) {
           authLogger.warn('服务端会话已失效，执行本地清理')
@@ -438,26 +452,26 @@ export const useAuthStore = defineStore('auth', {
         
         return true
       } catch (error) {
-        // 对于网络错误（如后端服务未启动），更新 lastSessionCheck 避免频繁调用
-        // 但延长检查间隔，避免在服务恢复前一直重试
+        // 对于网络错误（如后端服务未启动），更新 lastSessionCheck 和 lastNetworkError
+        // 延长检查间隔，避免在服务恢复前一直重试
         const isNetworkError = error.code === 'ECONNREFUSED' || 
                                error.code === 'ECONNABORTED' || 
                                error.message?.includes('timeout') ||
                                !error.response
         
         if (isNetworkError) {
-          // 网络错误时，延长检查间隔到 5 分钟，避免频繁闪烁
+          // 网络错误时，延长检查间隔到 5 分钟，避免频繁重试
           const extendedInterval = 5 * 60 * 1000
           this.lastNetworkError = now
-          if (!this.lastSessionCheck || now - this.lastSessionCheck < extendedInterval) {
-            this.lastSessionCheck = now
-            authLogger.debug('网络错误，延长检查间隔', { 
-              error: error.message,
-              lastSessionCheck: this.lastSessionCheck 
-            })
-            // 网络错误时不抛出异常，返回 false 但不影响路由跳转
-            return false
-          }
+          this.lastSessionCheck = now
+          authLogger.debug('网络错误，延长检查间隔', { 
+            error: error.message,
+            code: error.code,
+            lastNetworkError: this.lastNetworkError,
+            nextCheckAfter: Math.ceil(extendedInterval / 1000) + 's'
+          })
+          // 网络错误时不抛出异常，返回 false 但不影响路由跳转
+          return false
         }
         
         authLogger.error('登录状态校验失败', { error: error.message })

@@ -1,6 +1,6 @@
 package com.sciz.server.infrastructure.external.mail.provider;
 
-import com.sciz.server.infrastructure.shared.enums.MailProviderType;
+import com.sciz.server.infrastructure.shared.enums.MailProviderStatus;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import java.util.EnumMap;
@@ -18,7 +18,7 @@ import java.util.Optional;
  */
 public class MailProviderRegistry {
 
-    private final Map<MailProviderType, MailProvider> providerMap = new EnumMap<>(MailProviderType.class);
+    private final Map<MailProviderStatus, MailProvider> providerMap = new EnumMap<>(MailProviderStatus.class);
 
     public MailProviderRegistry(List<MailProvider> providers) {
         Optional.ofNullable(providers)
@@ -34,7 +34,7 @@ public class MailProviderRegistry {
      * @param type MailProviderType 服务商类型
      * @return MailProvider 服务商
      */
-    public MailProvider getProvider(MailProviderType type) {
+    public MailProvider getProvider(MailProviderStatus type) {
         return Optional.ofNullable(providerMap.get(type))
                 .orElseThrow(() -> new BusinessException(ResultCode.EMAIL_PROVIDER_NOT_CONFIGURED,
                         String.format("邮箱服务商[%s]未配置", type)));

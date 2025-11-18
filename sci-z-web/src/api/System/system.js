@@ -18,102 +18,70 @@ export const getIndustryConfig = () => {
 }
 
 /**
- * 更新行业配置
- * @param {Object} data - 配置数据
- * @returns {Promise} 更新配置响应
+ * 获取Dify配置
+ * @returns {Promise} Dify配置响应
  */
-export const updateIndustryConfig = (data) => {
+export const getDifyConfig = () => {
   return request({
-    url: SYSTEM_API.INDUSTRY_CONFIG,
+    url: SYSTEM_API.DIFY_CONFIG,
+    method: HTTP_METHODS.GET
+  })
+}
+
+/**
+ * 保存行业配置
+ * @param {Object} data - 行业配置数据
+ * @returns {Promise} 保存响应
+ */
+export const saveIndustryConfig = (data) => {
+  return request({
+    url: SYSTEM_API.SAVE_INDUSTRY_CONFIG,
     method: HTTP_METHODS.PUT,
     data
   })
 }
 
 /**
- * 获取部门列表
- * @param {Object} params - 查询参数
- * @param {number} params.page - 页码
- * @param {number} params.size - 每页数量
- * @param {string} params.keyword - 关键词搜索
- * @param {number} params.parentId - 父部门ID
- * @returns {Promise} 部门列表响应
+ * 保存Dify配置
+ * @param {Object} data - Dify配置数据
+ * @returns {Promise} 保存响应
  */
-export const getDepartments = (params) => {
+export const saveDifyConfig = (data) => {
   return request({
-    url: SYSTEM_API.DEPARTMENTS,
-    method: HTTP_METHODS.GET,
-    params
+    url: SYSTEM_API.SAVE_DIFY_CONFIG,
+    method: HTTP_METHODS.PUT,
+    data
   })
 }
 
+
+
 /**
- * 创建部门
- * @param {Object} data - 部门数据
- * @param {string} data.name - 部门名称
- * @param {string} data.code - 部门编码
- * @param {number} data.parentId - 父部门ID
- * @param {number} data.leaderId - 负责人ID
- * @param {string} data.description - 部门描述
- * @returns {Promise} 创建部门响应
+ * 分页查询角色列表
+ * @param {Object} data - 查询参数
+ * @param {number} data.pageNo - 页码
+ * @param {number} data.pageSize - 每页数量
+ * @param {string} data.sortBy - 排序字段
+ * @param {string} data.sortOrder - 排序方向 (ASC/DESC)
+ * @param {string} [data.keyword] - 关键词搜索（可选）
+ * @param {number} [data.status] - 状态（可选，1=正常，0=禁用）
+ * @returns {Promise} 角色列表响应
  */
-export const createDepartment = (data) => {
+export const getRoles = (data) => {
   return request({
-    url: SYSTEM_API.DEPARTMENTS,
+    url: SYSTEM_API.ROLES_LIST,
     method: HTTP_METHODS.POST,
     data
   })
 }
 
 /**
- * 更新部门
- * @param {number} id - 部门ID
- * @param {Object} data - 部门数据
- * @returns {Promise} 更新部门响应
- */
-export const updateDepartment = (id, data) => {
-  return request({
-    url: SYSTEM_API.DEPARTMENT_DETAIL(id),
-    method: HTTP_METHODS.PUT,
-    data
-  })
-}
-
-/**
- * 删除部门
- * @param {number} id - 部门ID
- * @returns {Promise} 删除部门响应
- */
-export const deleteDepartment = (id) => {
-  return request({
-    url: SYSTEM_API.DEPARTMENT_DETAIL(id),
-    method: HTTP_METHODS.DELETE
-  })
-}
-
-/**
- * 获取角色列表
- * @param {Object} params - 查询参数
- * @param {number} params.page - 页码
- * @param {number} params.size - 每页数量
- * @param {string} params.keyword - 关键词搜索
- * @returns {Promise} 角色列表响应
- */
-export const getRoles = (params) => {
-  return request({
-    url: SYSTEM_API.ROLES,
-    method: HTTP_METHODS.GET,
-    params
-  })
-}
-
-/**
  * 创建角色
  * @param {Object} data - 角色数据
- * @param {string} data.name - 角色名称
- * @param {string} data.code - 角色编码
- * @param {string} data.description - 角色描述
- * @param {Array} data.permissions - 权限列表
+ * @param {string} data.roleName - 角色名称（必填，最大长度50个字符）
+ * @param {string} data.roleCode - 角色编码（必填，最大长度50个字符，唯一）
+ * @param {string} [data.description] - 角色描述（可选，最大长度200个字符）
+ * @param {number} [data.sortOrder] - 排序值（可选，默认0）
  * @returns {Promise} 创建角色响应
  */
 export const createRole = (data) => {
@@ -126,15 +94,23 @@ export const createRole = (data) => {
 
 /**
  * 更新角色
- * @param {number} id - 角色ID
+ * @param {number} id - 角色ID（路径参数）
  * @param {Object} data - 角色数据
+ * @param {number} data.id - 角色ID（必填，必须与路径参数一致）
+ * @param {string} data.roleName - 角色名称（必填，最大长度50个字符）
+ * @param {string} [data.description] - 角色描述（可选，最大长度200个字符）
+ * @param {number} [data.sortOrder] - 排序值（可选，默认0）
+ * @param {number} [data.status] - 角色状态（可选，1=启用，0=禁用）
  * @returns {Promise} 更新角色响应
  */
 export const updateRole = (id, data) => {
   return request({
     url: SYSTEM_API.ROLE_DETAIL(id),
     method: HTTP_METHODS.PUT,
-    data
+    data: {
+      ...data,
+      id // 确保id字段与路径参数一致
+    }
   })
 }
 
@@ -162,6 +138,115 @@ export const getPermissionsTree = () => {
 }
 
 /**
+ * 更新角色权限
+ * @param {number} roleId - 角色ID
+ * @param {Array<number>} permissionIdList - 权限ID列表
+ * @returns {Promise} 更新权限响应
+ */
+export const updateRolePermissions = (roleId, permissionIdList) => {
+  return request({
+    url: SYSTEM_API.ROLE_PERMISSIONS_UPDATE,
+    method: HTTP_METHODS.POST,
+    data: {
+      roleId,
+      permissionIdList
+    }
+  })
+}
+
+/**
+ * 获取角色权限ID集合（用于回显）
+ * @param {number} roleId - 角色ID（路径参数）
+ * @returns {Promise} 权限ID集合响应 { permissionIdList: number[] }
+ */
+export const getRolePermissions = (roleId) => {
+  return request({
+    url: SYSTEM_API.ROLE_PERMISSIONS(roleId),
+    method: HTTP_METHODS.GET
+  })
+}
+
+/**
+ * 分页查询指定角色下的所有用户（用于点击用户数量时显示）
+ * @param {number} roleId - 角色ID（路径参数）
+ * @param {Object} data - 查询参数（请求体）
+ * @param {number} [data.pageNo] - 页码，从1开始，默认1，最小值为1
+ * @param {number} [data.pageSize] - 每页数量，默认10，最小值为1
+ * @param {string} [data.sortBy] - 排序字段（可选，如"createTime"）
+ * @param {string} [data.sortOrder] - 排序方式，支持"ASC"或"DESC"，默认"DESC"（可选）
+ * @param {string} [data.keyword] - 搜索关键字（可选），支持用户名/真实姓名/邮箱/手机号
+ * @param {number} [data.roleId] - 角色ID（可选，此接口中会被路径参数覆盖，可传null）
+ * @param {number} [data.status] - 用户状态（可选），1=正常，0=禁用，null=全部
+ * @returns {Promise} 用户列表响应
+ */
+export const getRoleUsers = (roleId, data = {}) => {
+  return request({
+    url: SYSTEM_API.ROLE_USERS(roleId),
+    method: HTTP_METHODS.POST,
+    data: {
+      pageNo: 1,
+      pageSize: 10,
+      sortBy: 'createTime',
+      sortOrder: 'DESC',
+      ...data,
+      roleId // 自动设置roleId，即使传入也会被覆盖
+    }
+  })
+}
+
+/**
+ * 获取角色绑定的用户ID集合（用于回显）
+ * @param {number} roleId - 角色ID（路径参数）
+ * @returns {Promise} 用户ID集合响应 { userIdList: number[] }
+ */
+export const getRoleUserIds = (roleId) => {
+  return request({
+    url: SYSTEM_API.ROLE_USER_IDS(roleId),
+    method: HTTP_METHODS.GET
+  })
+}
+
+/**
+ * 更新用户角色（全量替换用户在当前行业下的角色集合）
+ * @param {Object} data - 更新数据
+ * @param {number} data.userId - 用户ID（必填，不能为空）
+ * @param {Array<number>} data.roleIdList - 角色ID集合（必填，不能为空）
+ * @returns {Promise} 更新响应（data为null）
+ */
+export const updateUserRoles = (data) => {
+  return request({
+    url: SYSTEM_API.USER_ROLES_UPDATE,
+    method: HTTP_METHODS.POST,
+    data
+  })
+}
+
+/**
+ * 获取用户已绑定的角色ID集合（用于回显）
+ * @param {number} userId - 用户ID
+ * @returns {Promise} 用户角色ID集合响应
+ */
+export const getUserRoles = (userId) => {
+  return request({
+    url: SYSTEM_API.USER_ROLES(userId),
+    method: HTTP_METHODS.GET
+  })
+}
+
+/**
+ * 从角色解绑用户
+ * @param {number} roleId - 角色ID
+ * @param {number} userId - 用户ID
+ * @returns {Promise} 解绑响应
+ */
+export const unbindUserFromRole = (roleId, userId) => {
+  return request({
+    url: `${SYSTEM_API.ROLE_BIND_USERS(roleId)}/${userId}`,
+    method: HTTP_METHODS.DELETE
+  })
+}
+
+/**
  * 创建权限
  * @param {Object} data - 权限数据
  * @param {string} data.name - 权限名称
@@ -178,32 +263,6 @@ export const createPermission = (data) => {
     url: SYSTEM_API.PERMISSIONS,
     method: HTTP_METHODS.POST,
     data
-  })
-}
-
-/**
- * 更新权限
- * @param {number} id - 权限ID
- * @param {Object} data - 权限数据
- * @returns {Promise} 更新权限响应
- */
-export const updatePermission = (id, data) => {
-  return request({
-    url: SYSTEM_API.PERMISSION_DETAIL(id),
-    method: HTTP_METHODS.PUT,
-    data
-  })
-}
-
-/**
- * 删除权限
- * @param {number} id - 权限ID
- * @returns {Promise} 删除权限响应
- */
-export const deletePermission = (id) => {
-  return request({
-    url: SYSTEM_API.PERMISSION_DETAIL(id),
-    method: HTTP_METHODS.DELETE
   })
 }
 

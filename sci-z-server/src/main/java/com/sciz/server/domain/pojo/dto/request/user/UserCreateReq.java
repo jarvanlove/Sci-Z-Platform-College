@@ -2,7 +2,6 @@ package com.sciz.server.domain.pojo.dto.request.user;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.util.StringUtils;
@@ -10,12 +9,12 @@ import org.springframework.util.StringUtils;
 /**
  * 管理员创建用户请求
  *
- * @param username     String 用户名（3-20位，字母、数字、下划线）
- * @param realName     String 真实姓名
- * @param email        String 邮箱
- * @param phone        String 手机号（大陆11位）
- * @param password     String 初始密码（6-32位）
- * @param departmentId Long 部门ID
+ * @param username       String 用户名（3-20位，字母、数字、下划线）
+ * @param realName       String 真实姓名
+ * @param email          String 邮箱
+ * @param phone          String 手机号（大陆11位）
+ * @param password       String 初始密码（6-32位）
+ * @param departmentCode String 部门编码
  *
  * @author JiaWen.Wu
  * @className UserCreateReq
@@ -32,7 +31,7 @@ public record UserCreateReq(
 
         @NotBlank(message = "初始密码不能为空") @Size(min = 6, max = 32, message = "密码长度必须在6-32个字符之间") String password,
 
-        @NotNull(message = "部门ID不能为空") Long departmentId) {
+        @NotBlank(message = "部门编码不能为空") String departmentCode) {
 
     public UserCreateReq {
         username = normalize(username);
@@ -40,6 +39,7 @@ public record UserCreateReq(
         email = normalize(email);
         phone = normalize(phone);
         password = normalize(password);
+        departmentCode = normalize(departmentCode);
     }
 
     private static String normalize(String value) {

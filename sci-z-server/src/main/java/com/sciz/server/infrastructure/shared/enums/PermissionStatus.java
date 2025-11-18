@@ -7,11 +7,11 @@ import lombok.Getter;
  * 对应数据库表中的 permission_type 字段
  *
  * @author JiaWen.Wu
- * @className PermissionType
+ * @className PermissionStatus
  * @date 2025-11-07 11:20
  */
 @Getter
-public enum PermissionType {
+public enum PermissionStatus {
 
     /**
      * 菜单
@@ -31,7 +31,7 @@ public enum PermissionType {
     private final Integer code;
     private final String description;
 
-    PermissionType(Integer code, String description) {
+    PermissionStatus(Integer code, String description) {
         this.code = code;
         this.description = description;
     }
@@ -42,8 +42,8 @@ public enum PermissionType {
      * @param code 代码
      * @return 权限类型枚举
      */
-    public static PermissionType fromCode(Integer code) {
-        for (PermissionType type : values()) {
+    public static PermissionStatus fromCode(Integer code) {
+        for (PermissionStatus type : values()) {
             if (type.getCode().equals(code)) {
                 return type;
             }

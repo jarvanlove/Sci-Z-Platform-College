@@ -54,6 +54,46 @@ service.interceptors.response.use(
     return data
   },
   (error) => {
+    const isNetworkError = !error.response && (
+      error.code === 'ECONNREFUSED' || 
+      error.code === 'ECONNABORTED' || 
+      error.message?.includes('timeout') ||
+      error.message?.includes('Network Error')
+    )
+    
+    // 对于网络连接错误（如后端服务未启动），在开发环境下静默处理
+    // 避免频繁弹出错误提示干扰开发体验
+    if (isNetworkError) {
+      const authStore = useAuthStore()
+      const now = Date.now()
+      
+      // 记录网络错误时间，用于路由守卫判断
+      if (!authStore.lastNetworkError || (now - authStore.lastNetworkError) > 5 * 60 * 1000) {
+        authStore.lastNetworkError = now
+      }
+      
+      // 仅记录日志，不弹出错误提示（开发环境）
+      const isDev = import.meta.env.DEV
+      if (isDev) {
+        requestLogger.warn('网络连接错误（后端服务可能未启动）', { 
+          url: error.config?.url,
+          code: error.code,
+          message: error.message 
+        })
+        // 开发环境下静默处理，不弹出错误提示
+      } else {
+        // 生产环境仍然提示
+        if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+          ElMessage.error('请求超时，请稍后重试或联系管理员')
+        } else {
+          ElMessage.error('网络错误，请检查网络连接')
+        }
+      }
+      
+      return Promise.reject(error)
+    }
+    
+    // 对于有响应的错误，正常处理
     requestLogger.error('响应错误', { 
       status: error.response?.status, 
       url: error.config?.url,

@@ -7,7 +7,7 @@ import com.sciz.server.infrastructure.external.mail.provider.MailProvider;
 import com.sciz.server.infrastructure.external.mail.provider.MailProviderRegistry;
 import com.sciz.server.infrastructure.external.mail.provider.OutlookGraphMailProvider;
 import com.sciz.server.infrastructure.external.mail.provider.SmtpMailProvider;
-import com.sciz.server.infrastructure.shared.enums.MailProviderType;
+import com.sciz.server.infrastructure.shared.enums.MailProviderStatus;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -41,7 +41,7 @@ public class MailIntegrationConfig {
      * @param restTemplate RestTemplate HTTP 客户端
      * @param providers    List<MailProvider> 服务商列表
      */
-    private void buildProvider(MailProviderType type, ProviderConfig config, RestTemplate restTemplate,
+    private void buildProvider(MailProviderStatus type, ProviderConfig config, RestTemplate restTemplate,
             List<MailProvider> providers) {
         if (config == null || !config.enabled()) {
             return;

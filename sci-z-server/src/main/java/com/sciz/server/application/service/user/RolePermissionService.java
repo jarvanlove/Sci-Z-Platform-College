@@ -1,6 +1,7 @@
 package com.sciz.server.application.service.user;
 
 import com.sciz.server.domain.pojo.dto.request.system.RolePermissionUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.system.PermissionTreeResp;
 import java.util.List;
 
 /**
@@ -27,4 +28,11 @@ public interface RolePermissionService {
      * @param req RolePermissionUpdateReq 更新请求
      */
     void updateRolePermissions(RolePermissionUpdateReq req);
+
+    /**
+     * 获取权限树
+     *
+     * @return List<PermissionTreeResp> 权限树
+     */
+    List<PermissionTreeResp> getPermissionTree();
 }

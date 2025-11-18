@@ -3,7 +3,7 @@ package com.sciz.server.infrastructure.external.mail.impl;
 import com.sciz.server.infrastructure.external.mail.MailService;
 import com.sciz.server.infrastructure.external.mail.provider.MailProviderRegistry;
 import com.sciz.server.infrastructure.shared.constant.SystemConstant;
-import com.sciz.server.infrastructure.shared.enums.MailProviderType;
+import com.sciz.server.infrastructure.shared.enums.MailProviderStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +25,7 @@ public class MailServiceImpl implements MailService {
     }
 
     @Override
-    public void sendEmailVerificationCode(MailProviderType provider, String toEmail, String code) {
+    public void sendEmailVerificationCode(MailProviderStatus provider, String toEmail, String code) {
         var subject = SystemConstant.EMAIL_SUBJECT_VERIFICATION;
         var content = """
                 您正在申请接收 Sci-Z Platform 验证码。

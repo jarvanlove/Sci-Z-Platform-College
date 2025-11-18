@@ -4,10 +4,10 @@ package com.sciz.server.infrastructure.shared.enums;
  * 邮箱服务商类型
  *
  * @author JiaWen.Wu
- * @className MailProviderType
+ * @className MailProviderStatus
  * @date 2025-11-11 20:30
  */
-public enum MailProviderType {
+public enum MailProviderStatus {
     /**
      * 谷歌 Gmail
      */

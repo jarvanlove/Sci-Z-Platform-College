@@ -1,6 +1,6 @@
 package com.sciz.server.infrastructure.external.mail.provider;
 
-import com.sciz.server.infrastructure.shared.enums.MailProviderType;
+import com.sciz.server.infrastructure.shared.enums.MailProviderStatus;
 
 /**
  * 邮件服务商适配器
@@ -14,9 +14,9 @@ public interface MailProvider {
     /**
      * 支持的邮箱服务商类型
      *
-     * @return MailProviderType 服务商类型
+     * @return MailProviderStatus 服务商类型
      */
-    MailProviderType type();
+    MailProviderStatus type();
 
     /**
      * 发送邮件

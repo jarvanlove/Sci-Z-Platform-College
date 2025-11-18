@@ -36,8 +36,6 @@ WITH industries(industry_type) AS (
 INSERT INTO sys_permission (parent_id, permission_name, permission_code, permission_type, industry_type, path, icon, sort_order, status)
 SELECT (SELECT id FROM sys_permission WHERE permission_code='menu:declaration:list' AND industry_type=i.industry_type), '申报列表', 'menu:declaration:list:sub', 1, i.industry_type, '/declaration/list', 'List', 1, 1 FROM industries i
 UNION ALL
-SELECT (SELECT id FROM sys_permission WHERE permission_code='menu:declaration:list' AND industry_type=i.industry_type), '新建申报', 'menu:declaration:create', 1, i.industry_type, '/declaration/create', 'CirclePlus', 2, 1 FROM industries i
-UNION ALL
 SELECT (SELECT id FROM sys_permission WHERE permission_code='menu:project:list' AND industry_type=i.industry_type), '项目列表', 'menu:project:list:sub', 1, i.industry_type, '/project/list', 'List', 1, 1 FROM industries i
 UNION ALL
 SELECT (SELECT id FROM sys_permission WHERE permission_code='menu:report:list' AND industry_type=i.industry_type), '报告管理', 'menu:report:list:sub', 1, i.industry_type, '/report/list', 'List', 1, 1 FROM industries i
@@ -141,7 +139,7 @@ SELECT
 FROM sys_permission p
 WHERE p.permission_code IN (
   'menu:dashboard:view',
-  'menu:declaration:list', 'menu:declaration:list:sub', 'menu:declaration:create',
+  'menu:declaration:list', 'menu:declaration:list:sub',
   'menu:project:list',     'menu:project:list:sub',
   'menu:report:list',      'menu:report:list:sub',
   'menu:ai:chat',          'menu:ai:chat:sub', 'menu:knowledge:list',

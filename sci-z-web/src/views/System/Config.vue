@@ -1,23 +1,16 @@
 <!--
 /**
- * @description 系统配置页面
- * 系统管理员配置系统参数
+ * @description 系统管理 - 系统配置页面
+ * 极薄包装层，仅负责路由挂载
  */
 -->
 <template>
-  <div class="system-config-page">
-    <h1>系统配置页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <SystemConfig />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import { SystemConfig } from '@/components/Business/System'
 </script>
 
 <style lang="scss" scoped>
-.system-config-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
 </style>

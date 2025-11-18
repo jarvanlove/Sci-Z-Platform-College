@@ -1,7 +1,7 @@
 package com.sciz.server.infrastructure.external.mail.provider;
 
 import com.sciz.server.infrastructure.config.mail.MailProviderProperties.SmtpConfig;
-import com.sciz.server.infrastructure.shared.enums.MailProviderType;
+import com.sciz.server.infrastructure.shared.enums.MailProviderStatus;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import java.nio.charset.StandardCharsets;
@@ -21,18 +21,18 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 @Slf4j
 public class SmtpMailProvider implements MailProvider {
 
-    private final MailProviderType type;
+    private final MailProviderStatus type;
     private final SmtpConfig smtpConfig;
     private final JavaMailSenderImpl javaMailSender;
 
-    public SmtpMailProvider(MailProviderType type, SmtpConfig smtpConfig) {
+    public SmtpMailProvider(MailProviderStatus type, SmtpConfig smtpConfig) {
         this.type = type;
         this.smtpConfig = smtpConfig;
         this.javaMailSender = buildSender(smtpConfig);
     }
 
     @Override
-    public MailProviderType type() {
+    public MailProviderStatus type() {
         return type;
     }
 

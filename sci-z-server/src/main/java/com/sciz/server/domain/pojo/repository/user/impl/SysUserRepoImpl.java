@@ -102,6 +102,23 @@ public class SysUserRepoImpl implements SysUserRepo {
     }
 
     /**
+     * 根据ID列表批量查询用户（过滤逻辑删除）
+     *
+     * @param ids List<Long> 用户ID列表
+     * @return List<SysUser> 用户列表（仅返回未删除的用户）
+     */
+    @Override
+    public List<SysUser> findByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.List.of();
+        }
+        return new LambdaQueryChainWrapper<>(mapper)
+                .in(SysUser::getId, ids)
+                .eq(SysUser::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .list();
+    }
+
+    /**
      * 根据ID更新用户
      *
      * @param entity SysUser 用户实体
@@ -131,9 +148,11 @@ public class SysUserRepoImpl implements SysUserRepo {
         // 只查询未删除的用户
         wrapper.eq(SysUser::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
-        // 关键字搜索（用户名/邮箱/手机号）
+        // 关键字搜索（用户名/真实姓名/邮箱/手机号）
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(SysUser::getUsername, keyword)
+                    .or()
+                    .like(SysUser::getRealName, keyword)
                     .or()
                     .like(SysUser::getEmail, keyword)
                     .or()

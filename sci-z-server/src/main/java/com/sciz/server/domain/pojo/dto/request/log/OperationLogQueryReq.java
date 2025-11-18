@@ -13,10 +13,7 @@ import org.springframework.util.StringUtils;
  * @param pageSize  Integer 每页数量
  * @param sortBy    String 排序字段
  * @param sortOrder String 排序方式
- * @param username  String 用户名关键字
- * @param operation String 操作名称关键字
- * @param method    String 请求方法
- * @param status    Integer 操作状态
+ * @param username  String 用户名关键字（模糊查询）
  * @param startTime LocalDateTime 开始时间
  * @param endTime   LocalDateTime 结束时间
  * @param level     LogLevelStatus 日志级别
@@ -30,9 +27,6 @@ public record OperationLogQueryReq(
         String sortBy,
         String sortOrder,
         String username,
-        String operation,
-        String method,
-        Integer status,
         LocalDateTime startTime,
         LocalDateTime endTime,
         LogLevelStatus level) {
@@ -46,8 +40,6 @@ public record OperationLogQueryReq(
         sortBy = base.sortBy();
         sortOrder = base.sortOrder();
         username = normalize(username);
-        operation = normalize(operation);
-        method = normalize(method);
     }
 
     private static String normalize(String value) {

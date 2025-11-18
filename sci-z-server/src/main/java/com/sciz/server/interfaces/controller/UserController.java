@@ -6,14 +6,20 @@ import com.sciz.server.application.service.user.AuthService;
 import com.sciz.server.application.service.user.RolePermissionService;
 import com.sciz.server.application.service.user.UserRoleService;
 import com.sciz.server.application.service.user.UserService;
+import com.sciz.server.domain.pojo.dto.request.system.RoleCreateReq;
+import com.sciz.server.domain.pojo.dto.request.system.RoleListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.system.RolePermissionUpdateReq;
+import com.sciz.server.domain.pojo.dto.request.system.RoleUpdateReq;
 import com.sciz.server.domain.pojo.dto.request.system.UserRoleUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.system.PermissionTreeResp;
+import com.sciz.server.domain.pojo.dto.response.system.RoleResp;
 import com.sciz.server.domain.pojo.dto.response.user.IndustryConfigResp;
 import com.sciz.server.domain.pojo.dto.response.user.IndustryProfileFieldOptionResp;
 import com.sciz.server.domain.pojo.dto.response.user.IndustryProfileFieldResp;
 import com.sciz.server.domain.pojo.dto.response.user.RolePermissionIdsResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserRoleIdsResp;
 import com.sciz.server.domain.pojo.dto.response.user.RoleListResp;
+import com.sciz.server.domain.pojo.dto.response.user.RoleUserIdsResp;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.request.user.UserAdminResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.request.user.UserCreateReq;
@@ -130,32 +136,55 @@ public class UserController {
         return Result.success(respList);
     }
 
-    @Operation(summary = "获取角色列表", description = "查询角色列表")
-    @GetMapping("/roles")
-    public Result<List<RoleListResp>> listRoles() {
-        var roles = userRoleService.listRoles();
-        return Result.success(roles);
+    @Operation(summary = "分页查询角色列表", description = "分页查询角色列表，支持按关键字、状态筛选")
+    @PostMapping("/roles/list")
+    public Result<PageResult<RoleListResp>> pageRoles(@Valid @RequestBody RoleListQueryReq req) {
+        var resp = userRoleService.page(req);
+        return Result.success(resp);
+    }
+
+    @Operation(summary = "查询角色下的所有用户", description = "分页查询指定角色下的所有用户（仅查询当前行业下的用户），用于点击用户数量时显示")
+    @PostMapping("/roles/{roleId}/users")
+    public Result<PageResult<UserListResp>> listUsersByRoleId(@PathVariable Long roleId,
+            @Valid @RequestBody UserListQueryReq req) {
+        var resp = userRoleService.pageUsersByRoleId(roleId, req);
+        return Result.success(resp);
+    }
+
+    @Operation(summary = "角色用户ID列表", description = "查询角色在当前行业下绑定的用户ID集合（用于绑定用户页面的回显：打开模态框时调用此接口获取已绑定的用户ID，然后在用户列表中勾选对应的用户。注意：绑定用户页面调用 /users/list 展示所有用户，然后使用此接口回显已绑定的用户）")
+    @GetMapping("/roles/{roleId}/user-ids")
+    public Result<RoleUserIdsResp> listRoleUserIds(@PathVariable Long roleId) {
+        var userIds = userRoleService.listUserIdsByRoleId(roleId);
+        var resp = userConverter.toRoleUserIdsResp(userIds);
+        return Result.success(resp);
     }
 
     @Operation(summary = "创建角色", description = "创建角色")
     @PostMapping("/roles")
-    public Result<Object> createRole(@RequestBody Object request) {
-        return Result.success(null);
+    public Result<RoleResp> createRole(@Valid @RequestBody RoleCreateReq req) {
+        var resp = userRoleService.create(req);
+        return Result.success(resp);
     }
 
     @Operation(summary = "更新角色", description = "更新角色")
     @PutMapping("/roles/{id}")
-    public Result<Object> updateRole(@PathVariable Long id, @RequestBody Object request) {
-        return Result.success(null);
+    public Result<RoleResp> updateRole(@PathVariable Long id, @Valid @RequestBody RoleUpdateReq req) {
+        // 确保路径参数和请求体中的ID一致
+        if (!id.equals(req.id())) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "路径参数中的角色ID与请求体中的角色ID不一致");
+        }
+        var resp = userRoleService.update(req);
+        return Result.success(resp);
     }
 
-    @Operation(summary = "删除角色", description = "删除角色")
+    @Operation(summary = "删除角色", description = "删除角色（系统角色不允许删除）")
     @DeleteMapping("/roles/{id}")
     public Result<Void> deleteRole(@PathVariable Long id) {
-        return Result.success(null);
+        userRoleService.deleteById(id);
+        return Result.success();
     }
 
-    @Operation(summary = "角色权限列表", description = "查询角色在指定行业下的权限ID集合")
+    @Operation(summary = "角色权限列表", description = "查询角色在当前行业下的权限ID集合（用于配置权限页面的回显：打开模态框时调用此接口获取已绑定的权限ID，然后在权限树中勾选对应的权限）")
     @GetMapping("/roles/{roleId}/permissions")
     public Result<RolePermissionIdsResp> listRolePermissionIds(@PathVariable Long roleId) {
         var permissionIds = rolePermissionService.listPermissionIds(roleId);
@@ -163,38 +192,21 @@ public class UserController {
         return Result.success(resp);
     }
 
-    @Operation(summary = "更新角色权限", description = "全量替换角色在指定行业下绑定的权限集合")
+    @Operation(summary = "获取权限树", description = "获取权限树结构（用于角色权限配置）")
+    @GetMapping("/permissions/tree")
+    public Result<List<PermissionTreeResp>> getPermissionTree() {
+        var resp = rolePermissionService.getPermissionTree();
+        return Result.success(resp);
+    }
+
+    @Operation(summary = "更新角色权限", description = "全量替换角色在当前行业下绑定的权限集合。查询用户权限时会自动取所有角色的权限并集（去重），因此不同角色的权限可以重叠")
     @PostMapping("/roles/permissions")
     public Result<Void> updateRolePermissions(@Valid @RequestBody RolePermissionUpdateReq req) {
         rolePermissionService.updateRolePermissions(req);
         return Result.success();
     }
 
-    @Operation(summary = "获取权限树", description = "获取权限树结构")
-    @GetMapping("/permissions/tree")
-    public Result<Object> getPermissionTree() {
-        return Result.success(null);
-    }
-
-    @Operation(summary = "创建权限", description = "创建权限")
-    @PostMapping("/permissions")
-    public Result<Object> createPermission(@RequestBody Object request) {
-        return Result.success(null);
-    }
-
-    @Operation(summary = "更新权限", description = "更新权限")
-    @PutMapping("/permissions/{id}")
-    public Result<Object> updatePermission(@PathVariable Long id, @RequestBody Object request) {
-        return Result.success(null);
-    }
-
-    @Operation(summary = "删除权限", description = "删除权限")
-    @DeleteMapping("/permissions/{id}")
-    public Result<Void> deletePermission(@PathVariable Long id) {
-        return Result.success(null);
-    }
-
-    @Operation(summary = "用户角色列表", description = "查询用户在指定行业下的角色ID集合")
+    @Operation(summary = "用户角色列表", description = "查询用户在当前行业下的角色ID集合（用于绑定用户到角色时，查询用户已有角色，然后合并新角色）")
     @GetMapping("/users/{userId}/roles")
     public Result<UserRoleIdsResp> listUserRoleIds(@PathVariable Long userId) {
         var industryType = industryConfigCache.get().getType();
@@ -203,25 +215,20 @@ public class UserController {
         return Result.success(resp);
     }
 
-    /**
-     * 更新用户角色
-     *
-     * @param req UserRoleUpdateReq 更新请求
-     * @return Result<Void> 空结果
-     */
-    @Operation(summary = "更新用户角色", description = "全量替换用户在指定行业下的角色集合")
+    @Operation(summary = "获取角色列表", description = "查询角色列表（不分页）")
+    @GetMapping("/roles")
+    public Result<List<RoleListResp>> listRoles() {
+        var roles = userRoleService.listRoles();
+        return Result.success(roles);
+    }
+
+    @Operation(summary = "更新用户角色", description = "全量替换用户在当前行业下的角色集合（仅处理当前行业下的角色，不影响其他行业的角色）。支持绑定和解绑：前端需要传入用户最终应该绑定的所有角色ID列表，后端会自动添加新角色、删除不在列表中的已有角色。使用场景：1) 绑定用户到角色时，需要先查询用户已有角色，然后合并新角色后调用此接口；2) 解绑角色时，传入去除解绑角色后的完整角色列表")
     @PostMapping("/users/roles")
     public Result<Void> updateUserRoles(@Valid @RequestBody UserRoleUpdateReq req) {
         userRoleService.updateUserRoles(req);
         return Result.success();
     }
 
-    /**
-     * 分页查询用户列表
-     *
-     * @param req UserListQueryReq 查询请求
-     * @return Result<PageResult<UserListResp>> 分页结果
-     */
     @Operation(summary = "用户管理列表", description = "管理员分页查询用户列表，支持按关键字、角色、状态筛选")
     @PostMapping("/users/list")
     public Result<PageResult<UserListResp>> listUsers(@Valid @RequestBody UserListQueryReq req) {
@@ -236,13 +243,6 @@ public class UserController {
         return Result.success(resp);
     }
 
-    /**
-     * 更新用户
-     *
-     * @param id  Long 用户ID
-     * @param req UserUpdateReq 更新请求
-     * @return Result<UserUpdateResp> 更新响应
-     */
     @Operation(summary = "更新用户", description = "管理员更新用户信息（真实姓名、邮箱、手机号、部门、行业类型）")
     @PutMapping("/users/{id}")
     public Result<UserUpdateResp> updateUser(@PathVariable Long id, @Valid @RequestBody UserUpdateReq req) {
@@ -254,12 +254,6 @@ public class UserController {
         return Result.success(resp);
     }
 
-    /**
-     * 删除用户
-     *
-     * @param id Long 用户ID
-     * @return Result<Void> 空结果
-     */
     @Operation(summary = "删除用户", description = "管理员软删除用户")
     @DeleteMapping("/users/{id}")
     public Result<Void> deleteUser(@PathVariable Long id) {
@@ -267,26 +261,13 @@ public class UserController {
         return Result.success();
     }
 
-    /**
-     * 禁用/启用用户
-     *
-     * @param id       Long 用户ID
-     * @param disabled boolean true=禁用，false=启用
-     * @return Result<Void> 空结果
-     */
-    @Operation(summary = "禁用/启用用户", description = "管理员禁用或启用用户")
+    @Operation(summary = "禁用/启用用户", description = "管理员禁用或启用用户，true=禁用，false=启用")
     @PutMapping("/users/{id}/status")
     public Result<Void> disableUser(@PathVariable Long id, @RequestParam boolean disabled) {
         userService.disableById(id, disabled);
         return Result.success();
     }
 
-    /**
-     * 管理员重置用户密码
-     *
-     * @param req UserAdminResetPasswordReq 重置密码请求
-     * @return Result<Void> 空结果
-     */
     @Operation(summary = "重置用户密码", description = "管理员重置指定用户的密码，不需要验证码")
     @PutMapping("/users/password/reset")
     public Result<Void> adminResetPassword(@Valid @RequestBody UserAdminResetPasswordReq req) {
@@ -328,5 +309,4 @@ public class UserController {
         var resp = operationLogService.findDetail(logId);
         return Result.success(resp);
     }
-
 }

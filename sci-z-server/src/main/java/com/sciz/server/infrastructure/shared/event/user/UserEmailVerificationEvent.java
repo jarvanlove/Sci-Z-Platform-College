@@ -1,6 +1,6 @@
 package com.sciz.server.infrastructure.shared.event.user;
 
-import com.sciz.server.infrastructure.shared.enums.MailProviderType;
+import com.sciz.server.infrastructure.shared.enums.MailProviderStatus;
 import com.sciz.server.infrastructure.shared.event.DomainEvent;
 import java.util.Optional;
 
@@ -16,10 +16,10 @@ public class UserEmailVerificationEvent extends DomainEvent {
     private final Long userId;
     private final String email;
     private final String verificationCode;
-    private final MailProviderType mailProviderType;
+    private final MailProviderStatus mailProviderType;
 
     public UserEmailVerificationEvent(Long userId, String email, String verificationCode,
-            MailProviderType mailProviderType) {
+            MailProviderStatus mailProviderType) {
         super();
         this.userId = userId;
         this.email = email;
@@ -39,7 +39,7 @@ public class UserEmailVerificationEvent extends DomainEvent {
         return verificationCode;
     }
 
-    public MailProviderType getMailProviderType() {
+    public MailProviderStatus getMailProviderType() {
         return mailProviderType;
     }
 

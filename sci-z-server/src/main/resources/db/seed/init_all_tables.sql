@@ -350,6 +350,8 @@ COMMENT ON COLUMN sys_operation_log.created_time IS '创建时间';
 CREATE INDEX IF NOT EXISTS idx_sys_operation_log_user_id ON sys_operation_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_sys_operation_log_created_time ON sys_operation_log(created_time);
 CREATE INDEX IF NOT EXISTS idx_sys_operation_log_status ON sys_operation_log(status);
+CREATE INDEX IF NOT EXISTS idx_sys_operation_log_username_time ON sys_operation_log(username, created_time DESC);
+CREATE INDEX IF NOT EXISTS idx_sys_operation_log_status_time ON sys_operation_log(status, created_time DESC);
 
 -- ===================== DECLARATION DOMAIN (2 tables) =====================
 

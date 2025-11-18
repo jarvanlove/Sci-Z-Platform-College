@@ -2,7 +2,7 @@ package com.sciz.server.infrastructure.external.mail.provider;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.sciz.server.infrastructure.config.mail.MailProviderProperties.OAuthConfig;
-import com.sciz.server.infrastructure.shared.enums.MailProviderType;
+import com.sciz.server.infrastructure.shared.enums.MailProviderStatus;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import java.util.Map;
@@ -32,8 +32,8 @@ public class OutlookGraphMailProvider implements MailProvider {
     private final RestTemplate restTemplate;
 
     @Override
-    public MailProviderType type() {
-        return MailProviderType.OUTLOOK;
+    public MailProviderStatus type() {
+        return MailProviderStatus.OUTLOOK;
     }
 
     @Override

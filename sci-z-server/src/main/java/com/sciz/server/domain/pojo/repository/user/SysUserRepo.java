@@ -2,6 +2,7 @@ package com.sciz.server.domain.pojo.repository.user;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
+import java.util.List;
 
 /**
  * 用户仓储（领域层抽象）
@@ -51,6 +52,14 @@ public interface SysUserRepo {
      * @return SysUser 或 null
      */
     SysUser findById(Long id);
+
+    /**
+     * 根据ID列表批量查询用户（过滤逻辑删除）
+     *
+     * @param ids List<Long> 用户ID列表
+     * @return List<SysUser> 用户列表（仅返回未删除的用户）
+     */
+    List<SysUser> findByIds(List<Long> ids);
 
     /**
      * 更新用户

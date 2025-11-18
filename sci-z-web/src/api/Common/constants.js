@@ -24,23 +24,23 @@ const buildApiUrl = (path) => `${API_BASE_URL}${path}`
 // ================================
 
 export const AUTH_API = {
-  BASE_PATH: buildApiUrl('/auth'),
-  LOGIN: buildApiUrl('/auth/login'),
-  REGISTER: buildApiUrl('/auth/register'),
-  RESET_PASSWORD: buildApiUrl('/auth/reset-password'),
-  CAPTCHA: buildApiUrl('/auth/captcha'),
-  SEND_EMAIL_CODE: buildApiUrl('/auth/email-code'),
-  SEND_SMS_CODE: buildApiUrl('/auth/sms-code'),
-  REFRESH_TOKEN: buildApiUrl('/auth/refresh-token'),
-  PROFILE: buildApiUrl('/auth/profile'),
+  BASE_PATH: buildApiUrl('/auth'), // 认证模块基础路径
+  LOGIN: buildApiUrl('/auth/login'), // 登录
+  REGISTER: buildApiUrl('/auth/register'), // 注册
+  RESET_PASSWORD: buildApiUrl('/auth/reset-password'), // 重置密码
+  CAPTCHA: buildApiUrl('/auth/captcha'), // 获取验证码
+  SEND_EMAIL_CODE: buildApiUrl('/auth/email-code'), // 发送邮箱验证码
+  SEND_SMS_CODE: buildApiUrl('/auth/sms-code'), // 发送短信验证码
+  REFRESH_TOKEN: buildApiUrl('/auth/refresh-token'), // 刷新令牌
+  PROFILE: buildApiUrl('/auth/profile'), // 获取用户信息
   CHANGE_PASSWORD: buildApiUrl('/auth/change-password'),  // 修改密码
-  CHECK_LOGIN: buildApiUrl('/auth/check/login'),
-  CHECK_ROLE: buildApiUrl('/auth/check/role'),
-  CHECK_PERMISSION: buildApiUrl('/auth/check/perm'),
+  CHECK_LOGIN: buildApiUrl('/auth/check/login'), // 检查登录
+  CHECK_ROLE: buildApiUrl('/auth/check/role'), // 检查角色
+  CHECK_PERMISSION: buildApiUrl('/auth/check/perm'),  // 检查权限
   PERMISSIONS: buildApiUrl('/auth/permissions'),  // 获取用户权限列表（保留占位，后端未实现）
   MENUS: buildApiUrl('/auth/menus'),              // 获取用户菜单列表（保留占位，后端未实现）
-  LOGOUT: buildApiUrl('/auth/logout'),
-  DEPARTMENT_LABEL: buildApiUrl('/auth/department/label')
+  LOGOUT: buildApiUrl('/auth/logout'), // 登出
+  DEPARTMENT_LABEL: buildApiUrl('/auth/department/label') // 获取部门标签
 }
 
 // ================================
@@ -163,15 +163,15 @@ export const KNOWLEDGE_API = {
 // ================================
 
 export const FILE_API = {
-  BASE_PATH: buildApiUrl('/file'),
-  UPLOAD: buildApiUrl('/file/upload'),
-  BATCH_UPLOAD: buildApiUrl('/file/batch-upload'),
-  LIST: buildApiUrl('/file/list'),
-  DOWNLOAD: (id) => buildApiUrl(`/file/download/${id}`),
-  PREVIEW: (id) => buildApiUrl(`/file/preview/${id}`),
-  DELETE: (id) => buildApiUrl(`/file/delete/${id}`),
-  CHECK_DUPLICATE: buildApiUrl('/file/check-duplicate'),
-  SYNC_DIFY: buildApiUrl('/file/sync-dify')
+  BASE_PATH: buildApiUrl('/file'), // 文件管理模块基础路径
+  UPLOAD: buildApiUrl('/file/upload'), // 上传文件
+  BATCH_UPLOAD: buildApiUrl('/file/batch-upload'), // 批量上传文件
+  LIST: buildApiUrl('/file/list'), // 获取文件列表
+  DOWNLOAD: (id) => buildApiUrl(`/file/download/${id}`), // 下载文件
+  PREVIEW: (id) => buildApiUrl(`/file/preview/${id}`), // 预览文件
+  DELETE: (id) => buildApiUrl(`/file/delete/${id}`), // 删除文件
+  CHECK_DUPLICATE: buildApiUrl('/file/check-duplicate'), // 检查文件是否重复
+  SYNC_DIFY: buildApiUrl('/file/sync-dify') // 同步Dify文件
 }
 
 // ================================
@@ -179,18 +179,28 @@ export const FILE_API = {
 // ================================
 
 export const SYSTEM_API = {
-  BASE_PATH: buildApiUrl('/user'),
-  INDUSTRY_CONFIG: buildApiUrl('/user/industry/config'),
-  DEPARTMENTS: buildApiUrl('/user/departments'),
-  DEPARTMENT_DETAIL: (id) => buildApiUrl(`/user/departments/${id}`),
-  ROLES: buildApiUrl('/user/roles'),
-  ROLE_DETAIL: (id) => buildApiUrl(`/user/roles/${id}`),
-  PERMISSIONS_TREE: buildApiUrl('/user/permissions/tree'),
-  PERMISSIONS: buildApiUrl('/user/permissions'),
-  PERMISSION_DETAIL: (id) => buildApiUrl(`/user/permissions/${id}`),
-  USER_LIST: buildApiUrl('/user/users/list'),
-  USER_CREATE: buildApiUrl('/user/users/create'),
-  USER_DETAIL: (id) => buildApiUrl(`/user/users/${id}`),
+  BASE_PATH: buildApiUrl('/user'), // 系统管理模块基础路径
+  INDUSTRY_CONFIG: buildApiUrl('/user/industry/config'), // 获取当前行业配置（从sys_config表）
+  INDUSTRY_CONFIG_LIST: buildApiUrl('/user/industry/config/list'), // 获取所有行业配置模板（从sys_industry_config表）
+  SYSTEM_CONFIG: buildApiUrl('/system/config'), // 获取系统配置（从sys_config表，key-value格式）
+  SYSTEM_CONFIG_UPDATE: buildApiUrl('/system/config'), // 更新系统配置（更新sys_config表）
+  DIFY_CONFIG: buildApiUrl('/system/config/dify'), // 获取Dify配置（从sys_config表）
+  SAVE_DIFY_CONFIG: buildApiUrl('/system/config/dify'), // 保存Dify配置
+  SAVE_INDUSTRY_CONFIG: buildApiUrl('/system/config/industry'), // 保存行业配置
+  ROLES: buildApiUrl('/user/roles'), // 获取角色列表（创建/更新用）
+  ROLES_LIST: buildApiUrl('/user/roles/list'), // 分页查询角色列表
+  ROLE_DETAIL: (id) => buildApiUrl(`/user/roles/${id}`), // 获取角色详情
+  ROLE_USERS: (id) => buildApiUrl(`/user/roles/${id}/users`), // 分页查询指定角色下的所有用户（用于点击用户数量时显示）
+  ROLE_USER_IDS: (id) => buildApiUrl(`/user/roles/${id}/user-ids`), // 获取角色绑定的用户ID集合（用于回显）
+  ROLE_PERMISSIONS: (id) => buildApiUrl(`/user/roles/${id}/permissions`), // 获取角色权限ID集合（用于回显）
+  ROLE_PERMISSIONS_UPDATE: buildApiUrl('/user/roles/permissions'), // 更新角色权限
+  USER_ROLES_UPDATE: buildApiUrl('/user/users/roles'), // 更新用户角色（全量替换）
+  USER_ROLES: (id) => buildApiUrl(`/user/users/${id}/roles`), // 获取用户已绑定的角色ID集合（用于回显）
+  PERMISSIONS_TREE: buildApiUrl('/user/permissions/tree'), // 获取权限树
+  PERMISSIONS: buildApiUrl('/user/permissions'), // 获取权限列表
+  USER_LIST: buildApiUrl('/user/users/list'), // 获取用户列表
+  USER_CREATE: buildApiUrl('/user/users/create'), // 创建用户
+  USER_DETAIL: (id) => buildApiUrl(`/user/users/${id}`), // 获取用户详情
   USER_STATUS: (id) => buildApiUrl(`/user/users/${id}/status`),  // 禁用/启用用户
   RESET_PASSWORD: buildApiUrl('/user/users/password/reset'),  // 管理员重置用户密码
   OPERATION_LOGS: buildApiUrl('/user/operation/logs')
@@ -203,8 +213,8 @@ export const SYSTEM_API = {
 export const USER_API = {
   BASE_PATH: buildApiUrl('/user'),
   INFO: buildApiUrl('/user/info'),  // 更新用户信息
-  PROFILE_FIELDS: buildApiUrl('/user/profile/fields'),
-  UPLOAD_AVATAR: buildApiUrl('/user/avatar'),
+  PROFILE_FIELDS: buildApiUrl('/user/profile/fields'), // 获取用户信息字段
+  UPLOAD_AVATAR: buildApiUrl('/user/avatar'), // 上传头像
   LOGIN_LOGS: buildApiUrl('/user/login/logs')  // 登录日志查询
 }
 

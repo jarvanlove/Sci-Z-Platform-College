@@ -24,7 +24,7 @@
       :row-key="rowKey"
       :default-sort="defaultSort || undefined"
       :empty-text="emptyText"
-      :selection-change="handleSelectionChange"
+      @selection-change="handleSelectionChange"
       @sort-change="handleSortChange"
       @row-click="handleRowClick"
       @row-dblclick="handleRowDblClick"
@@ -354,6 +354,11 @@ onUnmounted(() => {
     cleanupScrollSync()
   }
 })
+
+// 暴露内部tableRef，供父组件访问
+defineExpose({
+  tableRef
+})
 </script>
 
 <style lang="scss" scoped>
@@ -379,7 +384,24 @@ onUnmounted(() => {
   &__pagination {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
     margin-top: 16px;
+    padding: 16px 0;
+    width: 100%;
+    
+    // 确保分页组件在表格容器内正确显示
+    :deep(.base-pagination) {
+      width: 100%;
+      min-width: fit-content;
+      flex-wrap: wrap;
+      gap: 12px;
+      
+      // 确保确认按钮样式正确
+      .base-pagination__jump-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+    }
   }
 }
 
@@ -451,33 +473,18 @@ onUnmounted(() => {
     }
   }
   
-  // 确保表格内容可以超出容器宽度，触发横向滚动
-  // 同时确保表头和表体的列宽一致
-  .el-table__header,
-  .el-table__body {
-    width: 100% !important;
-    min-width: 100%;
-    // 不设置 table-layout: fixed，让 Element Plus 自动计算列宽
-    // Element Plus 会自动同步表头和表体的列宽
-  }
-  
-  // 确保表头和表体的列宽完全一致
+  // Element Plus 表格会自动处理表头和表体的对齐和滚动
+  // 我们只需要确保滚动容器正确，不要干扰 Element Plus 的默认行为
   .el-table__header-wrapper,
   .el-table__body-wrapper {
-    // 确保滚动容器宽度一致
-    width: 100%;
+    overflow-x: auto !important;
+    overflow-y: hidden;
   }
   
-  // 确保所有行都能正确滚动 - 统一处理，不区分 stripe 行
-  .el-table__body {
-    tr {
-      td {
-        position: relative;
-        white-space: nowrap;
-        // 不设置 overflow，让父容器的滚动来控制隐藏
-        overflow: visible !important;
-      }
-    }
+  // 确保表头和表体的列宽一致（Element Plus 内部会自动同步）
+  .el-table__header th,
+  .el-table__body td {
+    box-sizing: border-box;
   }
   
   // 固定列也需要支持滚动

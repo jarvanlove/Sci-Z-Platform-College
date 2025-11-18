@@ -206,6 +206,51 @@ public ProcessInfo getApprovalProcess(JSONObject jsonObject) {
 
 ## 五、开发规范
 
+### 导入规范（Import 规范）
+
+**强制要求**：所有需要使用的类、接口、枚举等，必须使用 `import` 语句导入，禁止在代码中使用全限定名（Fully Qualified Name）。
+
+```java
+// ✅ 正确：使用 import 导入
+import com.sciz.server.domain.pojo.dto.response.user.UserListResp;
+import com.sciz.server.domain.pojo.dto.request.user.UserListQueryReq;
+import com.sciz.server.application.service.user.UserService;
+
+public class UserRoleServiceImpl implements UserRoleService {
+    private final UserService userService;
+
+    public PageResult<UserListResp> pageUsersByRoleId(Long roleId, UserListQueryReq req) {
+        // 使用简短的类名
+        return userService.page(queryReq);
+    }
+}
+
+// ❌ 错误：在代码中使用全限定名
+public class UserRoleServiceImpl implements UserRoleService {
+    private final com.sciz.server.application.service.user.UserService userService;
+
+    public PageResult<com.sciz.server.domain.pojo.dto.response.user.UserListResp> pageUsersByRoleId(
+            Long roleId,
+            com.sciz.server.domain.pojo.dto.request.user.UserListQueryReq req) {
+        // 代码冗长，可读性差
+        return userService.page(queryReq);
+    }
+}
+```
+
+**规范说明**：
+
+- ✅ **必须使用 import**：所有外部类、接口、枚举、注解等都必须通过 `import` 语句导入
+- ✅ **保持代码简洁**：使用简短的类名，提高代码可读性
+- ✅ **统一管理**：所有导入语句统一放在文件顶部，便于管理和查看依赖关系
+- ❌ **禁止全限定名**：禁止在方法签名、变量声明、方法调用等位置使用全限定名
+- ❌ **禁止混合使用**：同一文件中，不能既有 import 又有全限定名
+
+**特殊情况**：
+
+- 当存在同名类需要区分时，可以使用全限定名，但应优先考虑重命名或使用别名
+- 静态导入（`import static`）可以用于常量、工具方法等场景
+
 ### 日志规范
 
 统一使用 `String.format("%s", ...)` 占位符
@@ -1603,3 +1648,209 @@ user.setStatus(1);
 - 新增业务模块
 - 新增特定的成功/失败场景
 - 需要前端特殊处理的错误
+
+---
+
+### 操作日志规范
+
+#### 1. 操作日志工具类
+
+**工具类位置**：`infrastructure/shared/utils/OperationLogRecorderUtil.java`
+
+**功能说明**：
+
+- 提供通用的操作日志记录功能
+- 自动获取当前登录用户信息、请求信息（IP、浏览器、操作系统等）
+- 自动计算执行时间
+- 异步发布 `OperationLoggedEvent` 事件
+
+#### 2. 操作类型枚举管理
+
+**枚举类位置**：`infrastructure/shared/enums/OperationLogRecorderStatus.java`
+
+**功能说明**：
+
+- 按业务模块划分，统一管理操作名称和详细描述
+- **key**：操作名称（`code`字段，用于操作日志的`operation`字段）
+- **value**：详细描述（`description`字段，用于操作日志的`detail`字段，用户友好格式）
+- 只需维护一个地方，避免分散管理
+
+**设计优势**：
+
+- ✅ 操作名称和描述统一管理，只需维护一处
+- ✅ 类型安全，使用枚举而非字符串常量
+- ✅ 按业务模块分组，便于查找和维护
+- ✅ 自动生成用户友好的操作描述
+
+**现有模块**：
+
+- 用户管理模块（创建、更新、删除、禁用、启用、重置密码等）
+- 角色权限模块（创建、更新、删除角色，更新权限等）
+- 权限管理模块（创建、更新、删除权限）
+- 项目管理模块（创建、更新、删除、提交、审核项目）
+- 申报管理模块（创建、更新、删除、提交、审核申报）
+- 文件管理模块（上传、删除、下载文件）
+- 知识库模块（创建、更新、删除知识库）
+- 系统配置模块（更新系统配置）
+
+**使用方式**：
+
+```java
+// 获取操作类型枚举
+var operationType = disabled ? OperationType.USER_DISABLE : OperationType.USER_ENABLE;
+
+// 获取操作名称（用于operation字段）
+var operation = operationType.getCode();  // "禁用用户" 或 "启用用户"
+
+// 获取详细描述（用于detail字段）
+var description = operationType.getDescription();  // "已禁用用户" 或 "已启用用户"
+
+// 完整示例
+var operationType = OperationType.USER_DISABLE;
+var operation = operationType.getCode();  // "禁用用户"
+var detail = String.format("%s：%s（ID: %s）",
+        operationType.getDescription(), user.getUsername(), userId);
+// detail = "已禁用用户：wjw（ID: 5）"
+operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
+```
+
+**使用示例**：
+
+```java
+// 在 Service 中使用
+var operationType = disabled ? OperationType.USER_DISABLE : OperationType.USER_ENABLE;
+var operation = operationType.getCode();
+var detail = String.format("%s：%s（ID: %s）",
+        operationType.getDescription(), user.getUsername(), userId);
+operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
+```
+
+**根据操作名称查找枚举**：
+
+```java
+// 根据操作名称获取枚举
+var operationType = OperationType.fromCode("禁用用户");
+if (operationType != null) {
+    var description = operationType.getDescription();  // "已禁用用户"
+}
+```
+
+#### 3. 日志级别使用
+
+**枚举类**：`LogLevelStatus`（INFO、WARN、ERROR）
+
+**使用规范**：
+
+- **INFO**：正常操作成功（默认）
+- **WARN**：操作成功但存在警告（如：数据校验警告、业务规则提醒）
+- **ERROR**：操作失败
+
+**方法**：
+
+```java
+// 记录成功操作（INFO级别）
+operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
+
+// 记录警告操作（WARN级别）
+operationLogRecorderUtil.recordWarning(operation, detail, executionTime);
+
+// 记录失败操作（ERROR级别）
+operationLogRecorderUtil.recordFailure(operation, detail, errorMessage, executionTime);
+```
+
+#### 4. Detail 字段格式规范
+
+**原则**：用户友好，清晰易懂，避免技术术语
+
+**格式示例**：
+
+```java
+// ✅ 正确：用户友好的格式
+"已禁用用户：wjw（ID: 5）"
+"已启用用户：admin（ID: 1）"
+"已创建用户：张三（邮箱：zhangsan@example.com）"
+"已更新用户信息：李四（ID: 10）"
+
+// ❌ 错误：技术格式，用户看不懂
+"禁用用户: userId=5, username=wjw, status=0"
+"启用用户: userId=5, username=wjw, status=1"
+```
+
+**规范**：
+
+- 使用中文描述，避免英文技术术语
+- 关键信息用括号标注（如：ID、邮箱等）
+- 使用"已"字开头表示完成状态（如：已禁用、已启用）
+- 避免显示内部状态码（如：status=0/1）
+- **必须使用 `OperationType` 枚举获取操作名称和描述**，禁止硬编码
+
+#### 5. 请求参数和响应结果
+
+**请求参数**：
+
+- 自动从 `HttpServletRequest` 中提取
+- 支持查询参数、JSON 请求体、表单参数
+- **自动转换为 JSON 格式**（查询字符串如 `disabled=false` 会转换为 `{"disabled":false}`）
+- 优先从拦截器缓存中获取（如果已缓存）
+- 参数值会自动类型转换（布尔值、整数、浮点数、字符串）
+
+**响应结果**：
+
+- **自动拦截**：通过 `ResponseBodyCacheAdvice` 拦截所有 Controller 返回值
+- **自动转换为 JSON 格式**：响应对象自动转换为 JSON 字符串
+- **缓存机制**：响应结果缓存到 `request.getAttribute("cachedResponseBody")` 中
+- **获取时机**：在 `OperationLogRecorderUtil` 记录日志时，响应结果已经可用（因为 `ResponseBodyCacheAdvice` 在 Controller 返回后立即执行）
+- 也可通过方法参数手动传入：`recordSuccess(operation, detail, executionTime, responseResult)`
+
+**响应结果拦截器**：
+
+- **位置**：`infrastructure/common/advice/ResponseBodyCacheAdvice.java`
+- **功能**：拦截所有 Controller 方法的返回值，转换为 JSON 并缓存到 request 属性
+- **执行时机**：Controller 方法执行完成后，响应写入前
+- **使用方式**：无需手动调用，Spring 自动注册并执行
+
+#### 6. 使用示例
+
+```java
+@Service
+@RequiredArgsConstructor
+public class UserServiceImpl implements UserService {
+    private final OperationLogRecorderUtil operationLogRecorderUtil;
+
+    @Transactional(rollbackFor = Exception.class)
+    public void disableById(Long userId, boolean disabled) {
+        var startTime = DateUtil.now();
+        var operationType = disabled ? OperationType.USER_DISABLE : OperationType.USER_ENABLE;
+        var operation = operationType.getCode();
+
+        try {
+            // 业务逻辑...
+
+            // 记录成功日志
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            // 使用 OperationType 枚举获取操作名称和描述
+            var detail = String.format("%s：%s（ID: %s）",
+                    operationType.getDescription(), user.getUsername(), userId);
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
+        } catch (Exception e) {
+            // 记录失败日志
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var errorMessage = e instanceof BusinessException ? e.getMessage() : e.getClass().getSimpleName();
+            operationLogRecorderUtil.recordFailure(operation,
+                    String.format("%s失败：用户ID %s", operation, userId),
+                    errorMessage, executionTime);
+            throw e;
+        }
+    }
+}
+```
+
+#### 7. 注意事项
+
+- 操作日志记录是异步的，不会影响主业务流程
+- `createdBy` 和 `updatedBy` 字段自动从当前登录用户获取，与 `username` 字段取值一致
+- 执行时间使用 `DateUtil.millisBetween()` 计算
+- **操作名称和描述必须使用 `OperationLogRecorderStatus` 枚举**，禁止硬编码
+- 新增操作类型时，只需在 `OperationLogRecorderStatus` 枚举中添加一个条目即可
