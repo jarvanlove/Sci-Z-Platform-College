@@ -424,8 +424,12 @@ public class DifyApiService {
             log.info("开始执行 Dify 工作流（动态密钥），用户: {}, 工作流ID: {}", userId, workflowId);
             Map<String, Object> params = new HashMap<>();
             params.put("inputs", request.getInputs());
-            params.put("response_mode", request.getResponseMode());
-            params.put("user", request.getUser());
+            // 使用 responseMode 字段，如果为空则使用默认值
+            String responseMode = request.getResponseMode() != null ? request.getResponseMode() : "blocking";
+            params.put("response_mode", responseMode);
+            if (request.getUser() != null && !request.getUser().trim().isEmpty()) {
+                params.put("user", request.getUser());
+            }
             if (workflowId != null && !workflowId.trim().isEmpty()) {
                 params.put("workflow_id", workflowId);
             }
