@@ -5,19 +5,9 @@
  */
 -->
 <template>
-  <div class="declaration-create-page">
-    <h1>新建申报页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <DeclarationCreate />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import { DeclarationCreate } from '@/components/Business/Declaration'
 </script>
-
-<style lang="scss" scoped>
-.declaration-create-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
-</style>

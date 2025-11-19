@@ -5,19 +5,9 @@
  */
 -->
 <template>
-  <div class="declaration-detail-page">
-    <h1>申报详情页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <DeclarationDetail />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import { DeclarationDetail } from '@/components/Business/Declaration'
 </script>
-
-<style lang="scss" scoped>
-.declaration-detail-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
-</style>
