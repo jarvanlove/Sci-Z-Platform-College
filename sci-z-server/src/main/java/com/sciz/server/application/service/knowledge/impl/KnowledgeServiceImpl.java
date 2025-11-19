@@ -449,30 +449,12 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         // 6. 异步调用 Dify API 并转发流式响应
         new Thread(() -> {
             try {
-                // 调用 Dify API 进行流式对话
-                ResponseEntity<String> response = difyApiService.sendChatbotMessage(difyRequest);
-                
-                // 检查响应状态
-                if (!response.getStatusCode().is2xxSuccessful()) {
-                    String errorBody = response.getBody() != null ? response.getBody() : "Unknown error";
-                    emitter.send(SseEmitter.event()
-                            .name("error")
-                            .data(String.format("{\"error\": true, \"message\": \"Dify API调用失败: %s\", \"body\": %s}", 
-                                    response.getStatusCode(), errorBody)));
-                    emitter.complete();
-                    return;
-                }
-
-                // 转发流式响应
-                String responseBody = response.getBody();
-                if (responseBody != null) {
-                    // 如果响应是完整的JSON，直接发送
-                    // 如果是SSE格式，需要逐行解析
-                    String[] lines = responseBody.split("\n");
-                    for (String line : lines) {
+                // 调用 Dify API 进行流式对话（使用流式请求方法）
+                difyApiService.sendChatbotMessageStream(difyRequest, line -> {
+                    try {
                         String trimmedLine = line.trim();
                         if (trimmedLine.isEmpty()) {
-                            continue;
+                            return;
                         }
                         
                         // 处理 SSE 格式的数据行
@@ -483,14 +465,20 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                                         .name("message")
                                         .data(data));
                             }
+                        } else if (trimmedLine.startsWith("event:")) {
+                            // 处理事件类型
+                            String eventType = trimmedLine.substring(6).trim();
+                            log.debug(String.format("收到SSE事件: %s", eventType));
                         } else {
-                            // 如果不是 SSE 格式，直接发送原始数据
+                            // 如果不是标准 SSE 格式，直接发送原始数据
                             emitter.send(SseEmitter.event()
                                     .name("message")
                                     .data(trimmedLine));
                         }
+                    } catch (Exception e) {
+                        log.warn(String.format("处理流式数据行失败: line=%s, err=%s", line, e.getMessage()));
                     }
-                }
+                });
                 
                 // 发送完成事件
                 emitter.send(SseEmitter.event()
@@ -515,5 +503,69 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         }).start();
 
         return emitter;
+    }
+
+    /**
+     * 删除知识库
+     *
+     * @param id 知识库ID
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id) {
+        Long userId = StpUtil.getLoginIdAsLong();
+        log.info(String.format("删除知识库: userId=%s, id=%s", userId, id));
+
+        // 1. 查询知识库实体
+        SysKnowledgeBase entity = knowledgeBaseRepo.findById(id);
+        if (entity == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND, "知识库不存在");
+        }
+
+        // 2. 检查权限（只能删除自己创建的知识库）
+        if (!entity.getOwnerId().equals(userId)) {
+            throw new BusinessException(ResultCode.FORBIDDEN, "无权删除该知识库");
+        }
+
+        // 3. 如果存在 Dify 数据集ID，调用 Dify API 删除数据集
+        if (entity.getDifyKnowdataId() != null && !entity.getDifyKnowdataId().trim().isEmpty()) {
+            try {
+                // 获取用户的 Dify API Key
+                QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
+                queryWrapper.eq("user_id", userId)
+                           .eq("key_type", "dataset")
+                           .eq("is_active", true)
+                           .last("LIMIT 1");
+                DifyApiKey difyApiKey = difyApiKeyService.getOne(queryWrapper);
+                
+                String resourceId = (difyApiKey != null && difyApiKey.getResourceId() != null) 
+                    ? difyApiKey.getResourceId() 
+                    : defaultResourceId;
+
+                // 调用 Dify API 删除数据集
+                ResponseEntity<String> response = difyApiService.deleteDataset(
+                        entity.getDifyKnowdataId(), userId, resourceId, "dataset");
+                
+                if (!response.getStatusCode().is2xxSuccessful()) {
+                    log.warn(String.format("Dify API删除数据集失败: datasetId=%s, status=%s, body=%s", 
+                            entity.getDifyKnowdataId(), response.getStatusCode(), response.getBody()));
+                    // 即使 Dify API 删除失败，也继续删除本地数据（避免数据不一致）
+                } else {
+                    log.info(String.format("Dify API删除数据集成功: datasetId=%s", entity.getDifyKnowdataId()));
+                }
+            } catch (Exception e) {
+                log.error(String.format("调用 Dify API 删除数据集异常: datasetId=%s, err=%s", 
+                        entity.getDifyKnowdataId(), e.getMessage()), e);
+                // 即使 Dify API 调用异常，也继续删除本地数据（避免数据不一致）
+            }
+        }
+
+        // 4. 软删除本地知识库
+        boolean success = knowledgeBaseRepo.deleteById(id);
+        if (!success) {
+            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+        }
+
+        log.info(String.format("删除知识库成功: id=%s", id));
     }
 }

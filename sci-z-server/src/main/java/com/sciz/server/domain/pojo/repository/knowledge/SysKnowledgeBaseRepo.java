@@ -45,4 +45,12 @@ public interface SysKnowledgeBaseRepo {
      * @return 分页结果
      */
     IPage<SysKnowledgeBase> pageByCondition(Page<SysKnowledgeBase> page, Long userId);
+
+    /**
+     * 根据ID删除知识库（软删除）
+     *
+     * @param id 知识库ID
+     * @return 是否删除成功
+     */
+    boolean deleteById(Long id);
 }

@@ -104,8 +104,9 @@ export const useAuthStore = defineStore('auth', {
       rememberMe,
       sessionInfo: null,
       lastSessionCheck: 0,
-      lastNetworkError: 0, // 记录最后一次网络错误的时间
-      refreshPromise: null
+      refreshPromise: null,
+      isLoggingOut: false, // 标记是否正在退出登录，避免重复调用
+      verifyLoginPromise: null // 正在进行的登录状态校验 Promise，避免重复调用
     }
   },
 
@@ -425,58 +426,74 @@ export const useAuthStore = defineStore('auth', {
         return true
       }
       
-      try {
-        const response = await checkLoginStatus()
-        const payload = unwrapResponse(response) || {}
-        const isLoggedIn = payload?.login ?? payload?.isLogin ?? payload?.isLoggedIn ?? false
-        
-        // 请求成功时，清除网络错误标记
-        this.lastNetworkError = 0
-        
-        if (!isLoggedIn) {
-          authLogger.warn('服务端会话已失效，执行本地清理')
-          this.resetState()
-          return false
-        }
-        
-        const session = this.applySessionInfo(payload)
-        const expiresIn = session?.expiresIn
-        if (expiresIn !== null && expiresIn <= TOKEN_REFRESH_THRESHOLD) {
-          authLogger.info('Token 即将过期，尝试刷新', { expiresIn })
-          try {
-            await this.refreshSessionToken()
-          } catch (refreshError) {
-            authLogger.error('Token 刷新失败', { error: refreshError.message })
-          }
-        }
-        
-        return true
-      } catch (error) {
-        // 对于网络错误（如后端服务未启动），更新 lastSessionCheck 和 lastNetworkError
-        // 延长检查间隔，避免在服务恢复前一直重试
-        const isNetworkError = error.code === 'ECONNREFUSED' || 
-                               error.code === 'ECONNABORTED' || 
-                               error.message?.includes('timeout') ||
-                               !error.response
-        
-        if (isNetworkError) {
-          // 网络错误时，延长检查间隔到 5 分钟，避免频繁重试
-          const extendedInterval = 5 * 60 * 1000
-          this.lastNetworkError = now
-          this.lastSessionCheck = now
-          authLogger.debug('网络错误，延长检查间隔', { 
-            error: error.message,
-            code: error.code,
-            lastNetworkError: this.lastNetworkError,
-            nextCheckAfter: Math.ceil(extendedInterval / 1000) + 's'
-          })
-          // 网络错误时不抛出异常，返回 false 但不影响路由跳转
-          return false
-        }
-        
-        authLogger.error('登录状态校验失败', { error: error.message })
-        throw error
+      // 如果已经有正在进行的校验请求，直接复用 Promise，避免重复调用
+      if (this.verifyLoginPromise && !force) {
+        authLogger.debug('检测到正在进行的登录状态校验，复用 Promise')
+        return this.verifyLoginPromise
       }
+      
+      this.verifyLoginPromise = (async () => {
+        try {
+          const response = await checkLoginStatus()
+          const payload = unwrapResponse(response) || {}
+          const isLoggedIn = payload?.login ?? payload?.isLogin ?? payload?.isLoggedIn ?? false
+          
+          if (!isLoggedIn) {
+            authLogger.warn('服务端会话已失效，执行本地清理并跳转登录页')
+            this.resetState()
+            // 跳转到登录页
+            if (typeof window !== 'undefined') {
+              try {
+                const routerModule = await import('@/router')
+                const routerInstance = routerModule?.default || routerModule
+                if (routerInstance) {
+                  routerInstance.replace('/login').catch(() => {})
+                } else {
+                  window.location.href = '/login'
+                }
+              } catch (error) {
+                window.location.href = '/login'
+              }
+            }
+            return false
+          }
+          
+          const session = this.applySessionInfo(payload)
+          const expiresIn = session?.expiresIn
+          if (expiresIn !== null && expiresIn <= TOKEN_REFRESH_THRESHOLD) {
+            authLogger.info('Token 即将过期，尝试刷新', { expiresIn })
+            try {
+              await this.refreshSessionToken()
+            } catch (refreshError) {
+              authLogger.error('Token 刷新失败', { error: refreshError.message })
+            }
+          }
+          
+          return true
+        } catch (error) {
+          authLogger.error('登录状态校验失败，跳转登录页', { error: error.message })
+          // 校验失败时也跳转到登录页
+          this.resetState()
+          if (typeof window !== 'undefined') {
+            try {
+              const routerModule = await import('@/router')
+              const routerInstance = routerModule?.default || routerModule
+              if (routerInstance) {
+                routerInstance.replace('/login').catch(() => {})
+              } else {
+                window.location.href = '/login'
+              }
+            } catch (navError) {
+              window.location.href = '/login'
+            }
+          }
+          throw error
+        } finally {
+          this.verifyLoginPromise = null
+        }
+      })()
+      
+      return this.verifyLoginPromise
     },
 
     async refreshSessionToken(force = false) {
@@ -655,6 +672,7 @@ export const useAuthStore = defineStore('auth', {
       this.lastSessionCheck = 0
       this.lastNetworkError = 0
       this.refreshPromise = null
+      this.verifyLoginPromise = null
       
       if (clearRemember) {
         this.rememberMe = true

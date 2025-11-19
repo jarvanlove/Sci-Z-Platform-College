@@ -9,15 +9,16 @@
 
 /**
  * API 基础路径（与后端真实接口保持一致）
+ * 注意：baseURL 在 request.js 中已设置为 /api，这里只返回路径本身
  */
 export const API_BASE_URL = '/api'
 
 /**
- * 拼接完整 API 地址
+ * 构建 API 路径（不包含 /api 前缀，因为 baseURL 已经包含）
  * @param {string} path 模块相对路径，需以 / 开头
- * @returns {string}
+ * @returns {string} 返回路径本身，不包含 /api 前缀
  */
-const buildApiUrl = (path) => `${API_BASE_URL}${path}`
+const buildApiUrl = (path) => path
 
 // ================================
 // 2. 认证模块 API 路径
@@ -114,8 +115,31 @@ export const REPORT_API = {
 
 export const AI_API = {
   BASE_PATH: buildApiUrl('/ai'),
+  // AI会话管理接口
+  CONVERSATION_BASE: buildApiUrl('/ai/conversation'),
+  CONVERSATION_CREATE: buildApiUrl('/ai/conversation'),
+  CONVERSATION_UPDATE: buildApiUrl('/ai/conversation'),
+  CONVERSATION_DETAIL: (id) => buildApiUrl(`/ai/conversation/${id}`),
+  CONVERSATION_DELETE: (id) => buildApiUrl(`/ai/conversation/${id}`),
+  CONVERSATION_BATCH_DELETE: buildApiUrl('/ai/conversation/batch'),
+  CONVERSATION_PAGE: buildApiUrl('/ai/conversation/page'),
+  CONVERSATION_LIST: buildApiUrl('/ai/conversation/list'),
+  CONVERSATION_PINNED: (id) => buildApiUrl(`/ai/conversation/${id}/pinned`),
+  // AI消息管理接口
+  MESSAGE_BASE: buildApiUrl('/ai/message'),
+  MESSAGE_CREATE: buildApiUrl('/ai/message'),
+  MESSAGE_UPDATE: buildApiUrl('/ai/message'),
+  MESSAGE_DETAIL: (id) => buildApiUrl(`/ai/message/${id}`),
+  MESSAGE_DELETE: (id) => buildApiUrl(`/ai/message/${id}`),
+  MESSAGE_BATCH_DELETE: buildApiUrl('/ai/message/batch'),
+  MESSAGE_PAGE: buildApiUrl('/ai/message/page'),
+  MESSAGE_LIST: (conversationId) => buildApiUrl(`/ai/message/list/${conversationId}`),
+  MESSAGE_DELETE_BY_CONVERSATION: (conversationId) => buildApiUrl(`/ai/message/conversation/${conversationId}`),
+  // Chat 工作流接口
+  CHAT_WORKFLOW_RUN: buildApiUrl('/chat/workflow/run'),
+  // 旧接口（保留兼容）
   CONVERSATIONS: buildApiUrl('/ai/chat/conversations'),
-  CONVERSATION_DETAIL: (id) => buildApiUrl(`/ai/chat/conversations/${id}`),
+  CONVERSATION_DETAIL_OLD: (id) => buildApiUrl(`/ai/chat/conversations/${id}`),
   MESSAGES: buildApiUrl('/ai/chat/messages'),
   MESSAGES_BY_CONVERSATION: (id) => buildApiUrl(`/ai/chat/messages/${id}`),
   DELETE_MESSAGE: (id) => buildApiUrl(`/ai/chat/messages/${id}`),
@@ -134,7 +158,7 @@ export const KNOWLEDGE_API = {
   CREATE: buildApiUrl('/knowledge'), // POST /api/knowledge
   DETAIL: (id) => buildApiUrl(`/knowledge/detail/${id}`),
   UPDATE: (id) => buildApiUrl(`/knowledge/update/${id}`),
-  DELETE: (id) => buildApiUrl(`/knowledge/delete/${id}`),
+  DELETE: (id) => buildApiUrl(`/knowledge/${id}`), // DELETE /api/knowledge/{id}
   FOLDERS: (id) => buildApiUrl(`/knowledge/folders/${id}`),
   CREATE_FOLDER: buildApiUrl('/knowledge/folders'),
   UPDATE_FOLDER: (id) => buildApiUrl(`/knowledge/folders/${id}`),

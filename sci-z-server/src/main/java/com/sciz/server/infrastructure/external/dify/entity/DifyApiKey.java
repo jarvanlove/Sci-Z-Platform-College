@@ -65,7 +65,8 @@ public class DifyApiKey extends BaseEntity {
      */
     public enum KeyType {
         DATASET("dataset", "知识库密钥"),
-        WORKFLOW("workflow", "工作流密钥");
+        WORKFLOW("workflow", "工作流密钥"),
+        FILE("file", "文件密钥");
 
         private final String code;
         private final String description;

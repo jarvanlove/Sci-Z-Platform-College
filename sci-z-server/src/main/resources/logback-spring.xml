@@ -68,6 +68,14 @@
         </filter>
     </appender>
 
+    <!-- Kafka 客户端日志级别配置：降低连接失败时的日志噪音 -->
+    <logger name="org.apache.kafka.clients" level="ERROR"/>
+    <logger name="org.apache.kafka.common" level="ERROR"/>
+    <logger name="org.apache.kafka.clients.producer" level="ERROR"/>
+    <logger name="org.apache.kafka.clients.consumer" level="ERROR"/>
+    <logger name="org.apache.kafka.clients.NetworkClient" level="ERROR"/>
+    <logger name="org.apache.kafka.clients.Metadata" level="ERROR"/>
+
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="INFO_FILE"/>

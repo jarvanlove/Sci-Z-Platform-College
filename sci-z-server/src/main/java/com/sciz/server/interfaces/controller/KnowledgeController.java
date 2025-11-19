@@ -27,7 +27,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class KnowledgeController {
 
     private final KnowledgeService knowledgeService;
-
     /**
      * 创建知识库
      *
@@ -40,7 +39,6 @@ public class KnowledgeController {
         KnowledgeResp resp = knowledgeService.create(req);
         return Result.success(resp);
     }
-
     /**
      * 分页获取知识库列表
      *
@@ -63,7 +61,6 @@ public class KnowledgeController {
         // TODO: 实现知识库详情查询逻辑
         return Result.success();
     }
-
     /**
      * 上传文件到知识库
      *
@@ -81,7 +78,6 @@ public class KnowledgeController {
         knowledgeService.uploadFile(id, file, folderId);
         return Result.success();
     }
-
     /**
      * 基于知识库的 Chatbot 流式对话
      *
@@ -146,6 +142,13 @@ public class KnowledgeController {
     @Operation(summary = "移动文件", description = "移动知识库文件")
     @PutMapping("/files/move/{fileId}")
     public Result<Void> moveFile(@PathVariable Long fileId, @RequestBody Object request) {
+        return Result.success();
+    }
+
+    @Operation(summary = "删除知识库", description = "删除指定知识库，同时调用 Dify API 删除数据集")
+    @DeleteMapping("/{id}")
+    public Result<Void> deleteKnowledgeBase(@PathVariable Long id) {
+        knowledgeService.delete(id);
         return Result.success();
     }
 }

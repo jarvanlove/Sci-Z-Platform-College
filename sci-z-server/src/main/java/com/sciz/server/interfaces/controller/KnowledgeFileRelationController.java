@@ -95,5 +95,7 @@ public class KnowledgeFileRelationController {
         PageResult<KnowledgeFileRelationResp> result = fileRelationService.page(req);
         return Result.success(result);
     }
+
+    
 }
 

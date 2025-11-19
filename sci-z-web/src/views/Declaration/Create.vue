@@ -6,7 +6,7 @@
 -->
 <template>
   <div class="declaration-create-page">
-    <h1>新建申报页面</h1>
+    <h1>新建申报页面33333333333</h1>
     <p>待根据原型图开发</p>
   </div>
 </template>

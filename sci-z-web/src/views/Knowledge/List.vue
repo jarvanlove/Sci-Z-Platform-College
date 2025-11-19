@@ -17,6 +17,15 @@
         <div class="kb-header-actions">
           <button
             class="action-icon"
+            :title="isContentExpanded ? '收起内容区' : '展开内容区'"
+            @click="toggleContentCollapse"
+          >
+            <el-icon>
+              <component :is="isContentExpanded ? ArrowLeft : ArrowRight" />
+            </el-icon>
+          </button>
+          <button
+            class="action-icon"
             title="新建共享知识库"
             @click="showCreateDialog = true"
           >
@@ -53,6 +62,15 @@
             <div class="kb-item-info">
               <div class="kb-item-name">{{ kb.name }}</div>
             </div>
+            <div class="kb-item-actions" @click.stop>
+              <button
+                class="kb-action-icon"
+                title="删除知识库"
+                @click="deleteKnowledgeBase(kb)"
+              >
+                <el-icon><Delete /></el-icon>
+              </button>
+            </div>
           </div>
 
           <div v-if="knowledgeBases.length === 0" class="kb-empty-tip">
@@ -63,188 +81,232 @@
     </div>
 
     <!-- 中间内容区域 -->
-    <div class="main-content">
-      <div class="content-header">
-        <div class="content-title">
-          <div class="content-icon">
-            <el-icon><Document /></el-icon>
+    <transition name="main-content-fade">
+      <div v-show="isContentExpanded" class="main-content">
+        <div class="content-wrapper">
+          <div class="content-header">
+            <div class="content-title">
+              <div class="content-icon">
+                <el-icon><Document /></el-icon>
+              </div>
+              <div>
+                <div>
+                  {{ selectedKnowledgeBase ? (selectedKnowledgeBase.shortName || selectedKnowledgeBase.name) : '科研' }}
+                </div>
+                <div class="content-meta">
+                  Sci-Z | {{ selectedKnowledgeBase ? getCurrentFileCount() : 0 }}个内容
+                </div>
+                <div class="content-description">
+                  {{ selectedKnowledgeBase ? selectedKnowledgeBase.description : '科研项目知识库' }}
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <div>
-              {{ selectedKnowledgeBase ? (selectedKnowledgeBase.shortName || selectedKnowledgeBase.name) : '科研' }}
-            </div>
-            <div class="content-meta">
-              Sci-Z | {{ selectedKnowledgeBase ? getCurrentFileCount() : 0 }}个内容
-            </div>
-            <div class="content-description">
-              {{ selectedKnowledgeBase ? selectedKnowledgeBase.description : '科研项目知识库' }}
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div class="content-body">
-        <!-- 选中任何知识库都显示框架（标题/按钮/列表容器） -->
-        <div v-if="selectedKnowledgeBase" class="content-section">
-          <div class="section-header">
-            <div class="section-title">
-              <template v-if="currentFolder">
-                <span class="kb-breadcrumb">
-                  <span class="kb-crumb-link" @click="backToParent">内容</span>
-                  <span>></span>
-                  <span>{{ currentFolder.name }}</span>
+          <div class="content-body">
+            <div v-if="selectedKnowledgeBase" class="content-section">
+              <div class="section-header">
+                <div class="section-title">
+                  <template v-if="currentFolder">
+                    <span class="kb-breadcrumb">
+                      <span class="kb-crumb-link" @click="backToParent">内容</span>
+                      <span>></span>
+                      <span>{{ currentFolder.name }}</span>
+                    </span>
+                  </template>
+                  <template v-else>内容</template>
+                </div>
+                <div class="section-actions">
+                  <button
+                    class="action-icon"
+                    @click="toggleSearch"
+                    title="查询"
+                  >
+                    <el-icon><Search /></el-icon>
+                  </button>
+                  <button
+                    class="action-icon"
+                    @click="createFolder"
+                    title="创建文件夹"
+                  >
+                    <el-icon><FolderAdd /></el-icon>
+                  </button>
+                  <button
+                    class="action-icon"
+                    @click="triggerKbUpload"
+                    title="上传本地文件"
+                  >
+                    <el-icon><Upload /></el-icon>
+                  </button>
+                  <input
+                    ref="kbUploadInput"
+                    type="file"
+                    multiple
+                    style="display: none"
+                    @change="handleKbUpload"
+                  />
+                </div>
+              </div>
+
+              <div
+                v-if="showSearch"
+                class="search-input-wrap"
+                style="margin: 0 0 12px 0"
+              >
+                <span class="search-left-icon">
+                  <el-icon><Search /></el-icon>
                 </span>
-              </template>
-              <template v-else>内容</template>
-            </div>
-            <div class="section-actions">
-              <button
-                class="action-icon"
-                @click="toggleSearch"
-                title="查询"
-              >
-                <el-icon><Search /></el-icon>
-              </button>
-              <button
-                class="action-icon"
-                @click="createFolder"
-                title="创建文件夹"
-              >
-                <el-icon><FolderAdd /></el-icon>
-              </button>
-              <button
-                class="action-icon"
-                @click="triggerKbUpload"
-                title="上传本地文件"
-              >
-                <el-icon><Upload /></el-icon>
-              </button>
-              <input
-                ref="kbUploadInput"
-                type="file"
-                multiple
-                style="display: none"
-                @change="handleKbUpload"
-              />
-            </div>
-          </div>
-
-          <div
-            v-if="showSearch"
-            class="search-input-wrap"
-            style="margin: 0 0 12px 0"
-          >
-            <span class="search-left-icon">
-              <el-icon><Search /></el-icon>
-            </span>
-            <input
-              class="form-input"
-              v-model="kbSearchQuery"
-              placeholder="在知识库中搜索"
-              style="width: 100%; padding: 10px 40px 10px 36px"
-            />
-            <div
-              class="search-dismiss"
-              title="关闭搜索"
-              @click="toggleSearch"
-            >
-              <el-icon><Close /></el-icon>
-            </div>
-          </div>
-
-          <div class="content-list">
-            <template v-for="item in currentKbDisplayItems" :key="item.id">
-              <div class="content-item" v-if="item.type === 'file'">
-                <div class="content-item-icon">
-                  <el-icon><Document /></el-icon>
-                </div>
-                <div class="content-item-info">
-                  <div class="content-item-name">{{ item.name }}</div>
-                  <div class="content-item-meta">
-                    <span>{{ item.ext }}</span>
-                    <span>|</span>
-                    <span>{{ item.time }}</span>
-                  </div>
-                </div>
-                <div class="content-item-actions">
-                  <button
-                    class="action-icon"
-                    title="重命名"
-                    @click.stop="renameItem(item)"
-                  >
-                    <el-icon><Edit /></el-icon>
-                  </button>
-                  <button
-                    class="action-icon"
-                    title="删除"
-                    @click.stop="deleteItem(item)"
-                  >
-                    <el-icon><Delete /></el-icon>
-                  </button>
+                <input
+                  class="form-input"
+                  v-model="kbSearchQuery"
+                  placeholder="在知识库中搜索"
+                  style="width: 100%; padding: 10px 40px 10px 36px"
+                />
+                <div
+                  class="search-dismiss"
+                  title="关闭搜索"
+                  @click="toggleSearch"
+                >
+                  <el-icon><Close /></el-icon>
                 </div>
               </div>
 
-              <div class="content-item" v-else @click="enterFolder(item)">
-                <div class="content-item-icon folder-icon">
-                  <el-icon><Folder /></el-icon>
-                </div>
-                <div class="content-item-info">
-                  <div class="content-item-name">{{ item.name }}</div>
-                  <div class="content-item-meta">
-                    <span>{{ (item.files || []).length }} 个文件</span>
+              <div class="content-list">
+                <template v-for="item in currentKbDisplayItems" :key="item.id">
+                  <div class="content-item" v-if="item.type === 'file'">
+                    <div class="content-item-icon">
+                      <el-icon><Document /></el-icon>
+                    </div>
+                    <div class="content-item-info">
+                      <div class="content-item-name">{{ item.name }}</div>
+                      <div class="content-item-meta">
+                        <span>{{ item.ext }}</span>
+                        <span>|</span>
+                        <span>{{ item.time }}</span>
+                      </div>
+                    </div>
+                    <div class="content-item-actions">
+                      <button
+                        class="action-icon"
+                        title="重命名"
+                        @click.stop="renameItem(item)"
+                      >
+                        <el-icon><Edit /></el-icon>
+                      </button>
+                      <button
+                        class="action-icon"
+                        title="删除"
+                        @click.stop="deleteItem(item)"
+                      >
+                        <el-icon><Delete /></el-icon>
+                      </button>
+                      <el-dropdown
+                        class="content-actions-dropdown"
+                        trigger="click"
+                        @command="(cmd) => handleContentAction(cmd, item)"
+                      >
+                        <button class="action-icon more-action" title="更多操作">
+                          <el-icon><MoreFilled /></el-icon>
+                        </button>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item command="rename">
+                              重命名
+                            </el-dropdown-item>
+                            <el-dropdown-item command="delete" divided>
+                              删除
+                            </el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
+                    </div>
                   </div>
-                </div>
-                <div class="content-item-actions">
-                  <span
-                    v-if="(item.files || []).length > 2"
-                    style="color: #9ca3af"
-                  >▼</span>
-                  <button
-                    class="action-icon"
-                    title="重命名"
-                    @click.stop="renameItem(item)"
-                  >
-                    <el-icon><Edit /></el-icon>
-                  </button>
-                  <button
-                    class="action-icon"
-                    title="删除"
-                    @click.stop="deleteItem(item)"
-                  >
-                    <el-icon><Delete /></el-icon>
-                  </button>
-                </div>
-              </div>
-            </template>
-          </div>
-          <div
-            v-if="currentFolder && currentKbDisplayItems.length === 0"
-            class="content-empty"
-          >
-            <div>文件夹什么也没有，去这里添加</div>
-          </div>
-          <div v-else-if="!currentFolder && currentKbDisplayItems.length === 0" class="content-empty">
-            没有更多内容了
-          </div>
-        </div>
 
-        <!-- 未选中任何知识库时的空状态显示 -->
-        <div v-else class="empty-knowledge-base">
-          <div class="empty-icon-large"></div>
-          <div class="empty-title">知识库什么也没有，去这里添加</div>
-          <div class="empty-description">
-            上传文档、图片、视频等文件，让AI助手帮你整理和回答问题
+                  <div class="content-item" v-else @click="enterFolder(item)">
+                    <div class="content-item-icon folder-icon">
+                      <el-icon><Folder /></el-icon>
+                    </div>
+                    <div class="content-item-info">
+                      <div class="content-item-name">{{ item.name }}</div>
+                      <div class="content-item-meta">
+                        <span>{{ (item.files || []).length }} 个文件</span>
+                      </div>
+                    </div>
+                    <div class="content-item-actions">
+                      <span
+                        v-if="(item.files || []).length > 2"
+                        style="color: #9ca3af"
+                      >▼</span>
+                      <button
+                        class="action-icon"
+                        title="重命名"
+                        @click.stop="renameItem(item)"
+                      >
+                        <el-icon><Edit /></el-icon>
+                      </button>
+                      <button
+                        class="action-icon"
+                        title="删除"
+                        @click.stop="deleteItem(item)"
+                      >
+                        <el-icon><Delete /></el-icon>
+                      </button>
+                      <el-dropdown
+                        class="content-actions-dropdown"
+                        trigger="click"
+                        @command="(cmd) => handleContentAction(cmd, item)"
+                      >
+                        <button class="action-icon more-action" title="更多操作">
+                          <el-icon><MoreFilled /></el-icon>
+                        </button>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item command="rename">
+                              重命名
+                            </el-dropdown-item>
+                            <el-dropdown-item command="delete" divided>
+                              删除
+                            </el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <div
+                v-if="currentFolder && currentKbDisplayItems.length === 0"
+                class="content-empty"
+              >
+                <div>文件夹什么也没有，去这里添加</div>
+              </div>
+              <div
+                v-else-if="!currentFolder && currentKbDisplayItems.length === 0"
+                class="content-empty"
+              >
+                没有更多内容了
+              </div>
+            </div>
+
+            <div v-else class="empty-knowledge-base">
+              <div class="empty-icon-large"></div>
+              <div class="empty-title">知识库什么也没有，去这里添加</div>
+              <div class="empty-description">
+                上传文档、图片、视频等文件，让AI助手帮你整理和回答问题
+              </div>
+              <button class="upload-files-btn" @click="showCreateDialog = true">
+                <el-icon><Plus /></el-icon>
+                创建知识库
+              </button>
+            </div>
           </div>
-          <button class="upload-files-btn" @click="showCreateDialog = true">
-            <el-icon><Plus /></el-icon>
-            创建知识库
-          </button>
         </div>
       </div>
-    </div>
+    </transition>
 
     <!-- 右侧AI助手区域 -->
-    <div class="ai-assistant">
+    <div class="ai-assistant" :class="{ 'ai-expanded': !isContentExpanded }">
       <div class="ai-header">
         <div class="ai-header-left">
           <div class="ai-header-title">问知识库</div>
@@ -266,7 +328,7 @@
         <template v-if="kbMessagesList.length > 1">
           <div class="kb-messages">
             <div
-              v-for="msg in kbMessagesList.slice(1)"
+              v-for="msg in uniqueMessages"
               :key="msg.id"
               class="kb-message"
               :class="msg.type"
@@ -320,7 +382,7 @@
             v-model="kbInput"
             class="kb-message-input"
             placeholder="基于知识库提问"
-            @keydown.enter.prevent="sendKbMessage"
+            @keydown.enter.exact.prevent="handleEnterKey"
             @input="autoResizeInput"
           ></textarea>
 
@@ -328,8 +390,9 @@
           <div class="kb-input-bottom-bar">
             <button
               class="kb-send-btn"
-              :class="{ active: kbInput.trim() }"
-              @click="sendKbMessage"
+              :class="{ active: kbInput.trim() && !isSendingMessage }"
+              :disabled="isSendingMessage || isGenerating"
+              @click.stop.prevent="() => { console.log('[按钮点击] 发送按钮被点击'); sendKbMessage(); }"
             >
               <el-icon><ArrowUp /></el-icon>
             </button>
@@ -440,9 +503,11 @@
     >
       <div style="text-align: center; padding: 20px 0">
         <div style="font-size: 16px; color: #374151; margin-bottom: 8px">
-          确定要删除该项吗？
+          {{ deletingKnowledgeBase ? `确定要删除知识库"${deletingKnowledgeBase.name}"吗？` : '确定要删除该项吗？' }}
         </div>
-        <div style="font-size: 14px; color: #6b7280">此操作不可恢复</div>
+        <div style="font-size: 14px; color: #6b7280">
+          {{ deletingKnowledgeBase ? '删除知识库将同时删除其中的所有文件和文件夹，此操作不可恢复' : '此操作不可恢复' }}
+        </div>
       </div>
       <template #footer>
         <el-button @click="cancelDelete">取消</el-button>
@@ -464,6 +529,8 @@ import {
   FolderOpened,
   Plus,
   ArrowDown,
+  ArrowLeft,
+  ArrowRight,
   Document,
   Search,
   FolderAdd,
@@ -473,7 +540,8 @@ import {
   Delete,
   Folder,
   Picture,
-  ArrowUp
+  ArrowUp,
+  MoreFilled
 } from '@element-plus/icons-vue'
 import {
   getKnowledgeList,
@@ -485,6 +553,7 @@ import {
   renameKnowledgeFile,
   deleteKnowledgeFile,
   deleteKnowledgeFolder,
+  deleteKnowledge,
   searchKnowledge,
   // 文件关联接口
   getKnowledgeFileRelationList,
@@ -499,6 +568,7 @@ import { createLogger } from '@/utils/simpleLogger'
 const logger = createLogger('KnowledgeList')
 
 // 响应式数据
+const isContentExpanded = ref(true)
 const knowledgeBases = ref([])
 const selectedKnowledgeBase = ref(null)
 const kbItems = ref([])
@@ -522,6 +592,7 @@ const showRenameDialog = ref(false)
 const showDeleteDialog = ref(false)
 const editingItem = ref(null)
 const deletingItem = ref(null)
+const deletingKnowledgeBase = ref(null) // 要删除的知识库
 const renameForm = ref('')
 
 // 右侧AI助手相关
@@ -536,9 +607,12 @@ const kbMessagesList = ref([
 const kbInput = ref('')
 const kbMessages = ref(null)
 const isGenerating = ref(false)
+const isSendingMessage = ref(false) // 发送消息的锁，防止重复调用
 const currentAbortController = ref(null)
 const currentConversationId = ref(null)
 const currentDocuments = ref([]) // 当前回答使用的文档片段
+const lastUserMessageId = ref(null) // 最后发送的用户消息ID，用于清除重复
+const sendingMessageKey = ref(null) // 当前正在发送的消息唯一标识（内容+时间戳），用于防重复
 
 // 计算属性
 const currentKbDisplayItems = computed(() => {
@@ -552,15 +626,66 @@ const currentKbDisplayItems = computed(() => {
   )
 })
 
+// 去重消息列表（基于ID和内容去重，保留最后一个）
+const uniqueMessages = computed(() => {
+  const messages = kbMessagesList.value.slice(1) // 跳过第一条初始消息
+  const seenById = new Map() // 基于ID去重
+  const seenByContent = new Map() // 基于内容和时间戳去重（防止相同内容重复）
+  const result = []
+  
+  // 从后往前遍历，保留最后一个出现的消息（最新的）
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    
+    // 首先检查ID是否重复
+    if (seenById.has(msg.id)) {
+      logger.warn('发现重复ID的消息，已过滤', { 
+        id: msg.id, 
+        type: msg.type,
+        content: msg.content?.substring(0, 50) 
+      })
+      continue
+    }
+    
+    // 对于用户消息，还要检查内容和时间戳（防止相同内容在短时间内重复）
+    if (msg.type === 'user' && msg.content) {
+      const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : 0
+      const timeWindow = Math.floor(timestamp / 1000) // 按秒分组
+      const contentKey = `${msg.type}-${msg.content}-${timeWindow}`
+      if (seenByContent.has(contentKey)) {
+        logger.warn('发现重复内容的用户消息，已过滤', { 
+          id: msg.id, 
+          content: msg.content?.substring(0, 50),
+          timestamp: msg.timestamp
+        })
+        continue
+      }
+      seenByContent.set(contentKey, true)
+    }
+    
+    seenById.set(msg.id, true)
+    result.unshift(msg) // 使用 unshift 保持顺序
+  }
+  
+  return result
+})
+
 // 方法
 const loadKnowledgeBases = async () => {
   try {
     logger.info('加载知识库列表')
     const response = await getKnowledgeList({ page: 1, size: 100 })
     if (response.code === 200 && response.data) {
-      // TODO: 后端接口返回数据结构待确认，暂时使用模拟数据
       knowledgeBases.value = response.data.records || response.data.list || []
-      logger.info('知识库列表加载成功', knowledgeBases.value.length)
+      logger.info('知识库列表加载成功', { 
+        count: knowledgeBases.value.length,
+        items: knowledgeBases.value.map(kb => ({
+          id: kb.id,
+          name: kb.name,
+          difyKnowdataId: kb.difyKnowdataId,
+          difyKbId: kb.difyKbId
+        }))
+      })
     } else {
       ElMessage.warning('获取知识库列表失败，请稍后重试')
       knowledgeBases.value = []
@@ -581,6 +706,14 @@ const selectKnowledgeBase = (kb) => {
   kbItems.value = kbContents.value[kbId]
   currentFolder.value = null
   kbSearchQuery.value = ''
+  
+  // 记录选中的知识库信息，用于调试
+  logger.info('选中知识库', {
+    id: kb.id,
+    name: kb.name,
+    difyKnowdataId: kb.difyKnowdataId,
+    difyKbId: kb.difyKbId
+  })
   
   // 加载知识库文件列表，确保 ID 是数字类型
   loadKnowledgeFiles(kbId)
@@ -734,6 +867,18 @@ const toggleSearch = () => {
   }
 }
 
+const toggleContentCollapse = () => {
+  isContentExpanded.value = !isContentExpanded.value
+}
+
+const handleContentAction = (command, item) => {
+  if (command === 'rename') {
+    renameItem(item)
+  } else if (command === 'delete') {
+    deleteItem(item)
+  }
+}
+
 const createFolder = () => {
   // TODO: 后端接口待实现
   ElMessage.info('创建文件夹功能待后端接口实现')
@@ -747,10 +892,14 @@ const handleKbUpload = async (e) => {
   const files = e.target.files || []
   if (!files.length || !selectedKnowledgeBase.value) return
 
-  // 检查是否有 difyKbId
-  const difyKbId = selectedKnowledgeBase.value.difyKbId || selectedKnowledgeBase.value.difyKnowledgeId
+  // 检查是否有 Dify KB ID（优先使用 difyKnowdataId，兼容 difyKbId）
+  const difyKbId = selectedKnowledgeBase.value.difyKnowdataId || selectedKnowledgeBase.value.difyKbId
   if (!difyKbId) {
-    ElMessage.warning('知识库缺少 Dify KB ID，无法上传文件')
+    logger.warn('知识库缺少 Dify KB ID', {
+      knowledgeBase: selectedKnowledgeBase.value,
+      availableFields: Object.keys(selectedKnowledgeBase.value)
+    })
+    ElMessage.warning('知识库缺少 Dify KB ID，无法上传文件。请检查知识库是否已正确创建。')
     e.target.value = ''
     return
   }
@@ -872,10 +1021,73 @@ const cancelRename = () => {
 
 const deleteItem = (item) => {
   deletingItem.value = item
+  deletingKnowledgeBase.value = null
   showDeleteDialog.value = true
 }
 
+const cancelDelete = () => {
+  showDeleteDialog.value = false
+  deletingItem.value = null
+  deletingKnowledgeBase.value = null
+}
+
+/**
+ * 删除知识库
+ * @param {Object} kb - 知识库对象
+ */
+const deleteKnowledgeBase = (kb) => {
+  deletingKnowledgeBase.value = kb
+  showDeleteDialog.value = true
+}
+
+/**
+ * 确认删除（知识库或文件）
+ */
 const confirmDelete = async () => {
+  // 删除知识库
+  if (deletingKnowledgeBase.value) {
+    try {
+      await deleteKnowledge(deletingKnowledgeBase.value.id)
+      
+      // 从列表中移除
+      const idx = knowledgeBases.value.findIndex(
+        (kb) => kb.id === deletingKnowledgeBase.value.id
+      )
+      if (idx > -1) {
+        knowledgeBases.value.splice(idx, 1)
+      }
+      
+      // 如果删除的是当前选中的知识库，清空选中状态
+      if (selectedKnowledgeBase.value && selectedKnowledgeBase.value.id === deletingKnowledgeBase.value.id) {
+        selectedKnowledgeBase.value = null
+        kbItems.value = []
+        currentFolder.value = null
+        kbContents.value = {}
+        // 清空对话记录
+        kbMessagesList.value = [{
+          id: 1,
+          type: 'ai',
+          content: 'Hi，任何关于这个知识库的问题都可以问我～',
+          timestamp: new Date()
+        }]
+        currentConversationId.value = null
+      }
+      
+      // 从缓存中移除
+      delete kbContents.value[deletingKnowledgeBase.value.id]
+      
+      ElMessage.success('知识库已删除')
+      logger.info('删除知识库成功', { id: deletingKnowledgeBase.value.id })
+    } catch (error) {
+      logger.error('删除知识库失败', error)
+      ElMessage.error(error.message || '删除知识库失败')
+    }
+    showDeleteDialog.value = false
+    deletingKnowledgeBase.value = null
+    return
+  }
+  
+  // 删除文件（原有逻辑）
   if (!deletingItem.value) return
 
   try {
@@ -926,11 +1138,6 @@ const confirmDelete = async () => {
     logger.error('删除失败', error)
     ElMessage.error(error.message || '删除失败')
   }
-}
-
-const cancelDelete = () => {
-  showDeleteDialog.value = false
-  deletingItem.value = null
 }
 
 const getCurrentFileCount = () => {
@@ -992,38 +1199,237 @@ const autoResizeInput = (event) => {
   }
 }
 
-const sendKbMessage = async () => {
-  if (!kbInput.value.trim()) return
-  if (isGenerating.value) {
-    ElMessage.warning('正在生成回答，请稍候...')
+// 处理 Enter 键事件（防止与按钮点击冲突）
+const handleEnterKey = (event) => {
+  console.log('[handleEnterKey] Enter键被按下', { 
+    shiftKey: event.shiftKey,
+    isSending: isSendingMessage.value, 
+    isGenerating: isGenerating.value 
+  })
+  // 如果按的是 Shift+Enter，允许换行
+  if (event.shiftKey) {
+    console.log('[handleEnterKey] Shift+Enter，允许换行')
     return
   }
+  // 阻止默认行为并停止冒泡
+  event.preventDefault()
+  event.stopPropagation()
+  event.stopImmediatePropagation() // 立即停止事件传播
+  console.log('[handleEnterKey] 调用 sendKbMessage')
+  // 调用发送消息
+  sendKbMessage()
+  return false // 额外返回 false 确保阻止
+}
+
+// 使用一个标记来确保函数只执行一次（防止并发调用）
+let isExecuting = false
+
+const sendKbMessage = async () => {
+  console.log('[sendKbMessage] 函数被调用', { 
+    isSending: isSendingMessage.value, 
+    isGenerating: isGenerating.value,
+    isExecuting: isExecuting,
+    hasInput: !!kbInput.value?.trim(),
+    hasSelectedKb: !!selectedKnowledgeBase.value,
+    stack: new Error().stack.split('\n').slice(0, 5).join('\n')
+  })
+  
+  // 防止重复调用：使用同步锁机制，立即检查（必须在函数最开始）
+  if (isExecuting) {
+    console.warn('[sendKbMessage] 函数正在执行中，忽略重复请求', { 
+      sendingMessageKey: sendingMessageKey.value,
+      stack: new Error().stack.split('\n').slice(0, 5).join('\n')
+    })
+    return
+  }
+  
+  if (isSendingMessage.value) {
+    console.warn('[sendKbMessage] 正在发送消息，忽略重复请求', { 
+      sendingMessageKey: sendingMessageKey.value,
+      stack: new Error().stack.split('\n').slice(0, 5).join('\n')
+    })
+    logger.warn('正在发送消息，忽略重复请求', { 
+      sendingMessageKey: sendingMessageKey.value,
+      stack: new Error().stack 
+    })
+    return
+  }
+  
+  // 立即设置执行标记（同步操作，防止并发）
+  isExecuting = true
+  
+  if (isGenerating.value) {
+    console.warn('[sendKbMessage] 正在生成回答，忽略重复请求')
+    logger.warn('正在生成回答，忽略重复请求', { 
+      stack: new Error().stack 
+    })
+    isExecuting = false
+    return
+  }
+  
+  if (!kbInput.value.trim()) {
+    console.log('[sendKbMessage] 输入为空，退出')
+    isExecuting = false
+    return
+  }
+  
   if (!selectedKnowledgeBase.value) {
+    console.warn('[sendKbMessage] 未选择知识库')
     ElMessage.warning('请先选择知识库')
+    isExecuting = false
     return
   }
 
-  // 检查是否有 difyKbId
-  const difyKbId = selectedKnowledgeBase.value.difyKbId || selectedKnowledgeBase.value.difyKnowledgeId
+  // 检查是否有 Dify KB ID（优先使用 difyKnowdataId，兼容 difyKbId）
+  const difyKbId = selectedKnowledgeBase.value.difyKnowdataId || selectedKnowledgeBase.value.difyKbId
   if (!difyKbId) {
+    console.warn('[sendKbMessage] 知识库缺少 Dify KB ID', selectedKnowledgeBase.value)
+    logger.warn('知识库缺少 Dify KB ID', selectedKnowledgeBase.value)
     ElMessage.warning('知识库缺少 Dify KB ID，无法使用问答功能')
+    isExecuting = false
     return
   }
 
   const text = kbInput.value.trim()
-  const userMessageId = Date.now()
   
-  // 添加用户消息
-  kbMessagesList.value.push({
+  // 生成消息唯一标识（仅使用内容，用于防重复）
+  const messageKey = text
+  
+  // 检查是否正在发送相同的消息（防止快速重复点击）
+  if (sendingMessageKey.value === messageKey) {
+    console.warn('[sendKbMessage] 正在发送相同的消息，忽略重复请求', { 
+      messageKey, 
+      isSending: isSendingMessage.value
+    })
+    logger.warn('正在发送相同的消息，忽略重复请求', { 
+      messageKey, 
+      isSending: isSendingMessage.value,
+      stack: new Error().stack 
+    })
+    isExecuting = false
+    return
+  }
+  
+  // 立即设置锁和消息标识，防止并发调用（在所有验证通过后立即设置）
+  console.log('[sendKbMessage] 设置锁，开始发送', { messageKey, text: text.substring(0, 50) })
+  isSendingMessage.value = true
+  sendingMessageKey.value = messageKey
+  isGenerating.value = true
+  
+  console.log('[sendKbMessage] 开始发送消息', { 
+    messageKey, 
+    text: text.substring(0, 50),
+    currentMessageCount: kbMessagesList.value.length,
+    timestamp: Date.now()
+  })
+  logger.info('开始发送消息', { 
+    messageKey, 
+    text: text.substring(0, 50),
+    currentMessageCount: kbMessagesList.value.length,
+    timestamp: Date.now()
+  })
+  
+  // 生成唯一的消息ID（使用时间戳 + 随机数，确保唯一性）
+  const timestamp = Date.now()
+  const random = Math.floor(Math.random() * 10000)
+  const userMessageId = `${timestamp}-${random}`
+  const aiMessageId = `${timestamp + 1}-${random}`
+  
+  // 检查是否已存在相同的用户消息（防止重复添加）
+  const now = Date.now()
+  const existingUserMessage = kbMessagesList.value.find(
+    m => m.type === 'user' && m.content === text && 
+    Math.abs((m.timestamp ? new Date(m.timestamp).getTime() : 0) - now) < 2000 // 2秒内的相同消息视为重复
+  )
+  
+  if (existingUserMessage) {
+    logger.warn('检测到重复消息，跳过添加', { 
+      text, 
+      existingId: existingUserMessage.id,
+      timeDiff: Math.abs((existingUserMessage.timestamp ? new Date(existingUserMessage.timestamp).getTime() : 0) - now)
+    })
+    isSendingMessage.value = false
+    isGenerating.value = false
+    sendingMessageKey.value = null
+    isExecuting = false
+    return
+  }
+  
+  // 检查是否已存在相同ID的消息（防止重复添加）
+  const existingUserById = kbMessagesList.value.find(m => m.id === userMessageId)
+  const existingAiById = kbMessagesList.value.find(m => m.id === aiMessageId)
+  
+  if (existingUserById || existingAiById) {
+    logger.warn('检测到重复ID的消息，跳过添加', { 
+      userMessageId, 
+      aiMessageId,
+      existingUser: !!existingUserById,
+      existingAi: !!existingAiById
+    })
+    isSendingMessage.value = false
+    isGenerating.value = false
+    sendingMessageKey.value = null
+    isExecuting = false
+    return
+  }
+  
+  // 在添加前再次检查，确保不会重复添加
+  const existingUserBeforeAdd = kbMessagesList.value.find(m => m.id === userMessageId)
+  const existingAiBeforeAdd = kbMessagesList.value.find(m => m.id === aiMessageId)
+  
+  if (existingUserBeforeAdd || existingAiBeforeAdd) {
+    logger.warn('添加前检测到重复消息，跳过添加', { 
+      userMessageId, 
+      aiMessageId,
+      existingUser: !!existingUserBeforeAdd,
+      existingAi: !!existingAiBeforeAdd,
+      stack: new Error().stack
+    })
+    isSendingMessage.value = false
+    isGenerating.value = false
+    sendingMessageKey.value = null
+    isExecuting = false
+    return
+  }
+  
+  console.log('[sendKbMessage] 准备添加消息', { 
+    userMessageId, 
+    aiMessageId, 
+    text: text.substring(0, 50),
+    currentMessageCount: kbMessagesList.value.length
+  })
+  logger.info('添加新消息', { 
+    userMessageId, 
+    aiMessageId, 
+    text: text.substring(0, 50),
+    currentMessageCount: kbMessagesList.value.length
+  })
+  
+  // 添加用户消息（只添加一次）
+  const userMessage = {
     id: userMessageId,
     type: 'user',
     content: text,
     timestamp: new Date()
-  })
+  }
+  
+  // 再次检查是否已存在（防止并发添加）
+  const checkBeforePush = kbMessagesList.value.find(m => m.id === userMessageId)
+  if (!checkBeforePush) {
+    console.log('[sendKbMessage] 添加用户消息到列表', { id: userMessageId, content: text.substring(0, 50) })
+    kbMessagesList.value.push(userMessage)
+    console.log('[sendKbMessage] 用户消息已添加，当前消息数:', kbMessagesList.value.length)
+    logger.info('用户消息已添加', { id: userMessageId, content: text.substring(0, 50) })
+  } else {
+    console.warn('[sendKbMessage] 用户消息已存在，跳过添加', { id: userMessageId })
+    logger.warn('用户消息已存在，跳过添加', { id: userMessageId })
+  }
+  
+  // 保存最后发送的用户消息ID，用于后续清除重复
+  lastUserMessageId.value = userMessageId
   kbInput.value = ''
 
   // 创建AI消息占位
-  const aiMessageId = Date.now() + 1
   const aiMessage = {
     id: aiMessageId,
     type: 'ai',
@@ -1032,7 +1438,21 @@ const sendKbMessage = async () => {
     streaming: true,
     documents: [] // 文档片段数据
   }
-  kbMessagesList.value.push(aiMessage)
+  
+  // 再次检查是否已存在（防止并发添加）
+  const checkAiBeforePush = kbMessagesList.value.find(m => m.id === aiMessageId)
+  if (!checkAiBeforePush) {
+    kbMessagesList.value.push(aiMessage)
+    logger.info('AI消息占位已添加', { id: aiMessageId })
+  } else {
+    logger.warn('AI消息占位已存在，跳过添加', { id: aiMessageId })
+  }
+  
+  logger.info('消息添加完成', { 
+    totalMessages: kbMessagesList.value.length,
+    userMessages: kbMessagesList.value.filter(m => m.type === 'user').length,
+    aiMessages: kbMessagesList.value.filter(m => m.type === 'ai').length
+  })
 
   // 重置文档列表
   currentDocuments.value = []
@@ -1045,8 +1465,6 @@ const sendKbMessage = async () => {
     }
     scrollKbToBottom()
   })
-
-  isGenerating.value = true
 
   try {
     logger.info('开始流式问答', { 
@@ -1070,26 +1488,77 @@ const sendKbMessage = async () => {
       },
       onEnd: (data) => {
         // 消息结束，保存会话ID和文档片段
+        // 注意：只更新已存在的消息，不要添加新消息
         const message = kbMessagesList.value.find(m => m.id === aiMessageId)
         if (message) {
           message.streaming = false
           message.documents = data.documents || []
           currentDocuments.value = data.documents || []
+          
+          // 如果后端返回了 messageId，更新消息ID（但不要添加新消息）
+          if (data.messageId && data.messageId !== aiMessageId) {
+            logger.info('更新AI消息ID', { oldId: aiMessageId, newId: data.messageId })
+            message.id = data.messageId
+          }
+        } else {
+          logger.warn('未找到AI消息，可能已被删除', { aiMessageId })
         }
+        
+        // AI返回消息后，检查并清除重复的用户消息（保留最后一条）
+        if (lastUserMessageId.value) {
+          const lastUserMessage = kbMessagesList.value.find(m => m.id === lastUserMessageId.value)
+          if (lastUserMessage && lastUserMessage.content) {
+            const content = lastUserMessage.content.trim()
+            // 找出所有相同内容的用户消息
+            const duplicateMessages = kbMessagesList.value.filter(
+              m => m.type === 'user' && m.content?.trim() === content && m.id !== lastUserMessageId.value
+            )
+            
+            if (duplicateMessages.length > 0) {
+              // 删除重复的消息（保留最后一条）
+              duplicateMessages.forEach(dupMsg => {
+                const index = kbMessagesList.value.findIndex(m => m.id === dupMsg.id)
+                if (index > -1) {
+                  logger.info('清除重复的用户消息', { 
+                    content: content.substring(0, 50), 
+                    id: dupMsg.id,
+                    index
+                  })
+                  kbMessagesList.value.splice(index, 1)
+                }
+              })
+              logger.info('已清除重复的用户消息', { 
+                removedCount: duplicateMessages.length,
+                content: content.substring(0, 50)
+              })
+            }
+          }
+          // 清除标记
+          lastUserMessageId.value = null
+        }
+        
         if (data.conversationId) {
           currentConversationId.value = data.conversationId
         }
+        
+        isSendingMessage.value = false
         isGenerating.value = false
+        sendingMessageKey.value = null
+        isExecuting = false
         currentAbortController.value = null
         nextTick(scrollKbToBottom)
         logger.info('流式问答完成', { 
           conversationId: data.conversationId,
           messageId: data.messageId,
-          documentCount: (data.documents || []).length
+          documentCount: (data.documents || []).length,
+          totalMessages: kbMessagesList.value.length
         })
       },
       onError: (error) => {
+        isSendingMessage.value = false
         isGenerating.value = false
+        sendingMessageKey.value = null
+        isExecuting = false
         currentAbortController.value = null
         
         // 处理错误
@@ -1104,6 +1573,28 @@ const sendKbMessage = async () => {
           }
           message.streaming = false
         }
+        
+        // 即使出错，也清除重复的用户消息
+        if (lastUserMessageId.value) {
+          const lastUserMessage = kbMessagesList.value.find(m => m.id === lastUserMessageId.value)
+          if (lastUserMessage && lastUserMessage.content) {
+            const content = lastUserMessage.content.trim()
+            const duplicateMessages = kbMessagesList.value.filter(
+              m => m.type === 'user' && m.content?.trim() === content && m.id !== lastUserMessageId.value
+            )
+            if (duplicateMessages.length > 0) {
+              duplicateMessages.forEach(dupMsg => {
+                const index = kbMessagesList.value.findIndex(m => m.id === dupMsg.id)
+                if (index > -1) {
+                  kbMessagesList.value.splice(index, 1)
+                }
+              })
+              logger.info('错误处理中清除重复的用户消息', { removedCount: duplicateMessages.length })
+            }
+          }
+          lastUserMessageId.value = null
+        }
+        
         logger.error('流式问答失败', error)
         nextTick(scrollKbToBottom)
       }
@@ -1111,13 +1602,38 @@ const sendKbMessage = async () => {
 
     currentAbortController.value = abortController
   } catch (error) {
+    isSendingMessage.value = false
     isGenerating.value = false
+    sendingMessageKey.value = null
+    isExecuting = false
     currentAbortController.value = null
     const message = kbMessagesList.value.find(m => m.id === aiMessageId)
     if (message) {
       message.content = '抱歉，回答生成失败，请稍后再试。'
       message.streaming = false
     }
+    
+    // 即使异常，也清除重复的用户消息
+    if (lastUserMessageId.value) {
+      const lastUserMessage = kbMessagesList.value.find(m => m.id === lastUserMessageId.value)
+      if (lastUserMessage && lastUserMessage.content) {
+        const content = lastUserMessage.content.trim()
+        const duplicateMessages = kbMessagesList.value.filter(
+          m => m.type === 'user' && m.content?.trim() === content && m.id !== lastUserMessageId.value
+        )
+        if (duplicateMessages.length > 0) {
+          duplicateMessages.forEach(dupMsg => {
+            const index = kbMessagesList.value.findIndex(m => m.id === dupMsg.id)
+            if (index > -1) {
+              kbMessagesList.value.splice(index, 1)
+            }
+          })
+          logger.info('异常处理中清除重复的用户消息', { removedCount: duplicateMessages.length })
+        }
+      }
+      lastUserMessageId.value = null
+    }
+    
     logger.error('流式问答异常', error)
     ElMessage.error(error.message || '回答生成失败')
     nextTick(scrollKbToBottom)
@@ -1133,6 +1649,9 @@ onMounted(() => {
 .knowledge-base-container {
   display: flex;
   height: 100vh;
+  width: 100vw;
+  max-width: 100%;
+  margin: 0 auto;
   background: #f7f9fc;
   overflow: hidden;
 }
@@ -1140,6 +1659,7 @@ onMounted(() => {
 /* 左侧导航栏 */
 .kb-list-sidebar {
   width: 280px;
+  min-width: 280px;
   background: white;
   border-right: 1px solid #e5e7eb;
   display: flex;
@@ -1148,11 +1668,12 @@ onMounted(() => {
 }
 
 .kb-list-header {
-  padding: 14px 20px 14px 12px;
+  padding: 14px 20px 14px 16px;
   border-bottom: 1px solid #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .kb-header-title {
@@ -1162,13 +1683,26 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0;
 }
 
 .kb-header-actions {
   display: flex;
   gap: 8px;
 }
+
+// .kb-list-sidebar:not(.is-open) .kb-toggle-text {
+//   display: none;
+// }
+//
+// .kb-list-sidebar:not(.is-open) .kb-toggle-button {
+//   justify-content: center;
+//   padding: 10px;
+// }
+//
+// .kb-list-sidebar:not(.is-open) .kb-toggle-arrow {
+//   transform: rotate(-90deg);
+// }
+// Legacy sidebar collapse selectors removed
 
 .kb-section {
   margin-bottom: 24px;
@@ -1191,6 +1725,18 @@ onMounted(() => {
   overflow-y: auto;
   padding: 0 20px;
 }
+
+// .kb-collapse-enter-active,
+// .kb-collapse-leave-active {
+//   transition: opacity 0.2s ease, transform 0.2s ease;
+// }
+
+// .kb-collapse-enter-from,
+// .kb-collapse-leave-to {
+//   opacity: 0;
+//   transform: translateY(-8px);
+// }
+// Transition helpers for the old sidebar collapse removed
 
 .kb-item {
   cursor: pointer;
@@ -1252,6 +1798,37 @@ onMounted(() => {
   color: #111827;
 }
 
+.kb-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.kb-item:hover .kb-item-actions {
+  opacity: 1;
+}
+
+.kb-action-icon {
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+}
+
 .kb-empty-tip {
   padding: 20px;
   text-align: center;
@@ -1261,17 +1838,30 @@ onMounted(() => {
 
 /* 中间内容区域 */
 .main-content {
-  flex: 1;
+  flex: 1 1 0%;
+  max-width: 100%;
   background: white;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
+.main-content .content-wrapper {
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .content-header {
   padding: 24px;
   border-bottom: 1px solid #f3f4f6;
   background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .content-title {
@@ -1282,6 +1872,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
 }
 
 .content-icon {
@@ -1348,6 +1939,8 @@ onMounted(() => {
 .section-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .action-icon {
@@ -1362,7 +1955,6 @@ onMounted(() => {
   justify-content: center;
   color: #374151;
   transition: all 0.2s ease;
-  font-size: 14px;
 
   &:hover {
     background: #eef2ff;
@@ -1383,10 +1975,11 @@ onMounted(() => {
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   gap: 12px;
   transition: all 0.2s ease;
+  align-items: center;
 
   &:hover {
     background: #f3f4f6;
@@ -1436,7 +2029,26 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
+
+.content-actions-dropdown {
+  display: none;
+}
+
+// .content-collapse-enter-active,
+// .content-collapse-leave-active {
+//   transition: all 0.3s ease;
+//   overflow: hidden;
+// }
+//
+// .content-collapse-enter-from,
+// .content-collapse-leave-to {
+//   opacity: 0;
+//   max-height: 0;
+// }
+// Legacy content-collapse transitions removed
 
 .content-empty {
   text-align: center;
@@ -1617,11 +2229,18 @@ onMounted(() => {
 /* 右侧AI助手区域 */
 .ai-assistant {
   width: 600px;
+  flex: 0 0 600px;
   background: white;
   border-left: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.ai-assistant.ai-expanded {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
 }
 
 .ai-header {
@@ -1630,6 +2249,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.ai-header-left {
+  display: flex;
+  align-items: center;
 }
 
 .ai-header-title {
@@ -1669,11 +2293,13 @@ onMounted(() => {
   margin-bottom: 24px;
   display: flex;
   align-items: flex-start;
-
+  gap: 12px;
+ 
   &.user {
-    justify-content: flex-end;
+    flex-direction: row-reverse;
+    gap: 16px;
   }
-
+ 
   &.ai {
     justify-content: flex-start;
   }
@@ -1690,17 +2316,15 @@ onMounted(() => {
   font-weight: 600;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-
+ 
   &.user {
     background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
     color: #fff;
-    margin-left: 12px;
   }
-
+ 
   &.ai {
     background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
     color: #fff;
-    margin-right: 12px;
   }
 }
 
@@ -1725,6 +2349,10 @@ onMounted(() => {
   color: #fff;
   border-color: transparent;
   border-radius: 16px 16px 4px 16px;
+}
+
+.kb-message.user .kb-message-bubble {
+  align-self: flex-end;
 }
 
 .kb-message.ai .kb-message-content-wrapper {
@@ -1925,5 +2553,94 @@ onMounted(() => {
 .kb-streaming-text {
   font-size: 12px;
   color: #6b7280;
+}
+
+.main-content-fade-enter-active,
+.main-content-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.main-content-fade-enter-from,
+.main-content-fade-leave-to {
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+@media (max-width: 1440px) {
+  .ai-assistant {
+    width: 420px;
+  }
+}
+
+@media (max-width: 1400px) {
+  .knowledge-base-container {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    width: 100%;
+    max-width: none;
+  }
+
+  .kb-list-sidebar {
+    width: 100%;
+    min-width: 0;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .kb-list {
+    padding: 0 16px 16px;
+    max-height: 50vh;
+  }
+
+  .main-content {
+    order: 2;
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .ai-assistant {
+    order: 3;
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #e5e7eb;
+  }
+}
+
+@media (max-width: 768px) {
+  .content-header {
+    padding: 16px;
+  }
+
+  .ai-assistant {
+    border-top: none;
+  }
+
+  .content-item {
+    padding: 12px 10px;
+  }
+
+  .content-item-meta {
+    font-size: 11px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .content-item-actions {
+    gap: 4px;
+  }
+
+  .action-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .content-item-actions .action-icon:not(.more-action) {
+    display: none;
+  }
+
+  .content-item-actions .action-icon.more-action {
+    display: inline-flex;
+  }
 }
 </style>

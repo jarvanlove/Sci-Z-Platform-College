@@ -5,7 +5,9 @@
       <Sidebar />
       <main class="main-content">
         <div class="content-wrapper">
-          <router-view />
+          <slot>
+            <router-view />
+          </slot>
         </div>
       </main>
     </div>
@@ -38,7 +40,8 @@ import Sidebar from './Sidebar.vue'
   padding: 16px;
   
   .content-wrapper {
-    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
     min-height: calc(100vh - 108px); // 减去 header 和 padding
   }
 }

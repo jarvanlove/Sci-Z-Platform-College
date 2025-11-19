@@ -7,8 +7,13 @@ import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationCr
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationQueryReq;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeFileRelationResp;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sciz.server.domain.pojo.entity.file.SysAttachment;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeFileRelation;
+import com.sciz.server.domain.pojo.repository.file.SysAttachmentRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeFileRelationRepo;
 import com.sciz.server.infrastructure.external.dify.config.DifyConfig;
@@ -16,6 +21,7 @@ import com.sciz.server.infrastructure.external.dify.dto.DifyChatbotModelConfigRe
 import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiService;
 import com.sciz.server.infrastructure.external.dify.service.impl.DifyApiKeyServiceImpl;
+import org.springframework.beans.factory.annotation.Value;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -25,11 +31,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-
 /**
  * 知识库文件关联应用服务实现类
  *
@@ -41,13 +45,17 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationService {
-
     private final SysKnowledgeFileRelationRepo fileRelationRepo;
     private final KnowledgeFileRelationConverter converter;
     private final SysKnowledgeBaseRepo knowledgeBaseRepo;
     private final DifyApiKeyServiceImpl difyApiKeyService;
     private final DifyApiService difyApiService;
     private final DifyConfig difyConfig;
+    private final SysAttachmentRepo attachmentRepo;
+    private final ObjectMapper objectMapper;
+
+    @Value("${dify.default-resource-id:default}")
+    private String defaultResourceId;
 
     /**
      * 创建知识库文件关联
@@ -187,7 +195,69 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
             throw new BusinessException(ResultCode.DATA_NOT_FOUND, "知识库文件关联不存在");
         }
 
-        // 3. 软删除
+        // 3. 查询知识库实体，获取 Dify 数据集ID
+        SysKnowledgeBase knowledgeBase = knowledgeBaseRepo.findById(entity.getKnowledgeId());
+        if (knowledgeBase == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND, "知识库不存在");
+        }
+
+        // 4. 查询附件实体，获取 Dify 文档ID
+        SysAttachment attachment = attachmentRepo.findById(entity.getAttachmentId());
+        String difyDocumentId = null;
+        if (attachment != null && attachment.getDifyDocId() != null && !attachment.getDifyDocId().trim().isEmpty()) {
+            difyDocumentId = attachment.getDifyDocId();
+        } else if (entity.getCallback() != null && !entity.getCallback().trim().isEmpty()) {
+            // 如果附件中没有 Dify 文档ID，尝试从 callback 字段解析
+            try {
+                JsonNode callbackJson = objectMapper.readTree(entity.getCallback());
+                JsonNode documentNode = callbackJson.get("document");
+                if (documentNode != null && documentNode.has("id")) {
+                    difyDocumentId = documentNode.get("id").asText();
+                }
+            } catch (Exception e) {
+                log.warn(String.format("解析 callback 字段失败: callback=%s, err=%s", entity.getCallback(), e.getMessage()));
+            }
+        }
+
+        // 5. 如果存在 Dify 数据集ID和文档ID，调用 Dify API 删除文档
+        if (knowledgeBase.getDifyKnowdataId() != null && !knowledgeBase.getDifyKnowdataId().trim().isEmpty()
+                && difyDocumentId != null && !difyDocumentId.trim().isEmpty()) {
+            try {
+                // 获取用户的 Dify API Key
+                QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
+                queryWrapper.eq("user_id", userId)
+                           .eq("key_type", "dataset")
+                           .eq("is_active", true)
+                           .last("LIMIT 1");
+                DifyApiKey difyApiKey = difyApiKeyService.getOne(queryWrapper);
+                
+                String resourceId = (difyApiKey != null && difyApiKey.getResourceId() != null) 
+                    ? difyApiKey.getResourceId() 
+                    : defaultResourceId;
+
+                // 调用 Dify API 删除文档
+                ResponseEntity<String> response = difyApiService.deleteDocument(
+                        knowledgeBase.getDifyKnowdataId(), difyDocumentId, userId, resourceId, "dataset");
+                
+                if (!response.getStatusCode().is2xxSuccessful()) {
+                    log.warn(String.format("Dify API删除文档失败: datasetId=%s, documentId=%s, status=%s, body=%s", 
+                            knowledgeBase.getDifyKnowdataId(), difyDocumentId, response.getStatusCode(), response.getBody()));
+                    // 即使 Dify API 删除失败，也继续删除本地数据（避免数据不一致）
+                } else {
+                    log.info(String.format("Dify API删除文档成功: datasetId=%s, documentId=%s", 
+                            knowledgeBase.getDifyKnowdataId(), difyDocumentId));
+                }
+            } catch (Exception e) {
+                log.error(String.format("调用 Dify API 删除文档异常: datasetId=%s, documentId=%s, err=%s", 
+                        knowledgeBase.getDifyKnowdataId(), difyDocumentId, e.getMessage()), e);
+                // 即使 Dify API 调用异常，也继续删除本地数据（避免数据不一致）
+            }
+        } else {
+            log.warn(String.format("缺少 Dify 数据集ID或文档ID，跳过 Dify API 删除: datasetId=%s, documentId=%s", 
+                    knowledgeBase.getDifyKnowdataId(), difyDocumentId));
+        }
+
+        // 6. 软删除本地关联记录
         boolean success = fileRelationRepo.deleteById(longId);
         if (!success) {
             throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);

@@ -145,7 +145,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NullPointerException.class)
     public ResponseEntity<Result<Void>> handleNullPointerException(NullPointerException e) {
         log.error(String.format("空指针异常 err=%s", e.getMessage()), e);
-
         Result<Void> result = Result.fail(ResultCode.SERVER_ERROR.getCode(), "系统内部错误");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
@@ -212,13 +211,13 @@ public class GlobalExceptionHandler {
         Result<Void> result = Result.fail(ResultCode.BAD_REQUEST.getCode(), message);
         return ResponseEntity.badRequest().body(result);
     }
-
     /**
      * 处理请求体不可读异常
      *
      * @param e 请求体不可读异常
      * @return 错误响应
      */
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Result<Void>> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
         log.warn(String.format("请求体不可读: %s", e.getMessage()));
