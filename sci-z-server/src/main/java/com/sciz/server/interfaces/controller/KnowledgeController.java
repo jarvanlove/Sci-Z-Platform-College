@@ -27,7 +27,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class KnowledgeController {
 
     private final KnowledgeService knowledgeService;
-
     /**
      * 创建知识库
      *
@@ -40,7 +39,6 @@ public class KnowledgeController {
         KnowledgeResp resp = knowledgeService.create(req);
         return Result.success(resp);
     }
-
     /**
      * 分页获取知识库列表
      *
@@ -63,7 +61,6 @@ public class KnowledgeController {
         // TODO: 实现知识库详情查询逻辑
         return Result.success();
     }
-
     /**
      * 上传文件到知识库
      *
@@ -81,7 +78,6 @@ public class KnowledgeController {
         knowledgeService.uploadFile(id, file, folderId);
         return Result.success();
     }
-
     /**
      * 基于知识库的 Chatbot 流式对话
      *

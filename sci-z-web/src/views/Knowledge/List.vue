@@ -328,7 +328,7 @@
         <template v-if="kbMessagesList.length > 1">
           <div class="kb-messages">
             <div
-              v-for="msg in kbMessagesList.slice(1)"
+              v-for="msg in uniqueMessages"
               :key="msg.id"
               class="kb-message"
               :class="msg.type"
@@ -382,7 +382,7 @@
             v-model="kbInput"
             class="kb-message-input"
             placeholder="基于知识库提问"
-            @keydown.enter.prevent="sendKbMessage"
+            @keydown.enter.exact.prevent="handleEnterKey"
             @input="autoResizeInput"
           ></textarea>
 
@@ -390,8 +390,9 @@
           <div class="kb-input-bottom-bar">
             <button
               class="kb-send-btn"
-              :class="{ active: kbInput.trim() }"
-              @click="sendKbMessage"
+              :class="{ active: kbInput.trim() && !isSendingMessage }"
+              :disabled="isSendingMessage || isGenerating"
+              @click.stop.prevent="() => { console.log('[按钮点击] 发送按钮被点击'); sendKbMessage(); }"
             >
               <el-icon><ArrowUp /></el-icon>
             </button>
@@ -606,9 +607,12 @@ const kbMessagesList = ref([
 const kbInput = ref('')
 const kbMessages = ref(null)
 const isGenerating = ref(false)
+const isSendingMessage = ref(false) // 发送消息的锁，防止重复调用
 const currentAbortController = ref(null)
 const currentConversationId = ref(null)
 const currentDocuments = ref([]) // 当前回答使用的文档片段
+const lastUserMessageId = ref(null) // 最后发送的用户消息ID，用于清除重复
+const sendingMessageKey = ref(null) // 当前正在发送的消息唯一标识（内容+时间戳），用于防重复
 
 // 计算属性
 const currentKbDisplayItems = computed(() => {
@@ -620,6 +624,50 @@ const currentKbDisplayItems = computed(() => {
   return list.filter((it) =>
     (it.name || '').toLowerCase().includes(q)
   )
+})
+
+// 去重消息列表（基于ID和内容去重，保留最后一个）
+const uniqueMessages = computed(() => {
+  const messages = kbMessagesList.value.slice(1) // 跳过第一条初始消息
+  const seenById = new Map() // 基于ID去重
+  const seenByContent = new Map() // 基于内容和时间戳去重（防止相同内容重复）
+  const result = []
+  
+  // 从后往前遍历，保留最后一个出现的消息（最新的）
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    
+    // 首先检查ID是否重复
+    if (seenById.has(msg.id)) {
+      logger.warn('发现重复ID的消息，已过滤', { 
+        id: msg.id, 
+        type: msg.type,
+        content: msg.content?.substring(0, 50) 
+      })
+      continue
+    }
+    
+    // 对于用户消息，还要检查内容和时间戳（防止相同内容在短时间内重复）
+    if (msg.type === 'user' && msg.content) {
+      const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : 0
+      const timeWindow = Math.floor(timestamp / 1000) // 按秒分组
+      const contentKey = `${msg.type}-${msg.content}-${timeWindow}`
+      if (seenByContent.has(contentKey)) {
+        logger.warn('发现重复内容的用户消息，已过滤', { 
+          id: msg.id, 
+          content: msg.content?.substring(0, 50),
+          timestamp: msg.timestamp
+        })
+        continue
+      }
+      seenByContent.set(contentKey, true)
+    }
+    
+    seenById.set(msg.id, true)
+    result.unshift(msg) // 使用 unshift 保持顺序
+  }
+  
+  return result
 })
 
 // 方法
@@ -1151,39 +1199,237 @@ const autoResizeInput = (event) => {
   }
 }
 
-const sendKbMessage = async () => {
-  if (!kbInput.value.trim()) return
-  if (isGenerating.value) {
-    ElMessage.warning('正在生成回答，请稍候...')
+// 处理 Enter 键事件（防止与按钮点击冲突）
+const handleEnterKey = (event) => {
+  console.log('[handleEnterKey] Enter键被按下', { 
+    shiftKey: event.shiftKey,
+    isSending: isSendingMessage.value, 
+    isGenerating: isGenerating.value 
+  })
+  // 如果按的是 Shift+Enter，允许换行
+  if (event.shiftKey) {
+    console.log('[handleEnterKey] Shift+Enter，允许换行')
     return
   }
+  // 阻止默认行为并停止冒泡
+  event.preventDefault()
+  event.stopPropagation()
+  event.stopImmediatePropagation() // 立即停止事件传播
+  console.log('[handleEnterKey] 调用 sendKbMessage')
+  // 调用发送消息
+  sendKbMessage()
+  return false // 额外返回 false 确保阻止
+}
+
+// 使用一个标记来确保函数只执行一次（防止并发调用）
+let isExecuting = false
+
+const sendKbMessage = async () => {
+  console.log('[sendKbMessage] 函数被调用', { 
+    isSending: isSendingMessage.value, 
+    isGenerating: isGenerating.value,
+    isExecuting: isExecuting,
+    hasInput: !!kbInput.value?.trim(),
+    hasSelectedKb: !!selectedKnowledgeBase.value,
+    stack: new Error().stack.split('\n').slice(0, 5).join('\n')
+  })
+  
+  // 防止重复调用：使用同步锁机制，立即检查（必须在函数最开始）
+  if (isExecuting) {
+    console.warn('[sendKbMessage] 函数正在执行中，忽略重复请求', { 
+      sendingMessageKey: sendingMessageKey.value,
+      stack: new Error().stack.split('\n').slice(0, 5).join('\n')
+    })
+    return
+  }
+  
+  if (isSendingMessage.value) {
+    console.warn('[sendKbMessage] 正在发送消息，忽略重复请求', { 
+      sendingMessageKey: sendingMessageKey.value,
+      stack: new Error().stack.split('\n').slice(0, 5).join('\n')
+    })
+    logger.warn('正在发送消息，忽略重复请求', { 
+      sendingMessageKey: sendingMessageKey.value,
+      stack: new Error().stack 
+    })
+    return
+  }
+  
+  // 立即设置执行标记（同步操作，防止并发）
+  isExecuting = true
+  
+  if (isGenerating.value) {
+    console.warn('[sendKbMessage] 正在生成回答，忽略重复请求')
+    logger.warn('正在生成回答，忽略重复请求', { 
+      stack: new Error().stack 
+    })
+    isExecuting = false
+    return
+  }
+  
+  if (!kbInput.value.trim()) {
+    console.log('[sendKbMessage] 输入为空，退出')
+    isExecuting = false
+    return
+  }
+  
   if (!selectedKnowledgeBase.value) {
+    console.warn('[sendKbMessage] 未选择知识库')
     ElMessage.warning('请先选择知识库')
+    isExecuting = false
     return
   }
 
   // 检查是否有 Dify KB ID（优先使用 difyKnowdataId，兼容 difyKbId）
   const difyKbId = selectedKnowledgeBase.value.difyKnowdataId || selectedKnowledgeBase.value.difyKbId
   if (!difyKbId) {
+    console.warn('[sendKbMessage] 知识库缺少 Dify KB ID', selectedKnowledgeBase.value)
     logger.warn('知识库缺少 Dify KB ID', selectedKnowledgeBase.value)
     ElMessage.warning('知识库缺少 Dify KB ID，无法使用问答功能')
+    isExecuting = false
     return
   }
 
   const text = kbInput.value.trim()
-  const userMessageId = Date.now()
   
-  // 添加用户消息
-  kbMessagesList.value.push({
+  // 生成消息唯一标识（仅使用内容，用于防重复）
+  const messageKey = text
+  
+  // 检查是否正在发送相同的消息（防止快速重复点击）
+  if (sendingMessageKey.value === messageKey) {
+    console.warn('[sendKbMessage] 正在发送相同的消息，忽略重复请求', { 
+      messageKey, 
+      isSending: isSendingMessage.value
+    })
+    logger.warn('正在发送相同的消息，忽略重复请求', { 
+      messageKey, 
+      isSending: isSendingMessage.value,
+      stack: new Error().stack 
+    })
+    isExecuting = false
+    return
+  }
+  
+  // 立即设置锁和消息标识，防止并发调用（在所有验证通过后立即设置）
+  console.log('[sendKbMessage] 设置锁，开始发送', { messageKey, text: text.substring(0, 50) })
+  isSendingMessage.value = true
+  sendingMessageKey.value = messageKey
+  isGenerating.value = true
+  
+  console.log('[sendKbMessage] 开始发送消息', { 
+    messageKey, 
+    text: text.substring(0, 50),
+    currentMessageCount: kbMessagesList.value.length,
+    timestamp: Date.now()
+  })
+  logger.info('开始发送消息', { 
+    messageKey, 
+    text: text.substring(0, 50),
+    currentMessageCount: kbMessagesList.value.length,
+    timestamp: Date.now()
+  })
+  
+  // 生成唯一的消息ID（使用时间戳 + 随机数，确保唯一性）
+  const timestamp = Date.now()
+  const random = Math.floor(Math.random() * 10000)
+  const userMessageId = `${timestamp}-${random}`
+  const aiMessageId = `${timestamp + 1}-${random}`
+  
+  // 检查是否已存在相同的用户消息（防止重复添加）
+  const now = Date.now()
+  const existingUserMessage = kbMessagesList.value.find(
+    m => m.type === 'user' && m.content === text && 
+    Math.abs((m.timestamp ? new Date(m.timestamp).getTime() : 0) - now) < 2000 // 2秒内的相同消息视为重复
+  )
+  
+  if (existingUserMessage) {
+    logger.warn('检测到重复消息，跳过添加', { 
+      text, 
+      existingId: existingUserMessage.id,
+      timeDiff: Math.abs((existingUserMessage.timestamp ? new Date(existingUserMessage.timestamp).getTime() : 0) - now)
+    })
+    isSendingMessage.value = false
+    isGenerating.value = false
+    sendingMessageKey.value = null
+    isExecuting = false
+    return
+  }
+  
+  // 检查是否已存在相同ID的消息（防止重复添加）
+  const existingUserById = kbMessagesList.value.find(m => m.id === userMessageId)
+  const existingAiById = kbMessagesList.value.find(m => m.id === aiMessageId)
+  
+  if (existingUserById || existingAiById) {
+    logger.warn('检测到重复ID的消息，跳过添加', { 
+      userMessageId, 
+      aiMessageId,
+      existingUser: !!existingUserById,
+      existingAi: !!existingAiById
+    })
+    isSendingMessage.value = false
+    isGenerating.value = false
+    sendingMessageKey.value = null
+    isExecuting = false
+    return
+  }
+  
+  // 在添加前再次检查，确保不会重复添加
+  const existingUserBeforeAdd = kbMessagesList.value.find(m => m.id === userMessageId)
+  const existingAiBeforeAdd = kbMessagesList.value.find(m => m.id === aiMessageId)
+  
+  if (existingUserBeforeAdd || existingAiBeforeAdd) {
+    logger.warn('添加前检测到重复消息，跳过添加', { 
+      userMessageId, 
+      aiMessageId,
+      existingUser: !!existingUserBeforeAdd,
+      existingAi: !!existingAiBeforeAdd,
+      stack: new Error().stack
+    })
+    isSendingMessage.value = false
+    isGenerating.value = false
+    sendingMessageKey.value = null
+    isExecuting = false
+    return
+  }
+  
+  console.log('[sendKbMessage] 准备添加消息', { 
+    userMessageId, 
+    aiMessageId, 
+    text: text.substring(0, 50),
+    currentMessageCount: kbMessagesList.value.length
+  })
+  logger.info('添加新消息', { 
+    userMessageId, 
+    aiMessageId, 
+    text: text.substring(0, 50),
+    currentMessageCount: kbMessagesList.value.length
+  })
+  
+  // 添加用户消息（只添加一次）
+  const userMessage = {
     id: userMessageId,
     type: 'user',
     content: text,
     timestamp: new Date()
-  })
+  }
+  
+  // 再次检查是否已存在（防止并发添加）
+  const checkBeforePush = kbMessagesList.value.find(m => m.id === userMessageId)
+  if (!checkBeforePush) {
+    console.log('[sendKbMessage] 添加用户消息到列表', { id: userMessageId, content: text.substring(0, 50) })
+    kbMessagesList.value.push(userMessage)
+    console.log('[sendKbMessage] 用户消息已添加，当前消息数:', kbMessagesList.value.length)
+    logger.info('用户消息已添加', { id: userMessageId, content: text.substring(0, 50) })
+  } else {
+    console.warn('[sendKbMessage] 用户消息已存在，跳过添加', { id: userMessageId })
+    logger.warn('用户消息已存在，跳过添加', { id: userMessageId })
+  }
+  
+  // 保存最后发送的用户消息ID，用于后续清除重复
+  lastUserMessageId.value = userMessageId
   kbInput.value = ''
 
   // 创建AI消息占位
-  const aiMessageId = Date.now() + 1
   const aiMessage = {
     id: aiMessageId,
     type: 'ai',
@@ -1192,7 +1438,21 @@ const sendKbMessage = async () => {
     streaming: true,
     documents: [] // 文档片段数据
   }
-  kbMessagesList.value.push(aiMessage)
+  
+  // 再次检查是否已存在（防止并发添加）
+  const checkAiBeforePush = kbMessagesList.value.find(m => m.id === aiMessageId)
+  if (!checkAiBeforePush) {
+    kbMessagesList.value.push(aiMessage)
+    logger.info('AI消息占位已添加', { id: aiMessageId })
+  } else {
+    logger.warn('AI消息占位已存在，跳过添加', { id: aiMessageId })
+  }
+  
+  logger.info('消息添加完成', { 
+    totalMessages: kbMessagesList.value.length,
+    userMessages: kbMessagesList.value.filter(m => m.type === 'user').length,
+    aiMessages: kbMessagesList.value.filter(m => m.type === 'ai').length
+  })
 
   // 重置文档列表
   currentDocuments.value = []
@@ -1205,8 +1465,6 @@ const sendKbMessage = async () => {
     }
     scrollKbToBottom()
   })
-
-  isGenerating.value = true
 
   try {
     logger.info('开始流式问答', { 
@@ -1230,26 +1488,77 @@ const sendKbMessage = async () => {
       },
       onEnd: (data) => {
         // 消息结束，保存会话ID和文档片段
+        // 注意：只更新已存在的消息，不要添加新消息
         const message = kbMessagesList.value.find(m => m.id === aiMessageId)
         if (message) {
           message.streaming = false
           message.documents = data.documents || []
           currentDocuments.value = data.documents || []
+          
+          // 如果后端返回了 messageId，更新消息ID（但不要添加新消息）
+          if (data.messageId && data.messageId !== aiMessageId) {
+            logger.info('更新AI消息ID', { oldId: aiMessageId, newId: data.messageId })
+            message.id = data.messageId
+          }
+        } else {
+          logger.warn('未找到AI消息，可能已被删除', { aiMessageId })
         }
+        
+        // AI返回消息后，检查并清除重复的用户消息（保留最后一条）
+        if (lastUserMessageId.value) {
+          const lastUserMessage = kbMessagesList.value.find(m => m.id === lastUserMessageId.value)
+          if (lastUserMessage && lastUserMessage.content) {
+            const content = lastUserMessage.content.trim()
+            // 找出所有相同内容的用户消息
+            const duplicateMessages = kbMessagesList.value.filter(
+              m => m.type === 'user' && m.content?.trim() === content && m.id !== lastUserMessageId.value
+            )
+            
+            if (duplicateMessages.length > 0) {
+              // 删除重复的消息（保留最后一条）
+              duplicateMessages.forEach(dupMsg => {
+                const index = kbMessagesList.value.findIndex(m => m.id === dupMsg.id)
+                if (index > -1) {
+                  logger.info('清除重复的用户消息', { 
+                    content: content.substring(0, 50), 
+                    id: dupMsg.id,
+                    index
+                  })
+                  kbMessagesList.value.splice(index, 1)
+                }
+              })
+              logger.info('已清除重复的用户消息', { 
+                removedCount: duplicateMessages.length,
+                content: content.substring(0, 50)
+              })
+            }
+          }
+          // 清除标记
+          lastUserMessageId.value = null
+        }
+        
         if (data.conversationId) {
           currentConversationId.value = data.conversationId
         }
+        
+        isSendingMessage.value = false
         isGenerating.value = false
+        sendingMessageKey.value = null
+        isExecuting = false
         currentAbortController.value = null
         nextTick(scrollKbToBottom)
         logger.info('流式问答完成', { 
           conversationId: data.conversationId,
           messageId: data.messageId,
-          documentCount: (data.documents || []).length
+          documentCount: (data.documents || []).length,
+          totalMessages: kbMessagesList.value.length
         })
       },
       onError: (error) => {
+        isSendingMessage.value = false
         isGenerating.value = false
+        sendingMessageKey.value = null
+        isExecuting = false
         currentAbortController.value = null
         
         // 处理错误
@@ -1264,6 +1573,28 @@ const sendKbMessage = async () => {
           }
           message.streaming = false
         }
+        
+        // 即使出错，也清除重复的用户消息
+        if (lastUserMessageId.value) {
+          const lastUserMessage = kbMessagesList.value.find(m => m.id === lastUserMessageId.value)
+          if (lastUserMessage && lastUserMessage.content) {
+            const content = lastUserMessage.content.trim()
+            const duplicateMessages = kbMessagesList.value.filter(
+              m => m.type === 'user' && m.content?.trim() === content && m.id !== lastUserMessageId.value
+            )
+            if (duplicateMessages.length > 0) {
+              duplicateMessages.forEach(dupMsg => {
+                const index = kbMessagesList.value.findIndex(m => m.id === dupMsg.id)
+                if (index > -1) {
+                  kbMessagesList.value.splice(index, 1)
+                }
+              })
+              logger.info('错误处理中清除重复的用户消息', { removedCount: duplicateMessages.length })
+            }
+          }
+          lastUserMessageId.value = null
+        }
+        
         logger.error('流式问答失败', error)
         nextTick(scrollKbToBottom)
       }
@@ -1271,13 +1602,38 @@ const sendKbMessage = async () => {
 
     currentAbortController.value = abortController
   } catch (error) {
+    isSendingMessage.value = false
     isGenerating.value = false
+    sendingMessageKey.value = null
+    isExecuting = false
     currentAbortController.value = null
     const message = kbMessagesList.value.find(m => m.id === aiMessageId)
     if (message) {
       message.content = '抱歉，回答生成失败，请稍后再试。'
       message.streaming = false
     }
+    
+    // 即使异常，也清除重复的用户消息
+    if (lastUserMessageId.value) {
+      const lastUserMessage = kbMessagesList.value.find(m => m.id === lastUserMessageId.value)
+      if (lastUserMessage && lastUserMessage.content) {
+        const content = lastUserMessage.content.trim()
+        const duplicateMessages = kbMessagesList.value.filter(
+          m => m.type === 'user' && m.content?.trim() === content && m.id !== lastUserMessageId.value
+        )
+        if (duplicateMessages.length > 0) {
+          duplicateMessages.forEach(dupMsg => {
+            const index = kbMessagesList.value.findIndex(m => m.id === dupMsg.id)
+            if (index > -1) {
+              kbMessagesList.value.splice(index, 1)
+            }
+          })
+          logger.info('异常处理中清除重复的用户消息', { removedCount: duplicateMessages.length })
+        }
+      }
+      lastUserMessageId.value = null
+    }
+    
     logger.error('流式问答异常', error)
     ElMessage.error(error.message || '回答生成失败')
     nextTick(scrollKbToBottom)

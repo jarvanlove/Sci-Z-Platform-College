@@ -879,7 +879,6 @@ public class ChatController {
             // 不抛出异常，允许继续执行
         }
     }
-
     /**
      * 从配置文件构建模型配置
      *
