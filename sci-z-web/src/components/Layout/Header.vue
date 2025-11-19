@@ -52,7 +52,7 @@
 </template>
 
 <script setup>
-import { computed, watch, onMounted } from 'vue'
+import { computed, watch, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -69,6 +69,9 @@ const authStore = useAuthStore()
 
 // 使用 storeToRefs 确保响应式
 const { userInfo: storeUserInfo } = storeToRefs(authStore)
+
+// 用于强制刷新头像的时间戳
+const avatarTimestamp = ref(Date.now())
 
 // 侧边栏状态
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
@@ -120,32 +123,56 @@ const avatarUrl = computed(() => {
   
   // 开发环境调试
   if (import.meta.env.DEV) {
-    console.log('[Header] 头像信息:', { avatar, avatarFileId, userInfo: info })
+    console.log('[Header] 头像信息:', { avatar, avatarFileId, userInfo: info, timestamp: avatarTimestamp.value })
   }
+  
+  let baseUrl = null
   
   // 如果有完整的 URL（http/https），直接使用
   if (avatar && (avatar.startsWith('http://') || avatar.startsWith('https://'))) {
-    return avatar
+    baseUrl = avatar
   }
-  
   // 如果是相对路径（以 / 开头），直接使用
-  if (avatar && avatar.startsWith('/')) {
-    return avatar
+  else if (avatar && avatar.startsWith('/')) {
+    baseUrl = avatar
   }
-  
   // 如果有文件 ID，使用预览接口
-  if (avatarFileId) {
-    return `/api/file/preview/${avatarFileId}`
+  else if (avatarFileId) {
+    baseUrl = `/api/file/preview/${avatarFileId}`
   }
-  
   // 如果 avatar 是纯数字，可能是文件 ID
-  if (avatar && /^\d+$/.test(String(avatar))) {
-    return `/api/file/preview/${avatar}`
+  else if (avatar && /^\d+$/.test(String(avatar))) {
+    baseUrl = `/api/file/preview/${avatar}`
+  }
+  // 其他情况返回原值（可能是相对路径但不以 / 开头）
+  else {
+    baseUrl = avatar || null
   }
   
-  // 其他情况返回原值（可能是相对路径但不以 / 开头）
-  return avatar || null
+  // 🔥 关键修复：添加时间戳避免浏览器缓存，确保头像实时更新
+  if (baseUrl) {
+    return baseUrl.includes('?') 
+      ? `${baseUrl}&t=${avatarTimestamp.value}` 
+      : `${baseUrl}?t=${avatarTimestamp.value}`
+  }
+  
+  return null
 })
+
+// 🔥 关键修复：监听 avatar 和 avatarFileId 变化，更新时间戳以强制刷新头像
+watch(() => [userInfo.value?.avatar, userInfo.value?.avatarFileId], ([newAvatar, newAvatarFileId], [oldAvatar, oldAvatarFileId]) => {
+  // 只有当 avatar 或 avatarFileId 真正变化时，才更新时间戳
+  if (newAvatar !== oldAvatar || newAvatarFileId !== oldAvatarFileId) {
+    avatarTimestamp.value = Date.now()
+    if (import.meta.env.DEV) {
+      console.log('[Header] 头像已更新，刷新时间戳:', { 
+        newAvatar, 
+        newAvatarFileId,
+        timestamp: avatarTimestamp.value
+      })
+    }
+  }
+}, { immediate: false })
 
 // 监听 userInfo 变化，用于调试
 if (import.meta.env.DEV) {
@@ -153,6 +180,7 @@ if (import.meta.env.DEV) {
     console.log('[Header] userInfo 变化:', { 
       hasUserInfo: !!newVal, 
       avatar: newVal?.avatar,
+      avatarFileId: newVal?.avatarFileId,
       username: newVal?.username 
     })
   }, { immediate: true, deep: true })

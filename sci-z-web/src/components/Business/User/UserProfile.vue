@@ -262,6 +262,7 @@ import { getUserInfo, updateUserInfo, getProfileFields } from '@/api/User'
 import { previewFile } from '@/api/File'
 import { useAuthStore } from '@/store/modules/auth'
 import { useIndustryStore } from '@/store/modules/industry'
+import { setUserInfo } from '@/utils/auth'
 import { validateChineseName, validateEmail, validatePhone } from '@/utils/validate'
 import { createLogger } from '@/utils/simpleLogger'
 import {
@@ -475,7 +476,16 @@ try {
   syncDepartmentValue()
   syncTitleValue()
 
-  avatarPreview.value = formData.avatar
+  // 🔥 关键修复：加载时添加时间戳，避免浏览器缓存导致头像不更新
+  if (formData.avatar) {
+    const timestamp = Date.now()
+    const urlWithTimestamp = formData.avatar.includes('?') 
+      ? `${formData.avatar}&t=${timestamp}` 
+      : `${formData.avatar}?t=${timestamp}`
+    avatarPreview.value = urlWithTimestamp
+  } else {
+    avatarPreview.value = formData.avatar
+  }
   resetVerification('email')
   resetVerification('phone')
   applyFieldDefaults()
@@ -516,7 +526,24 @@ try {
   logger.info('提交个人信息 payload', payload)
   console.table?.(payload)
   await updateUserInfo(payload)
+  
+  // 🔥 关键修复：保存成功后，强制刷新用户信息，确保所有组件都能获取到最新数据
   await authStore.getUserInfo(true)
+  
+  // 🔥 关键修复：更新预览 URL 时添加时间戳，避免浏览器缓存导致头像不更新
+  if (formData.avatar) {
+    const timestamp = Date.now()
+    const urlWithTimestamp = formData.avatar.includes('?') 
+      ? `${formData.avatar}&t=${timestamp}` 
+      : `${formData.avatar}?t=${timestamp}`
+    avatarPreview.value = urlWithTimestamp
+    logger.info('保存成功，已更新头像预览 URL', { 
+      avatar: formData.avatar,
+      avatarFileId: formData.avatarFileId,
+      preview: urlWithTimestamp
+    })
+  }
+  
   ElMessage.success(t('user.profile.saveSuccess'))
 } catch (error) {
   if (error !== 'cancel') {
@@ -645,10 +672,28 @@ if (!url) {
   return
 }
 
-formData.avatar = url
-avatarPreview.value = url
+// 添加时间戳避免浏览器缓存
+const timestamp = Date.now()
+const urlWithTimestamp = url.includes('?') ? `${url}&t=${timestamp}` : `${url}?t=${timestamp}`
+
+formData.avatar = url  // 保存原始 URL（用于提交给后端）
+avatarPreview.value = urlWithTimestamp  // 显示带时间戳的 URL（用于预览，避免缓存）
 formData.avatarFileId = fileInfo.id || fileInfo.fileId || fileInfo.attachmentId || null
 pendingAvatarFile.value = null
+
+// 🔥 关键修复：同步更新 authStore 的 userInfo，确保右上角头像实时更新
+if (authStore.userInfo) {
+  // 保存原始 URL 到 authStore（不带时间戳），在 Header 中显示时动态添加时间戳
+  authStore.userInfo.avatar = url
+  authStore.userInfo.avatarFileId = formData.avatarFileId
+  // 立即保存到 localStorage，确保刷新页面后也能看到最新头像
+  setUserInfo(authStore.userInfo)
+  logger.info('头像上传成功，已同步更新 authStore 和 localStorage', {
+    avatar: url,
+    avatarFileId: formData.avatarFileId
+  })
+}
+
 ElMessage.success(reused ? t('user.profile.avatarReused') : t('user.profile.uploadSuccess'))
 ElMessage.info(t('user.profile.avatarRememberSave'))
 }
@@ -743,9 +788,22 @@ resetPreviewUrl()
 
 const handlePreviewAvatar = async () => {
 if (previewVisible.value) return
+
+// 🔥 关键修复：添加详细的调试日志，确保使用正确的头像 ID
+logger.info('开始预览头像', {
+  avatarFileId: formData.avatarFileId,
+  avatar: formData.avatar,
+  username: authStore.userInfo?.username,
+  storeAvatarFileId: authStore.userInfo?.avatarFileId
+})
+
 try {
-  if (formData.avatarFileId) {
-    const response = await previewFile(formData.avatarFileId)
+  // 🔥 关键修复：优先使用 authStore 中的 avatarFileId（确保是最新的）
+  const avatarIdToUse = formData.avatarFileId || authStore.userInfo?.avatarFileId
+  
+  if (avatarIdToUse) {
+    logger.info('使用文件 ID 预览头像', { avatarFileId: avatarIdToUse })
+    const response = await previewFile(avatarIdToUse)
     const raw = response?.data ?? response
     resetPreviewUrl()
     let previewUrl = ''
@@ -788,15 +846,30 @@ try {
     if (!previewUrl) {
       throw new Error('preview url not resolved')
     }
-    avatarPreview.value = previewUrl
+    // 添加时间戳避免缓存
+    const timestamp = Date.now()
+    avatarPreview.value = previewUrl.includes('?') 
+      ? `${previewUrl}&t=${timestamp}` 
+      : `${previewUrl}?t=${timestamp}`
+    logger.info('头像预览成功', { previewUrl: avatarPreview.value })
   } else if (formData.avatar) {
-    avatarPreview.value = formData.avatar
+    logger.info('使用 avatar URL 预览头像', { avatar: formData.avatar })
+    // 添加时间戳避免缓存
+    const timestamp = Date.now()
+    avatarPreview.value = formData.avatar.includes('?') 
+      ? `${formData.avatar}&t=${timestamp}` 
+      : `${formData.avatar}?t=${timestamp}`
   } else {
+    logger.info('使用默认头像预览')
     avatarPreview.value = defaultAvatar.value
   }
   previewVisible.value = true
 } catch (error) {
-  logger.error('avatar preview failed', { error: error.message })
+  logger.error('avatar preview failed', { 
+    error: error.message,
+    avatarFileId: formData.avatarFileId,
+    avatar: formData.avatar
+  })
   ElMessage.error(t('user.profile.previewError'))
   avatarPreview.value = formData.avatar || defaultAvatar.value
   previewVisible.value = true
