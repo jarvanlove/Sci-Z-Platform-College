@@ -37,11 +37,6 @@ public class AiMessageRepoImpl implements AiMessageRepo {
     }
 
     @Override
-    public boolean updateById(AiMessage entity) {
-        return mapper.updateById(entity) > 0;
-    }
-
-    @Override
     public AiMessage findById(Long id) {
         return new LambdaQueryChainWrapper<>(mapper)
                 .eq(AiMessage::getId, id)
@@ -50,11 +45,17 @@ public class AiMessageRepoImpl implements AiMessageRepo {
     }
 
     @Override
+    public boolean updateById(AiMessage entity) {
+        return mapper.updateById(entity) > 0;
+    }
+
+    @Override
     public IPage<AiMessage> pageByConversationId(Page<AiMessage> page, Long conversationId) {
         LambdaQueryWrapper<AiMessage> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(AiMessage::getConversationId, conversationId)
                 .eq(AiMessage::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
-                .orderByAsc(AiMessage::getSendTime);
+                .orderByAsc(AiMessage::getSendTime)
+                .orderByAsc(AiMessage::getCreatedTime);
         return mapper.selectPage(page, queryWrapper);
     }
 
@@ -64,6 +65,7 @@ public class AiMessageRepoImpl implements AiMessageRepo {
                 .eq(AiMessage::getConversationId, conversationId)
                 .eq(AiMessage::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
                 .orderByAsc(AiMessage::getSendTime)
+                .orderByAsc(AiMessage::getCreatedTime)
                 .list();
     }
 

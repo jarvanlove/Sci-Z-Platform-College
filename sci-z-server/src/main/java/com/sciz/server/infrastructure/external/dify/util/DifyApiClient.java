@@ -9,16 +9,10 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.ResponseExtractor;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.function.Consumer;
 
 /**
  * Dify API 客户端工具类
@@ -42,47 +36,92 @@ public class DifyApiClient {
      * 
      * @param method 请求类型 (GET, POST, PUT, DELETE)
      * @param path 请求路径
-     * @param body 请求体 (POST/PUT 时使用)
-     * @param params 查询参数 (GET 时使用)
+     * @param body 请求体 (POST/PUT 时使用，会被序列化为 JSON)
+     * @param params 查询参数 (GET 时使用，会拼接到 URL)
      * @param userId 用户ID
      * @param resourceId 资源ID
      * @param keyType 密钥类型
+     * @param key URL 类型（0=baseUrl, 1=privateUrl）
      * @return 响应结果
      */
     public ResponseEntity<String> request(String method, String path, Object body, Map<String, Object> params,
                                          Long userId, String resourceId, String keyType, int key) {
         HttpMethod httpMethod = HttpMethod.valueOf(method.toUpperCase());
-        String url = buildUrl(path, params,key);
-        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType,key);
-        log.debug("Dify {} 请求: {}, userId={}, resourceId={}, keyType={}", 
-                method, url, userId, resourceId, keyType);
-        ResponseEntity<String> response = restTemplate.exchange(url, httpMethod, entity, String.class);
-        validateResponse(url, response);
-        return response;
-    }
-    /**
-     * 简化请求方法 - 无请求体
-     */
-    public ResponseEntity<String> request(String method, String path, Long userId, String resourceId, String keyType) {
-        return request(method, path, null, null, userId, resourceId, keyType,0);
+        String url = buildUrl(path, params, key);
+        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType, key);
+        log.debug("Dify {} 请求: {}, userId={}, resourceId={}, keyType={}, hasBody={}", 
+                method, url, userId, resourceId, keyType, body != null);
+        
+        // 使用 URI.create() 避免 RestTemplate 将 URL 中的 {} 当作 URI 模板变量处理
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            ResponseEntity<String> response = restTemplate.exchange(uri, httpMethod, entity, String.class);
+            validateResponse(url, response);
+            return response;
+        } catch (IllegalArgumentException e) {
+            log.error("URL 格式错误: {}, 错误: {}", url, e.getMessage());
+            throw new RuntimeException("URL 格式错误: " + url, e);
+        }
     }
     
     /**
-     * 简化请求方法 - 带请求体
+     * GET 请求方法（无请求体，无查询参数）
+     * 
+     * @param method 请求类型（通常是 GET）
+     * @param path 请求路径
+     * @param userId 用户ID
+     * @param resourceId 资源ID
+     * @param keyType 密钥类型
+     * @return 响应结果
+     */
+    public ResponseEntity<String> request(String method, String path, Long userId, String resourceId, String keyType) {
+        return request(method, path, null, null, userId, resourceId, keyType, 0);
+    }
+    
+    /**
+     * POST 请求方法（带请求体，body 会被序列化为 JSON）
+     * 
+     * @param method 请求类型（通常是 POST）
+     * @param path 请求路径
+     * @param body 请求体（会被序列化为 JSON 字符串）
+     * @param userId 用户ID
+     * @param resourceId 资源ID
+     * @param keyType 密钥类型
+     * @return 响应结果
      */
     public ResponseEntity<String> request(String method, String path, Object body, Long userId, String resourceId, String keyType) {
-        return request(method, path, body, null, userId, resourceId, keyType,0);
-    }
-
-    public ResponseEntity<String> request(String method, String path, Object body, Long userId, String resourceId, String keyType,int  key) {
-        return request(method, path, body, null, userId, resourceId, keyType,key);
+        return request(method, path, body, null, userId, resourceId, keyType, 0);
     }
 
     /**
-     * 简化请求方法 - 带查询参数
+     * POST 请求方法（带请求体，body 会被序列化为 JSON，支持指定 URL 类型）
+     * 
+     * @param method 请求类型（通常是 POST）
+     * @param path 请求路径
+     * @param body 请求体（会被序列化为 JSON 字符串）
+     * @param userId 用户ID
+     * @param resourceId 资源ID
+     * @param keyType 密钥类型
+     * @param key URL 类型（0=baseUrl, 1=privateUrl）
+     * @return 响应结果
+     */
+    public ResponseEntity<String> request(String method, String path, Object body, Long userId, String resourceId, String keyType, int key) {
+        return request(method, path, body, null, userId, resourceId, keyType, key);
+    }
+
+    /**
+     * GET 请求方法（带查询参数，params 会拼接到 URL）
+     * 
+     * @param method 请求类型（通常是 GET）
+     * @param path 请求路径
+     * @param params 查询参数（会拼接到 URL 的查询字符串）
+     * @param userId 用户ID
+     * @param resourceId 资源ID
+     * @param keyType 密钥类型
+     * @return 响应结果
      */
     public ResponseEntity<String> request(String method, String path, Map<String, Object> params, Long userId, String resourceId, String keyType) {
-        return request(method, path, null, params, userId, resourceId, keyType,0);
+        return request(method, path, null, params, userId, resourceId, keyType, 0);
     }
 
 
@@ -136,17 +175,35 @@ public class DifyApiClient {
 
     /**
      * 创建带动态密钥的 HTTP 实体
+     * 
+     * @param body 请求体（如果不为 null，会被序列化为 JSON 字符串）
+     * @param userId 用户ID
+     * @param resourceId 资源ID
+     * @param keyType 密钥类型
+     * @param IsKey URL 类型（0=baseUrl, 1=privateUrl）
+     * @return HTTP 实体
      */
-    private HttpEntity<?> createHttpEntityWithDynamicKey(Object body, Long userId, String resourceId, String keyType,int IsKey) {
+    private HttpEntity<?> createHttpEntityWithDynamicKey(Object body, Long userId, String resourceId, String keyType, int IsKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        if (IsKey==0){
+        if (IsKey == 0) {
             // 动态获取API密钥
             String apiKey = difyApiKeyService.getApiKey(userId, resourceId, keyType);
             headers.set("Authorization", "Bearer " + apiKey);
         }
 
-        return new HttpEntity<>(body, headers);
+        // 如果 body 不为 null，将其序列化为 JSON 字符串，确保作为请求体发送（而不是查询参数）
+        if (body != null) {
+            try {
+                String jsonBody = objectMapper.writeValueAsString(body);
+                return new HttpEntity<>(jsonBody, headers);
+            } catch (Exception e) {
+                log.error("序列化请求体失败: {}", e.getMessage(), e);
+                throw new RuntimeException("序列化请求体失败: " + e.getMessage(), e);
+            }
+        }
+
+        return new HttpEntity<>(headers);
     }
 
     /**
@@ -183,7 +240,7 @@ public class DifyApiClient {
 
 
     /**
-     * 流式请求方法（用于 SSE 流式响应）
+     * 流式请求方法（改为普通 HTTP 请求）
      * 
      * @param method 请求类型 (POST)
      * @param path 请求路径
@@ -191,77 +248,41 @@ public class DifyApiClient {
      * @param userId 用户ID
      * @param resourceId 资源ID
      * @param keyType 密钥类型
-     * @param onData 数据回调函数，每收到一行数据时调用
+     * @return 响应结果
      */
-    public void requestStream(String method, String path, Object body,
-                             Long userId, String resourceId, String keyType,
-                             Consumer<String> onData) {
+    public ResponseEntity<String> requestStream(String method, String path, Object body,
+                                                Long userId, String resourceId, String keyType) {
         HttpMethod httpMethod = HttpMethod.valueOf(method.toUpperCase());
         String url = buildUrl(path, null, 0);
         HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType, 0);
         
-        log.debug("Dify {} 流式请求: {}, userId={}, resourceId={}, keyType={}", 
-                method, url, userId, resourceId, keyType);
+        // 为流式请求添加 Accept 头，接收 text/event-stream 格式
+        HttpHeaders headers = new HttpHeaders();
+        headers.putAll(entity.getHeaders());
+        headers.setAccept(java.util.Collections.singletonList(MediaType.TEXT_EVENT_STREAM));
+        HttpEntity<?> streamEntity = new HttpEntity<>(entity.getBody(), headers);
         
-        ResponseExtractor<Void> responseExtractor = response -> {
-            HttpStatusCode statusCode = response.getStatusCode();
-            
-            if (!statusCode.is2xxSuccessful()) {
-                // 读取错误响应
-                try (InputStream inputStream = response.getBody();
-                     BufferedReader reader = new BufferedReader(
-                             new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-                    StringBuilder errorBody = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        errorBody.append(line).append("\n");
-                    }
-                    throw new RuntimeException("Dify 流式请求失败，url: " + url
-                            + ", 状态码: " + statusCode
-                            + ", 响应体: " + errorBody.toString());
-                }
-            }
-            
-            // 流式读取响应
-            try (InputStream inputStream = response.getBody();
-                 BufferedReader reader = new BufferedReader(
-                         new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (onData != null) {
-                        onData.accept(line);
-                    }
-                }
-            } catch (Exception e) {
-                log.error("流式读取响应失败: {}", e.getMessage(), e);
-                throw new RuntimeException("流式读取响应失败: " + e.getMessage(), e);
-            }
-            
-            return null;
-        };
-        restTemplate.execute(url, httpMethod, 
-                request -> {
-                    // 设置请求头
-                    HttpHeaders headers = entity.getHeaders();
-                    if (headers != null) {
-                        headers.forEach((name, values) -> {
-                            request.getHeaders().put(name, values);
-                        });
-                    }
-                    // 设置请求体
-                    if (entity.getBody() != null) {
-                        try {
-                            String jsonBody = objectMapper.writeValueAsString(entity.getBody());
-                            request.getBody().write(jsonBody.getBytes(StandardCharsets.UTF_8));
-                        } catch (Exception e) {
-                            log.error("序列化请求体失败: {}", e.getMessage(), e);
-                            throw new RuntimeException("序列化请求体失败: " + e.getMessage(), e);
-                        }
-                    }
-                }, 
-                responseExtractor);
+        log.debug(String.format("Dify %s 流式请求: %s, userId=%s, resourceId=%s, keyType=%s, hasBody=%s", 
+                method, url, userId, resourceId, keyType, body != null));
+        
+        // 使用 URI.create() 避免 RestTemplate 将 URL 中的 {} 当作 URI 模板变量处理
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            ResponseEntity<String> response = restTemplate.exchange(uri, httpMethod, streamEntity, String.class);
+            validateResponse(url, response);
+            return response;
+        } catch (IllegalArgumentException e) {
+            log.error(String.format("URL 格式错误: url=%s, err=%s", url, e.getMessage()));
+            throw new RuntimeException("URL 格式错误: " + url, e);
+        }
     }
 
+    /**
+     * 验证响应状态码
+     *
+     * @param url 请求URL
+     * @param response HTTP响应
+     */
     private void validateResponse(String url, ResponseEntity<String> response) {
         if (!response.getStatusCode().is2xxSuccessful()) {
             throw new RuntimeException("Dify 请求失败，url: " + url

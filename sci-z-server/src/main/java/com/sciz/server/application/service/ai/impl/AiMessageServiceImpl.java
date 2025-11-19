@@ -184,6 +184,35 @@ public class AiMessageServiceImpl implements AiMessageService {
      * @return 响应
      */
     @Override
+    public AiMessageResp findById(String id) {
+        Long userId = StpUtil.getLoginIdAsLong();
+        log.info(String.format("查询AI消息: userId=%s, id=%s", userId, id));
+
+        // 1. 转换ID
+        Long messageId;
+        try {
+            messageId = Long.parseLong(id);
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "无效的消息ID格式");
+        }
+
+        // 2. 查询实体
+        AiMessage entity = messageRepo.findById(messageId);
+        if (entity == null) {
+            throw new BusinessException(ResultCode.AI_MESSAGE_NOT_FOUND);
+        }
+
+        // 3. 转换为响应
+        return converter.toResp(entity);
+    }
+
+    /**
+     * 根据ID查询详情（带权限检查）
+     *
+     * @param id 消息ID
+     * @return 响应
+     */
+    @Override
     public AiMessageResp findDetail(String id) {
         Long userId = StpUtil.getLoginIdAsLong();
         log.info(String.format("查询AI消息详情: userId=%s, id=%s", userId, id));
@@ -220,14 +249,19 @@ public class AiMessageServiceImpl implements AiMessageService {
      */
     @Override
     public PageResult<AiMessageResp> page(AiMessageQueryReq req) {
+        return pageByConversationId(req);
+    }
+
+    @Override
+    public PageResult<AiMessageResp> pageByConversationId(AiMessageQueryReq req) {
         Long userId = StpUtil.getLoginIdAsLong();
         log.info(String.format("分页查询AI消息: userId=%s, conversationId=%s, pageNo=%s, pageSize=%s", 
-                userId, req.getConversationId(), req.getPageNo(), req.getPageSize()));
+                userId, req.conversationId(), req.pageNo(), req.pageSize()));
 
         // 1. 转换会话ID
         Long conversationId;
         try {
-            conversationId = Long.parseLong(req.getConversationId());
+            conversationId = Long.parseLong(req.conversationId());
         } catch (NumberFormatException e) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "无效的会话ID格式");
         }
@@ -337,6 +371,17 @@ public class AiMessageServiceImpl implements AiMessageService {
         }
 
         log.info(String.format("删除AI消息成功: id=%s", messageId));
+    }
+
+    /**
+     * 批量删除（根据ID列表）
+     *
+     * @param ids ID列表
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteBatchByIds(List<String> ids) {
+        deleteBatch(ids);
     }
 
     /**

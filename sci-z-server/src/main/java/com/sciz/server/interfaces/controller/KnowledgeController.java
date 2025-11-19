@@ -148,4 +148,11 @@ public class KnowledgeController {
     public Result<Void> moveFile(@PathVariable Long fileId, @RequestBody Object request) {
         return Result.success();
     }
+
+    @Operation(summary = "删除知识库", description = "删除指定知识库，同时调用 Dify API 删除数据集")
+    @DeleteMapping("/{id}")
+    public Result<Void> deleteKnowledgeBase(@PathVariable Long id) {
+        knowledgeService.delete(id);
+        return Result.success();
+    }
 }

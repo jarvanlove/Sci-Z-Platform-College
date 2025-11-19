@@ -9,6 +9,7 @@ const requestLogger = createLogger('Request')
 const REQUEST_TIMEOUT = 300000
 
 // 创建axios实例
+// baseURL 设置为 /api，所有 API 路径定义中不再包含 /api 前缀
 const service = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: REQUEST_TIMEOUT
@@ -67,7 +68,13 @@ service.interceptors.response.use(
         case 401:
           ElMessage.error('登录已过期，请重新登录')
           const authStore = useAuthStore()
-          authStore.logout()
+          // 避免重复调用 logout，如果已经在跳转中则跳过
+          if (!authStore.isLoggingOut) {
+            authStore.isLoggingOut = true
+            authStore.logout().finally(() => {
+              authStore.isLoggingOut = false
+            })
+          }
           break
         case 403:
           ElMessage.error('没有权限访问该资源')

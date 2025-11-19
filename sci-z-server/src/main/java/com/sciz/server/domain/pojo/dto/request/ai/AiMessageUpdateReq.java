@@ -1,12 +1,10 @@
 package com.sciz.server.domain.pojo.dto.request.ai;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 /**
  * AI 消息更新请求
@@ -18,48 +16,34 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class AiMessageUpdateReq {
-
     /**
      * 消息ID
      */
-    @NotNull(message = "消息ID不能为空")
+    @NotBlank(message = "消息ID不能为空")
     private String id;
 
     /**
-     * 会话ID
+     * 会话ID（可选）
      */
     private String conversationId;
 
     /**
-     * 角色(user/assistant)
+     * 角色(user/assistant)（可选）
      */
-    @Size(max = 10, message = "角色长度不能超过10个字符")
     private String role;
 
     /**
-     * 消息内容
+     * 消息内容（可选）
      */
     private String content;
 
     /**
-     * Dify消息ID（可选）
-     */
-    @Size(max = 100, message = "Dify消息ID长度不能超过100个字符")
-    private String difyMessageId;
-
-    /**
-     * 知识来源(JSON)
+     * 知识来源(JSON字符串，可选)
      */
     private String sources;
 
     /**
-     * 置信度
+     * 置信度（可选）
      */
     private BigDecimal confidence;
-
-    /**
-     * 发送时间
-     */
-    private LocalDateTime sendTime;
 }
-

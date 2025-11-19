@@ -18,7 +18,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -91,6 +93,68 @@ public class DifyApiService {
         } catch (HttpClientErrorException e) {
             log.error("发送 Chatbot 对话失败: {}", e.getMessage());
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        }
+    }
+
+    /**
+     * 发送 Chatbot 流式对话
+     * 只传递必要的 body 参数：inputs, query, response_mode, conversation_id, user, files
+     * 注意：resourceId 和 keyType 仅用于查找 API Key，不放入请求体
+     *
+     * @param request Chatbot 消息请求
+     * @param onData 数据回调函数，每收到一行数据时调用
+     */
+    public void sendChatbotMessageStream(DifyChatbotMessageRequest request, java.util.function.Consumer<String> onData) {
+        try {
+            // 构建只包含必要参数的 body（不包含 resourceId 和 keyType）
+            Map<String, Object> body = new HashMap<>();
+            // inputs: 默认为空对象
+            body.put("inputs", request.getInputs() != null ? request.getInputs() : new HashMap<>());
+            // query: 必填
+            body.put("query", request.getQuery());
+            // response_mode: 默认为 streaming
+            body.put("response_mode", request.getResponseMode() != null ? request.getResponseMode() : "streaming");
+            // conversation_id: 默认为空字符串
+            body.put("conversation_id", request.getConversationId() != null ? request.getConversationId() : "");
+            // user: 可选
+            if (request.getUser() != null && !request.getUser().trim().isEmpty()) {
+                body.put("user", request.getUser());
+            }
+            // files: 可选，如果有文件则添加
+            if (request.getFiles() != null && !request.getFiles().isEmpty()) {
+                // 将 ChatFile 对象转换为 Map
+                List<Map<String, Object>> filesList = new ArrayList<>();
+                for (DifyChatbotMessageRequest.ChatFile chatFile : request.getFiles()) {
+                    Map<String, Object> fileMap = new HashMap<>();
+                    // type: 必填
+                    if (chatFile.getType() != null) {
+                        fileMap.put("type", chatFile.getType());
+                    }
+                    // transfer_method: 必填
+                    if (chatFile.getTransferMethod() != null) {
+                        fileMap.put("transfer_method", chatFile.getTransferMethod());
+                    }
+                    // upload_file_id: 用于本地文件（优先级高于 url）
+                    if (chatFile.getUploadFileId() != null && !chatFile.getUploadFileId().trim().isEmpty()) {
+                        fileMap.put("upload_file_id", chatFile.getUploadFileId());
+                    } else if (chatFile.getUrl() != null && !chatFile.getUrl().trim().isEmpty()) {
+                        // url: 用于远程文件
+                        fileMap.put("url", chatFile.getUrl());
+                    }
+                    filesList.add(fileMap);
+                }
+                body.put("files", filesList);
+            }
+            
+            // 将 Map 转换为 Object 类型，符合方法签名要求
+            Object bodyObject = body;
+            
+            // resourceId 和 keyType 仅用于查找 API Key，不放入请求体
+            difyApiClient.requestStream("POST", "/chat-messages", bodyObject,
+                    request.getUserId(), request.getResourceId(), request.getKeyType(), onData);
+        } catch (Exception e) {
+            log.error("发送 Chatbot 流式对话失败: {}", e.getMessage(), e);
+            throw e;
         }
     }
 
@@ -416,25 +480,26 @@ public class DifyApiService {
      *
      * @param request 工作流请求
      * @param userId 用户ID
-     * @param workflowId 工作流ID
+     * @param workflowId 工作流ID（用于查找 API Key，不放入请求体）
      * @return 工作流执行结果
      */
     public ResponseEntity<String> runWorkflowWithDynamicKey(DifyWorkflowRequest request, Long userId, String workflowId) {
         try {
             log.info("开始执行 Dify 工作流（动态密钥），用户: {}, 工作流ID: {}", userId, workflowId);
-            Map<String, Object> params = new HashMap<>();
-            params.put("inputs", request.getInputs());
+            // 构建请求体：inputs, response_mode, user
+            Map<String, Object> bodyMap = new HashMap<>();
+            bodyMap.put("inputs", request.getInputs());
             // 使用 responseMode 字段，如果为空则使用默认值
             String responseMode = request.getResponseMode() != null ? request.getResponseMode() : "blocking";
-            params.put("response_mode", responseMode);
+            bodyMap.put("response_mode", responseMode);
             if (request.getUser() != null && !request.getUser().trim().isEmpty()) {
-                params.put("user", request.getUser());
+                bodyMap.put("user", request.getUser());
             }
-            if (workflowId != null && !workflowId.trim().isEmpty()) {
-                params.put("workflow_id", workflowId);
-            }
+            // 将 Map 转换为 Object 类型，符合方法签名要求
+            Object body = bodyMap;
             String endpoint = "/workflows/run";
-            ResponseEntity<String> response = difyApiClient.request("POST", endpoint, params, 
+            // 将 body 作为请求体传递，而不是查询参数
+            ResponseEntity<String> response = difyApiClient.request("POST", endpoint, body, 
                     userId, workflowId, DifyApiKey.KeyType.WORKFLOW.getCode());
             log.info("Dify 工作流执行完成（动态密钥），状态码: {}", response.getStatusCode());
             return response;

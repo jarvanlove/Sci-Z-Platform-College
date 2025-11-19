@@ -24,20 +24,20 @@ public interface AiMessageRepo {
     Long save(AiMessage entity);
 
     /**
-     * 根据ID更新
-     *
-     * @param entity AiMessage 实体
-     * @return 是否更新成功
-     */
-    boolean updateById(AiMessage entity);
-
-    /**
      * 根据ID查询
      *
      * @param id 主键ID
      * @return 实体
      */
     AiMessage findById(Long id);
+
+    /**
+     * 更新
+     *
+     * @param entity 实体
+     * @return 是否更新成功
+     */
+    boolean updateById(AiMessage entity);
 
     /**
      * 根据会话ID分页查询
@@ -52,12 +52,12 @@ public interface AiMessageRepo {
      * 根据会话ID查询列表
      *
      * @param conversationId 会话ID
-     * @return 消息列表
+     * @return 列表
      */
     List<AiMessage> listByConversationId(Long conversationId);
 
     /**
-     * 根据ID软删除
+     * 根据ID删除（软删除）
      *
      * @param id 主键ID
      * @return 是否删除成功
@@ -65,7 +65,7 @@ public interface AiMessageRepo {
     boolean deleteById(Long id);
 
     /**
-     * 批量软删除
+     * 批量删除（软删除）
      *
      * @param ids ID列表
      * @return 是否删除成功
@@ -73,7 +73,7 @@ public interface AiMessageRepo {
     boolean deleteBatchByIds(List<Long> ids);
 
     /**
-     * 根据会话ID批量删除
+     * 根据会话ID删除（软删除）
      *
      * @param conversationId 会话ID
      * @return 是否删除成功

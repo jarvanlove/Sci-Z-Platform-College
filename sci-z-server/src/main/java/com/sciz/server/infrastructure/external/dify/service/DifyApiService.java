@@ -99,13 +99,44 @@ public class DifyApiService {
      * 
      * @param request 对话请求
      * @param onData 数据回调函数，每收到一行数据时调用
+     * @return 响应结果
      */
-    public void sendChatbotMessageStream(DifyChatbotMessageRequest request, java.util.function.Consumer<String> onData) {
+    public ResponseEntity<String> sendChatbotMessageStream(DifyChatbotMessageRequest request, java.util.function.Consumer<String> onData) {
         try {
-            difyApiClient.requestStream("POST", "/chat-messages", request,
-                    request.getUserId(), request.getResourceId(), request.getKeyType(), onData);
+            log.info(String.format("发送 Chatbot 流式对话请求: userId=%s, resourceId=%s, query=%s, responseMode=%s", 
+                    request.getUserId(), request.getResourceId(), request.getQuery(), request.getResponseMode()));
+            
+            // 调用普通 HTTP 请求获取完整响应体
+            ResponseEntity<String> response = difyApiClient.requestStream("POST", "/chat-messages", request,
+                    request.getUserId(), request.getResourceId(), request.getKeyType());
+            
+            log.info(String.format("Chatbot 流式对话响应: statusCode=%s, hasBody=%s, contentType=%s", 
+                    response.getStatusCode(), response.getBody() != null, 
+                    response.getHeaders().getContentType()));
+            
+            // 如果响应体不为空，解析 SSE 格式并逐行调用回调
+            if (response.getBody() != null && onData != null) {
+                String responseBody = response.getBody();
+                log.debug(String.format("响应体长度: %d 字符", responseBody.length()));
+                
+                // 按行分割响应体（SSE 格式通常是按行分隔的）
+                String[] lines = responseBody.split("\n");
+                log.debug(String.format("响应体行数: %d", lines.length));
+                
+                for (String line : lines) {
+                    String trimmedLine = line.trim();
+                    if (!trimmedLine.isEmpty()) {
+                        onData.accept(trimmedLine);
+                    }
+                }
+            } else {
+                log.warn(String.format("响应体为空或回调函数为空: hasBody=%s, hasCallback=%s", 
+                        response.getBody() != null, onData != null));
+            }
+            
+            return response;
         } catch (Exception e) {
-            log.error("发送 Chatbot 流式对话失败: {}", e.getMessage(), e);
+            log.error(String.format("发送 Chatbot 流式对话失败: err=%s", e.getMessage()), e);
             throw e;
         }
     }
@@ -205,6 +236,26 @@ public class DifyApiService {
             return difyApiClient.request("DELETE", "/datasets/" + datasetId, userId, resourceId, keyType);
         } catch (HttpClientErrorException e) {
             log.error("Dify API调用失败: {}", e.getMessage());
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        }
+    }
+
+    /**
+     * 删除文档
+     *
+     * @param datasetId 数据集ID
+     * @param documentId 文档ID
+     * @param userId 用户ID
+     * @param resourceId 资源ID
+     * @param keyType 密钥类型
+     * @return 响应结果
+     */
+    public ResponseEntity<String> deleteDocument(String datasetId, String documentId, Long userId, String resourceId, String keyType) {
+        try {
+            log.info(String.format("删除 Dify 文档: datasetId=%s, documentId=%s, userId=%s", datasetId, documentId, userId));
+            return difyApiClient.request("DELETE", "/datasets/" + datasetId + "/documents/" + documentId, userId, resourceId, keyType);
+        } catch (HttpClientErrorException e) {
+            log.error(String.format("Dify API调用失败: datasetId=%s, documentId=%s, err=%s", datasetId, documentId, e.getMessage()));
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
         }
     }
@@ -457,18 +508,37 @@ public class DifyApiService {
      * @return 工作流执行结果
      */
     public ResponseEntity<String> runWorkflowWithDynamicKey(DifyWorkflowRequest request, Long userId, String workflowId) {
+        return runWorkflowWithDynamicKey(request, userId, workflowId, DifyApiKey.KeyType.WORKFLOW.getCode());
+    }
+
+    /**
+     * 使用动态密钥执行工作流（支持指定 keyType）
+     *
+     * @param request 工作流请求
+     * @param userId 用户ID
+     * @param workflowId 工作流ID（用于查找 API Key，不放入请求体）
+     * @param keyType 密钥类型（workflow/file）
+     * @return 工作流执行结果
+     */
+    public ResponseEntity<String> runWorkflowWithDynamicKey(DifyWorkflowRequest request, Long userId, String workflowId, String keyType) {
         try {
-            log.info("开始执行 Dify 工作流（动态密钥），用户: {}, 工作流ID: {}", userId, workflowId);
-            Map<String, Object> params = new HashMap<>();
-            params.put("inputs", request.getInputs());
-            params.put("response_mode", request.getResponseMode());
-            params.put("user", request.getUser());
-            if (workflowId != null && !workflowId.trim().isEmpty()) {
-                params.put("workflow_id", workflowId);
+            log.info("开始执行 Dify 工作流（动态密钥），用户: {}, 工作流ID: {}, keyType: {}", userId, workflowId, keyType);
+            Map<String, Object> bodymap = new HashMap<>();
+            // 构建请求体：inputs, response_mode, user
+            bodymap.put("inputs", request.getInputs());
+            // 使用 responseMode 字段，如果为空则使用默认值
+            String responseMode = request.getResponseMode() != null ? request.getResponseMode() : "blocking";
+            bodymap.put("response_mode", responseMode);
+            if (request.getUser() != null && !request.getUser().trim().isEmpty()) {
+                bodymap.put("user", request.getUser());
             }
+            // 注意：workflow_id 不放入请求体，仅用于查找 API Key
             String endpoint = "/workflows/run";
-            ResponseEntity<String> response = difyApiClient.request("POST", endpoint, params, 
-                    userId, workflowId, DifyApiKey.KeyType.WORKFLOW.getCode());
+
+            Object body = bodymap;
+            // 将 body 作为请求体传递，而不是查询参数
+            ResponseEntity<String> response = difyApiClient.request("POST", endpoint, body,
+                    userId, workflowId, keyType);
             log.info("Dify 工作流执行完成（动态密钥），状态码: {}", response.getStatusCode());
             return response;
         } catch (HttpClientErrorException e) {
@@ -548,16 +618,30 @@ public class DifyApiService {
      * @return 文件上传结果
      */
     public ResponseEntity<String> uploadFileWithDynamicKey(Long user, MultipartFile file, Long userId, String resourceId) {
+        return uploadFileWithDynamicKey(user, file, userId, resourceId, DifyApiKey.KeyType.DATASET.getCode());
+    }
+
+    /**
+     * 使用动态密钥上传文件（支持指定 keyType）
+     *
+     * @param user 用户标识
+     * @param file 上传的文件
+     * @param userId 用户ID
+     * @param resourceId 资源ID
+     * @param keyType 密钥类型（dataset/file）
+     * @return 文件上传结果
+     */
+    public ResponseEntity<String> uploadFileWithDynamicKey(Long user, MultipartFile file, Long userId, String resourceId, String keyType) {
         try {
-            log.info("开始上传文件到 Dify（动态密钥），用户: {}, 文件名: {}, 大小: {} bytes, 资源ID: {}", 
-                    user, file.getOriginalFilename(), file.getSize(), resourceId);
+            log.info("开始上传文件到 Dify（动态密钥），用户: {}, 文件名: {}, 大小: {} bytes, 资源ID: {}, keyType: {}", 
+                    user, file.getOriginalFilename(), file.getSize(), resourceId, keyType);
             // 构建表单数据
             Map<String, Object> formData = new HashMap<>();
             formData.put("user", user);
             // 调用 Dify 文件上传 API
             String endpoint = "/files/upload";
             ResponseEntity<String> response = difyApiClient.uploadFile("POST", endpoint, file, formData, 
-                    userId, resourceId, DifyApiKey.KeyType.DATASET.getCode());
+                    userId, resourceId, keyType);
             log.info("文件上传完成（动态密钥），状态码: {}", response.getStatusCode());
             return response;
         } catch (HttpClientErrorException e) {

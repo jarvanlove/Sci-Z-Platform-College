@@ -102,33 +102,6 @@ public class DifyApiController {
         return difyApiService.uploadDocumentWithFileStorage(datasetId, file, userId, resourceId, keyType);
     }
     /**
-     * 执行 Dify 工作流 - 完整版本
-     */
-    @PostMapping("/workflows/run")
-    @Operation(summary = "执行 Dify 工作流")
-    public ResponseEntity<String> runWorkflow(@Valid @RequestBody DifyWorkflowRequest request) {
-        return difyApiService.runWorkflowWithDynamicKey(request, request.getUserId(), request.getResourceId());
-    }
-
-    /**
-     * 获取工作流运行状态
-     */
-    @PostMapping("/workflows/run/status")
-    @Operation(summary = "获取工作流运行状态")
-    public ResponseEntity<String> getWorkflowRunStatus(@Valid @RequestBody DifyWorkflowStatusRequest request) {
-        return difyApiService.getWorkflowRunStatusWithDynamicKey(request.getWorkflowRunId(), request.getUserId(), request.getResourceId());
-    }
-
-    /**
-     * 获取工作流日志
-     */
-    @PostMapping("/workflows/logs")
-    @Operation(summary = "获取工作流日志")
-    public ResponseEntity<String> getWorkflowLogs(@Valid @RequestBody DifyWorkflowLogsRequest request) {
-        return difyApiService.getWorkflowLogsWithDynamicKey(request.getPage(), request.getLimit(), request.getUserId(), request.getResourceId());
-    }
-
-    /**
      * 上传文件
      */
     @PostMapping("/files/upload")

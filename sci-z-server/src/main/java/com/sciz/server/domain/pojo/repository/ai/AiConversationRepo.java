@@ -24,20 +24,20 @@ public interface AiConversationRepo {
     Long save(AiConversation entity);
 
     /**
-     * 根据ID更新
-     *
-     * @param entity AiConversation 实体
-     * @return 是否更新成功
-     */
-    boolean updateById(AiConversation entity);
-
-    /**
      * 根据ID查询
      *
      * @param id 主键ID
      * @return 实体
      */
     AiConversation findById(Long id);
+
+    /**
+     * 更新
+     *
+     * @param entity 实体
+     * @return 是否更新成功
+     */
+    boolean updateById(AiConversation entity);
 
     /**
      * 根据用户ID分页查询
@@ -52,12 +52,12 @@ public interface AiConversationRepo {
      * 根据用户ID查询列表
      *
      * @param userId 用户ID
-     * @return 会话列表
+     * @return 列表
      */
     List<AiConversation> listByUserId(Long userId);
 
     /**
-     * 根据ID软删除
+     * 根据ID删除（软删除）
      *
      * @param id 主键ID
      * @return 是否删除成功
@@ -65,7 +65,7 @@ public interface AiConversationRepo {
     boolean deleteById(Long id);
 
     /**
-     * 批量软删除
+     * 批量删除（软删除）
      *
      * @param ids ID列表
      * @return 是否删除成功

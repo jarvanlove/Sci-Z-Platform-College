@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.sciz.server.domain.pojo.entity.BaseEntity;
+import com.sciz.server.infrastructure.shared.typehandler.JsonTypeHandler;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Getter;
@@ -15,7 +16,7 @@ import lombok.Setter;
  *
  * - 对应表：ai_message
  *
- * @author JiaWen.Wu
+ * @author shihangshang
  * @className AiMessage
  * @date 2025-10-30 00:00
  */
@@ -57,7 +58,7 @@ public class AiMessage extends BaseEntity {
     /**
      * 知识来源(JSON)
      */
-    @TableField("sources")
+    @TableField(value = "sources", typeHandler = JsonTypeHandler.class)
     private String sources;
 
     /**

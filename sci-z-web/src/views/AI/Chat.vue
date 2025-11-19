@@ -118,8 +118,8 @@
                         >
                           <el-icon class="kb-document-icon"><Document /></el-icon>
                           <div class="kb-document-info">
-                            <span class="kb-document-name">{{ doc.name || `文档 ${index + 1}` }}</span>
-                            <span v-if="doc.datasetName && doc.datasetName !== doc.name" class="kb-document-dataset">（{{ doc.datasetName }}）</span>
+                            <span class="kb-document-name">{{ doc.document_name || doc.name || `文档 ${index + 1}` }}</span>
+                            <span v-if="(doc.dataset_name || doc.datasetName) && (doc.dataset_name || doc.datasetName) !== (doc.document_name || doc.name)" class="kb-document-dataset">（{{ doc.dataset_name || doc.datasetName }}）</span>
                           </div>
                           <span v-if="doc.score" class="kb-document-score">相关度: {{ (doc.score * 100).toFixed(0) }}%</span>
                         </div>
@@ -265,9 +265,8 @@
                 <!-- 附件按钮 -->
                 <button
                   class="kb-attachment-btn"
-                  :class="{ disabled: hasKnowledgeBaseSelected }"
                   @click="handleAttachmentClick"
-                  :title="hasKnowledgeBaseSelected ? '知识库模式下不支持附件' : '添加附件'"
+                  title="添加附件（上传文件时需要选择知识库）"
                 >
                   <el-icon><Paperclip /></el-icon>
                 </button>
@@ -335,6 +334,9 @@ import {
 import {
   streamKnowledgeChatbot
 } from '@/api/Knowledge/knowledge'
+import {
+  runWorkflowStream
+} from '@/api/AI/ai'
 import {
   // 新接口
   createAiConversation,
@@ -548,14 +550,40 @@ const loadMessages = async (chatId) => {
         // 使用新接口：查询会话的所有消息列表
         const response = await listAiMessages(chatId)
         if (response.code === 200 && response.data) {
-          const apiMessages = (response.data.records || response.data.list || response.data || []).map(msg => ({
-            id: msg.id,
-            type: msg.role === 'user' ? 'user' : 'ai',
-            content: msg.content || '',
-            timestamp: new Date(msg.sendTime || msg.createdTime || msg.createdAt || msg.timestamp),
-            documents: msg.sources ? (typeof msg.sources === 'string' ? JSON.parse(msg.sources) : msg.sources) : [],
-            conversationId: msg.conversationId
-          }))
+          const apiMessages = (response.data.records || response.data.list || response.data || []).map(msg => {
+            // 解析 sources 字段，统一字段名格式
+            let documents = []
+            if (msg.sources) {
+              try {
+                const sourcesData = typeof msg.sources === 'string' ? JSON.parse(msg.sources) : msg.sources
+                if (Array.isArray(sourcesData)) {
+                  documents = sourcesData.map(doc => ({
+                    id: doc.document_id || doc.id,
+                    documentId: doc.document_id || doc.id,
+                    name: doc.document_name || doc.name,
+                    document_name: doc.document_name || doc.name,
+                    datasetName: doc.dataset_name || doc.datasetName,
+                    dataset_name: doc.dataset_name || doc.datasetName,
+                    content: doc.content,
+                    score: doc.score,
+                    segmentId: doc.segment_id || doc.segmentId,
+                    segment_id: doc.segment_id || doc.segmentId
+                  }))
+                }
+              } catch (e) {
+                logger.warn('解析 sources 字段失败', e)
+                documents = []
+              }
+            }
+            return {
+              id: msg.id,
+              type: msg.role === 'user' ? 'user' : 'ai',
+              content: msg.content || '',
+              timestamp: new Date(msg.sendTime || msg.createdTime || msg.createdAt || msg.timestamp),
+              documents: documents,
+              conversationId: msg.conversationId
+            }
+          })
           messages.value = apiMessages
           // 更新本地存储
           if (chat) {
@@ -660,13 +688,29 @@ const sendKbMessage = async () => {
     return
   }
 
-  const text = inputMessage.value.trim()
+  const rawText = inputMessage.value.trim()
+  
+  // 从输入文本中移除所有 @知识库名字 的内容，只保留实际的问题内容
+  let text = rawText
+  if (selectedKnowledgeBases.value.length > 0) {
+    // 移除所有已选择的知识库的 @名字 标记
+    for (const kb of selectedKnowledgeBases.value) {
+      const kbText = `@${kb.name}`
+      // 使用正则表达式移除 @知识库名字（包括前后的空格）
+      text = text.replace(new RegExp(`\\s*${kbText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`, 'g'), ' ').trim()
+    }
+    // 清理多余的空格
+    text = text.replace(/\s+/g, ' ').trim()
+  }
   
   // 如果没有选择知识库，knowledgeId为null，可以正常对话
-  // 如果有选择知识库，使用第一个知识库的difyKbId（支持多个知识库选择，但接口只传第一个）
+  // 如果有选择知识库，支持多个知识库ID（后端接口支持数组）
   let knowledgeId = null
+  let knowledgeIds = [] // 用于支持多个知识库ID
   if (selectedKnowledgeBases.value.length > 0) {
-    // 如果有多个知识库，使用第一个
+    // 收集所有知识库的ID（系统内部ID，用于后端查询Dify ID）
+    knowledgeIds = selectedKnowledgeBases.value.map(kb => String(kb.id))
+    // 如果有多个知识库，使用第一个的difyKbId作为主要ID（用于文件上传等场景）
     const firstKb = selectedKnowledgeBases.value[0]
     knowledgeId = firstKb.difyKbId || firstKb.difyKnowledgeId
     if (!knowledgeId) {
@@ -675,11 +719,19 @@ const sendKbMessage = async () => {
     }
   }
 
-  // 构建用户消息内容（包含@知识库标记）
-  let userMessageContent = text
+  // 构建用户消息内容（包含@知识库标记，用于前端显示）
+  let userMessageContent = rawText
+  // 如果输入框中已经有 @知识库名字，就不需要再拼接了
+  // 如果没有，则根据已选择的知识库列表拼接
   if (selectedKnowledgeBases.value.length > 0) {
-    const kbNames = selectedKnowledgeBases.value.map(kb => `@${kb.name}`).join(' ')
-    userMessageContent = `${kbNames} ${text}`
+    const hasKbMention = selectedKnowledgeBases.value.some(kb => {
+      const kbText = `@${kb.name}`
+      return rawText.includes(kbText)
+    })
+    if (!hasKbMention) {
+      const kbNames = selectedKnowledgeBases.value.map(kb => `@${kb.name}`).join(' ')
+      userMessageContent = `${kbNames} ${rawText}`
+    }
   }
 
   const userMessageId = Date.now()
@@ -773,7 +825,12 @@ const sendKbMessage = async () => {
     saveChatsToStorage()
   }
 
-  // 清空输入框和附件
+  // 在清空之前先保存文件列表和知识库列表（用于后续接口调用）
+  const filesToUpload = attachments.value.length > 0 ? attachments.value.map(att => att.file) : null
+  const hasFiles = filesToUpload && filesToUpload.length > 0
+  const knowledgeBasesToUse = [...selectedKnowledgeBases.value] // 保存知识库列表副本
+
+  // 清空输入框和附件（但保留副本用于接口调用）
   inputMessage.value = ''
   attachments.value = []
   selectedKnowledgeBases.value = []
@@ -802,16 +859,27 @@ const sendKbMessage = async () => {
       knowledgeId: knowledgeId || '无知识库',
       query: text,
       conversationId: currentConversationId.value,
-      selectedKbCount: selectedKnowledgeBases.value.length
+      selectedKbCount: knowledgeBasesToUse.length,
+      filesCount: filesToUpload?.length || 0
     })
 
-    // 调用流式对话接口
-    // 如果没有选择知识库，knowledgeId为null，后端应该支持普通AI对话
-    // 如果选择了知识库，使用第一个知识库的ID
-    const abortController = await streamKnowledgeChatbot({
-      knowledgeId: knowledgeId || null, // 无知识库时传null
-      query: text,
-      conversationId: currentConversationId.value,
+    // 调用新的工作流流式接口
+    // 支持四种模式：
+    // 1. 单独提问：不传文件和知识库，直接提问（不使用知识库）
+    // 2. 根据知识库提问：只传知识库ID，基于知识库提问
+    // 3. 根据文件提问：只传文件，执行工作流后再提问（使用 file 类型的 API key）
+    // 4. 根据文件和知识库提问：同时传文件和知识库ID，执行工作流后再提问（文件上传到知识库）
+    // 注意：所有参数都是可选的，除了 query（用户问题）是必填的
+    
+    // 调用接口（支持所有组合模式）
+    // 如果有多个知识库，传递知识库ID数组（系统内部ID），后端会查询对应的Dify ID
+    const knowledgeIdToSend = knowledgeIds.length > 0 ? knowledgeIds : (knowledgeId ? [knowledgeId] : undefined)
+    const abortController = await runWorkflowStream({
+      query: text, // 必填：用户问题
+      knowledgeId: knowledgeIdToSend || undefined, // 可选：知识库ID（支持单个ID或数组，不传则不使用知识库）
+      workflowId: undefined, // 可选：工作流ID（暂时不传，由后端决定）
+      files: filesToUpload || undefined, // 可选：文件列表（不传则不执行工作流）
+      conversationId: currentConversationId.value || conversationId || undefined, // 可选：会话ID
       onMessage: (answer) => {
         // 追加回答内容
         const message = messages.value.find(m => m.id === aiMessageId)
@@ -825,7 +893,39 @@ const sendKbMessage = async () => {
         const message = messages.value.find(m => m.id === aiMessageId)
         if (message) {
           message.streaming = false
-          message.documents = data.documents || []
+          // 统一文档格式，支持下划线和驼峰命名
+          if (data.documents && Array.isArray(data.documents) && data.documents.length > 0) {
+            message.documents = data.documents.map(doc => ({
+              id: doc.document_id || doc.documentId || doc.id || doc.segment_id || doc.segmentId,
+              documentId: doc.document_id || doc.documentId || doc.id,
+              name: doc.document_name || doc.name || `文档 ${doc.id || doc.segment_id || ''}`,
+              document_name: doc.document_name || doc.name,
+              datasetName: doc.dataset_name || doc.datasetName,
+              dataset_name: doc.dataset_name || doc.datasetName,
+              content: doc.content || '',
+              score: doc.score || 0,
+              segmentId: doc.segment_id || doc.segmentId,
+              segment_id: doc.segment_id || doc.segmentId
+            }))
+          } else {
+            // 如果没有文档数据，尝试从 metadata 中提取
+            if (data.metadata?.retriever_resources && Array.isArray(data.metadata.retriever_resources)) {
+              message.documents = data.metadata.retriever_resources.map((resource, index) => ({
+                id: resource.segment_id || `doc-${index}`,
+                documentId: resource.document_id,
+                name: resource.document_name || resource.dataset_name || `文档 ${index + 1}`,
+                document_name: resource.document_name,
+                datasetName: resource.dataset_name,
+                dataset_name: resource.dataset_name,
+                content: resource.content || '',
+                score: resource.score || 0,
+                segmentId: resource.segment_id,
+                segment_id: resource.segment_id
+              }))
+            } else {
+              message.documents = []
+            }
+          }
           message.conversationId = data.conversationId || currentChat.value?.id
         }
         
@@ -838,15 +938,15 @@ const sendKbMessage = async () => {
         const conversationId = currentChat.value?.id || data.conversationId
         if (conversationId && message && message.content) {
           try {
-            // 将文档片段转换为JSON字符串
+            // 将文档片段转换为JSON字符串，统一使用下划线命名
             const sourcesJson = message.documents && message.documents.length > 0
               ? JSON.stringify(message.documents.map(doc => ({
-                  document_id: doc.documentId || doc.id,
-                  document_name: doc.name,
-                  dataset_name: doc.datasetName,
+                  document_id: doc.document_id || doc.documentId || doc.id,
+                  document_name: doc.document_name || doc.name,
+                  dataset_name: doc.dataset_name || doc.datasetName,
                   content: doc.content,
                   score: doc.score,
-                  segment_id: doc.segmentId
+                  segment_id: doc.segment_id || doc.segmentId
                 })))
               : null
             
@@ -1174,10 +1274,7 @@ const selectModel = (model) => {
 
 // 附件相关方法
 const handleAttachmentClick = () => {
-  if (hasKnowledgeBaseSelected.value) {
-    ElMessage.warning('知识库模式下不支持附件')
-    return
-  }
+  // 现在支持在有知识库的情况下也上传文件
   fileInput.value && fileInput.value.click()
 }
 

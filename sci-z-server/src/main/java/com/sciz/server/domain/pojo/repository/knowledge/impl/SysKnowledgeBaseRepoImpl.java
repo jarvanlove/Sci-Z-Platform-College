@@ -3,6 +3,7 @@ package com.sciz.server.domain.pojo.repository.knowledge.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
+import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
 import com.sciz.server.domain.pojo.mapper.knowledge.SysKnowledgeBaseMapper;
@@ -69,5 +70,19 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
         queryWrapper.orderByDesc(SysKnowledgeBase::getCreatedTime);
         
         return mapper.selectPage(page, queryWrapper);
+    }
+
+    /**
+     * 根据ID删除知识库（软删除）
+     *
+     * @param id 知识库ID
+     * @return 是否删除成功
+     */
+    @Override
+    public boolean deleteById(Long id) {
+        return new LambdaUpdateChainWrapper<>(mapper)
+                .eq(SysKnowledgeBase::getId, id)
+                .set(SysKnowledgeBase::getIsDeleted, DeleteStatus.DELETED.getCode())
+                .update();
     }
 }

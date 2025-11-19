@@ -27,7 +27,7 @@ public interface AiMessageConverter {
      * @return 实体
      */
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "conversationId", expression = "java(Long.parseLong(req.getConversationId()))")
+    @Mapping(target = "conversationId", expression = "java(req.getConversationId() != null && !req.getConversationId().isEmpty() ? Long.parseLong(req.getConversationId()) : null)")
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "createdTime", ignore = true)
@@ -42,8 +42,8 @@ public interface AiMessageConverter {
      * @param req 更新请求
      * @param entity 目标实体
      */
-    @Mapping(target = "id", expression = "java(Long.parseLong(req.getId()))")
-    @Mapping(target = "conversationId", expression = "java(req.getConversationId() != null ? Long.parseLong(req.getConversationId()) : null)")
+    @Mapping(target = "id", expression = "java(req.getId() != null && !req.getId().isEmpty() ? Long.parseLong(req.getId()) : null)")
+    @Mapping(target = "conversationId", expression = "java(req.getConversationId() != null && !req.getConversationId().isEmpty() ? Long.parseLong(req.getConversationId()) : null)")
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "createdTime", ignore = true)
@@ -57,7 +57,7 @@ public interface AiMessageConverter {
      * @param entity 实体
      * @return 响应
      */
-    @Mapping(target = "id", expression = "java(String.valueOf(entity.getId()))")
+    @Mapping(target = "id", expression = "java(entity.getId() != null ? String.valueOf(entity.getId()) : null)")
     @Mapping(target = "conversationId", expression = "java(entity.getConversationId() != null ? String.valueOf(entity.getConversationId()) : null)")
     AiMessageResp toResp(AiMessage entity);
 

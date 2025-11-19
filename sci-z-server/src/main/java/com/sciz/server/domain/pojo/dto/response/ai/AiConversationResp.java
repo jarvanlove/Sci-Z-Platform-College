@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class AiConversationResp {
-
     /**
      * 会话ID
      */
@@ -51,4 +50,3 @@ public class AiConversationResp {
      */
     private LocalDateTime updatedTime;
 }
-

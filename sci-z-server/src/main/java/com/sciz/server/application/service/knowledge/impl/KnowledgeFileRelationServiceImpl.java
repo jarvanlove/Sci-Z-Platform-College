@@ -1,15 +1,19 @@
 package com.sciz.server.application.service.knowledge.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.application.service.knowledge.KnowledgeFileRelationService;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationCreateReq;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationQueryReq;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeFileRelationResp;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sciz.server.domain.pojo.entity.file.SysAttachment;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeFileRelation;
+import com.sciz.server.domain.pojo.repository.file.SysAttachmentRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeFileRelationRepo;
 import com.sciz.server.infrastructure.external.dify.config.DifyConfig;
@@ -17,6 +21,7 @@ import com.sciz.server.infrastructure.external.dify.dto.DifyChatbotModelConfigRe
 import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiService;
 import com.sciz.server.infrastructure.external.dify.service.impl.DifyApiKeyServiceImpl;
+import org.springframework.beans.factory.annotation.Value;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -46,6 +51,11 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
     private final DifyApiKeyServiceImpl difyApiKeyService;
     private final DifyApiService difyApiService;
     private final DifyConfig difyConfig;
+    private final SysAttachmentRepo attachmentRepo;
+    private final ObjectMapper objectMapper;
+
+    @Value("${dify.default-resource-id:default}")
+    private String defaultResourceId;
 
     /**
      * 创建知识库文件关联
@@ -185,7 +195,69 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
             throw new BusinessException(ResultCode.DATA_NOT_FOUND, "知识库文件关联不存在");
         }
 
-        // 3. 软删除
+        // 3. 查询知识库实体，获取 Dify 数据集ID
+        SysKnowledgeBase knowledgeBase = knowledgeBaseRepo.findById(entity.getKnowledgeId());
+        if (knowledgeBase == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND, "知识库不存在");
+        }
+
+        // 4. 查询附件实体，获取 Dify 文档ID
+        SysAttachment attachment = attachmentRepo.findById(entity.getAttachmentId());
+        String difyDocumentId = null;
+        if (attachment != null && attachment.getDifyDocId() != null && !attachment.getDifyDocId().trim().isEmpty()) {
+            difyDocumentId = attachment.getDifyDocId();
+        } else if (entity.getCallback() != null && !entity.getCallback().trim().isEmpty()) {
+            // 如果附件中没有 Dify 文档ID，尝试从 callback 字段解析
+            try {
+                JsonNode callbackJson = objectMapper.readTree(entity.getCallback());
+                JsonNode documentNode = callbackJson.get("document");
+                if (documentNode != null && documentNode.has("id")) {
+                    difyDocumentId = documentNode.get("id").asText();
+                }
+            } catch (Exception e) {
+                log.warn(String.format("解析 callback 字段失败: callback=%s, err=%s", entity.getCallback(), e.getMessage()));
+            }
+        }
+
+        // 5. 如果存在 Dify 数据集ID和文档ID，调用 Dify API 删除文档
+        if (knowledgeBase.getDifyKnowdataId() != null && !knowledgeBase.getDifyKnowdataId().trim().isEmpty()
+                && difyDocumentId != null && !difyDocumentId.trim().isEmpty()) {
+            try {
+                // 获取用户的 Dify API Key
+                QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
+                queryWrapper.eq("user_id", userId)
+                           .eq("key_type", "dataset")
+                           .eq("is_active", true)
+                           .last("LIMIT 1");
+                DifyApiKey difyApiKey = difyApiKeyService.getOne(queryWrapper);
+                
+                String resourceId = (difyApiKey != null && difyApiKey.getResourceId() != null) 
+                    ? difyApiKey.getResourceId() 
+                    : defaultResourceId;
+
+                // 调用 Dify API 删除文档
+                ResponseEntity<String> response = difyApiService.deleteDocument(
+                        knowledgeBase.getDifyKnowdataId(), difyDocumentId, userId, resourceId, "dataset");
+                
+                if (!response.getStatusCode().is2xxSuccessful()) {
+                    log.warn(String.format("Dify API删除文档失败: datasetId=%s, documentId=%s, status=%s, body=%s", 
+                            knowledgeBase.getDifyKnowdataId(), difyDocumentId, response.getStatusCode(), response.getBody()));
+                    // 即使 Dify API 删除失败，也继续删除本地数据（避免数据不一致）
+                } else {
+                    log.info(String.format("Dify API删除文档成功: datasetId=%s, documentId=%s", 
+                            knowledgeBase.getDifyKnowdataId(), difyDocumentId));
+                }
+            } catch (Exception e) {
+                log.error(String.format("调用 Dify API 删除文档异常: datasetId=%s, documentId=%s, err=%s", 
+                        knowledgeBase.getDifyKnowdataId(), difyDocumentId, e.getMessage()), e);
+                // 即使 Dify API 调用异常，也继续删除本地数据（避免数据不一致）
+            }
+        } else {
+            log.warn(String.format("缺少 Dify 数据集ID或文档ID，跳过 Dify API 删除: datasetId=%s, documentId=%s", 
+                    knowledgeBase.getDifyKnowdataId(), difyDocumentId));
+        }
+
+        // 6. 软删除本地关联记录
         boolean success = fileRelationRepo.deleteById(longId);
         if (!success) {
             throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
@@ -229,62 +301,31 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
      */
     @Override
     public PageResult<KnowledgeFileRelationResp> page(KnowledgeFileRelationQueryReq req) {
-        log.info(String.format("分页查询知识库文件关联: knowledgeId=%s, knowledgeIds=%s, folderId=%s, page=%s, size=%s", 
-                req.getKnowledgeId(), req.getKnowledgeIds(), req.getFolderId(), req.getPage(), req.getSize()));
+        log.info(String.format("分页查询知识库文件关联: knowledgeId=%s, folderId=%s, page=%s, size=%s", 
+                req.getKnowledgeId(), req.getFolderId(), req.getPage(), req.getSize()));
 
-        // 1. 检查知识库ID（支持单个或批量）
-        List<Long> knowledgeIdList = new ArrayList<>();
-        
-        // 优先使用 knowledgeIds（批量查询）
-        if (req.getKnowledgeIds() != null && !req.getKnowledgeIds().isEmpty()) {
-            try {
-                knowledgeIdList = req.getKnowledgeIds().stream()
-                        .map(id -> {
-                            try {
-                                return Long.parseLong(id);
-                            } catch (NumberFormatException e) {
-                                throw new BusinessException(ResultCode.BAD_REQUEST, "无效的知识库ID格式: " + id);
-                            }
-                        })
-                        .toList();
-            } catch (BusinessException e) {
-                throw e;
-            }
-        } 
-        // 如果没有批量ID，使用单个ID（兼容旧接口）
-        else if (req.getKnowledgeId() != null && !req.getKnowledgeId().trim().isEmpty()) {
-            try {
-                Long knowledgeId = Long.parseLong(req.getKnowledgeId());
-                knowledgeIdList.add(knowledgeId);
-            } catch (NumberFormatException e) {
-                throw new BusinessException(ResultCode.BAD_REQUEST, "无效的知识库ID格式: " + req.getKnowledgeId());
-            }
-        } else {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "知识库ID或知识库ID列表不能为空");
+        // 1. 检查知识库ID
+        if (req.getKnowledgeId() == null || req.getKnowledgeId().trim().isEmpty()) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "知识库ID不能为空");
         }
 
-        // 2. 转换文件夹ID
+        // 2. 转换 String 类型字段为 Long
+        Long knowledgeId;
         Long folderId = null;
-        if (req.getFolderId() != null && !req.getFolderId().trim().isEmpty()) {
-            try {
+        try {
+            knowledgeId = Long.parseLong(req.getKnowledgeId());
+            if (req.getFolderId() != null && !req.getFolderId().trim().isEmpty()) {
                 folderId = Long.parseLong(req.getFolderId());
-            } catch (NumberFormatException e) {
-                throw new BusinessException(ResultCode.BAD_REQUEST, "无效的文件夹ID格式: " + req.getFolderId());
             }
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "无效的ID格式");
         }
 
         // 3. 创建分页对象
         Page<SysKnowledgeFileRelation> pageParam = new Page<>(req.getPage(), req.getSize());
 
-        // 4. 执行分页查询（支持单个或多个知识库ID）
-        IPage<SysKnowledgeFileRelation> pageResult;
-        if (knowledgeIdList.size() == 1) {
-            // 单个知识库ID，使用原有方法
-            pageResult = fileRelationRepo.pageByKnowledgeId(pageParam, knowledgeIdList.get(0), folderId);
-        } else {
-            // 多个知识库ID，使用新方法
-            pageResult = fileRelationRepo.pageByKnowledgeIds(pageParam, knowledgeIdList, folderId);
-        }
+        // 4. 执行分页查询
+        var pageResult = fileRelationRepo.pageByKnowledgeId(pageParam, knowledgeId, folderId);
 
         // 5. 转换为响应DTO列表
         var respList = converter.toRespList(pageResult.getRecords());
@@ -297,21 +338,18 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
                 pageResult.getSize()
         );
 
-        log.info(String.format("分页查询知识库文件关联成功: total=%s, current=%s, size=%s, knowledgeIdCount=%s", 
-                result.getTotal(), result.getCurrent(), result.getSize(), knowledgeIdList.size()));
+        log.info(String.format("分页查询知识库文件关联成功: total=%s, current=%s, size=%s", 
+                result.getTotal(), result.getCurrent(), result.getSize()));
 
-        // 7. 更新 Chatbot 应用的知识库ID配置（只更新第一个知识库，避免重复更新）
-        if (!knowledgeIdList.isEmpty()) {
-            try {
-                Long userId = StpUtil.getLoginIdAsLong();
-                Long firstKnowledgeId = knowledgeIdList.get(0);
-                updateChatbotKnowledgeBaseIdByUserId(userId, firstKnowledgeId);
-                log.info(String.format("更新Chatbot知识库ID成功: userId=%s, knowledgeId=%s", userId, firstKnowledgeId));
-            } catch (Exception updateException) {
-                // 更新失败不影响查询，只记录日志
-                log.warn(String.format("更新Chatbot知识库ID失败: knowledgeId=%s, err=%s", 
-                        knowledgeIdList.get(0), updateException.getMessage()), updateException);
-            }
+        // 7. 更新 Chatbot 应用的知识库ID配置
+        try {
+            Long userId = StpUtil.getLoginIdAsLong();
+            updateChatbotKnowledgeBaseIdByUserId(userId, knowledgeId);
+            log.info(String.format("更新Chatbot知识库ID成功: userId=%s, knowledgeId=%s", userId, knowledgeId));
+        } catch (Exception updateException) {
+            // 更新失败不影响查询，只记录日志
+            log.warn(String.format("更新Chatbot知识库ID失败: knowledgeId=%s, err=%s", 
+                    knowledgeId, updateException.getMessage()), updateException);
         }
 
         return result;

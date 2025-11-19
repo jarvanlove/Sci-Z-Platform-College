@@ -11,8 +11,6 @@ import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeFileRelation
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-
 /**
  * 知识库文件关系仓储实现
  * 
@@ -61,29 +59,6 @@ public class SysKnowledgeFileRelationRepoImpl implements SysKnowledgeFileRelatio
         LambdaQueryWrapper<SysKnowledgeFileRelation> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(SysKnowledgeFileRelation::getKnowledgeId, knowledgeId)
                 .eq(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
-        
-        // 如果指定了文件夹ID，则只查询该文件夹下的文件
-        if (folderId != null) {
-            queryWrapper.eq(SysKnowledgeFileRelation::getFolderId, folderId);
-        }
-        
-        // 按排序号升序，创建时间倒序排列
-        queryWrapper.orderByAsc(SysKnowledgeFileRelation::getSortOrder)
-                .orderByDesc(SysKnowledgeFileRelation::getCreatedTime);
-        
-        return mapper.selectPage(page, queryWrapper);
-    }
-
-    @Override
-    public IPage<SysKnowledgeFileRelation> pageByKnowledgeIds(Page<SysKnowledgeFileRelation> page, List<Long> knowledgeIds, Long folderId) {
-        LambdaQueryWrapper<SysKnowledgeFileRelation> queryWrapper = new LambdaQueryWrapper<>();
-        
-        // 如果知识库ID列表不为空，使用 IN 查询
-        if (knowledgeIds != null && !knowledgeIds.isEmpty()) {
-            queryWrapper.in(SysKnowledgeFileRelation::getKnowledgeId, knowledgeIds);
-        }
-        
-        queryWrapper.eq(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
         
         // 如果指定了文件夹ID，则只查询该文件夹下的文件
         if (folderId != null) {

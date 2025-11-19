@@ -62,6 +62,15 @@
             <div class="kb-item-info">
               <div class="kb-item-name">{{ kb.name }}</div>
             </div>
+            <div class="kb-item-actions" @click.stop>
+              <button
+                class="kb-action-icon"
+                title="删除知识库"
+                @click="deleteKnowledgeBase(kb)"
+              >
+                <el-icon><Delete /></el-icon>
+              </button>
+            </div>
           </div>
 
           <div v-if="knowledgeBases.length === 0" class="kb-empty-tip">
@@ -493,9 +502,11 @@
     >
       <div style="text-align: center; padding: 20px 0">
         <div style="font-size: 16px; color: #374151; margin-bottom: 8px">
-          确定要删除该项吗？
+          {{ deletingKnowledgeBase ? `确定要删除知识库"${deletingKnowledgeBase.name}"吗？` : '确定要删除该项吗？' }}
         </div>
-        <div style="font-size: 14px; color: #6b7280">此操作不可恢复</div>
+        <div style="font-size: 14px; color: #6b7280">
+          {{ deletingKnowledgeBase ? '删除知识库将同时删除其中的所有文件和文件夹，此操作不可恢复' : '此操作不可恢复' }}
+        </div>
       </div>
       <template #footer>
         <el-button @click="cancelDelete">取消</el-button>
@@ -541,6 +552,7 @@ import {
   renameKnowledgeFile,
   deleteKnowledgeFile,
   deleteKnowledgeFolder,
+  deleteKnowledge,
   searchKnowledge,
   // 文件关联接口
   getKnowledgeFileRelationList,
@@ -579,6 +591,7 @@ const showRenameDialog = ref(false)
 const showDeleteDialog = ref(false)
 const editingItem = ref(null)
 const deletingItem = ref(null)
+const deletingKnowledgeBase = ref(null) // 要删除的知识库
 const renameForm = ref('')
 
 // 右侧AI助手相关
@@ -615,9 +628,16 @@ const loadKnowledgeBases = async () => {
     logger.info('加载知识库列表')
     const response = await getKnowledgeList({ page: 1, size: 100 })
     if (response.code === 200 && response.data) {
-      // TODO: 后端接口返回数据结构待确认，暂时使用模拟数据
       knowledgeBases.value = response.data.records || response.data.list || []
-      logger.info('知识库列表加载成功', knowledgeBases.value.length)
+      logger.info('知识库列表加载成功', { 
+        count: knowledgeBases.value.length,
+        items: knowledgeBases.value.map(kb => ({
+          id: kb.id,
+          name: kb.name,
+          difyKnowdataId: kb.difyKnowdataId,
+          difyKbId: kb.difyKbId
+        }))
+      })
     } else {
       ElMessage.warning('获取知识库列表失败，请稍后重试')
       knowledgeBases.value = []
@@ -638,6 +658,14 @@ const selectKnowledgeBase = (kb) => {
   kbItems.value = kbContents.value[kbId]
   currentFolder.value = null
   kbSearchQuery.value = ''
+  
+  // 记录选中的知识库信息，用于调试
+  logger.info('选中知识库', {
+    id: kb.id,
+    name: kb.name,
+    difyKnowdataId: kb.difyKnowdataId,
+    difyKbId: kb.difyKbId
+  })
   
   // 加载知识库文件列表，确保 ID 是数字类型
   loadKnowledgeFiles(kbId)
@@ -816,10 +844,14 @@ const handleKbUpload = async (e) => {
   const files = e.target.files || []
   if (!files.length || !selectedKnowledgeBase.value) return
 
-  // 检查是否有 difyKbId
-  const difyKbId = selectedKnowledgeBase.value.difyKbId || selectedKnowledgeBase.value.difyKnowledgeId
+  // 检查是否有 Dify KB ID（优先使用 difyKnowdataId，兼容 difyKbId）
+  const difyKbId = selectedKnowledgeBase.value.difyKnowdataId || selectedKnowledgeBase.value.difyKbId
   if (!difyKbId) {
-    ElMessage.warning('知识库缺少 Dify KB ID，无法上传文件')
+    logger.warn('知识库缺少 Dify KB ID', {
+      knowledgeBase: selectedKnowledgeBase.value,
+      availableFields: Object.keys(selectedKnowledgeBase.value)
+    })
+    ElMessage.warning('知识库缺少 Dify KB ID，无法上传文件。请检查知识库是否已正确创建。')
     e.target.value = ''
     return
   }
@@ -941,10 +973,73 @@ const cancelRename = () => {
 
 const deleteItem = (item) => {
   deletingItem.value = item
+  deletingKnowledgeBase.value = null
   showDeleteDialog.value = true
 }
 
+const cancelDelete = () => {
+  showDeleteDialog.value = false
+  deletingItem.value = null
+  deletingKnowledgeBase.value = null
+}
+
+/**
+ * 删除知识库
+ * @param {Object} kb - 知识库对象
+ */
+const deleteKnowledgeBase = (kb) => {
+  deletingKnowledgeBase.value = kb
+  showDeleteDialog.value = true
+}
+
+/**
+ * 确认删除（知识库或文件）
+ */
 const confirmDelete = async () => {
+  // 删除知识库
+  if (deletingKnowledgeBase.value) {
+    try {
+      await deleteKnowledge(deletingKnowledgeBase.value.id)
+      
+      // 从列表中移除
+      const idx = knowledgeBases.value.findIndex(
+        (kb) => kb.id === deletingKnowledgeBase.value.id
+      )
+      if (idx > -1) {
+        knowledgeBases.value.splice(idx, 1)
+      }
+      
+      // 如果删除的是当前选中的知识库，清空选中状态
+      if (selectedKnowledgeBase.value && selectedKnowledgeBase.value.id === deletingKnowledgeBase.value.id) {
+        selectedKnowledgeBase.value = null
+        kbItems.value = []
+        currentFolder.value = null
+        kbContents.value = {}
+        // 清空对话记录
+        kbMessagesList.value = [{
+          id: 1,
+          type: 'ai',
+          content: 'Hi，任何关于这个知识库的问题都可以问我～',
+          timestamp: new Date()
+        }]
+        currentConversationId.value = null
+      }
+      
+      // 从缓存中移除
+      delete kbContents.value[deletingKnowledgeBase.value.id]
+      
+      ElMessage.success('知识库已删除')
+      logger.info('删除知识库成功', { id: deletingKnowledgeBase.value.id })
+    } catch (error) {
+      logger.error('删除知识库失败', error)
+      ElMessage.error(error.message || '删除知识库失败')
+    }
+    showDeleteDialog.value = false
+    deletingKnowledgeBase.value = null
+    return
+  }
+  
+  // 删除文件（原有逻辑）
   if (!deletingItem.value) return
 
   try {
@@ -995,11 +1090,6 @@ const confirmDelete = async () => {
     logger.error('删除失败', error)
     ElMessage.error(error.message || '删除失败')
   }
-}
-
-const cancelDelete = () => {
-  showDeleteDialog.value = false
-  deletingItem.value = null
 }
 
 const getCurrentFileCount = () => {
@@ -1072,9 +1162,10 @@ const sendKbMessage = async () => {
     return
   }
 
-  // 检查是否有 difyKbId
-  const difyKbId = selectedKnowledgeBase.value.difyKbId || selectedKnowledgeBase.value.difyKnowledgeId
+  // 检查是否有 Dify KB ID（优先使用 difyKnowdataId，兼容 difyKbId）
+  const difyKbId = selectedKnowledgeBase.value.difyKnowdataId || selectedKnowledgeBase.value.difyKbId
   if (!difyKbId) {
+    logger.warn('知识库缺少 Dify KB ID', selectedKnowledgeBase.value)
     ElMessage.warning('知识库缺少 Dify KB ID，无法使用问答功能')
     return
   }
@@ -1349,6 +1440,37 @@ onMounted(() => {
   font-size: 14px;
   font-weight: 500;
   color: #111827;
+}
+
+.kb-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.kb-item:hover .kb-item-actions {
+  opacity: 1;
+}
+
+.kb-action-icon {
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #fee2e2;
+    color: #dc2626;
+  }
 }
 
 .kb-empty-tip {

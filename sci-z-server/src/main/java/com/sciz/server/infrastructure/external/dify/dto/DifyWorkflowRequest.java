@@ -26,6 +26,7 @@ public class DifyWorkflowRequest extends BaseDifyRequest {
     private Map<String, Object> inputs;
 
     @Schema(description = "响应模式", example = "blocking", allowableValues = {"blocking", "streaming"})
+    @com.fasterxml.jackson.annotation.JsonProperty("response_mode")
     private String responseMode = "blocking";
 
     @Schema(description = "用户标识", example = "workflow_user_001")

@@ -144,6 +144,35 @@ public class AiConversationServiceImpl implements AiConversationService {
      * @return 响应
      */
     @Override
+    public AiConversationResp findById(String id) {
+        Long userId = StpUtil.getLoginIdAsLong();
+        log.info(String.format("查询AI会话: userId=%s, id=%s", userId, id));
+
+        // 1. 转换ID
+        Long conversationId;
+        try {
+            conversationId = Long.parseLong(id);
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "无效的会话ID格式");
+        }
+
+        // 2. 查询实体
+        AiConversation entity = conversationRepo.findById(conversationId);
+        if (entity == null) {
+            throw new BusinessException(ResultCode.AI_CONVERSATION_NOT_FOUND);
+        }
+
+        // 3. 转换为响应
+        return converter.toResp(entity);
+    }
+
+    /**
+     * 根据ID查询详情（带权限检查）
+     *
+     * @param id 会话ID
+     * @return 响应
+     */
+    @Override
     public AiConversationResp findDetail(String id) {
         Long userId = StpUtil.getLoginIdAsLong();
         log.info(String.format("查询AI会话详情: userId=%s, id=%s", userId, id));
@@ -181,7 +210,7 @@ public class AiConversationServiceImpl implements AiConversationService {
     public PageResult<AiConversationResp> page(AiConversationQueryReq req) {
         Long userId = StpUtil.getLoginIdAsLong();
         log.info(String.format("分页查询AI会话: userId=%s, pageNo=%s, pageSize=%s", 
-                userId, req.getPageNo(), req.getPageSize()));
+                userId, req.pageNo(), req.pageSize()));
 
         // 1. 构建分页对象
         var baseQuery = req.toBaseQuery();
@@ -192,9 +221,9 @@ public class AiConversationServiceImpl implements AiConversationService {
 
         // 3. 关键字过滤（如果提供）
         List<AiConversation> filteredList = pageResult.getRecords();
-        if (StringUtils.hasText(req.getKeyword())) {
+        if (StringUtils.hasText(req.keyword())) {
             filteredList = filteredList.stream()
-                    .filter(conversation -> conversation.getTitle().contains(req.getKeyword()))
+                    .filter(conversation -> conversation.getTitle().contains(req.keyword()))
                     .collect(Collectors.toList());
         }
 
@@ -215,6 +244,41 @@ public class AiConversationServiceImpl implements AiConversationService {
     }
 
     /**
+     * 分页查询（根据用户ID）
+     *
+     * @param req 查询请求
+     * @return 分页结果
+     */
+    @Override
+    public PageResult<AiConversationResp> pageByUserId(AiConversationQueryReq req) {
+        Long userId = StpUtil.getLoginIdAsLong();
+        log.info(String.format("分页查询AI会话: userId=%s, pageNo=%s, pageSize=%s", 
+                userId, req.pageNo(), req.pageSize()));
+
+        // 1. 构建分页对象
+        var baseQuery = req.toBaseQuery();
+        Page<AiConversation> page = new Page<>(baseQuery.pageNo(), baseQuery.pageSize());
+
+        // 2. 执行分页查询
+        var pageResult = conversationRepo.pageByUserId(page, userId);
+
+        // 3. 转换为响应列表
+        var respList = converter.toRespList(pageResult.getRecords());
+
+        // 4. 构建分页结果
+        var result = new PageResult<AiConversationResp>(
+                respList,
+                pageResult.getTotal(),
+                pageResult.getCurrent(),
+                pageResult.getSize()
+        );
+
+        log.info(String.format("分页查询AI会话成功: total=%s, current=%s, size=%s", 
+                result.getTotal(), result.getCurrent(), result.getSize()));
+        return result;
+    }
+
+    /**
      * 查询当前用户的会话列表
      *
      * @return 会话列表
@@ -222,6 +286,23 @@ public class AiConversationServiceImpl implements AiConversationService {
     @Override
     public List<AiConversationResp> list() {
         Long userId = StpUtil.getLoginIdAsLong();
+        log.info(String.format("查询AI会话列表: userId=%s", userId));
+
+        // 1. 查询列表
+        List<AiConversation> entities = conversationRepo.listByUserId(userId);
+
+        // 2. 转换为响应列表
+        return converter.toRespList(entities);
+    }
+
+    /**
+     * 根据用户ID查询列表
+     *
+     * @param userId 用户ID
+     * @return 列表
+     */
+    @Override
+    public List<AiConversationResp> listByUserId(Long userId) {
         log.info(String.format("查询AI会话列表: userId=%s", userId));
 
         // 1. 查询列表
@@ -268,6 +349,17 @@ public class AiConversationServiceImpl implements AiConversationService {
         }
 
         log.info(String.format("删除AI会话成功: id=%s", conversationId));
+    }
+
+    /**
+     * 批量删除（根据ID列表）
+     *
+     * @param ids ID列表
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteBatchByIds(List<String> ids) {
+        deleteBatch(ids);
     }
 
     /**

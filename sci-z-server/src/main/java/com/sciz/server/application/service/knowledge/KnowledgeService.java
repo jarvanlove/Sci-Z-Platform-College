@@ -50,4 +50,11 @@ public interface KnowledgeService {
      * @return 流式响应（SSE格式）
      */
     SseEmitter chatbotStream(KnowledgeChatbotStreamReq req);
+
+    /**
+     * 删除知识库
+     *
+     * @param id 知识库ID
+     */
+    void delete(Long id);
 }

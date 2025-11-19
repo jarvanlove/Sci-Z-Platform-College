@@ -34,15 +34,37 @@ public interface AiConversationService {
     AiConversationResp update(AiConversationUpdateReq req);
 
     /**
+     * 根据ID删除
+     *
+     * @param id 主键ID
+     */
+    void deleteById(String id);
+
+    /**
+     * 批量删除
+     *
+     * @param ids ID列表
+     */
+    void deleteBatchByIds(List<String> ids);
+
+    /**
      * 根据ID查询详情
      *
-     * @param id 会话ID
+     * @param id 主键ID
+     * @return 响应
+     */
+    AiConversationResp findById(String id);
+
+    /**
+     * 根据ID查询详情（带权限检查）
+     *
+     * @param id 主键ID
      * @return 响应
      */
     AiConversationResp findDetail(String id);
 
     /**
-     * 分页查询会话列表
+     * 分页查询
      *
      * @param req 查询请求
      * @return 分页结果
@@ -50,18 +72,27 @@ public interface AiConversationService {
     PageResult<AiConversationResp> page(AiConversationQueryReq req);
 
     /**
+     * 根据用户ID分页查询
+     *
+     * @param req 查询请求
+     * @return 分页结果
+     */
+    PageResult<AiConversationResp> pageByUserId(AiConversationQueryReq req);
+
+    /**
      * 查询当前用户的会话列表
      *
-     * @return 会话列表
+     * @return 列表
      */
     List<AiConversationResp> list();
 
     /**
-     * 根据ID删除
+     * 根据用户ID查询列表
      *
-     * @param id 会话ID
+     * @param userId 用户ID
+     * @return 列表
      */
-    void deleteById(String id);
+    List<AiConversationResp> listByUserId(Long userId);
 
     /**
      * 批量删除
@@ -73,10 +104,9 @@ public interface AiConversationService {
     /**
      * 更新置顶状态
      *
-     * @param id 会话ID
+     * @param id 主键ID
      * @param isPinned 是否置顶(0:否,1:是)
      * @return 响应
      */
     AiConversationResp updatePinnedStatus(String id, Integer isPinned);
 }
-

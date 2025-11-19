@@ -34,33 +34,9 @@ public interface AiMessageService {
     AiMessageResp update(AiMessageUpdateReq req);
 
     /**
-     * 根据ID查询详情
-     *
-     * @param id 消息ID
-     * @return 响应
-     */
-    AiMessageResp findDetail(String id);
-
-    /**
-     * 分页查询消息列表
-     *
-     * @param req 查询请求
-     * @return 分页结果
-     */
-    PageResult<AiMessageResp> page(AiMessageQueryReq req);
-
-    /**
-     * 根据会话ID查询消息列表
-     *
-     * @param conversationId 会话ID
-     * @return 消息列表
-     */
-    List<AiMessageResp> listByConversationId(String conversationId);
-
-    /**
      * 根据ID删除
      *
-     * @param id 消息ID
+     * @param id 主键ID
      */
     void deleteById(String id);
 
@@ -69,13 +45,60 @@ public interface AiMessageService {
      *
      * @param ids ID列表
      */
-    void deleteBatch(List<String> ids);
+    void deleteBatchByIds(List<String> ids);
 
     /**
-     * 根据会话ID删除所有消息
+     * 根据会话ID删除
      *
      * @param conversationId 会话ID
      */
     void deleteByConversationId(String conversationId);
+
+    /**
+     * 根据ID查询详情
+     *
+     * @param id 主键ID
+     * @return 响应
+     */
+    AiMessageResp findById(String id);
+
+    /**
+     * 根据ID查询详情（带权限检查）
+     *
+     * @param id 主键ID
+     * @return 响应
+     */
+    AiMessageResp findDetail(String id);
+
+    /**
+     * 分页查询
+     *
+     * @param req 查询请求
+     * @return 分页结果
+     */
+    PageResult<AiMessageResp> page(AiMessageQueryReq req);
+
+    /**
+     * 根据会话ID分页查询
+     *
+     * @param req 查询请求
+     * @return 分页结果
+     */
+    PageResult<AiMessageResp> pageByConversationId(AiMessageQueryReq req);
+
+    /**
+     * 根据会话ID查询列表
+     *
+     * @param conversationId 会话ID
+     * @return 列表
+     */
+    List<AiMessageResp> listByConversationId(String conversationId);
+
+    /**
+     * 批量删除
+     *
+     * @param ids ID列表
+     */
+    void deleteBatch(List<String> ids);
 }
 

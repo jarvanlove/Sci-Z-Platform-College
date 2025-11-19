@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import { KNOWLEDGE_API, HTTP_METHODS } from '../Common/constants'
+import { KNOWLEDGE_API, HTTP_METHODS, API_BASE_URL } from '../Common/constants'
 
 /**
  * 知识库模块 API 接口
@@ -290,8 +290,8 @@ export const streamKnowledgeChatbot = async (params) => {
     throw error
   }
 
-  // 直接使用固定的API路径
-  const url = '/api/api/knowledge/chatbot/stream'
+  // 使用正确的API路径（fetch 需要完整路径，需要手动添加 /api 前缀）
+  const url = `${API_BASE_URL}${KNOWLEDGE_API.CHATBOT_STREAM}`
   
   const logger = (await import('@/utils/simpleLogger')).createLogger('KnowledgeChatbot')
   logger.info('流式对话请求URL', { url, knowledgeId, query })

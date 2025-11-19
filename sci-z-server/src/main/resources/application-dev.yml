@@ -48,14 +48,11 @@ minio: # MinIO 开发环境配置
 
 # Dify 开发环境密钥（示例值，建议放本地私密配置或环境变量）
 dify:
-  api:
-    base-url: https://192,168.1.203/v1 # Dify API 网关
-    api-key: YOUR_DEV_DIFY_KEY # 开发密钥（建议本地私密管理）
   http:
     connect-timeout-ms: 5000 # 连接超时(ms)
     read-timeout-ms: 60000 # 读超时(ms)
-  base-url: http://192.168.1.203/v1
-  private-url: http://192.168.1.203
+  base-url: http://192.168.1.203/v1 # Dify API 网关
+  private-url: http://192.168.1.203 # Dify API 网关
   api-key: dataset-MwOxGbIDhZmg6bUdHEid0rhX    # Dify API 测试知识库 密钥
   api-workflow-key: app-TsSdGbD50r8fDt1shM3RBSMi # Dify API 测试工作流密钥
   timeout: 30000

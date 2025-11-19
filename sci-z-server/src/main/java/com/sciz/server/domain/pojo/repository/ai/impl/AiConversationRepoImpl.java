@@ -37,11 +37,6 @@ public class AiConversationRepoImpl implements AiConversationRepo {
     }
 
     @Override
-    public boolean updateById(AiConversation entity) {
-        return mapper.updateById(entity) > 0;
-    }
-
-    @Override
     public AiConversation findById(Long id) {
         return new LambdaQueryChainWrapper<>(mapper)
                 .eq(AiConversation::getId, id)
@@ -50,12 +45,17 @@ public class AiConversationRepoImpl implements AiConversationRepo {
     }
 
     @Override
+    public boolean updateById(AiConversation entity) {
+        return mapper.updateById(entity) > 0;
+    }
+
+    @Override
     public IPage<AiConversation> pageByUserId(Page<AiConversation> page, Long userId) {
         LambdaQueryWrapper<AiConversation> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(AiConversation::getUserId, userId)
                 .eq(AiConversation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
                 .orderByDesc(AiConversation::getIsPinned)
-                .orderByDesc(AiConversation::getCreatedTime);
+                .orderByDesc(AiConversation::getUpdatedTime);
         return mapper.selectPage(page, queryWrapper);
     }
 
@@ -65,7 +65,7 @@ public class AiConversationRepoImpl implements AiConversationRepo {
                 .eq(AiConversation::getUserId, userId)
                 .eq(AiConversation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
                 .orderByDesc(AiConversation::getIsPinned)
-                .orderByDesc(AiConversation::getCreatedTime)
+                .orderByDesc(AiConversation::getUpdatedTime)
                 .list();
     }
 

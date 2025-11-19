@@ -4,8 +4,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeFileRelation;
 
-import java.util.List;
-
 /**
  * 知识库文件关系仓储（领域层抽象）
  * 
@@ -56,14 +54,4 @@ public interface SysKnowledgeFileRelationRepo {
      * @return 分页结果
      */
     IPage<SysKnowledgeFileRelation> pageByKnowledgeId(Page<SysKnowledgeFileRelation> page, Long knowledgeId, Long folderId);
-
-    /**
-     * 根据多个知识库ID分页查询文件关联列表
-     *
-     * @param page 分页对象
-     * @param knowledgeIds 知识库ID列表
-     * @param folderId 文件夹ID（可选，如果为null则查询所有文件夹）
-     * @return 分页结果
-     */
-    IPage<SysKnowledgeFileRelation> pageByKnowledgeIds(Page<SysKnowledgeFileRelation> page, List<Long> knowledgeIds, Long folderId);
 }

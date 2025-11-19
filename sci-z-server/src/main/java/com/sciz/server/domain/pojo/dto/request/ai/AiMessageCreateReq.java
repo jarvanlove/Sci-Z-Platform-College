@@ -2,7 +2,6 @@ package com.sciz.server.domain.pojo.dto.request.ai;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -19,18 +18,16 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class AiMessageCreateReq {
-
     /**
      * 会话ID
      */
-    @NotNull(message = "会话ID不能为空")
+    @NotBlank(message = "会话ID不能为空")
     private String conversationId;
 
     /**
      * 角色(user/assistant)
      */
     @NotBlank(message = "角色不能为空")
-    @Size(max = 10, message = "角色长度不能超过10个字符")
     private String role;
 
     /**
@@ -42,22 +39,20 @@ public class AiMessageCreateReq {
     /**
      * Dify消息ID（可选）
      */
-    @Size(max = 100, message = "Dify消息ID长度不能超过100个字符")
     private String difyMessageId;
 
     /**
-     * 知识来源(JSON)
+     * 知识来源(JSON字符串，可选)
      */
     private String sources;
 
     /**
-     * 置信度
+     * 置信度（可选）
      */
     private BigDecimal confidence;
 
     /**
-     * 发送时间
+     * 发送时间（可选，为空时使用当前时间）
      */
     private LocalDateTime sendTime;
 }
-

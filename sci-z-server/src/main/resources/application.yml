@@ -42,6 +42,9 @@ logging: # 日志总配置
     org.springframework.web: INFO # Web 相关日志
     com.baomidou.mybatisplus: INFO # MyBatis-Plus 日志
     org.mybatis: INFO # MyBatis 日志
+    # Kafka 客户端日志级别：降低连接失败时的日志噪音
+    org.apache.kafka.clients: ERROR # Kafka 客户端日志（仅 ERROR）
+    org.apache.kafka.common: ERROR # Kafka 通用日志（仅 ERROR）
   file: # 文件输出配置
     name: logs/app.log # 日志文件路径
   pattern: # 控制台与文件日志格式（依赖 logback）

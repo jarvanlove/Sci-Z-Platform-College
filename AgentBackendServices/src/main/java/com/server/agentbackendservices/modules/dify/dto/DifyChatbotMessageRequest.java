@@ -57,12 +57,27 @@ public class DifyChatbotMessageRequest extends BaseDifyRequest {
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ChatFile {
+        /**
+         * 文件类型
+         */
         private String type;
 
+        /**
+         * 传输方式
+         */
         @JsonProperty("transfer_method")
         private String transferMethod;
 
+        /**
+         * 文件URL（用于远程文件）
+         */
         private String url;
+
+        /**
+         * 上传文件ID（用于本地文件，UUID格式）
+         */
+        @JsonProperty("upload_file_id")
+        private String uploadFileId;
     }
 }
 

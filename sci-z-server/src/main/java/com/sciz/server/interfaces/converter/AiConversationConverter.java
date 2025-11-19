@@ -41,7 +41,7 @@ public interface AiConversationConverter {
      * @param req 更新请求
      * @param entity 目标实体
      */
-    @Mapping(target = "id", expression = "java(Long.parseLong(req.getId()))")
+    @Mapping(target = "id", expression = "java(req.getId() != null && !req.getId().isEmpty() ? Long.parseLong(req.getId()) : null)")
     @Mapping(target = "userId", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
@@ -56,7 +56,7 @@ public interface AiConversationConverter {
      * @param entity 实体
      * @return 响应
      */
-    @Mapping(target = "id", expression = "java(String.valueOf(entity.getId()))")
+    @Mapping(target = "id", expression = "java(entity.getId() != null ? String.valueOf(entity.getId()) : null)")
     @Mapping(target = "userId", expression = "java(entity.getUserId() != null ? String.valueOf(entity.getUserId()) : null)")
     AiConversationResp toResp(AiConversation entity);
 
@@ -68,4 +68,3 @@ public interface AiConversationConverter {
      */
     List<AiConversationResp> toRespList(List<AiConversation> entities);
 }
-

@@ -1,8 +1,6 @@
 package com.sciz.server.domain.pojo.dto.request.ai;
 
 import com.sciz.server.domain.pojo.dto.request.BaseQueryReq;
-import lombok.Getter;
-import lombok.Setter;
 
 /**
  * AI 会话查询请求
@@ -11,42 +9,23 @@ import lombok.Setter;
  * @className AiConversationQueryReq
  * @date 2025-11-14 10:00
  */
-@Getter
-@Setter
-public class AiConversationQueryReq {
+public record AiConversationQueryReq(
+        Integer pageNo,
+        Integer pageSize,
+        String sortBy,
+        String sortOrder,
+        Long userId,
+        String keyword
+) {
+    public AiConversationQueryReq {
+        var base = BaseQueryReq.of(pageNo, pageSize, sortBy, sortOrder);
+        pageNo = base.pageNo();
+        pageSize = base.pageSize();
+        sortBy = base.sortBy();
+        sortOrder = base.sortOrder();
+    }
 
-    /**
-     * 页码
-     */
-    private Integer pageNo;
-
-    /**
-     * 每页数量
-     */
-    private Integer pageSize;
-
-    /**
-     * 排序字段
-     */
-    private String sortBy;
-
-    /**
-     * 排序方式（ASC/DESC）
-     */
-    private String sortOrder;
-
-    /**
-     * 关键字搜索（标题）
-     */
-    private String keyword;
-
-    /**
-     * 转换为基础分页请求
-     *
-     * @return BaseQueryReq
-     */
     public BaseQueryReq toBaseQuery() {
         return BaseQueryReq.of(pageNo, pageSize, sortBy, sortOrder);
     }
 }
-

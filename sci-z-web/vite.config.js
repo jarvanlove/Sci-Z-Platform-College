@@ -32,8 +32,9 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8808',
         changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        secure: false
+        // 不移除 /api 前缀，保持路径完整，后端控制器路径包含 /api
+        // 注意：移除了 rewrite 规则，这样 /api 前缀不会被移除
       }
     }
   },
