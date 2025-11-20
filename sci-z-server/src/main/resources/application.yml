@@ -42,9 +42,6 @@ logging: # 日志总配置
     org.springframework.web: INFO # Web 相关日志
     com.baomidou.mybatisplus: INFO # MyBatis-Plus 日志
     org.mybatis: INFO # MyBatis 日志
-    # Kafka 客户端日志级别：降低连接失败时的日志噪音
-    org.apache.kafka.clients: ERROR # Kafka 客户端日志（仅 ERROR）
-    org.apache.kafka.common: ERROR # Kafka 通用日志（仅 ERROR）
   file: # 文件输出配置
     name: logs/app.log # 日志文件路径
   pattern: # 控制台与文件日志格式（依赖 logback）
@@ -110,9 +107,23 @@ sa-token: # Sa-Token 身份认证配置
   #   database: 0 # Redis 数据库索引（默认使用 spring.redis.database）
   #   key-prefix: "satoken:" # Redis key 前缀（默认：satoken:）
 
-# Actuator 健康检查配置（全局默认）
+# Actuator 健康检查配置（基础配置，环境差异通过 profile 覆盖）
 management: # Spring Boot Actuator 配置
-  health: # 健康检查配置
-    mail: # 邮件健康检查配置
-      enabled: false # 禁用邮件健康检查（避免默认配置导致连接失败）
-
+  endpoints:
+    web:
+      base-path: /actuator # 统一的基础路径
+  endpoint:
+    health:
+      show-components: always # 显示各组件状态（database、redis、kafka、minio）
+  health:
+    # 配置各组件健康检查
+    db:
+      enabled: true # 数据库健康检查（默认启用）
+    redis:
+      enabled: true # Redis 健康检查（默认启用）
+    minio:
+      enabled: true # MinIO 健康检查（需要时启用）
+    mail:
+      enabled: false # 邮箱健康检查（需要时启用）
+    kafka:
+      enabled: false # Kafka 健康检查（需要时启用）
