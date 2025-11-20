@@ -52,7 +52,6 @@ public class ClientInfoUtil implements ApplicationContextAware {
     /**
      * 获取客户端IP地址
      *
-     * @param request HttpServletRequest
      * @return IP地址
      */
     public static String getClientIp() {

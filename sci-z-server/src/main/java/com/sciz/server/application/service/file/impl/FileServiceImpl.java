@@ -59,7 +59,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @RequiredArgsConstructor
 public class FileServiceImpl implements FileService {
-    private static final int DEFAULT_PREVIEW_EXPIRE_SECONDS = 600;
     private static final DateTimeFormatter DATE_FOLDER_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter
             .ofPattern(SystemConstant.DATE_TIME_FORMAT);
@@ -105,7 +104,7 @@ public class FileServiceImpl implements FileService {
         publishUploadEvent(req, currentUser.userId(), currentUser.realName(), attachment);
 
         // 10. 构建响应并返回
-        FileInfoResp resp = buildFileInfoResp(attachment, DEFAULT_PREVIEW_EXPIRE_SECONDS);
+        FileInfoResp resp = buildFileInfoResp(attachment, SystemConstant.DEFAULT_PREVIEW_EXPIRE_SECONDS);
         log.info(String.format("文件上传完成: attachmentId=%s, uploaderId=%s",
                 attachment.getId(), currentUser.userId()));
         return resp;
@@ -160,7 +159,7 @@ public class FileServiceImpl implements FileService {
                 asc);
 
         var records = attachmentPage.getRecords().stream()
-                .map(item -> buildFileInfoResp(item, DEFAULT_PREVIEW_EXPIRE_SECONDS))
+                .map(item -> buildFileInfoResp(item, SystemConstant.DEFAULT_PREVIEW_EXPIRE_SECONDS))
                 .toList();
 
         Page<FileInfoResp> resultPage = new Page<>(attachmentPage.getCurrent(), attachmentPage.getSize());
@@ -201,7 +200,7 @@ public class FileServiceImpl implements FileService {
 
         // 2. 计算有效期
         var effectiveExpire = (expireSeconds == null || expireSeconds <= 0)
-                ? DEFAULT_PREVIEW_EXPIRE_SECONDS
+                ? SystemConstant.DEFAULT_PREVIEW_EXPIRE_SECONDS
                 : expireSeconds;
 
         // 3. 生成预签名链接
@@ -212,6 +211,68 @@ public class FileServiceImpl implements FileService {
             log.error(String.format("获取文件预览链接失败: attachmentId=%s", attachmentId), exception);
             throw new BusinessException(ResultCode.FILE_DOWNLOAD_FAILED, "获取文件预览链接失败");
         }
+    }
+
+    /**
+     * 根据file_url生成预签名URL
+     * file_url格式：bucketName/filePath（如：sciz-files/2025/11/19/xxx.jpeg）
+     *
+     * @param fileUrl       String 文件URL（格式：bucketName/filePath）
+     * @param expireSeconds Integer 预签名过期秒数（可选，默认使用系统配置）
+     * @return String 预签名URL
+     */
+    @Override
+    public String generatePresignedUrlFromFileUrl(String fileUrl, Integer expireSeconds) {
+        if (!StringUtils.hasText(fileUrl)) {
+            return null;
+        }
+
+        // 1. 从fileUrl中提取filePath（去掉bucketName前缀）
+        // fileUrl格式：bucketName/filePath（如：sciz-files/2025/11/19/xxx.jpeg）
+        // 需要提取出：2025/11/19/xxx.jpeg
+        var filePath = extractFilePathFromFileUrl(fileUrl);
+        if (!StringUtils.hasText(filePath)) {
+            log.warn(String.format("无法从fileUrl中提取filePath: fileUrl=%s", fileUrl));
+            return null;
+        }
+
+        // 2. 计算有效期
+        var effectiveExpire = (expireSeconds == null || expireSeconds <= 0)
+                ? SystemConstant.DEFAULT_PREVIEW_EXPIRE_SECONDS
+                : expireSeconds;
+
+        // 3. 生成预签名链接（参考preview方法的实现）
+        ensureBucket();
+        try {
+            return MinioUtil.presignedGetUrl(minioClient, bucketName, filePath, effectiveExpire);
+        } catch (Exception exception) {
+            log.warn(String.format("根据fileUrl生成预签名URL失败: fileUrl=%s, filePath=%s", fileUrl, filePath), exception);
+            return null;
+        }
+    }
+
+    /**
+     * 从fileUrl中提取filePath（去掉bucketName前缀）
+     * fileUrl格式：bucketName/filePath（如：sciz-files/2025/11/19/xxx.jpeg）
+     * 返回：filePath（如：2025/11/19/xxx.jpeg）
+     *
+     * @param fileUrl String 文件URL（格式：bucketName/filePath）
+     * @return String filePath（不包含bucketName）
+     */
+    private String extractFilePathFromFileUrl(String fileUrl) {
+        if (!StringUtils.hasText(fileUrl)) {
+            return null;
+        }
+
+        // 查找第一个斜杠的位置
+        var firstSlashIndex = fileUrl.indexOf('/');
+        if (firstSlashIndex < 0 || firstSlashIndex >= fileUrl.length() - 1) {
+            // 没有斜杠或斜杠在末尾，说明格式不正确
+            return null;
+        }
+
+        // 提取bucketName后面的部分（filePath）
+        return fileUrl.substring(firstSlashIndex + 1);
     }
 
     /**
@@ -254,7 +315,7 @@ public class FileServiceImpl implements FileService {
         if (attachment == null) {
             return new FileDuplicateCheckResp(false, null);
         }
-        var infoResp = buildFileInfoResp(attachment, DEFAULT_PREVIEW_EXPIRE_SECONDS);
+        var infoResp = buildFileInfoResp(attachment, SystemConstant.DEFAULT_PREVIEW_EXPIRE_SECONDS);
         return new FileDuplicateCheckResp(true, infoResp);
     }
 

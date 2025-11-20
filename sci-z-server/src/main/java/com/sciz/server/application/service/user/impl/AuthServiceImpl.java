@@ -476,7 +476,9 @@ public class AuthServiceImpl implements AuthService {
         userInfo.setStatus(getUserStatusDescription(user.getStatus()));
         userInfo.setIndustry(industryType);
         userInfo.setIndustryCode(industryType);
-        userInfo.setAvatar(user.getAvatarUrl());
+        // 从用户表的avatar_url生成预签名URL（参考FileServiceImpl.preview方法）
+        var presignedUrl = fileService.generatePresignedUrlFromFileUrl(user.getAvatarUrl(), null);
+        userInfo.setAvatar(presignedUrl != null ? presignedUrl : user.getAvatarUrl());
         userInfo.setTitle(loadUserProfileAttribute(user.getId(), PROFILE_TITLE_CODE));
         userInfo.setAvatarFileId(loadUserProfileAttributeAsLong(user.getId(), PROFILE_AVATAR_FILE_ID_CODE));
     }
@@ -1303,8 +1305,8 @@ public class AuthServiceImpl implements AuthService {
         // 文件上传请求中的关联信息由前端传入，这里不再强制设置
         var fileInfo = fileService.upload(req);
 
-        // 4. 更新用户头像URL和附件ID
-        updateUserAvatar(user, fileInfo, userId);
+        // 4. 更新用户头像URL和附件ID（使用fileUrl，存储格式：bucketName/filePath）
+        updateUserAvatar(user, fileInfo.fileUrl(), fileInfo.id(), userId);
 
         // 5. 刷新登录用户上下文缓存
         var industryType = Optional.ofNullable(user.getIndustryType())
@@ -1312,19 +1314,20 @@ public class AuthServiceImpl implements AuthService {
         cacheLoginUserContext(user, industryType);
 
         log.info(String.format("上传用户头像成功: userId=%s, avatarUrl=%s, avatarFileId=%s",
-                userId, fileInfo.previewUrl(), fileInfo.id()));
+                userId, fileInfo.fileUrl(), fileInfo.id()));
         return fileInfo;
     }
 
     /**
      * 更新用户头像URL和附件ID
      *
-     * @param user     SysUser 用户实体
-     * @param fileInfo FileInfoResp 文件信息
-     * @param userId   Long 用户ID
+     * @param user         SysUser 用户实体
+     * @param permanentUrl String 永久访问URL
+     * @param avatarFileId Long 头像附件ID
+     * @param userId       Long 用户ID
      */
-    private void updateUserAvatar(SysUser user, FileInfoResp fileInfo, Long userId) {
-        user.setAvatarUrl(fileInfo.previewUrl());
+    private void updateUserAvatar(SysUser user, String permanentUrl, Long avatarFileId, Long userId) {
+        user.setAvatarUrl(permanentUrl);
         user.setUpdatedTime(LocalDateTime.now(DEFAULT_ZONE));
 
         if (!sysUserRepo.updateById(user)) {
@@ -1333,7 +1336,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 保存头像附件ID到扩展属性
-        saveAvatarFileId(userId, fileInfo.id());
+        saveAvatarFileId(userId, avatarFileId);
     }
 
     /**

@@ -75,7 +75,7 @@ public class FileController {
     @GetMapping("/download/{id}")
     public void download(@PathVariable Long id, HttpServletResponse response) {
         try (FileDownloadContext context = fileService.download(id);
-             var inputStream = context.inputStream()) {
+                var inputStream = context.inputStream()) {
             response.setContentType(context.contentType());
             if (context.contentLength() != null) {
                 response.setContentLengthLong(context.contentLength());

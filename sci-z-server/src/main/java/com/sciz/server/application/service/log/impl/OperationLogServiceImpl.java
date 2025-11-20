@@ -127,7 +127,8 @@ public class OperationLogServiceImpl implements OperationLogService {
                         log.getStatus(),
                         log.getExecutionTime(),
                         log.getDetailInfo(),
-                        truncate(log.getErrorMessage(), 200)))
+                        truncate(log.getErrorMessage(), 200),
+                        log.getCreatedTime()))
                 .toList();
 
         Page<OperationLogResp> resultPage = new Page<>(logPage.getCurrent(), logPage.getSize());
@@ -157,7 +158,8 @@ public class OperationLogServiceImpl implements OperationLogService {
                 logEntity.getStatus(),
                 logEntity.getExecutionTime(),
                 logEntity.getDetailInfo(),
-                logEntity.getErrorMessage());
+                logEntity.getErrorMessage(),
+                logEntity.getCreatedTime());
     }
 
     /**

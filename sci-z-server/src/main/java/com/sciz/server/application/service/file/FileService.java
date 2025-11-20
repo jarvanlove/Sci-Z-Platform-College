@@ -61,6 +61,16 @@ public interface FileService {
     String preview(Long attachmentId, Integer expireSeconds);
 
     /**
+     * 根据file_url生成预签名URL
+     * file_url格式：bucketName/filePath（如：sciz-files/2025/11/19/xxx.jpeg）
+     *
+     * @param fileUrl       String 文件URL（格式：bucketName/filePath）
+     * @param expireSeconds Integer 预签名过期秒数（可选，默认使用系统配置）
+     * @return String 预签名URL
+     */
+    String generatePresignedUrlFromFileUrl(String fileUrl, Integer expireSeconds);
+
+    /**
      * 删除附件
      *
      * @param attachmentId Long 附件ID

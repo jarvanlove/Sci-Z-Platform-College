@@ -1,8 +1,3 @@
-const sizeValidation = validateFileSize(file, AVATAR_MAX_SIZE_MB)
-if (!sizeValidation.passed) {
-  ElMessage.error(sizeValidation.reason)
-  return
-}
 <!--
 /**
 * @description 用户中心 - 个人信息业务组件
@@ -258,21 +253,20 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { InfoFilled, Upload, Loading, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
 import { BaseButton, BaseCard } from '@/components/Common'
-import { getUserInfo, updateUserInfo, getProfileFields } from '@/api/User'
+import { getUserInfo, updateUserInfo, getProfileFields, uploadAvatar } from '@/api/User'
 import { previewFile } from '@/api/File'
 import { useAuthStore } from '@/store/modules/auth'
 import { useIndustryStore } from '@/store/modules/industry'
 import { validateChineseName, validateEmail, validatePhone } from '@/utils/validate'
 import { createLogger } from '@/utils/simpleLogger'
 import {
-ATTACHMENT_CATEGORY,
 ATTACHMENT_RELATION,
+ATTACHMENT_CATEGORY,
 IMAGE_FILE_EXTENSIONS,
 validateFileType,
 validateFileSize,
 DEFAULT_AVATAR_MAX_SIZE_MB
 } from '@/constants/attachment'
-import { useFileUpload } from '@/composables/useFileUpload'
 import Cropper from 'cropperjs'
 import 'cropperjs/dist/cropper.css'
 
@@ -503,15 +497,13 @@ try {
   )
 
   saving.value = true
+  // 🔥 修复：只传基本信息，不传头像相关字段（头像通过独立的上传接口更新）
   const payload = {
     realName: formData.realName,
     email: formData.email,
     phone: formData.phone,
     department: formData.department,
-    title: formData.title,
-    avatar: formData.avatar,
-    avatarFileId: formData.avatarFileId,
-    industryCode: industryStore.industryCode
+    title: formData.title
   }
   logger.info('提交个人信息 payload', payload)
   console.table?.(payload)
@@ -538,29 +530,7 @@ fileInputRef.value.click()
 const AVATAR_MAX_SIZE_MB = DEFAULT_AVATAR_MAX_SIZE_MB
 const previewVisible = ref(false)
 const previewObjectUrl = ref('')
-
-const fileUploader = useFileUpload({
-maxSizeMB: AVATAR_MAX_SIZE_MB,
-allowedExtensions: IMAGE_FILE_EXTENSIONS,
-getExtraFormData: () => {
-  const extra = {}
-  const userId = authStore.userInfo?.id || authStore.userInfo?.userId
-  if (userId) {
-    extra.relationType = ATTACHMENT_RELATION.USER
-    extra.relationId = userId
-    const username = authStore.userInfo?.username
-    const realName = authStore.userInfo?.realName || authStore.userInfo?.name
-    const relationName = [username, realName].filter(Boolean).join(' / ')
-    if (relationName) {
-      extra.relationName = relationName
-    }
-  }
-  extra.attachmentType = ATTACHMENT_CATEGORY.IMAGE
-  extra.isPublic = '0'
-  return extra
-}
-})
-const uploading = fileUploader.uploading
+const uploading = ref(false)
 
 const cropperVisible = ref(false)
 const cropperImageSrc = ref('')
@@ -633,24 +603,65 @@ await openCropperDialog(file)
 }
 
 const uploadAvatarFile = async (file) => {
-const result = await fileUploader.uploadWithCheck(file)
-if (!result) {
-  return
-}
-
-const { fileInfo, reused } = result
-const url = fileInfo?.previewUrl || fileInfo?.fileUrl || formData.avatar
-if (!url) {
+try {
+  uploading.value = true
+  const uploadFormData = new FormData()
+  
+  // 🔥 关键修复：字段名必须是 'file'，与后端 FileUploadReq.file 对应
+  uploadFormData.append('file', file)
+  
+  // 添加其他可选字段，与 file/upload 接口保持一致
+  const userId = authStore.userInfo?.id || authStore.userInfo?.userId
+  if (userId) {
+    uploadFormData.append('relationType', ATTACHMENT_RELATION.USER)
+    uploadFormData.append('relationId', userId.toString())
+    const username = authStore.userInfo?.username
+    const realName = authStore.userInfo?.realName || authStore.userInfo?.name
+    const relationName = [username, realName].filter(Boolean).join(' / ')
+    if (relationName) {
+      uploadFormData.append('relationName', relationName)
+    }
+  }
+  uploadFormData.append('attachmentType', ATTACHMENT_CATEGORY.IMAGE)
+  uploadFormData.append('isPublic', '0')
+  
+  const response = await uploadAvatar(uploadFormData)
+  const payload = response?.data?.data || response?.data || response || {}
+  
+  // 处理返回结果，兼容不同的返回格式
+  // 优先使用 previewUrl（上传接口返回的预览URL），其次使用其他字段
+  const url = payload.previewUrl || payload.avatar || payload.avatarUrl || payload.url || payload.fileUrl
+  const fileId = payload.avatarFileId || payload.fileId || payload.attachmentId || payload.id || null
+  
+  if (!url) {
+    throw new Error('上传接口未返回头像URL')
+  }
+  
+  // 🔥 优化：直接使用上传接口返回的 previewUrl 进行渲染，不调用 api/auth/profile
+  // 更新个人信息页面的头像显示
+  formData.avatar = url
+  avatarPreview.value = url
+  formData.avatarFileId = fileId
+  pendingAvatarFile.value = null
+  
+  // 直接更新 authStore 中的用户信息，使 Header 头像立即更新
+  // 等用户退出登录后再次登录或点击个人信息菜单时，会调用 api/auth/profile 获取最新的 avatar
+  if (authStore.userInfo) {
+    authStore.userInfo.avatar = url
+    if (fileId) {
+      authStore.userInfo.avatarFileId = fileId
+    }
+    logger.info('头像上传成功，已更新本地和 Header 头像显示', { url, fileId })
+  }
+  
+  ElMessage.success(t('user.profile.uploadSuccess'))
+} catch (error) {
+  logger.error('upload avatar failed', { error: error.message })
   ElMessage.error(t('user.profile.uploadError'))
-  return
+  throw error
+} finally {
+  uploading.value = false
 }
-
-formData.avatar = url
-avatarPreview.value = url
-formData.avatarFileId = fileInfo.id || fileInfo.fileId || fileInfo.attachmentId || null
-pendingAvatarFile.value = null
-ElMessage.success(reused ? t('user.profile.avatarReused') : t('user.profile.uploadSuccess'))
-ElMessage.info(t('user.profile.avatarRememberSave'))
 }
 
 const handleCropConfirm = async () => {
@@ -744,60 +755,82 @@ resetPreviewUrl()
 const handlePreviewAvatar = async () => {
 if (previewVisible.value) return
 try {
+  // 🔥 关键修复：优先使用 avatar URL，避免使用已删除的文件 ID
+  // 如果 avatar 是完整的 URL（http/https 或 / 开头），直接使用
+  if (formData.avatar && (formData.avatar.startsWith('http://') || formData.avatar.startsWith('https://') || formData.avatar.startsWith('/'))) {
+    avatarPreview.value = formData.avatar
+    previewVisible.value = true
+    return
+  }
+  
+  // 如果有 avatarFileId 且没有有效的 avatar URL，才使用文件预览接口
   if (formData.avatarFileId) {
-    const response = await previewFile(formData.avatarFileId)
-    const raw = response?.data ?? response
-    resetPreviewUrl()
-    let previewUrl = ''
-    if (raw instanceof Blob) {
-      if (raw.size === 0) {
-        throw new Error('empty preview blob')
-      }
-      const contentType = (raw.type || '').toLowerCase()
-      if (contentType.includes('application/json')) {
-        const text = await raw.text()
-        try {
-          const parsed = JSON.parse(text)
-          if (typeof parsed?.data === 'string') {
-            previewUrl = parsed.data
-          } else if (typeof parsed?.url === 'string') {
-            previewUrl = parsed.url
-          } else {
-            throw new Error('preview json missing url')
-          }
-        } catch (parseError) {
-          throw new Error('preview json parse failed')
-        }
-      } else {
-        previewUrl = URL.createObjectURL(raw)
-        previewObjectUrl.value = previewUrl
-      }
-    } else if (typeof raw === 'string') {
-      previewUrl = raw
-    } else if (raw?.data) {
-      if (raw.data instanceof Blob) {
-        if (raw.data.size === 0) {
+    try {
+      const response = await previewFile(formData.avatarFileId)
+      const raw = response?.data ?? response
+      resetPreviewUrl()
+      let previewUrl = ''
+      if (raw instanceof Blob) {
+        if (raw.size === 0) {
           throw new Error('empty preview blob')
         }
-        previewUrl = URL.createObjectURL(raw.data)
-        previewObjectUrl.value = previewUrl
-      } else if (typeof raw.data === 'string') {
-        previewUrl = raw.data
+        const contentType = (raw.type || '').toLowerCase()
+        if (contentType.includes('application/json')) {
+          const text = await raw.text()
+          try {
+            const parsed = JSON.parse(text)
+            if (typeof parsed?.data === 'string') {
+              previewUrl = parsed.data
+            } else if (typeof parsed?.url === 'string') {
+              previewUrl = parsed.url
+            } else {
+              throw new Error('preview json missing url')
+            }
+          } catch (parseError) {
+            throw new Error('preview json parse failed')
+          }
+        } else {
+          previewUrl = URL.createObjectURL(raw)
+          previewObjectUrl.value = previewUrl
+        }
+      } else if (typeof raw === 'string') {
+        previewUrl = raw
+      } else if (raw?.data) {
+        if (raw.data instanceof Blob) {
+          if (raw.data.size === 0) {
+            throw new Error('empty preview blob')
+          }
+          previewUrl = URL.createObjectURL(raw.data)
+          previewObjectUrl.value = previewUrl
+        } else if (typeof raw.data === 'string') {
+          previewUrl = raw.data
+        }
       }
+      if (previewUrl) {
+        avatarPreview.value = previewUrl
+        previewVisible.value = true
+        return
+      }
+    } catch (fileError) {
+      logger.warn('文件预览失败，尝试使用 avatar URL', { error: fileError.message, fileId: formData.avatarFileId })
+      // 如果文件预览失败，继续尝试使用 avatar URL
     }
-    if (!previewUrl) {
-      throw new Error('preview url not resolved')
-    }
-    avatarPreview.value = previewUrl
-  } else if (formData.avatar) {
-    avatarPreview.value = formData.avatar
-  } else {
-    avatarPreview.value = defaultAvatar.value
   }
+  
+  // 最后尝试使用 avatar 字段（可能是相对路径）
+  if (formData.avatar) {
+    avatarPreview.value = formData.avatar
+    previewVisible.value = true
+    return
+  }
+  
+  // 都没有则使用默认头像
+  avatarPreview.value = defaultAvatar.value
   previewVisible.value = true
 } catch (error) {
   logger.error('avatar preview failed', { error: error.message })
   ElMessage.error(t('user.profile.previewError'))
+  // 出错时尝试使用 avatar URL 或默认头像
   avatarPreview.value = formData.avatar || defaultAvatar.value
   previewVisible.value = true
 }
@@ -916,6 +949,60 @@ flex-direction: column;
 align-items: center;
 gap: 16px;
 padding: 16px 0;
+
+// 选择图片按钮悬浮效果 - 文字和图标变白色
+:deep(.base-button.el-button--primary) {
+  transition: all 0.2s ease;
+  cursor: pointer;
+  
+  &:hover:not(:disabled):not(.is-loading) {
+    background-color: var(--color-primary-dark) !important;
+    border-color: var(--color-primary-dark) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3) !important;
+    
+    // 悬浮时文字和图标变白色
+    color: #ffffff !important;
+    
+    .el-icon,
+    svg {
+      color: #ffffff !important;
+      fill: #ffffff !important;
+    }
+    
+    span {
+      color: #ffffff !important;
+    }
+  }
+  
+  &:active:not(:disabled):not(.is-loading) {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3) !important;
+  }
+}
+
+// 暗色主题下的悬浮效果
+[data-theme='dark'] &,
+.dark & {
+  :deep(.base-button.el-button--primary:hover:not(:disabled):not(.is-loading)) {
+    background-color: var(--color-primary-light) !important;
+    border-color: var(--color-primary-light) !important;
+    box-shadow: 0 4px 12px rgba(96, 165, 250, 0.3) !important;
+    
+    // 暗色主题下悬浮时文字和图标也变白色
+    color: #ffffff !important;
+    
+    .el-icon,
+    svg {
+      color: #ffffff !important;
+      fill: #ffffff !important;
+    }
+    
+    span {
+      color: #ffffff !important;
+    }
+  }
+}
 }
 
 .avatar-preview {
@@ -953,9 +1040,16 @@ align-items: center;
 justify-content: center;
 gap: 6px;
 background: rgba(30, 64, 175, 0.65);
-color: #fff;
+color: #ffffff;
 opacity: 0;
 transition: opacity 0.3s ease;
+font-weight: 500;
+text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+
+span {
+  color: #ffffff;
+  font-weight: 500;
+}
 }
 
 .avatar-tip {

@@ -315,7 +315,7 @@ const normalizeLogItem = (item, index) => {
     executionTime: item.executionTime !== undefined && item.executionTime !== null ? item.executionTime : '',
     detail: item.detail || item.detailInfo || item.description || '',
     errorMessage: item.errorMessage || '',
-    timestamp: formatDate(item.timestamp || item.operateTime || item.createdTime || item.createTime, 'YYYY-MM-DD HH:mm:ss'),
+    timestamp: formatDate(item.timestamp || item.operationTime || item.operateTime || item.createdTime || item.createTime, 'YYYY-MM-DD HH:mm:ss'),
     userAgent: item.userAgent || '',
     requestParams: stringify(item.requestParams || item.requestBody),
     response: stringify(item.response || item.responseResult || item.responseBody),

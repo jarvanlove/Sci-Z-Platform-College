@@ -97,3 +97,47 @@ export const submitDeclaration = (id) => {
     method: HTTP_METHODS.POST
   })
 }
+
+/**
+ * 更新申报状态
+ * @param {Object} params - 更新参数
+ * @param {number} params.id - 申报ID
+ * @param {string} params.status - 新状态 (submitting/success/failed)
+ * @returns {Promise} 更新状态响应
+ */
+export const updateDeclarationStatus = (params) => {
+  return request({
+    url: DECLARATION_API.UPDATE(params.id),
+    method: HTTP_METHODS.PUT,
+    data: { status: params.status }
+  })
+}
+
+/**
+ * 下载申报文档
+ * @param {Object} params - 下载参数
+ * @param {number} params.id - 申报ID
+ * @param {string} params.format - 下载格式 (pdf/word/markdown)
+ * @returns {Promise} 下载响应（Blob）
+ */
+export const downloadDeclaration = (params) => {
+  return request({
+    url: `${DECLARATION_API.DETAIL(params.id)}/download`,
+    method: HTTP_METHODS.GET,
+    params: { format: params.format },
+    responseType: 'blob'
+  })
+}
+
+/**
+ * 获取申报预览内容
+ * @param {Object} params - 预览参数
+ * @param {number} params.id - 申报ID
+ * @returns {Promise} 预览内容响应
+ */
+export const getDeclarationPreview = (params) => {
+  return request({
+    url: `${DECLARATION_API.DETAIL(params.id)}/preview`,
+    method: HTTP_METHODS.GET
+  })
+}
