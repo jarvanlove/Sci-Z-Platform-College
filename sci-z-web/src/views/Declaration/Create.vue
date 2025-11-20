@@ -1,23 +1,13 @@
 <!--
 /**
  * @description 新建申报页面
- * 创建新的科研项目申报
+ * 展示所有申报项目，支持搜索、筛选、分页等功能
  */
 -->
 <template>
-  <div class="declaration-create-page">
-    <h1>新建申报页面33333333333</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <DeclarationCreate />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import { DeclarationCreate } from '@/components/Business/Declaration'
 </script>
-
-<style lang="scss" scoped>
-.declaration-create-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
-</style>

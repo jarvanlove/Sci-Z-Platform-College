@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.sciz.server.domain.pojo.entity.BaseEntity;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -63,19 +64,19 @@ public class Declaration extends BaseEntity {
      * 红头文件发布时间
      */
     @TableField("document_publish_time")
-    private java.time.LocalDate documentPublishTime;
+    private LocalDate documentPublishTime;
 
     /**
      * 项目开始时间
      */
     @TableField("project_start_time")
-    private java.time.LocalDate projectStartTime;
+    private LocalDate projectStartTime;
 
     /**
      * 项目结束时间
      */
     @TableField("project_end_time")
-    private java.time.LocalDate projectEndTime;
+    private LocalDate projectEndTime;
 
     /**
      * 研究方向(富文本)

@@ -60,16 +60,19 @@
         :sortable="column.sortable"
         :align="column.align || 'left'"
         :show-overflow-tooltip="column.showOverflowTooltip !== false"
+        :class-name="getColumnClassName(column)"
       >
         <template #default="{ row, $index }">
-          <slot
-            :name="column.prop"
-            :row="row"
-            :index="$index"
-            :column="column"
-          >
-            {{ getColumnValue(row, column) }}
-          </slot>
+          <div :class="getColumnCellClass(column)">
+            <slot
+              :name="column.prop"
+              :row="row"
+              :index="$index"
+              :column="column"
+            >
+              {{ getColumnValue(row, column) }}
+            </slot>
+          </div>
         </template>
       </el-table-column>
 
@@ -229,6 +232,37 @@ const getColumnValue = (row, column) => {
     value = value?.[key]
   }
   return value ?? ''
+}
+
+// 获取列的类名，用于控制换行行为（Element Plus 表格列支持 class-name）
+const getColumnClassName = (column) => {
+  // 如果列配置了 wrap: true，则添加允许换行的类
+  if (column.wrap === true) {
+    return 'base-table__column-wrap'
+  }
+  // 如果列配置了 noWrap: true，则添加不换行的类
+  if (column.noWrap === true) {
+    return 'base-table__column-nowrap'
+  }
+  // 如果列配置了 showOverflowTooltip: false，默认允许换行
+  if (column.showOverflowTooltip === false && column.wrap !== false) {
+    return 'base-table__column-wrap'
+  }
+  return ''
+}
+
+// 获取单元格内容的类名，用于更精确的控制
+const getColumnCellClass = (column) => {
+  const classes = []
+  // 如果列配置了 wrap: true，则添加允许换行的类
+  if (column.wrap === true || (column.showOverflowTooltip === false && column.wrap !== false)) {
+    classes.push('base-table__cell-wrap')
+  }
+  // 如果列配置了 noWrap: true，则添加不换行的类
+  if (column.noWrap === true || (column.showOverflowTooltip !== false && column.wrap === false)) {
+    classes.push('base-table__cell-nowrap')
+  }
+  return classes.join(' ')
 }
 
 // 事件处理
@@ -569,9 +603,59 @@ defineExpose({
     font-size: 14px;
     letter-spacing: 0.01em;
     border-bottom: 1px solid var(--border) !important;
+    border-right: none !important; // 🔥 移除右侧边框，避免白色线条
     padding: 14px 16px !important;
     // 确保表头列宽与表体一致
     box-sizing: border-box;
+    // 🔥 确保表头内容自适应居中显示，即使其他列内容过多
+    vertical-align: middle; // 垂直居中
+    position: relative; // 确保定位上下文
+    
+    .cell {
+      // 🔥 确保单元格内容根据列的 align 属性正确对齐，不受其他列影响
+      padding: 0 !important;
+      line-height: 1.5;
+      white-space: nowrap; // 表头默认不换行
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block; // 使用 block 确保对齐生效
+      width: 100%;
+    }
+    
+    // 🔥 根据列的 align 属性强制设置表头对齐（优先级最高）
+    // Element Plus 会自动添加这些类名，我们确保样式生效
+    &.is-center {
+      text-align: center !important;
+      
+      .cell {
+        text-align: center !important;
+      }
+    }
+    
+    &.is-right {
+      text-align: right !important;
+      
+      .cell {
+        text-align: right !important;
+      }
+    }
+    
+    &.is-left {
+      text-align: left !important;
+      
+      .cell {
+        text-align: left !important;
+      }
+    }
+    
+    // 🔥 如果没有明确的对齐类，默认左对齐（Element Plus 默认行为）
+    &:not(.is-center):not(.is-right) {
+      text-align: left;
+      
+      .cell {
+        text-align: left;
+      }
+    }
   }
 
   .el-table__body {
@@ -579,8 +663,10 @@ defineExpose({
       background-color: var(--surface) !important;
       color: var(--text) !important;
 
+      // 🔥 修复暗色主题下悬浮行背景色问题
       &:hover > td {
         background-color: var(--hover) !important;
+        color: var(--text) !important; // 确保文字颜色正确
       }
 
       &.el-table__row--striped {
@@ -590,19 +676,73 @@ defineExpose({
         td {
           overflow: visible !important;
           position: relative !important;
+          background-color: var(--hover-light) !important; // 确保 stripe 行背景色正确
+        }
+        
+        // 🔥 修复暗色主题下 stripe 行悬浮时的背景色
+        &:hover > td {
+          background-color: var(--hover) !important;
         }
       }
     }
 
     td {
       border-bottom: 1px solid var(--border) !important;
+      border-right: none !important; // 🔥 移除右侧边框，避免白色线条
       color: var(--text) !important;
       padding: 12px 16px !important;
       position: relative;
+      // 🔥 默认不换行，保持向后兼容
       white-space: nowrap;
       // 确保表体列宽与表头一致
       box-sizing: border-box;
       // 不设置 overflow，让父容器的滚动来控制隐藏
+      vertical-align: top; // 顶部对齐，换行时更美观
+      
+      .cell {
+        padding: 0 !important;
+        line-height: 1.6;
+        // 默认不换行
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      
+      // 🔥 支持换行的列：通过类名控制（两种方式：列级别和单元格级别）
+      &.base-table__column-wrap {
+        white-space: normal;
+        
+        .cell {
+          white-space: normal;
+          word-break: break-word; // 长单词自动换行
+          overflow: visible;
+        }
+      }
+      
+      // 🔥 单元格级别的换行控制（更精确）
+      .base-table__cell-wrap {
+        white-space: normal;
+        word-break: break-word;
+        overflow: visible;
+      }
+      
+      // 🔥 明确不换行的列
+      &.base-table__column-nowrap {
+        white-space: nowrap;
+        
+        .cell {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+      
+      // 🔥 单元格级别的不换行控制
+      .base-table__cell-nowrap {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
     }
   }
 
@@ -644,9 +784,27 @@ defineExpose({
     background-color: var(--surface) !important;
   }
 
+  // 🔥 修复表格外边框颜色，避免白色线条
   &::before,
   &::after {
     background-color: var(--border) !important;
+  }
+  
+  // 🔥 确保表格内部所有边框都使用主题色
+  .el-table__inner-wrapper::before {
+    background-color: var(--border) !important;
+  }
+  
+  // 🔥 修复表格单元格之间的边框颜色
+  .el-table__header th,
+  .el-table__body td {
+    border-right: none !important; // 移除右侧边框，统一使用底部边框
+  }
+  
+  // 🔥 修复表格最右侧边框（如果有）
+  .el-table__border-column-patch {
+    background-color: var(--border) !important;
+    border-color: var(--border) !important;
   }
 }
 </style>

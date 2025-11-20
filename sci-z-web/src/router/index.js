@@ -63,7 +63,8 @@ const routes = [
         meta: { 
           title: '新建申报', 
           requiresAuth: true,
-          permission: 'menu:declaration:create',
+          // 🔥 详情页和创建页不是独立菜单，继承列表页权限
+          permission: 'menu:declaration:list',
           layout: 'main'
         }
       },
@@ -74,7 +75,8 @@ const routes = [
         meta: { 
           title: '申报详情', 
           requiresAuth: true,
-          permission: 'menu:declaration:detail',
+          // 🔥 详情页和创建页不是独立菜单，继承列表页权限
+          permission: 'menu:declaration:list',
           layout: 'main'
         }
       }
@@ -357,13 +359,16 @@ router.beforeEach(async (to, from, next) => {
         }
       }
     
-    // 检查页面权限
+    // 检查页面权限 - 完全依赖后端返回的权限列表，不进行任何硬编码
     if (to.meta.permission) {
+      // 🔥 关键修复：权限检查完全依赖后端返回的权限列表，不进行任何硬编码
       let hasPermission = authStore.hasPermission(to.meta.permission)
       
+      // 如果本地权限检查失败，尝试调用服务端校验接口
       if (!hasPermission) {
         routerLogger.info('本地权限校验失败，尝试调用服务端校验接口', {
-          requiredPermission: to.meta.permission
+          requiredPermission: to.meta.permission,
+          userPermissions: authStore.permissions
         })
         try {
           hasPermission = await authStore.validatePermission(to.meta.permission)
@@ -383,6 +388,7 @@ router.beforeEach(async (to, from, next) => {
         routerLogger.warn('权限检查失败', { 
           requiredPermission: to.meta.permission, 
           userPermissions: authStore.permissions,
+          userRoles: authStore.roles,
           targetPath: to.path
         })
         ElMessage.error('没有权限访问该页面')

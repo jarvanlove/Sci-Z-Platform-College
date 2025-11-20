@@ -7,7 +7,7 @@
 export { default as DeclarationList } from './DeclarationList.vue'
 
 // 申报表单组件
-//export { default as DeclarationCreate } from './DeclarationCreate.vue'
+export { default as DeclarationCreate } from './DeclarationCreate.vue'
 
 // 申报详情组件
 //export { default as DeclarationDetail } from './DeclarationDetail.vue'

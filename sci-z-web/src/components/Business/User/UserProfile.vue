@@ -259,6 +259,7 @@ import { useAuthStore } from '@/store/modules/auth'
 import { useIndustryStore } from '@/store/modules/industry'
 import { validateChineseName, validateEmail, validatePhone } from '@/utils/validate'
 import { createLogger } from '@/utils/simpleLogger'
+import { setUserInfo } from '@/utils/auth'
 import {
 ATTACHMENT_RELATION,
 ATTACHMENT_CATEGORY,
@@ -637,21 +638,31 @@ try {
     throw new Error('上传接口未返回头像URL')
   }
   
-  // 🔥 优化：直接使用上传接口返回的 previewUrl 进行渲染，不调用 api/auth/profile
+  // 🔥 关键修复：上传成功后立即从服务器获取最新用户信息，确保 Header 显示最新头像
   // 更新个人信息页面的头像显示
   formData.avatar = url
   avatarPreview.value = url
   formData.avatarFileId = fileId
   pendingAvatarFile.value = null
   
-  // 直接更新 authStore 中的用户信息，使 Header 头像立即更新
-  // 等用户退出登录后再次登录或点击个人信息菜单时，会调用 api/auth/profile 获取最新的 avatar
-  if (authStore.userInfo) {
-    authStore.userInfo.avatar = url
-    if (fileId) {
-      authStore.userInfo.avatarFileId = fileId
+  // 立即从服务器获取最新用户信息，确保 Header 和所有组件都能获取到最新的头像
+  try {
+    await authStore.getUserInfo(true)
+    logger.info('头像上传成功，已从服务器获取最新用户信息', { 
+      avatar: authStore.userInfo?.avatar,
+      avatarFileId: authStore.userInfo?.avatarFileId 
+    })
+  } catch (getUserInfoError) {
+    // 如果获取失败，至少更新本地 store，确保当前页面显示正确
+    logger.warn('获取最新用户信息失败，使用上传接口返回的数据', { error: getUserInfoError.message })
+    if (authStore.userInfo) {
+      authStore.userInfo.avatar = url
+      if (fileId) {
+        authStore.userInfo.avatarFileId = fileId
+      }
+      // 保存到 localStorage，确保刷新后也能显示
+      setUserInfo(authStore.userInfo)
     }
-    logger.info('头像上传成功，已更新本地和 Header 头像显示', { url, fileId })
   }
   
   ElMessage.success(t('user.profile.uploadSuccess'))

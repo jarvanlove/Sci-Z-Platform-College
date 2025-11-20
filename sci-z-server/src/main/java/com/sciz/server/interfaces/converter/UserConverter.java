@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Optional;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
+import org.mapstruct.ReportingPolicy;
 
 /**
  * 用户模块转换器
@@ -22,7 +24,7 @@ import org.mapstruct.Mapping;
  * @className UserConverter
  * @date 2025-11-09 03:05
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface UserConverter {
 
     /**
@@ -31,6 +33,7 @@ public interface UserConverter {
      * @param roleIds List<Long> 角色ID列表
      * @return UserRoleIdsResp 响应
      */
+    @Named("toUserRoleIdsResp")
     default UserRoleIdsResp toUserRoleIdsResp(List<Long> roleIds) {
         return new UserRoleIdsResp(Optional.ofNullable(roleIds).map(List::copyOf).orElseGet(List::of));
     }
@@ -41,6 +44,7 @@ public interface UserConverter {
      * @param permissionIds List<Long> 权限ID列表
      * @return RolePermissionIdsResp 响应
      */
+    @Named("toRolePermissionIdsResp")
     default RolePermissionIdsResp toRolePermissionIdsResp(List<Long> permissionIds) {
         return new RolePermissionIdsResp(
                 Optional.ofNullable(permissionIds).map(List::copyOf).orElseGet(List::of));
@@ -52,6 +56,7 @@ public interface UserConverter {
      * @param userIds List<Long> 用户ID列表
      * @return RoleUserIdsResp 响应
      */
+    @Named("toRoleUserIdsResp")
     default RoleUserIdsResp toRoleUserIdsResp(List<Long> userIds) {
         return new RoleUserIdsResp(
                 Optional.ofNullable(userIds).map(List::copyOf).orElseGet(List::of));

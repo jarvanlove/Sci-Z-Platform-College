@@ -240,7 +240,7 @@ const tableColumns = computed(() => [
   {
     prop: 'level',
     label: t('system.logs.level'),
-    width: 110,
+    minWidth: 110,
     align: 'center'
   },
   {
@@ -251,17 +251,19 @@ const tableColumns = computed(() => [
   {
     prop: 'operation',
     label: t('system.logs.operation'),
-    minWidth: 220
+    minWidth: 200,
+    wrap: true // 🔥 允许换行，充分利用空间
   },
   {
     prop: 'ip',
     label: t('system.logs.ipAddress'),
-    width: 140
+    minWidth: 140
   },
   {
     prop: 'detail',
     label: t('system.logs.detail'),
-    minWidth: 260
+    minWidth: 200,
+    wrap: true // 🔥 允许换行，充分利用空间
   }
 ])
 

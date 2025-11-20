@@ -228,26 +228,25 @@ const tableColumns = computed(() => [
   {
     prop: 'loginIp',
     label: t('user.security.loginIP'),
-    minWidth: 140,
-    showOverflowTooltip: true
+    minWidth: 140
   },
   {
     prop: 'loginLocation',
     label: t('user.security.loginLocation'),
     minWidth: 160,
-    showOverflowTooltip: true
+    wrap: true // 🔥 允许换行，充分利用空间
   },
   {
     prop: 'browser',
     label: t('user.security.browser'),
     minWidth: 150,
-    showOverflowTooltip: true
+    wrap: true // 🔥 允许换行，充分利用空间
   },
   {
     prop: 'os',
     label: t('user.security.operatingSystem'),
     minWidth: 140,
-    showOverflowTooltip: true
+    wrap: true // 🔥 允许换行，充分利用空间
   },
   {
     prop: 'status',

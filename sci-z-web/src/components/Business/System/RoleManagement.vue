@@ -393,38 +393,43 @@ const roleList = ref([])
 
 // 表格列配置
 const tableColumns = computed(() => [
-  { prop: 'roleName', label: t('system.role.roleName'), width: 150 },
-  { prop: 'description', label: t('system.role.roleDescription'), minWidth: 150, showOverflowTooltip: true },
-  { prop: 'userCount', label: t('system.role.userCount'), width: 120, align: 'center' },
-  { prop: 'createdTime', label: t('common.createTime'), width: 180 }
+  { prop: 'roleName', label: t('system.role.roleName'), minWidth: 150 },
+  { 
+    prop: 'description', 
+    label: t('system.role.roleDescription'), 
+    minWidth: 200, 
+    wrap: true // 🔥 允许换行，充分利用空间
+  },
+  { prop: 'userCount', label: t('system.role.userCount'), minWidth: 120, align: 'center' },
+  { prop: 'createdTime', label: t('common.createTime'), minWidth: 180 }
 ])
 
 // 用户表格列配置
 const userTableColumns = computed(() => [
-  { prop: 'username', label: t('system.user.username'), width: 150 },
-  { prop: 'realName', label: t('system.user.realName'), width: 120 },
-  { prop: 'email', label: t('system.user.email'), minWidth: 200 },
-  { prop: 'phone', label: t('system.user.phone'), width: 150 },
-  { prop: 'status', label: t('common.status'), width: 100, align: 'center' }
+  { prop: 'username', label: t('system.user.username'), minWidth: 150 },
+  { prop: 'realName', label: t('system.user.realName'), minWidth: 120 },
+  { prop: 'email', label: t('system.user.email'), minWidth: 200, wrap: true },
+  { prop: 'phone', label: t('system.user.phone'), minWidth: 150 },
+  { prop: 'status', label: t('common.status'), minWidth: 100, align: 'center' }
 ])
 
 // 可选用户表格列配置 - 所有列居中对齐
 const availableUserTableColumns = computed(() => [
-  { prop: 'username', label: t('system.user.username'), width: 150, align: 'center' },
-  { prop: 'realName', label: t('system.user.realName'), width: 120, align: 'center' },
-  { prop: 'email', label: t('system.user.email'), minWidth: 200, align: 'center' },
-  { prop: 'phone', label: t('system.user.phone'), width: 150, align: 'center' },
-  { prop: 'status', label: t('common.status'), width: 100, align: 'center' }
+  { prop: 'username', label: t('system.user.username'), minWidth: 150, align: 'center' },
+  { prop: 'realName', label: t('system.user.realName'), minWidth: 120, align: 'center' },
+  { prop: 'email', label: t('system.user.email'), minWidth: 200, align: 'center', wrap: true },
+  { prop: 'phone', label: t('system.user.phone'), minWidth: 150, align: 'center' },
+  { prop: 'status', label: t('common.status'), minWidth: 100, align: 'center' }
 ])
 
 // 角色用户表格列配置
 const roleUserTableColumns = computed(() => [
-  { prop: 'username', label: t('system.user.username'), width: 150 },
-  { prop: 'realName', label: t('system.user.realName'), width: 120 },
-  { prop: 'email', label: t('system.user.email'), minWidth: 200 },
-  { prop: 'phone', label: t('system.user.phone'), width: 150 },
-  { prop: 'departmentName', label: t('system.user.department'), width: 150 },
-  { prop: 'status', label: t('common.status'), width: 100, align: 'center' }
+  { prop: 'username', label: t('system.user.username'), minWidth: 150 },
+  { prop: 'realName', label: t('system.user.realName'), minWidth: 120 },
+  { prop: 'email', label: t('system.user.email'), minWidth: 200, wrap: true },
+  { prop: 'phone', label: t('system.user.phone'), minWidth: 150 },
+  { prop: 'departmentName', label: t('system.user.department'), minWidth: 150, wrap: true },
+  { prop: 'status', label: t('common.status'), minWidth: 100, align: 'center' }
 ])
 
 // 状态相关方法

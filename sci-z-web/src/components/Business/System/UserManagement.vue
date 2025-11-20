@@ -462,9 +462,15 @@ const getSelectedDepartmentName = () => {
 
 // 可选角色表格列配置
 const availableRoleTableColumns = computed(() => [
-  { prop: 'roleName', label: t('system.role.roleName'), width: 150, align: 'center' },
-  { prop: 'description', label: t('system.role.roleDescription'), minWidth: 200, align: 'center', showOverflowTooltip: true },
-  { prop: 'status', label: t('common.status'), width: 100, align: 'center' }
+  { prop: 'roleName', label: t('system.role.roleName'), minWidth: 150, align: 'center' },
+  { 
+    prop: 'description', 
+    label: t('system.role.roleDescription'), 
+    minWidth: 200, 
+    align: 'center', 
+    wrap: true // 🔥 允许换行，充分利用空间
+  },
+  { prop: 'status', label: t('common.status'), minWidth: 100, align: 'center' }
 ])
 
 // 表格列配置
@@ -472,50 +478,44 @@ const tableColumns = computed(() => [
   {
     prop: 'username',
     label: t('system.user.username'),
-    width: 120,
-    showOverflowTooltip: true
+    minWidth: 100
   },
   {
     prop: 'realName',
     label: t('system.user.realName'),
-    width: 150,
-    showOverflowTooltip: true
+    minWidth: 110
   },
   {
     prop: 'employeeId',
     label: industryStore.employeeIdLabel || t('system.user.employeeId'),
-    width: 240,
-    showOverflowTooltip: true
+    minWidth: 230
   },
   {
     prop: 'email',
     label: t('system.user.email'),
-    width: 200,
-    showOverflowTooltip: true
+    minWidth: 200
   },
   {
     prop: 'departmentName',
     label: t(industryStore.departmentLabelKey || 'system.user.department'),
-    width: 140,
-    showOverflowTooltip: true
+    minWidth: 140
   },
   {
     prop: 'role',
     label: industryStore.roleLabel || t('system.user.role'),
-    width: 200,
+    minWidth: 200,
     align: 'center'
   },
   {
     prop: 'status',
     label: t('common.status'),
-    width: 100,
+    minWidth: 100,
     align: 'center'
   },
   {
     prop: 'createTime',
     label: t('common.createTime'),
-    width: 200,
-    showOverflowTooltip: true
+    minWidth: 180
   }
 ])
 

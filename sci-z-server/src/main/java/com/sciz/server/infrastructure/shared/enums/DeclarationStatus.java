@@ -13,44 +13,19 @@ import lombok.Getter;
 public enum DeclarationStatus {
 
     /**
-     * 草稿
+     * 申报中
      */
-    DRAFT(0, "草稿"),
+    IN_PROGRESS(1, "申报中"),
 
     /**
-     * 待提交
+     * 申报成功
      */
-    PENDING_SUBMIT(1, "待提交"),
+    SUCCESS(2, "申报成功"),
 
     /**
-     * 已提交
+     * 申报失败
      */
-    SUBMITTED(2, "已提交"),
-
-    /**
-     * 待审批
-     */
-    PENDING_APPROVAL(3, "待审批"),
-
-    /**
-     * 审批中
-     */
-    APPROVING(4, "审批中"),
-
-    /**
-     * 已通过
-     */
-    APPROVED(5, "已通过"),
-
-    /**
-     * 已驳回
-     */
-    REJECTED(6, "已驳回"),
-
-    /**
-     * 已撤回
-     */
-    WITHDRAWN(7, "已撤回");
+    FAILED(3, "申报失败");
 
     private final Integer code;
     private final String description;
@@ -76,74 +51,29 @@ public enum DeclarationStatus {
     }
 
     /**
-     * 判断是否为草稿状态
+     * 判断是否为申报中状态
      *
-     * @return 是否为草稿状态
+     * @return 是否为申报中状态
      */
-    public boolean isDraft() {
-        return this == DRAFT;
+    public boolean isInProgress() {
+        return this == IN_PROGRESS;
     }
 
     /**
-     * 判断是否为待提交状态
+     * 判断是否为申报成功状态
      *
-     * @return 是否为待提交状态
+     * @return 是否为申报成功状态
      */
-    public boolean isPendingSubmit() {
-        return this == PENDING_SUBMIT;
+    public boolean isSuccess() {
+        return this == SUCCESS;
     }
 
     /**
-     * 判断是否为已提交状态
+     * 判断是否为申报失败状态
      *
-     * @return 是否为已提交状态
+     * @return 是否为申报失败状态
      */
-    public boolean isSubmitted() {
-        return this == SUBMITTED;
-    }
-
-    /**
-     * 判断是否为待审批状态
-     *
-     * @return 是否为待审批状态
-     */
-    public boolean isPendingApproval() {
-        return this == PENDING_APPROVAL;
-    }
-
-    /**
-     * 判断是否为审批中状态
-     *
-     * @return 是否为审批中状态
-     */
-    public boolean isApproving() {
-        return this == APPROVING;
-    }
-
-    /**
-     * 判断是否为已通过状态
-     *
-     * @return 是否为已通过状态
-     */
-    public boolean isApproved() {
-        return this == APPROVED;
-    }
-
-    /**
-     * 判断是否为已驳回状态
-     *
-     * @return 是否为已驳回状态
-     */
-    public boolean isRejected() {
-        return this == REJECTED;
-    }
-
-    /**
-     * 判断是否为已撤回状态
-     *
-     * @return 是否为已撤回状态
-     */
-    public boolean isWithdrawn() {
-        return this == WITHDRAWN;
+    public boolean isFailed() {
+        return this == FAILED;
     }
 }

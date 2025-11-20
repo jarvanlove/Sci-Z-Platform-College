@@ -27,7 +27,7 @@
         
         <el-select
           v-model="searchForm.status"
-          :placeholder="$t('declaration.statusPlaceholder')"
+          :placeholder="$t('declaration.declarationStatusPlaceholder') || '请选择申报状态'"
           clearable
           style="width: 150px"
         >
@@ -63,66 +63,78 @@
         action-fixed="right"
         :empty-text="$t('declaration.noData')"
         stripe
+        class="declaration-table"
         @row-click="handleRowClick"
         @current-change="handleCurrentChange"
         @size-change="handleSizeChange"
       >
         <!-- 研究方向列自定义 -->
         <template #direction="{ row }">
-          <span class="direction-cell">{{ row.direction }}</span>
+          <div class="direction-cell base-table__cell-wrap">{{ row.direction }}</div>
         </template>
 
         <!-- 研究领域列自定义 -->
         <template #fields="{ row }">
-          <div class="fields-cell">
-            <el-tag
+          <div class="fields-cell base-table__cell-wrap">
+            <span
               v-for="field in row.fields"
               :key="field"
-              size="small"
               class="field-tag"
             >
               {{ field }}
-            </el-tag>
+            </span>
           </div>
         </template>
 
         <!-- 研究主题列自定义 -->
         <template #topic="{ row }">
-          <span class="topic-cell">{{ row.topic || $t('declaration.noTopic') }}</span>
+          <div class="topic-cell base-table__cell-wrap">{{ row.topic || $t('declaration.noTopic') }}</div>
         </template>
 
-        <!-- 状态列自定义 -->
-        <template #status="{ row }">
-          <el-dropdown
-            @command="(command) => handleStatusEdit(row.id, command)"
-            trigger="click"
-            class="status-dropdown"
-          >
-            <span
-              class="status-tag status-clickable"
-              :class="`status-${row.statusType}`"
+        <!-- 申报状态列自定义 -->
+        <template #declarationStatus="{ row }">
+          <div @click.stop.prevent>
+            <el-dropdown
+              @command="(command) => handleStatusEdit(row.id, command)"
+              trigger="click"
+              class="status-dropdown"
             >
-              {{ row.status }}
-              <el-icon class="status-arrow"><ArrowDown /></el-icon>
-            </span>
-            <template #dropdown>
-              <el-dropdown-menu class="status-dropdown-menu">
-                <el-dropdown-item
-                  v-for="option in editableStatusOptions"
-                  :key="option.value"
-                  :command="option.value"
-                  :disabled="option.value === row.statusType"
-                >
-                  <span
-                    class="status-tag"
-                    :class="`status-${option.value}`"
+              <span
+                class="status-tag status-clickable"
+                :class="`status-${row.statusType}`"
+                @click.stop.prevent
+              >
+                {{ row.status }}
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu class="status-dropdown-menu">
+                  <el-dropdown-item
+                    v-for="option in editableStatusOptions"
+                    :key="option.value"
+                    :command="option.value"
+                    :disabled="option.value === row.statusType"
                   >
-                    {{ option.label }}
-                  </span>
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+                    <span
+                      class="status-tag"
+                      :class="`status-${option.value}`"
+                    >
+                      {{ option.label }}
+                    </span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </template>
+
+        <!-- 工作流状态列自定义 -->
+        <template #workflowStatus="{ row }">
+          <span
+            class="workflow-status-tag"
+            :class="`workflow-status-${row.workflowStatus}`"
+          >
+            {{ getWorkflowStatusLabel(row.workflowStatus) }}
+          </span>
         </template>
 
         <!-- 操作列 -->
@@ -134,45 +146,42 @@
             >
               {{ $t('common.view') }}
             </button>
-            <el-dropdown
-              v-if="row.statusType === 'success'"
-              @command="handleDownload"
-              trigger="click"
-            >
-              <span class="action-btn btn-success" style="cursor: pointer;">
-                {{ $t('declaration.download') }}
-                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item
-                    :command="{id: row.id, format: 'pdf'}"
-                  >
-                    <el-icon><Document /></el-icon>
-                    PDF格式
-                  </el-dropdown-item>
-                  <el-dropdown-item
-                    :command="{id: row.id, format: 'word'}"
-                  >
-                    <el-icon><Document /></el-icon>
-                    Word格式
-                  </el-dropdown-item>
-                  <el-dropdown-item
-                    :command="{id: row.id, format: 'markdown'}"
-                  >
-                    <el-icon><Document /></el-icon>
-                    Markdown格式
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-            <button
-              v-if="row.statusType === 'success'"
-              class="action-btn btn-info"
-              @click.stop="handlePreview(row.id)"
-            >
-              {{ $t('declaration.preview') }}
-            </button>
+            <div v-if="row.statusType === 'success'" class="action-row" @click.stop.prevent>
+              <el-dropdown
+                @command="handleDownload"
+                trigger="click"
+              >
+                <span 
+                  class="action-btn btn-success" 
+                  style="cursor: pointer;"
+                  @click.stop.prevent
+                >
+                  {{ $t('declaration.download') }}
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item
+                      :command="{id: row.id, format: 'word'}"
+                    >
+                      <el-icon><Edit /></el-icon>
+                      Word格式
+                    </el-dropdown-item>
+                    <el-dropdown-item
+                      :command="{id: row.id, format: 'pdf'}"
+                    >
+                      <el-icon><Document /></el-icon>
+                      PDF格式
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              <button
+                class="action-btn btn-info"
+                @click.stop="handlePreview(row.id)"
+              >
+                {{ $t('declaration.preview') }}
+              </button>
+            </div>
           </div>
         </template>
       </BaseTable>
@@ -185,7 +194,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Refresh, ArrowDown, Document } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Document, Edit } from '@element-plus/icons-vue'
 import { BaseCard, BaseTable } from '@/components/Common'
 import { DECLARATION_STATUS_CONFIG } from '@/utils/constants'
 import { getDeclarationList, updateDeclarationStatus, downloadDeclaration, getDeclarationPreview } from '@/api/Declaration'
@@ -227,47 +236,69 @@ const editableStatusOptions = computed(() => [
   { label: t('declaration.statusFailed'), value: 'failed' }
 ])
 
-// 表格列配置
+// 工作流状态配置
+const WORKFLOW_STATUS_CONFIG = {
+  pending: { label: '待处理', color: '#f59e0b', bgColor: '#fef3c7' },
+  running: { label: '处理中', color: '#3b82f6', bgColor: '#dbeafe' },
+  completed: { label: '已完成', color: '#16a34a', bgColor: '#dcfce7' },
+  failed: { label: '失败', color: '#dc2626', bgColor: '#fee2e2' }
+}
+
+// 获取工作流状态标签
+const getWorkflowStatusLabel = (status) => {
+  return WORKFLOW_STATUS_CONFIG[status]?.label || status || '-'
+}
+
+// 表格列配置 - 使用自适应策略
 const tableColumns = computed(() => [
   {
     prop: 'number',
     label: t('declaration.number'),
-    width: 120,
+    minWidth: 140, // 使用 minWidth 而非固定 width，允许自适应
     align: 'center'
   },
   {
     prop: 'applicant',
     label: t('declaration.applicant'),
-    width: 100,
+    minWidth: 100,
     align: 'center'
   },
   {
     prop: 'submitTime',
     label: t('declaration.submitTime'),
-    width: 120,
+    minWidth: 120,
     align: 'center'
   },
   {
     prop: 'direction',
     label: t('declaration.direction'),
-    minWidth: 200,
-    showOverflowTooltip: true
+    minWidth: 200, // 降低最小宽度，允许自适应扩展
+    showOverflowTooltip: false, // 允许换行，不需要 tooltip
+    wrap: true // 🔥 明确指定允许换行
   },
   {
     prop: 'fields',
     label: t('declaration.fields'),
-    width: 150
+    minWidth: 150, // 使用 minWidth，允许根据内容自适应
+    wrap: true // 🔥 明确指定允许换行
   },
   {
     prop: 'topic',
     label: t('declaration.topic'),
-    minWidth: 180,
-    showOverflowTooltip: true
+    minWidth: 200, // 降低最小宽度，允许自适应扩展
+    showOverflowTooltip: false, // 允许换行，不需要 tooltip
+    wrap: true // 🔥 明确指定允许换行
   },
   {
-    prop: 'status',
-    label: t('common.status'),
-    width: 120,
+    prop: 'declarationStatus',
+    label: t('declaration.declarationStatus'),
+    minWidth: 120,
+    align: 'center'
+  },
+  {
+    prop: 'workflowStatus',
+    label: t('declaration.workflowStatus'),
+    minWidth: 120,
     align: 'center'
   }
 ])
@@ -301,7 +332,8 @@ const loadDeclarations = async () => {
         fields: ['人工智能', '前沿技术研究与应用'],
         submitTime: '2025-11-03',
         status: '申报成功',
-        statusType: 'success'
+        statusType: 'success',
+        workflowStatus: 'completed'
       },
       {
         id: 2,
@@ -312,7 +344,8 @@ const loadDeclarations = async () => {
         fields: ['区块链', '供应链', '分布式系统'],
         submitTime: '2025-01-14',
         status: '申报成功',
-        statusType: 'success'
+        statusType: 'success',
+        workflowStatus: 'running'
       },
       {
         id: 3,
@@ -323,7 +356,8 @@ const loadDeclarations = async () => {
         fields: ['量子计算', '算法优化', '物理'],
         submitTime: '2025-01-13',
         status: '申报失败',
-        statusType: 'failed'
+        statusType: 'failed',
+        workflowStatus: 'failed'
       },
       {
         id: 4,
@@ -334,7 +368,8 @@ const loadDeclarations = async () => {
         fields: ['生物信息学', '数据分析', '统计学'],
         submitTime: '2025-01-12',
         status: '申报成功',
-        statusType: 'success'
+        statusType: 'success',
+        workflowStatus: 'pending'
       },
       {
         id: 5,
@@ -345,7 +380,8 @@ const loadDeclarations = async () => {
         fields: ['物联网', '网络安全', '加密技术'],
         submitTime: '2025-01-11',
         status: '申报失败',
-        statusType: 'failed'
+        statusType: 'failed',
+        workflowStatus: 'failed'
       },
       {
         id: 6,
@@ -356,7 +392,8 @@ const loadDeclarations = async () => {
         fields: ['机器学习', '医疗诊断', '深度学习'],
         submitTime: '2025-01-10',
         status: '申报中',
-        statusType: 'submitting'
+        statusType: 'submitting',
+        workflowStatus: 'running'
       }
     ]
     
@@ -440,13 +477,12 @@ const handleDownload = async (command) => {
   const { id, format } = command
   const formatNames = {
     pdf: 'PDF',
-    word: 'Word',
-    markdown: 'Markdown'
+    word: 'Word'
   }
   
   try {
     logger.info('User started download', { id, format })
-    ElMessage.info(t('declaration.downloading', { format: formatNames[format] }))
+    ElMessage.info(t('declaration.downloading', { format: formatNames[format] }) || `正在下载${formatNames[format]}格式文档...`)
     
     // TODO: 后端接口开发完成后替换为实际接口调用
     // const response = await downloadDeclaration({ id, format })
@@ -463,11 +499,11 @@ const handleDownload = async (command) => {
     // 临时模拟下载过程（后端开发完成后删除）
     await new Promise(resolve => setTimeout(resolve, 1000)) // 模拟网络延迟
     
-    ElMessage.success(t('declaration.downloadComplete', { format: formatNames[format] }))
+    ElMessage.success(t('declaration.downloadComplete', { format: formatNames[format] }) || `${formatNames[format]}格式文档下载完成`)
     logger.info('Download completed successfully', { id, format })
   } catch (error) {
     logger.error('Download failed', error)
-    ElMessage.error(t('declaration.downloadFailed'))
+    ElMessage.error(t('declaration.downloadFailed') || '下载失败')
   }
 }
 
@@ -522,12 +558,14 @@ const handleStatusEdit = async (id, newStatus) => {
   if (newStatus === oldStatus) return
   
   try {
+    // 🔥 参考原型图：选择非当前状态后，弹出确认对话框
     await ElMessageBox.confirm(
-      t('declaration.confirmStatusChange', { status: statusLabels[newStatus] }),
-      t('declaration.confirmTitle'),
+      t('declaration.confirmStatusChange', { status: statusLabels[newStatus] }) || 
+      `确定要将申报状态修改为"${statusLabels[newStatus]}"吗？`,
+      t('declaration.confirmTitle') || '确认修改',
       {
-        confirmButtonText: t('common.confirm'),
-        cancelButtonText: t('common.cancel'),
+        confirmButtonText: t('common.confirm') || '确定',
+        cancelButtonText: t('common.cancel') || '取消',
         type: 'warning',
         customClass: 'modern-confirm-dialog',
         center: false,
@@ -537,8 +575,23 @@ const handleStatusEdit = async (id, newStatus) => {
         beforeClose: (action, instance, done) => {
           if (action === 'confirm') {
             instance.confirmButtonLoading = true
-            instance.confirmButtonText = t('declaration.statusChanging')
-            // 模拟接口调用
+            instance.confirmButtonText = t('declaration.statusChanging') || '修改中...'
+            // 🔥 真实场景时需要调用后端接口
+            // TODO: 后端接口开发完成后替换为实际接口调用
+            // updateDeclarationStatus({ id, status: newStatus })
+            //   .then(() => {
+            //     done()
+            //     setTimeout(() => {
+            //       instance.confirmButtonLoading = false
+            //     }, 300)
+            //   })
+            //   .catch((error) => {
+            //     instance.confirmButtonLoading = false
+            //     ElMessage.error('状态更新失败')
+            //     throw error
+            //   })
+            
+            // 临时模拟接口调用（后端开发完成后删除）
             setTimeout(() => {
               done()
               setTimeout(() => {
@@ -554,6 +607,7 @@ const handleStatusEdit = async (id, newStatus) => {
     
     logger.info('User confirmed status change', { id, oldStatus, newStatus })
     
+    // 🔥 真实场景时需要调用后端接口
     // TODO: 后端接口开发完成后替换为实际接口调用
     // await updateDeclarationStatus({ id, status: newStatus })
     
@@ -564,17 +618,18 @@ const handleStatusEdit = async (id, newStatus) => {
     declaration.statusType = newStatus
     declaration.status = statusLabels[newStatus]
     
-    ElMessage.success(t('declaration.statusChanged', { status: statusLabels[newStatus] }))
+    ElMessage.success(t('declaration.statusChanged', { status: statusLabels[newStatus] }) || 
+      `申报状态已修改为"${statusLabels[newStatus]}"`)
     logger.info('Status updated successfully', { id, newStatus })
   } catch (error) {
     if (error === 'cancel') {
       // 用户取消
-      ElMessage.info(t('common.cancelled'))
+      ElMessage.info(t('common.cancelled') || '已取消修改')
       logger.info('User cancelled status change', { id })
     } else {
       // 接口错误
       logger.error('Status update failed', error)
-      ElMessage.error(t('declaration.statusUpdateFailed'))
+      ElMessage.error(t('declaration.statusUpdateFailed') || '状态更新失败')
     }
   }
 }
@@ -604,6 +659,9 @@ onMounted(() => {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  // 🔥 确保容器充分利用可用宽度，不受父容器限制
+  margin: 0;
+  overflow-x: visible;
 }
 
 .page-header {
@@ -625,11 +683,15 @@ onMounted(() => {
   border-radius: 12px;
   padding: 24px;
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
+  // 🔥 确保卡片充分利用宽度
+  margin: 0;
   
   :deep(.base-card__content) {
     padding: 0;
     width: 100%;
+    max-width: 100%;
   }
 }
 
@@ -639,6 +701,24 @@ onMounted(() => {
   margin-bottom: 24px;
   flex-wrap: wrap;
   align-items: center;
+  
+  // 🔥 暗色主题下重置按钮样式优化
+  :deep(.el-button:not(.el-button--primary)) {
+    background-color: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--text-2) !important;
+    
+    &:hover {
+      background-color: var(--hover) !important;
+      border-color: var(--border-hover) !important;
+      color: var(--text-1) !important;
+    }
+    
+    &:active {
+      background-color: var(--hover-light) !important;
+      border-color: var(--border) !important;
+    }
+  }
 }
 
 .number-cell { 
@@ -656,22 +736,60 @@ onMounted(() => {
 
 .direction-cell { 
   color: var(--text-1);
+  // 🔥 允许换行，充分利用空间
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.6;
+  max-width: 100%;
 }
 
 .topic-cell { 
   color: var(--text-1);
+  // 🔥 允许换行，充分利用空间
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.6;
+  max-width: 100%;
 }
 
 .fields-cell {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   line-height: 1.4;
+  justify-content: center;
+  align-items: center;
   
   .field-tag {
-    margin-right: 4px !important;
-    margin-bottom: 4px !important;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    background: #e0e7ff;
+    color: #6366f1;
+    border: none;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background: #c7d2fe;
+      color: #4f46e5;
+    }
+  }
+}
+
+// 暗色主题下的标签样式
+[data-theme='dark'] .fields-cell .field-tag,
+.dark .fields-cell .field-tag {
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8; // 🔥 暗色主题下使用稍亮的蓝色，保持可读性
+  
+  &:hover {
+    background: rgba(99, 102, 241, 0.3);
+    color: #a5b4fc;
   }
 }
 
@@ -703,24 +821,72 @@ onMounted(() => {
   color: #dc2626;
 }
 
+// 工作流状态标签样式
+.workflow-status-tag {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.workflow-status-pending {
+  background-color: #fef3c7;
+  color: #f59e0b;
+}
+
+.workflow-status-running {
+  background-color: #dbeafe;
+  color: #3b82f6;
+}
+
+.workflow-status-completed {
+  background-color: #dcfce7;
+  color: #16a34a;
+}
+
+.workflow-status-failed {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+// 暗色主题下的工作流状态样式
+[data-theme='dark'] .workflow-status-tag,
+.dark .workflow-status-tag {
+  &.workflow-status-pending {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+  }
+  
+  &.workflow-status-running {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+  }
+  
+  &.workflow-status-completed {
+    background: rgba(22, 163, 74, 0.2);
+    color: #4ade80;
+  }
+  
+  &.workflow-status-failed {
+    background: rgba(220, 38, 38, 0.2);
+    color: #f87171;
+  }
+}
+
 .status-clickable {
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.2s ease;
+  position: relative;
 
   &:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
-}
-
-.status-arrow {
-  font-size: 12px;
-  opacity: 0.6;
-  transition: transform 0.2s ease;
-}
-
-.status-clickable:hover .status-arrow {
-  opacity: 1;
-  transform: translateY(1px);
 }
 
 // 下拉菜单样式
@@ -810,6 +976,8 @@ onMounted(() => {
   &.btn-success {
     color: #16a34a;
     border-color: #16a34a;
+    display: inline-flex;
+    align-items: center;
     
     &:hover:not(:disabled) {
       background: #16a34a;
@@ -914,19 +1082,26 @@ onMounted(() => {
 }
 
 // 表格样式 - 参考 UserManagement.vue
-:deep(.base-table) {
+.declaration-table {
   width: 100%;
-  display: flex;
-  flex-direction: column;
+  border-radius: 8px;
+  overflow: visible;
+  border: 1px solid var(--border);
   
-  .base-table__table {
+  :deep(.base-table) {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  :deep(.base-table__table) {
     width: 100% !important;
     min-width: 100%;
     flex: 1;
     overflow: auto;
   }
   
-  .el-table {
+  :deep(.el-table) {
     // 表头样式
     .el-table__header {
       th {
@@ -941,35 +1116,12 @@ onMounted(() => {
       }
     }
     
-    // 表体样式
+    // 表体样式 - BaseTable 已提供通用换行支持，这里只做微调
     .el-table__body {
       td {
         padding: 12px 16px !important;
         font-size: 14px;
         color: var(--text);
-        white-space: nowrap;
-        overflow: visible !important;
-        position: relative !important;
-        
-        .cell {
-          padding: 0 !important;
-          line-height: 1.6;
-          white-space: nowrap;
-          overflow: visible !important;
-          position: relative !important;
-        }
-      }
-      
-      tr.el-table__row--striped {
-        td {
-          overflow: visible !important;
-          position: relative !important;
-          
-          .cell {
-            overflow: visible !important;
-            position: relative !important;
-          }
-        }
       }
     }
     
