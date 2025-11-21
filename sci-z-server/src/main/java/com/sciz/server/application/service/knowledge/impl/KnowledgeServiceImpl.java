@@ -5,9 +5,12 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sciz.server.application.service.file.FileService;
 import com.sciz.server.application.service.knowledge.KnowledgeService;
+import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeChatbotStreamReq;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeCreateReq;
+import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
 import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeResp;
 import com.sciz.server.infrastructure.external.dify.dto.DifyChatbotMessageRequest;
 import com.sciz.server.domain.pojo.entity.file.SysAttachment;
@@ -22,6 +25,8 @@ import com.sciz.server.infrastructure.external.dify.dto.DifyDatasetRequest;
 import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiService;
 import com.sciz.server.infrastructure.external.dify.service.impl.DifyApiKeyServiceImpl;
+import com.sciz.server.infrastructure.shared.enums.AttachmentCategoryStatus;
+import com.sciz.server.infrastructure.shared.enums.AttachmentRelationStatus;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -35,7 +40,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,6 +63,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private final KnowledgeConverter knowledgeConverter;
     private final SysAttachmentRepo attachmentRepo;
     private final SysKnowledgeFileRelationRepo fileRelationRepo;
+    private final FileService fileService;
 
     @Value("${dify.default-resource-id:default}")
     private String defaultResourceId;
@@ -255,7 +260,24 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             throw new BusinessException(ResultCode.USER_NOT_FOUND);
         }
 
-        // 5. 获取用户的 Dify API Key
+        // 5. 先上传文件到 MinIO，获取 attachment_id
+        FileUploadReq fileUploadReq = new FileUploadReq();
+        fileUploadReq.setFile(file);
+        fileUploadReq.setRelationType(AttachmentRelationStatus.KNOWLEDGE.getCode());
+        fileUploadReq.setRelationId(knowledgeBase.getId());
+        fileUploadReq.setRelationName(knowledgeBase.getName());
+        fileUploadReq.setAttachmentType(AttachmentCategoryStatus.DOCUMENT.getCode());
+        fileUploadReq.setIsPublic(0);
+
+        log.info(String.format("上传文件到 MinIO: fileName=%s", file.getOriginalFilename()));
+        FileInfoResp fileInfoResp = fileService.upload(fileUploadReq);
+        Long attachmentId = fileInfoResp.id();
+        if (attachmentId == null) {
+            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED, "上传文件到 MinIO 失败");
+        }
+        log.info(String.format("文件已上传到 MinIO: attachmentId=%s", attachmentId));
+
+        // 6. 获取用户的 Dify API Key
         DifyApiKey difyApiKey = null;
         QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId)
@@ -264,16 +286,16 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 .last("LIMIT 1");
         difyApiKey = difyApiKeyService.getOne(queryWrapper);
 
-        // 6. 确定 resourceId
+        // 7. 确定 resourceId
         String resourceId = Optional.ofNullable(difyApiKey)
                 .map(DifyApiKey::getResourceId)
                 .orElse(defaultResourceId);
 
-        // 7. 调用 Dify API 上传文档
+        // 8. 调用 Dify API 上传文档（使用原始文件）
         ResponseEntity<String> response = difyApiService.uploadDocumentWithFileStorage(
                 datasetId, file, userId, resourceId, "dataset");
 
-        // 8. 检查响应状态
+        // 9. 检查响应状态
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
             log.error(String.format("Dify API上传文档失败: status=%s, body=%s", 
                     response.getStatusCode(), response.getBody()));
@@ -281,7 +303,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                     String.format("上传文件失败: Dify API调用失败, status=%s", response.getStatusCode()));
         }
 
-        // 9. 解析返回的JSON
+        // 10. 解析返回的JSON
         JsonNode responseJson;
         try {
             responseJson = objectMapper.readTree(response.getBody());
@@ -290,7 +312,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             throw new BusinessException(ResultCode.SERVER_ERROR, "解析Dify API响应失败");
         }
 
-        // 10. 提取文档信息
+        // 11. 提取文档信息
         JsonNode documentNode = responseJson.get("document");
         if (documentNode == null) {
             log.error(String.format("Dify API返回数据缺少document字段: body=%s", response.getBody()));
@@ -306,32 +328,21 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             throw new BusinessException(ResultCode.SERVER_ERROR, "上传文件失败: Dify API返回数据异常");
         }
 
-        // 11. 创建附件记录
-        SysAttachment attachment = new SysAttachment();
-        attachment.setFileName(file.getOriginalFilename());
-        attachment.setOriginalName(file.getOriginalFilename());
-        attachment.setFileType(getFileType(file.getOriginalFilename()));
-        attachment.setFileExtension(getFileExtension(file.getOriginalFilename()));
-        attachment.setFileSize(file.getSize());
-        attachment.setFileUrl(""); // Dify存储的文件，URL为空
-        attachment.setFilePath(""); // Dify存储的文件，路径为空
-        attachment.setMimeType(file.getContentType());
-        attachment.setMd5Hash(""); // 如果需要MD5，可以后续计算
-        attachment.setUploaderId(userId);
-        attachment.setUploaderName(user.getRealName());
-        attachment.setUploadTime(LocalDateTime.now());
-        attachment.setDownloadCount(0);
-        attachment.setIsPublic(0);
-        attachment.setDifyDocId(difyDocId); // 存储Dify文档ID
-        attachment.setCreatedBy(userId);
+        // 12. 更新附件记录，保存 Dify 文档ID
+        SysAttachment attachment = attachmentRepo.findById(attachmentId);
+        if (attachment == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND, "附件记录不存在");
+        }
+        attachment.setDifyDocId(difyDocId);
         attachment.setUpdatedBy(userId);
-
-        Long attachmentId = attachmentRepo.save(attachment);
-        if (attachmentId == null) {
-            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED, "保存附件记录失败");
+        boolean updateSuccess = attachmentRepo.update(attachment);
+        if (!updateSuccess) {
+            log.warn(String.format("更新附件记录失败: attachmentId=%s, difyDocId=%s", attachmentId, difyDocId));
+        } else {
+            log.info(String.format("更新附件记录成功: attachmentId=%s, difyDocId=%s", attachmentId, difyDocId));
         }
 
-        // 12. 创建知识库文件关联记录
+        // 13. 创建知识库文件关联记录
         SysKnowledgeFileRelation fileRelation = new SysKnowledgeFileRelation();
         fileRelation.setKnowledgeId(knowledgeBase.getId()); // 使用数据库主键ID
         fileRelation.setFolderId(folderId != null ? folderId : 0L);

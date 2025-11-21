@@ -277,7 +277,7 @@ java -jar target/AgentBackendServices-0.0.1-SNAPSHOT.jar
 
 #### 用户登录
 ```http
-POST /api/auth/login
+POST /api/auth/
 Content-Type: application/json
 
 {

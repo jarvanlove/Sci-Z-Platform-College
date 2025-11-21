@@ -1,5 +1,4 @@
 package com.sciz.server.infrastructure.external.dify.service.impl;
-
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.sciz.server.infrastructure.external.dify.common.service.BaseServiceImpl;
 import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
@@ -7,20 +6,18 @@ import com.sciz.server.infrastructure.external.dify.mapper.DifyApiKeyMapper;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiKeyService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 
 /**
  * Dify API 密钥管理服务实现类
- *
  * @author shihang.shang
  * @className DifyApiKeyServiceImpl
  * @date 2025-01-28 12:30
- */
+*/
+
 @Slf4j
 @Service
 public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, DifyApiKey> implements DifyApiKeyService {
-
     @Override
     public String getApiKey(Long userId, String resourceId, String keyType) {
         try {
@@ -84,8 +81,7 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
                 this.save(newKey);
                 log.info("创建用户 {} 的 {} 密钥，资源ID: {}", userId, keyType, resourceId);
                 return newKey;
-            }
-            
+            } 
         } catch (Exception e) {
             log.error("保存API密钥失败: userId={}, resourceId={}, keyType={}, error={}", 
                     userId, resourceId, keyType, e.getMessage(), e);

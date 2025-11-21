@@ -687,10 +687,8 @@ const scrollKbToBottom = () => {
     kbMessages.value.scrollTop = kbMessages.value.scrollHeight
   }
 }
-
 // 使用一个标记来确保函数只执行一次（防止并发调用）
 let isExecuting = false
-
 // 发送消息
 const sendKbMessage = async () => {
   console.log('[sendKbMessage] 函数被调用', { 
@@ -701,7 +699,6 @@ const sendKbMessage = async () => {
     hasSelectedKb: selectedKnowledgeBases.value.length > 0,
     stack: new Error().stack.split('\n').slice(0, 5).join('\n')
   })
-  
   // 防止重复调用：使用同步锁机制，立即检查（必须在函数最开始）
   if (isExecuting) {
     console.warn('[sendKbMessage] 函数正在执行中，忽略重复请求', { 
@@ -710,7 +707,6 @@ const sendKbMessage = async () => {
     })
     return
   }
-  
   if (isSendingMessage.value) {
     console.warn('[sendKbMessage] 正在发送消息，忽略重复请求', { 
       sendingMessageKey: sendingMessageKey.value,
@@ -722,7 +718,6 @@ const sendKbMessage = async () => {
     })
     return
   }
-  
   // 立即设置执行标记（同步操作，防止并发）
   isExecuting = true
   

@@ -184,6 +184,7 @@ public class ChatController {
                             fileIds.add(uploadResult.getId());
                             log.info("文件上传成功: 文件ID={}", uploadResult.getId());
                         }
+
                     }
                     
                     if (fileIds.isEmpty()) {

@@ -14,3 +14,6 @@ export { default as SystemConfig } from './SystemConfig.vue'
 
 // 日志管理组件
 export { default as SystemLogs } from './LogManagement.vue'
+
+// API Key 配置组件
+export { default as ApiKeyManagement } from './ApiKeyManagement.vue'

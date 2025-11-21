@@ -263,6 +263,17 @@ const routes = [
           permission: 'menu:system:logs',
           layout: 'main'
         }
+      },
+      {
+        path: 'apikey',
+        name: 'SystemApiKey',
+        component: () => import('@/views/System/ApiKey.vue'),
+        meta: { 
+          title: 'API Key 配置', 
+          requiresAuth: true,
+          permission: 'menu:system:apikey',
+          layout: 'main'
+        }
       }
     ]
   },

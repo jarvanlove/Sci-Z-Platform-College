@@ -521,12 +521,17 @@ defineExpose({
     box-sizing: border-box;
   }
   
-  // 固定列也需要支持滚动
+  // 固定列样式 - 确保在滚动时不缩进去
   .el-table__fixed,
   .el-table__fixed-right {
+    // 固定列应该使用 absolute 定位（Element Plus 默认），不要改为 fixed
+    // 确保固定列在滚动时保持固定位置
+    position: absolute !important;
+    
     .el-table__fixed-body-wrapper {
-      overflow-x: auto !important;
-      overflow-y: hidden;
+      // 固定列禁用横向滚动，只允许纵向滚动
+      overflow-x: hidden !important;
+      overflow-y: auto;
       // 使用自定义滚动条样式
       scrollbar-width: thin; /* Firefox */
       scrollbar-color: var(--border) transparent; /* Firefox */
@@ -549,12 +554,35 @@ defineExpose({
         
         &:hover {
           background: var(--border-hover);
+        }
+      }
+      
+      // 确保固定列中的所有行（包括 stripe 行）都不缩进去
+      tr {
+        td {
+          position: relative !important;
+          white-space: nowrap;
+          overflow: visible !important;
+        }
+      }
+      
+      // stripe 行（灰色背景）也要保持固定
+      tr.el-table__row--striped {
+        td {
+          position: relative !important;
+          overflow: visible !important;
+          
+          .cell {
+            overflow: visible !important;
+            position: relative !important;
+          }
         }
       }
     }
     
     .el-table__fixed-header-wrapper {
-      overflow-x: auto !important;
+      // 固定列表头禁用横向滚动
+      overflow-x: hidden !important;
       overflow-y: hidden;
       // 使用自定义滚动条样式
       scrollbar-width: thin; /* Firefox */
@@ -578,18 +606,6 @@ defineExpose({
         
         &:hover {
           background: var(--border-hover);
-        }
-      }
-    }
-    
-    // 确保固定列中的所有行都能正确滚动 - 统一处理
-    .el-table__fixed-body-wrapper {
-      tr {
-        td {
-          position: relative;
-          white-space: nowrap;
-          // 确保内容可以被滚动隐藏
-          overflow: visible !important;
         }
       }
     }
@@ -751,30 +767,29 @@ defineExpose({
     color: var(--text-3) !important;
   }
 
-  // 固定列样式
+  // 固定列样式 - 确保背景色和阴影正确
   .el-table__fixed,
   .el-table__fixed-right {
     background-color: var(--surface) !important;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.12);
     
-    // 确保固定列中的 stripe 行背景色正确，并且能正确滚动
+    // 确保固定列中的 stripe 行背景色正确
     .el-table__fixed-body-wrapper {
       tr.el-table__row--striped {
         background-color: var(--hover-light) !important;
         
         td {
           background-color: var(--hover-light) !important;
-          // 确保 stripe 行的内容可以被滚动隐藏 - 强制设置
-          overflow: visible !important;
           position: relative !important;
+          overflow: visible !important;
         }
       }
       
       tr {
         td {
-          position: relative;
+          position: relative !important;
           white-space: nowrap;
-          // 不设置 overflow，让父容器的滚动来控制隐藏
+          overflow: visible !important;
         }
       }
     }

@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class MinioConfig {
+    
 
     @Value("${minio.endpoint:http://127.0.0.1:9000}")
     private String endpoint;
@@ -31,4 +32,5 @@ public class MinioConfig {
                 .credentials(accessKey, secretKey)
                 .build();
     }
+
 }
