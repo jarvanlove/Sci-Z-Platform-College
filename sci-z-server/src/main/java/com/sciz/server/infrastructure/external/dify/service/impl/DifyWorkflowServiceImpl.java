@@ -80,10 +80,10 @@ public class DifyWorkflowServiceImpl implements DifyWorkflowService {
 
     /**
      * 转换为 DifyWorkflowRequest
-     *
      * @param request 申报工作流请求
      * @return DifyWorkflowRequest
      */
+
     private DifyWorkflowRequest convertToDifyWorkflowRequest(DeclarationWorkflowReq request) {
         var difyRequest = new DifyWorkflowRequest();
         difyRequest.setUserId(request.userId());

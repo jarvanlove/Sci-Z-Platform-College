@@ -1,27 +1,29 @@
 package com.sciz.server.domain.pojo.dto.request.project;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Max;
 import java.math.BigDecimal;
 
 /**
- * 项目创建请求
+ * 项目更新请求
  *
+ * @param id             Long 项目ID（必填）
  * @param name           String 项目名称
  * @param description    String 项目描述
- * @param declarationId  Long 关联申报ID（可选）
- * @param budget         BigDecimal 项目预算（可选）
- * @param progress       Integer 进度百分比（0-100，可选）
- * @param status         String 项目状态（可选，默认草稿）
- * @param difyKnowledgeId String Dify知识库ID（可选）
+ * @param declarationId  Long 关联申报ID
+ * @param budget         BigDecimal 项目预算
+ * @param progress       Integer 进度百分比（0-100）
+ * @param status         String 项目状态
+ * @param difyKnowledgeId String Dify知识库ID
  * @author JiaWen.Wu
- * @className ProjectCreateReq
+ * @className ProjectUpdateReq
  * @date 2025-01-24 16:00
  */
-public record ProjectCreateReq(
-        @NotBlank(message = "项目名称不能为空") String name,
+public record ProjectUpdateReq(
+        @NotNull(message = "项目ID不能为空") Long id,
+        String name,
         String description,
         Long declarationId,
         @DecimalMin(value = "0.0", message = "项目预算不能为负数") BigDecimal budget,
@@ -29,3 +31,4 @@ public record ProjectCreateReq(
         String status,
         String difyKnowledgeId) {
 }
+

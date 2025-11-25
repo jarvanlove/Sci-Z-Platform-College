@@ -11,8 +11,9 @@
     <groupId>com.Server</groupId>
     <artifactId>AgentBackendServices</artifactId>
     <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
     <name>AgentBackendServices</name>
-    <description>AgentBackendServices</description>
+    <description>AgentBackendServices - Dify API 服务依赖包，提供 Dify API 调用、认证、用户管理等服务</description>
     <url/>
     <licenses>
         <license/>
@@ -116,6 +117,13 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+        
+        <!-- Spring Boot 自动配置处理器 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -152,6 +160,8 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <!-- 不打包成可执行 jar，只打包成普通 jar 依赖 -->
+                    <skip>true</skip>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
@@ -159,6 +169,20 @@
                         </exclude>
                     </excludes>
                 </configuration>
+            </plugin>
+            <!-- Maven 源码插件，生成源码 jar -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -7,6 +7,7 @@ import com.sciz.server.domain.pojo.entity.ai.AiConversation;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.ReportingPolicy;
 
 import java.util.List;
 
@@ -17,9 +18,8 @@ import java.util.List;
  * @className AiConversationConverter
  * @date 2025-11-14 10:00
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface AiConversationConverter {
-
     /**
      * createReq → entity
      *
@@ -34,7 +34,6 @@ public interface AiConversationConverter {
     @Mapping(target = "updatedTime", ignore = true)
     @Mapping(target = "isDeleted", ignore = true)
     AiConversation toEntity(AiConversationCreateReq req);
-
     /**
      * updateReq → entity（更新）
      *
@@ -49,7 +48,6 @@ public interface AiConversationConverter {
     @Mapping(target = "updatedTime", ignore = true)
     @Mapping(target = "isDeleted", ignore = true)
     void updateEntity(@MappingTarget AiConversation entity, AiConversationUpdateReq req);
-
     /**
      * entity → resp
      *
@@ -59,7 +57,6 @@ public interface AiConversationConverter {
     @Mapping(target = "id", expression = "java(entity.getId() != null ? String.valueOf(entity.getId()) : null)")
     @Mapping(target = "userId", expression = "java(entity.getUserId() != null ? String.valueOf(entity.getUserId()) : null)")
     AiConversationResp toResp(AiConversation entity);
-
     /**
      * entity列表 → resp列表
      *

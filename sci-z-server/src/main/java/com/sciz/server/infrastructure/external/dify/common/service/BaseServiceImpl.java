@@ -27,6 +27,7 @@ public class BaseServiceImpl<M extends MyBaseMapper<T>, T extends BaseEntity> ex
                 queryWrapper.or().like(name, entity.getKey());
             }
         }
+        
         if (entity.getWhere()!= null && !entity.getWhere().isEmpty()){
             String where = entity.getWhere();
             Map<String, Condition> stringConditionMap = parseQuery(where);

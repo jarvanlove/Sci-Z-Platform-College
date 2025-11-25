@@ -5,19 +5,9 @@
  */
 -->
 <template>
-  <div class="report-list-page">
-    <h1>报告列表页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <ReportList />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import { ReportList } from '@/components/Business/Report'
 </script>
-
-<style lang="scss" scoped>
-.report-list-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
-</style>

@@ -28,7 +28,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -176,7 +175,6 @@ public class ChatController {
                             throw new BusinessException(ResultCode.SERVER_ERROR, 
                                     "文件上传失败: " + uploadResponse.getBody());
                         }
-                        
                         // 解析上传响应，获取文件ID
                         DifyFileUploadResponse uploadResult = objectMapper.readValue(
                                 uploadResponse.getBody(), DifyFileUploadResponse.class);
@@ -482,7 +480,6 @@ public class ChatController {
                         if (trimmedLine.isEmpty()) {
                             return;
                         }
-                        
                         // 处理 SSE 格式的数据行
                         if (trimmedLine.startsWith("data:")) {
                             String data = trimmedLine.substring(5).trim();
@@ -529,7 +526,6 @@ public class ChatController {
                 emitter.completeWithError(e);
             }
         }).start();
-
         return emitter;
     }
 
@@ -542,6 +538,7 @@ public class ChatController {
      * @param userId 当前登录用户ID
      * @return 流式响应（SSE格式）
      */
+
     private SseEmitter callChatbotDirectly(String query, String conversationId, String user, Long userId) {
         // 1. 创建 SSE Emitter（超时时间设置为60秒）
         SseEmitter emitter = new SseEmitter(60000L);
@@ -610,13 +607,11 @@ public class ChatController {
                         log.warn("处理流式数据行失败: line={}, err={}", line, e.getMessage());
                     }
                 });
-                
                 // 发送完成事件
                 emitter.send(SseEmitter.event()
                         .name("message_end")
                         .data("{}"));
                 emitter.complete();
-                
                 log.info("Chatbot 流式对话完成: userId={}, query={}", userId, query);
                 
             } catch (Exception e) {
@@ -670,7 +665,7 @@ public class ChatController {
                         internalId, e.getMessage());
                 return null;
             }
-        } catch (NumberFormatException e) {
+         }catch (NumberFormatException e) {
             // 如果不是数字，可能是 UUID 格式，直接返回
             log.debug("conversationId 不是数字，可能是 UUID 格式: conversationId={}", conversationId);
             return conversationId;

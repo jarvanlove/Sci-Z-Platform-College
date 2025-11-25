@@ -63,4 +63,12 @@ public interface DifyApiKeyService extends BaseService<DifyApiKey> {
      * @param operator 操作者
      */
     void deactivateApiKey(Long id, String operator);
+
+    /**
+     * 查询报告类型列表
+     * 查询 key_type = 'workflow' 且 key_name 包含"报告"的密钥列表
+     *
+     * @return 报告类型列表
+     */
+    List<DifyApiKey> getReportTypes();
 }

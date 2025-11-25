@@ -33,7 +33,6 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
                 log.debug("找到用户 {} 的 {} 密钥，资源ID: {}", userId, keyType, resourceId);
                 return apiKey.getApiKey();
             }
-            
             // 如果用户没有配置密钥，尝试使用系统默认密钥
             log.warn("用户 {} 没有配置 {} 密钥，资源ID: {}，尝试使用系统默认密钥", userId, keyType, resourceId);
             return getDefaultApiKey(keyType, resourceId);
@@ -124,6 +123,24 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
         } catch (Exception e) {
             log.error("停用API密钥失败: id={}, error={}", id, e.getMessage(), e);
             throw new RuntimeException("停用API密钥失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public List<DifyApiKey> getReportTypes() {
+        try {
+            QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("key_type", DifyApiKey.KeyType.WORKFLOW.getCode())
+                       .like("key_name", "报告")
+                       .eq("is_active", true)
+                       .orderByDesc("created_time");
+            
+            List<DifyApiKey> reportTypes = this.list(queryWrapper);
+            log.info(String.format("查询报告类型列表成功: 数量=%d", reportTypes.size()));
+            return reportTypes;
+        } catch (Exception e) {
+            log.error(String.format("查询报告类型列表失败: err=%s", e.getMessage()), e);
+            throw new RuntimeException("查询报告类型列表失败: " + e.getMessage());
         }
     }
 

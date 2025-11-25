@@ -5,19 +5,9 @@
  */
 -->
 <template>
-  <div class="report-generate-page">
-    <h1>报告生成页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <ReportGenerate />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import { ReportGenerate } from '@/components/Business/Report'
 </script>
-
-<style lang="scss" scoped>
-.report-generate-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
-</style>

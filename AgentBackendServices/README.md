@@ -1,8 +1,56 @@
-~~# AgentBackendServices
+# AgentBackendServices
 
 ## 📋 项目简介
 
 AgentBackendServices 是一个基于 Spring Boot 3.5.6 的高校科研项目管理平台后端服务，采用现代化的微服务架构设计，为科研项目申报、管理、验收等业务场景提供稳定可靠的后端支撑。集成了 AI 知识库管理、用户认证、权限控制等核心功能。
+
+## 📦 作为 Maven 依赖包使用
+
+本项目已配置为 Maven 依赖包，其他项目可以直接引入并使用其中提供的 Service 方法。
+
+### 快速开始
+
+1. **安装到本地仓库**：
+   ```bash
+   cd AgentBackendServices
+   mvn clean install
+   ```
+
+2. **在目标项目中添加依赖**：
+   ```xml
+   <dependency>
+       <groupId>com.Server</groupId>
+       <artifactId>AgentBackendServices</artifactId>
+       <version>0.0.1-SNAPSHOT</version>
+   </dependency>
+   ```
+
+3. **直接使用 Service**：
+   ```java
+   @Autowired
+   private DifyApiService difyApiService;
+   
+   @Autowired
+   private DifyApiKeyService difyApiKeyService;
+   
+   @Autowired
+   private AuthService authService;
+   ```
+
+### 详细文档
+
+- **快速开始**：查看 [快速开始.md](./快速开始.md)
+- **使用说明**：查看 [使用说明.md](./使用说明.md)
+
+### 提供的服务
+
+- **DifyApiService**: Dify API 调用服务（创建 Chatbot、知识库、工作流等）
+- **DifyApiKeyService**: API Key 管理服务
+- **AuthService**: 用户认证服务
+- **UserService**: 用户管理服务
+- **DifyApiClient**: Dify API 客户端工具类
+
+所有服务已配置自动扫描，引入依赖后即可直接使用，无需额外配置。
 
 ## 🛠️ 技术栈
 

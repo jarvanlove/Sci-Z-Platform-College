@@ -1,10 +1,10 @@
 package com.sciz.server.interfaces.converter;
 
-import com.sciz.server.domain.pojo.dto.request.project.ProjectCreateReq;
-import com.sciz.server.domain.pojo.dto.request.project.ProjectUpdateReq;
-import com.sciz.server.domain.pojo.dto.response.project.ProjectDetailResp;
-import com.sciz.server.domain.pojo.dto.response.project.ProjectListResp;
-import com.sciz.server.domain.pojo.entity.project.Project;
+import com.sciz.server.domain.pojo.dto.request.report.ReportManagementCreateReq;
+import com.sciz.server.domain.pojo.dto.request.report.ReportManagementUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.report.ReportManagementDetailResp;
+import com.sciz.server.domain.pojo.dto.response.report.ReportManagementListResp;
+import com.sciz.server.domain.pojo.entity.report.ReportManagement;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -13,14 +13,14 @@ import org.mapstruct.ReportingPolicy;
 import java.util.List;
 
 /**
- * 项目转换器
+ * 报告管理转换器
  *
  * @author JiaWen.Wu
- * @className ProjectConverter
- * @date 2025-01-24 16:00
+ * @className ReportManagementConverter
+ * @date 2025-01-24 14:30
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
-public interface ProjectConverter {
+public interface ReportManagementConverter {
 
     /**
      * createReq → entity
@@ -30,12 +30,16 @@ public interface ProjectConverter {
      */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "number", ignore = true)
+    @Mapping(target = "creatorId", ignore = true)
+    @Mapping(target = "creatorName", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "generateTime", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "createdTime", ignore = true)
     @Mapping(target = "updatedTime", ignore = true)
     @Mapping(target = "isDeleted", ignore = true)
-    Project toEntity(ProjectCreateReq req);
+    ReportManagement toEntity(ReportManagementCreateReq req);
 
     /**
      * entity → listResp
@@ -43,7 +47,7 @@ public interface ProjectConverter {
      * @param entity 实体
      * @return 列表响应
      */
-    ProjectListResp toListResp(Project entity);
+    ReportManagementListResp toListResp(ReportManagement entity);
 
     /**
      * entity → detailResp
@@ -51,7 +55,7 @@ public interface ProjectConverter {
      * @param entity 实体
      * @return 详情响应
      */
-    ProjectDetailResp toDetailResp(Project entity);
+    ReportManagementDetailResp toDetailResp(ReportManagement entity);
 
     /**
      * entityList → listRespList
@@ -59,7 +63,7 @@ public interface ProjectConverter {
      * @param entities 实体列表
      * @return 列表响应列表
      */
-    List<ProjectListResp> toListRespList(List<Project> entities);
+    List<ReportManagementListResp> toListRespList(List<ReportManagement> entities);
 
     /**
      * updateReq → entity（更新实体）
@@ -69,12 +73,15 @@ public interface ProjectConverter {
      */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "number", ignore = true)
+    @Mapping(target = "projectId", ignore = true)
+    @Mapping(target = "creatorId", ignore = true)
+    @Mapping(target = "creatorName", ignore = true)
+    @Mapping(target = "generateTime", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "createdTime", ignore = true)
     @Mapping(target = "updatedTime", ignore = true)
     @Mapping(target = "isDeleted", ignore = true)
-    void updateEntity(@MappingTarget Project entity, ProjectUpdateReq req);
+    void updateEntity(@MappingTarget ReportManagement entity, ReportManagementUpdateReq req);
 }
-
 

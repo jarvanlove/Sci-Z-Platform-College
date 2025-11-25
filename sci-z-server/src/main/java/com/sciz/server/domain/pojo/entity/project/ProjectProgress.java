@@ -22,31 +22,26 @@ import lombok.Setter;
 @Setter
 @TableName("project_progress")
 public class ProjectProgress extends BaseEntity {
-
     /**
      * 进度ID，主键
      */
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
-
     /**
      * 项目ID
      */
     @TableField("project_id")
     private Long projectId;
-
     /**
      * 进度标题
      */
     @TableField("title")
     private String title;
-
     /**
      * 进度内容
      */
     @TableField("content")
     private String content;
-
     /**
      * 进度百分比
      */

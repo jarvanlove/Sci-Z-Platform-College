@@ -79,20 +79,20 @@
 
         <!-- 对话区 -->
         <div
-          class="kb-messages-container"
-          :class="{ 'has-messages': messages.length > 0 }"
-          ref="kbMessages"
-        >
+        class="kb-messages-container"
+        :class="{ 'has-messages': uniqueMessages.length > 0 }"
+        ref="kbMessages"
+      >
           <!-- 空状态显示 -->
-          <div v-if="messages.length === 0" class="empty-chat-message">
+          <div v-if="uniqueMessages.length === 0" class="empty-chat-message">
             Hi，任何问题都可以问我
           </div>
 
           <!-- 消息列表 -->
-          <template v-if="messages.length > 0">
+          <template v-if="uniqueMessages.length > 0">
             <div class="kb-messages">
               <div
-                v-for="msg in messages"
+                v-for="msg in uniqueMessages"
                 :key="msg.id"
                 class="kb-message"
                 :class="msg.type"
@@ -419,6 +419,49 @@ const filteredKnowledgeBases = computed(() => {
 
 const hasKnowledgeBaseSelected = computed(() => {
   return selectedKnowledgeBases.value.length > 0
+})
+
+// 去重消息列表（基于ID和内容去重，保留最后一个）
+const uniqueMessages = computed(() => {
+  const seenById = new Map() // 基于ID去重
+  const seenByContent = new Map() // 基于内容和时间戳去重（防止相同内容重复）
+  const result = []
+  
+  // 从后往前遍历，保留最后一个出现的消息（最新的）
+  for (let i = messages.value.length - 1; i >= 0; i--) {
+    const msg = messages.value[i]
+    
+    // 首先检查ID是否重复
+    if (seenById.has(msg.id)) {
+      logger.warn('发现重复ID的消息，已过滤', { 
+        id: msg.id, 
+        type: msg.type,
+        content: msg.content?.substring(0, 50) 
+      })
+      continue
+    }
+    
+    // 对于用户消息，还要检查内容和时间戳（防止相同内容在短时间内重复）
+    if (msg.type === 'user' && msg.content) {
+      const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : 0
+      const timeWindow = Math.floor(timestamp / 1000) // 按秒分组
+      const contentKey = `${msg.type}-${msg.content}-${timeWindow}`
+      if (seenByContent.has(contentKey)) {
+        logger.warn('发现重复内容的用户消息，已过滤', { 
+          id: msg.id, 
+          content: msg.content?.substring(0, 50),
+          timestamp: msg.timestamp
+        })
+        continue
+      }
+      seenByContent.set(contentKey, true)
+    }
+    
+    seenById.set(msg.id, true)
+    result.unshift(msg) // 使用 unshift 保持顺序
+  }
+  
+  return result
 })
 
 // 方法
@@ -879,12 +922,14 @@ const sendKbMessage = async () => {
   const checkBeforePush = messages.value.find(m => m.id === userMessageId)
   if (!checkBeforePush) {
     console.log('[sendKbMessage] 添加用户消息到列表', { id: userMessageId, content: userMessageContent.substring(0, 50) })
-  messages.value.push(userMessage)
+    messages.value.push(userMessage)
     console.log('[sendKbMessage] 用户消息已添加，当前消息数:', messages.value.length)
+    logger.info('用户消息已添加', { id: userMessageId, content: userMessageContent.substring(0, 50) })
     // 保存最后发送的用户消息ID，用于后续清除重复
     lastUserMessageId.value = userMessageId
   } else {
     console.warn('[sendKbMessage] 用户消息已存在，跳过添加', { id: userMessageId })
+    logger.warn('用户消息已存在，跳过添加', { id: userMessageId })
   }
   
   // 保存用户消息到后端
@@ -971,7 +1016,7 @@ const sendKbMessage = async () => {
   hideKnowledgeBaseList()
 
   // 创建AI消息占位
-  const aiMessageId = Date.now() + 1
+  const aiMessageId = `${timestamp + 1}-${random}`
   const aiMessage = {
     id: aiMessageId,
     type: 'ai',
@@ -980,7 +1025,15 @@ const sendKbMessage = async () => {
     streaming: true,
     documents: []
   }
-  messages.value.push(aiMessage)
+  
+  // 检查是否已存在相同ID的AI消息（防止重复添加）
+  const existingAiById = messages.value.find(m => m.id === aiMessageId)
+  if (!existingAiById) {
+    messages.value.push(aiMessage)
+    logger.info('AI消息占位已添加', { id: aiMessageId })
+  } else {
+    logger.warn('AI消息占位已存在，跳过添加', { id: aiMessageId })
+  }
 
   nextTick(() => {
     scrollKbToBottom()
@@ -1136,7 +1189,7 @@ const sendKbMessage = async () => {
               duplicateMessages.forEach(dupMsg => {
                 const index = messages.value.findIndex(m => m.id === dupMsg.id)
                 if (index > -1) {
-                  console.log('[sendKbMessage] 清除重复的用户消息', { 
+                  logger.info('清除重复的用户消息', { 
                     content: content.substring(0, 50), 
                     id: dupMsg.id,
                     index
@@ -1144,7 +1197,7 @@ const sendKbMessage = async () => {
                   messages.value.splice(index, 1)
                 }
               })
-              console.log('[sendKbMessage] 已清除重复的用户消息', { 
+              logger.info('已清除重复的用户消息', { 
                 removedCount: duplicateMessages.length,
                 content: content.substring(0, 50)
               })
@@ -1207,7 +1260,7 @@ const sendKbMessage = async () => {
                   messages.value.splice(index, 1)
                 }
               })
-              console.log('[sendKbMessage] 错误处理中清除重复的用户消息', { removedCount: duplicateMessages.length })
+              logger.info('错误处理中清除重复的用户消息', { removedCount: duplicateMessages.length })
             }
           }
           lastUserMessageId.value = null
@@ -1258,7 +1311,7 @@ const sendKbMessage = async () => {
               messages.value.splice(index, 1)
             }
           })
-          console.log('[sendKbMessage] 异常处理中清除重复的用户消息', { removedCount: duplicateMessages.length })
+          logger.info('异常处理中清除重复的用户消息', { removedCount: duplicateMessages.length })
         }
       }
       lastUserMessageId.value = null
