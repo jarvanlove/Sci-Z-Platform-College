@@ -17,6 +17,7 @@ import com.sciz.server.infrastructure.external.dify.service.DifyApiService;
 import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
+import com.sciz.server.infrastructure.shared.utils.LoginUserUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -56,7 +57,7 @@ public class DifyWorkflowServiceImpl implements DifyWorkflowService {
                 fileName, req.resourceId(), req.keyType()));
 
         // 1. 获取当前登录用户
-        var currentUser = com.sciz.server.infrastructure.shared.utils.LoginUserUtil.requireCurrentUser();
+        var currentUser = LoginUserUtil.requireCurrentUser();
         Long userId = currentUser.userId();
 
         // 2. 同步上传文件到 Dify
@@ -89,22 +90,6 @@ public class DifyWorkflowServiceImpl implements DifyWorkflowService {
 
         log.info(String.format("文件已上传到 Dify: difyFileId=%s, fileName=%s", difyFileId, fileName));
         return new FileSyncDifyResp(difyFileId);
-    }
-
-    /**
-     * 转换为 DifyWorkflowRequest
-     * @param request 申报工作流请求
-     * @return DifyWorkflowRequest
-     */
-    private DifyWorkflowRequest convertToDifyWorkflowRequest(DeclarationWorkflowReq request) {
-        var difyRequest = new DifyWorkflowRequest();
-        difyRequest.setUserId(request.userId());
-        difyRequest.setResourceId(request.resourceId());
-        difyRequest.setKeyType(request.keyType());
-        difyRequest.setInputs(request.inputs());
-        difyRequest.setResponseMode(request.responseMode());
-        difyRequest.setUser(request.user());
-        return difyRequest;
     }
 
     /**
