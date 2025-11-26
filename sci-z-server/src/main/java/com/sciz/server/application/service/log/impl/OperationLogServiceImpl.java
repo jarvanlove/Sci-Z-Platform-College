@@ -140,7 +140,7 @@ public class OperationLogServiceImpl implements OperationLogService {
     @Override
     public OperationLogResp findDetail(Long logId) {
         var logEntity = Optional.ofNullable(repository.findById(logId))
-                .orElseThrow(() -> new BusinessException(ResultCode.DATA_NOT_FOUND, "操作日志不存在"));
+                .orElseThrow(() -> BusinessException.of(ResultCode.DATA_NOT_FOUND, "操作日志不存在"));
         return new OperationLogResp(
                 logEntity.getId(),
                 logEntity.getUserId(),
@@ -170,7 +170,7 @@ public class OperationLogServiceImpl implements OperationLogService {
      */
     private void validateTimeRange(LocalDateTime startTime, LocalDateTime endTime) {
         if (startTime != null && endTime != null && startTime.isAfter(endTime)) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "开始时间不能晚于结束时间");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "开始时间不能晚于结束时间");
         }
     }
 

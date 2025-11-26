@@ -7,6 +7,7 @@ import com.sciz.server.domain.pojo.dto.request.user.UserAdminResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.request.user.UserCreateReq;
 import com.sciz.server.domain.pojo.dto.request.user.UserListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.user.UserUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.user.DifyApiKeyResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserCreateResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserListResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserUpdateResp;
@@ -25,6 +26,7 @@ import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.enums.OperationLogRecorderStatus;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
+import com.sciz.server.infrastructure.external.dify.service.DifyApiKeyService;
 import com.sciz.server.infrastructure.shared.utils.DateUtil;
 import com.sciz.server.infrastructure.shared.utils.OperationLogRecorderUtil;
 import com.sciz.server.interfaces.converter.UserConverter;
@@ -63,6 +65,7 @@ public class UserServiceImpl implements UserService {
     private final IndustryConfigCache industryConfigCache;
     private final UserConverter userConverter;
     private final OperationLogRecorderUtil operationLogRecorderUtil;
+    private final DifyApiKeyService difyApiKeyService;
 
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Shanghai");
 
@@ -101,7 +104,7 @@ public class UserServiceImpl implements UserService {
             var industryType = Optional.ofNullable(industryConfigCache.get())
                     .map(IndustryConfigCache.IndustryView::getType)
                     .map(type -> type.trim().toLowerCase(Locale.ROOT))
-                    .orElseThrow(() -> new BusinessException(ResultCode.SERVER_ERROR, "行业配置未初始化"));
+                    .orElseThrow(() -> BusinessException.of(ResultCode.SERVER_ERROR, "行业配置未初始化"));
 
             // 2. 校验账号唯一性
             ensureAccountUniqueness(username, email, phone);
@@ -117,7 +120,7 @@ public class UserServiceImpl implements UserService {
             var userId = Optional.ofNullable(sysUserRepo.save(user))
                     .orElseThrow(() -> {
                         log.error(String.format("%s失败，保存数据库失败: username=%s", operation, username));
-                        return new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+                        return BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
                     });
 
             // 6. 记录操作日志（成功）
@@ -157,17 +160,17 @@ public class UserServiceImpl implements UserService {
         Optional.ofNullable(sysUserRepo.findByUsername(username))
                 .ifPresent(existing -> {
                     log.warn(String.format("创建用户失败，用户名已存在: username=%s", username));
-                    throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "用户名已存在");
+                    throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "用户名已存在");
                 });
         Optional.ofNullable(sysUserRepo.findByEmail(email))
                 .ifPresent(existing -> {
                     log.warn(String.format("创建用户失败，邮箱已被注册: email=%s", email));
-                    throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "邮箱已被注册");
+                    throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "邮箱已被注册");
                 });
         Optional.ofNullable(sysUserRepo.findByPhone(phone))
                 .ifPresent(existing -> {
                     log.warn(String.format("创建用户失败，手机号已被注册: phone=%s", phone));
-                    throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "手机号已被注册");
+                    throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "手机号已被注册");
                 });
     }
 
@@ -182,23 +185,23 @@ public class UserServiceImpl implements UserService {
         var department = Optional.ofNullable(sysDepartmentRepo.findById(departmentId))
                 .orElseThrow(() -> {
                     log.warn(String.format("部门不存在: departmentId=%s", departmentId));
-                    return new BusinessException(ResultCode.BAD_REQUEST, "部门不存在");
+                    return BusinessException.of(ResultCode.BAD_REQUEST, "部门不存在");
                 });
 
         if (!industryType.equals(department.getIndustryType())) {
             log.warn(String.format("部门行业不匹配: departmentId=%s, departmentIndustry=%s, reqIndustry=%s",
                     departmentId, department.getIndustryType(), industryType));
-            throw new BusinessException(ResultCode.BAD_REQUEST, "部门行业类型不匹配");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "部门行业类型不匹配");
         }
 
         if (!EnableStatus.ENABLED.getCode().equals(department.getStatus())) {
             log.warn(String.format("部门已禁用: departmentId=%s", departmentId));
-            throw new BusinessException(ResultCode.BAD_REQUEST, "部门已禁用");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "部门已禁用");
         }
 
         if (DeleteStatus.DELETED.getCode().equals(department.getIsDeleted())) {
             log.warn(String.format("部门已删除: departmentId=%s", departmentId));
-            throw new BusinessException(ResultCode.BAD_REQUEST, "部门已删除");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "部门已删除");
         }
 
         return department;
@@ -215,17 +218,17 @@ public class UserServiceImpl implements UserService {
         var department = Optional.ofNullable(sysDepartmentRepo.findByCode(industryType, departmentCode))
                 .orElseThrow(() -> {
                     log.warn(String.format("部门不存在: departmentCode=%s, industryType=%s", departmentCode, industryType));
-                    return new BusinessException(ResultCode.BAD_REQUEST, "部门不存在");
+                    return BusinessException.of(ResultCode.BAD_REQUEST, "部门不存在");
                 });
 
         if (!EnableStatus.ENABLED.getCode().equals(department.getStatus())) {
             log.warn(String.format("部门已禁用: departmentCode=%s", departmentCode));
-            throw new BusinessException(ResultCode.BAD_REQUEST, "部门已禁用");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "部门已禁用");
         }
 
         if (DeleteStatus.DELETED.getCode().equals(department.getIsDeleted())) {
             log.warn(String.format("部门已删除: departmentCode=%s", departmentCode));
-            throw new BusinessException(ResultCode.BAD_REQUEST, "部门已删除");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "部门已删除");
         }
 
         return department;
@@ -430,7 +433,7 @@ public class UserServiceImpl implements UserService {
             var user = Optional.ofNullable(sysUserRepo.findById(req.id()))
                     .orElseThrow(() -> {
                         log.warn(String.format("%s失败，用户不存在: userId=%s", operation, req.id()));
-                        return new BusinessException(ResultCode.USER_NOT_FOUND);
+                        return BusinessException.of(ResultCode.USER_NOT_FOUND);
                     });
 
             // 2. 规格化入参
@@ -440,7 +443,7 @@ public class UserServiceImpl implements UserService {
             var industryType = Optional.ofNullable(industryConfigCache.get())
                     .map(IndustryConfigCache.IndustryView::getType)
                     .map(type -> type.trim().toLowerCase(Locale.ROOT))
-                    .orElseThrow(() -> new BusinessException(ResultCode.SERVER_ERROR, "行业配置未初始化"));
+                    .orElseThrow(() -> BusinessException.of(ResultCode.SERVER_ERROR, "行业配置未初始化"));
             var departmentCode = req.departmentCode();
 
             // 3. 校验邮箱/手机号唯一性（排除当前用户）
@@ -460,7 +463,7 @@ public class UserServiceImpl implements UserService {
 
             if (!sysUserRepo.updateById(user)) {
                 log.error(String.format("%s失败，保存数据库失败: userId=%s", operation, req.id()));
-                throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+                throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
             }
 
             // 6. 记录操作日志（成功）
@@ -507,7 +510,7 @@ public class UserServiceImpl implements UserService {
         var user = Optional.ofNullable(sysUserRepo.findById(userId))
                 .orElseThrow(() -> {
                     log.warn(String.format("删除用户失败，用户不存在: userId=%s", userId));
-                    return new BusinessException(ResultCode.USER_NOT_FOUND);
+                    return BusinessException.of(ResultCode.USER_NOT_FOUND);
                 });
 
         // 2. 软删除用户
@@ -516,7 +519,7 @@ public class UserServiceImpl implements UserService {
 
         if (!sysUserRepo.updateById(user)) {
             log.error(String.format("删除用户失败，保存数据库失败: userId=%s", userId));
-            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+            throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
         }
 
         log.info(String.format("删除用户成功: userId=%s", userId));
@@ -541,7 +544,7 @@ public class UserServiceImpl implements UserService {
             var user = Optional.ofNullable(sysUserRepo.findById(userId))
                     .orElseThrow(() -> {
                         log.warn(String.format("%s失败，用户不存在: userId=%s", operation, userId));
-                        return new BusinessException(ResultCode.USER_NOT_FOUND);
+                        return BusinessException.of(ResultCode.USER_NOT_FOUND);
                     });
 
             // 2. 更新用户状态
@@ -551,7 +554,7 @@ public class UserServiceImpl implements UserService {
 
             if (!sysUserRepo.updateById(user)) {
                 log.error(String.format("%s失败，保存数据库失败: userId=%s", operation, userId));
-                throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+                throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
             }
 
             // 3. 记录操作日志（成功）
@@ -587,7 +590,7 @@ public class UserServiceImpl implements UserService {
         var user = Optional.ofNullable(sysUserRepo.findById(req.userId()))
                 .orElseThrow(() -> {
                     log.warn(String.format("管理员重置密码失败，用户不存在: userId=%s", req.userId()));
-                    return new BusinessException(ResultCode.USER_NOT_FOUND);
+                    return BusinessException.of(ResultCode.USER_NOT_FOUND);
                 });
 
         // 2. 更新密码
@@ -596,7 +599,7 @@ public class UserServiceImpl implements UserService {
 
         if (!sysUserRepo.updateById(user)) {
             log.error(String.format("管理员重置密码失败，保存数据库失败: userId=%s", req.userId()));
-            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+            throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
         }
 
         log.info(String.format("管理员重置用户密码成功: userId=%s", req.userId()));
@@ -614,14 +617,38 @@ public class UserServiceImpl implements UserService {
                 .filter(existing -> !existing.getId().equals(userId))
                 .ifPresent(existing -> {
                     log.warn(String.format("更新用户失败，邮箱已被其他用户注册: userId=%s, email=%s", userId, email));
-                    throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "邮箱已被其他用户注册");
+                    throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "邮箱已被其他用户注册");
                 });
         Optional.ofNullable(sysUserRepo.findByPhone(phone))
                 .filter(existing -> !existing.getId().equals(userId))
                 .ifPresent(existing -> {
                     log.warn(String.format("更新用户失败，手机号已被其他用户注册: userId=%s, phone=%s", userId, phone));
-                    throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "手机号已被其他用户注册");
+                    throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "手机号已被其他用户注册");
                 });
+    }
+
+    /**
+     * 获取所有工作流 API 密钥
+     * 获取所有激活的 Dify API 密钥列表
+     *
+     * @return List<DifyApiKeyResp> API 密钥列表
+     */
+    @Override
+    public List<DifyApiKeyResp> listAllApiKeys() {
+        log.info("获取所有工作流 API 密钥");
+
+        // 1. 调用 DifyApiKeyService 获取所有 API 密钥
+        var apiKeys = difyApiKeyService.getAllApiKeys();
+
+        // 2. 转换为响应对象
+        var respList = Optional.ofNullable(apiKeys)
+                .orElseGet(List::of)
+                .stream()
+                .map(userConverter::toDifyApiKeyResp)
+                .toList();
+
+        log.info(String.format("获取所有工作流 API 密钥成功: size=%d", respList.size()));
+        return respList;
     }
 
     /**

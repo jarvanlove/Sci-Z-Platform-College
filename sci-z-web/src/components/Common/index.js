@@ -4,6 +4,7 @@
  */
 
 // 基础组件
+export { default as BackButton } from './BackButton.vue'
 export { default as BaseButton } from './BaseButton.vue'
 export { default as BaseCard } from './BaseCard.vue'
 export { default as BaseDialog } from './BaseDialog.vue'
@@ -14,6 +15,7 @@ export { default as BaseDatePicker } from './BaseDatePicker.vue'
 export { default as BaseSwitch } from './BaseSwitch.vue'
 
 // 功能组件
+export { default as AgreementNotice } from './AgreementNotice.vue'
 export { default as LanguageSwitcher } from './LanguageSwitcher.vue'
 
 // 业务组件

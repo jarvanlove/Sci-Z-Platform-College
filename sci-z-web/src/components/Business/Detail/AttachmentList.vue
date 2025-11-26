@@ -168,8 +168,7 @@ import {
   Document,
   Picture,
   VideoPlay,
-  Folder,
-  FileText
+  Folder
 } from '@element-plus/icons-vue'
 
 // Props
@@ -268,7 +267,7 @@ const getFileIcon = (attachment) => {
   } else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(extension)) {
     return Folder
   } else if (['pdf', 'doc', 'docx', 'txt'].includes(extension)) {
-    return FileText
+    return Document
   } else {
     return Document
   }

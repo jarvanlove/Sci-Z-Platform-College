@@ -1,10 +1,12 @@
 package com.sciz.server.interfaces.converter;
 
 import com.sciz.server.domain.pojo.dto.request.user.UserCreateReq;
+import com.sciz.server.domain.pojo.dto.response.user.DifyApiKeyResp;
 import com.sciz.server.domain.pojo.dto.response.user.RolePermissionIdsResp;
 import com.sciz.server.domain.pojo.dto.response.user.RoleUserIdsResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserCreateResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserRoleIdsResp;
+import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
 import com.sciz.server.domain.pojo.entity.user.SysUser;
 import java.util.List;
 import java.util.Optional;
@@ -90,4 +92,23 @@ public interface UserConverter {
      * @return UserCreateResp 创建响应
      */
     UserCreateResp toUserCreateResp(SysUser entity);
+
+    /**
+     * DifyApiKey 实体 → DifyApiKeyResp 响应
+     *
+     * @param entity DifyApiKey 实体
+     * @return DifyApiKeyResp 响应
+     */
+    default DifyApiKeyResp toDifyApiKeyResp(DifyApiKey entity) {
+        if (entity == null) {
+            return null;
+        }
+        return new DifyApiKeyResp(
+                entity.getId(),
+                entity.getUserId(),
+                entity.getKeyType(),
+                entity.getResourceId(),
+                entity.getKeyName(),
+                entity.getDescription());
+    }
 }

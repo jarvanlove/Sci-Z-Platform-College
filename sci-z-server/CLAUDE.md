@@ -1373,11 +1373,10 @@ public class XxxEventHandler {
 
 #### 2. 现有常量类
 
-| 常量类              | 用途           | 示例                                    |
-| ------------------- | -------------- | --------------------------------------- |
-| **CacheConstant**   | 缓存相关常量   | `AUTH_FAIL_KEY`、`MAX_LOGIN_FAIL_COUNT` |
-| **MessageConstant** | 系统级通用消息 | `SUCCESS_MESSAGE`、`FAIL_MESSAGE`       |
-| **SystemConstant**  | 系统配置常量   | `DEFAULT_PAGE_SIZE`、`DATE_TIME_FORMAT` |
+| 常量类             | 用途         | 示例                                    |
+| ------------------ | ------------ | --------------------------------------- |
+| **CacheConstant**  | 缓存相关常量 | `AUTH_FAIL_KEY`、`MAX_LOGIN_FAIL_COUNT` |
+| **SystemConstant** | 系统配置常量 | `DEFAULT_PAGE_SIZE`、`DATE_TIME_FORMAT` |
 
 #### 3. 使用规范
 

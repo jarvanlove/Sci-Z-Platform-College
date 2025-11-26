@@ -155,6 +155,11 @@ public enum OperationLogRecorderStatus {
      */
     DECLARATION_APPROVE("审核申报", "已审核申报"),
 
+    /**
+     * 上传红头文件
+     */
+    DECLARATION_UPLOAD_RED_HEADER_FILE("上传红头文件", "已上传红头文件"),
+
     // ==================== 文件管理模块 ====================
 
     /**

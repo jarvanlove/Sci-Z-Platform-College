@@ -2,14 +2,18 @@ package com.sciz.server.application.service.file.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.sciz.server.application.service.file.FileConvertService;
 import com.sciz.server.application.service.file.FileService;
 import com.sciz.server.domain.pojo.dto.request.file.FileBatchUploadReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileCheckDuplicateReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileListQueryReq;
+import com.sciz.server.domain.pojo.dto.request.file.FileSyncDifyReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.file.FileDownloadContext;
 import com.sciz.server.domain.pojo.dto.response.file.FileDuplicateCheckResp;
 import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
+import com.sciz.server.domain.pojo.dto.response.file.FileSyncDifyResp;
+import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
 import com.sciz.server.domain.pojo.entity.file.SysAttachment;
 import com.sciz.server.domain.pojo.entity.file.SysAttachmentRelation;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRelationRepo;
@@ -30,6 +34,8 @@ import com.sciz.server.infrastructure.shared.utils.MinioUtil;
 import com.sciz.server.interfaces.converter.FileConverter;
 import io.minio.GetObjectResponse;
 import io.minio.MinioClient;
+
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
@@ -67,9 +73,12 @@ public class FileServiceImpl implements FileService {
     private final SysAttachmentRelationRepo sysAttachmentRelationRepo;
     private final FileConverter fileConverter;
     private final EventPublisher eventPublisher;
+    private final FileConvertService fileConvertService;
+    private final DifyWorkflowService difyWorkflowService;
     @Value("${minio.bucket:sciz-files}")
     private String bucketName;
     private final AtomicBoolean bucketInitialized = new AtomicBoolean(false);
+
     /**
      * 单文件上传
      *
@@ -176,14 +185,86 @@ public class FileServiceImpl implements FileService {
      */
     @Override
     public FileDownloadContext download(Long attachmentId) {
+        return download(attachmentId, null);
+    }
+
+    /**
+     * 文件下载（支持格式转换）
+     *
+     * @param attachmentId Long 附件ID
+     * @param targetFormat String 目标格式（docx/pdf，null表示不转换）
+     * @return FileDownloadContext 下载上下文
+     */
+    @Override
+    public FileDownloadContext download(Long attachmentId, String targetFormat) {
         // 1. 查询附件
         var attachment = obtainAttachment(attachmentId);
 
-        // 2. 确保存储桶可用
-        ensureBucket();
+        // 2. 如果不需要转换，直接下载原文件
+        if (!StringUtils.hasText(targetFormat)) {
+            ensureBucket();
+            return downloadFromObjectStorage(attachmentId, attachment);
+        }
 
-        // 3. 执行下载并更新统计
-        return downloadFromObjectStorage(attachmentId, attachment);
+        // 3. 需要格式转换
+        log.info(String.format("文件格式转换下载: attachmentId=%s, targetFormat=%s", attachmentId, targetFormat));
+
+        // 3.1 获取源文件格式
+        var sourceFormat = FileUtil.getFileExtension(attachment.getOriginalName());
+        if (!StringUtils.hasText(sourceFormat)) {
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "无法识别源文件格式");
+        }
+
+        // 3.2 检查是否支持转换
+        if (!fileConvertService.isSupported(sourceFormat, targetFormat)) {
+            throw BusinessException.of(ResultCode.BAD_REQUEST,
+                    "不支持的文件格式转换: %s → %s", sourceFormat, targetFormat);
+        }
+
+        // 3.3 如果格式相同，直接下载
+        if (sourceFormat.equalsIgnoreCase(targetFormat)) {
+            ensureBucket();
+            return downloadFromObjectStorage(attachmentId, attachment);
+        }
+
+        // 3.4 从 MinIO 下载源文件
+        ensureBucket();
+        GetObjectResponse sourceFile;
+        try {
+            sourceFile = MinioUtil.download(minioClient, bucketName, attachment.getFilePath());
+        } catch (Exception e) {
+            log.error(String.format("下载源文件失败: attachmentId=%s, err=%s", attachmentId, e.getMessage()), e);
+            throw BusinessException.of(ResultCode.FILE_DOWNLOAD_FAILED, "下载源文件失败: %s", e.getMessage());
+        }
+
+        // 3.5 执行格式转换
+        try (var sourceInputStream = sourceFile) {
+            var convertResult = fileConvertService.convert(
+                    sourceInputStream,
+                    sourceFormat,
+                    targetFormat,
+                    attachment.getOriginalName());
+
+            // 3.6 更新下载统计
+            sysAttachmentRepo.increaseDownloadCount(attachmentId,
+                    LoginUserUtil.getCurrentUserId().orElse(null));
+
+            // 3.7 封装为 FileDownloadContext
+            // 注意：需要将 InputStream 转换为可重复读取的格式（ByteArrayInputStream）
+            var convertedBytes = convertResult.inputStream().readAllBytes();
+            var byteArrayInputStream = new ByteArrayInputStream(convertedBytes);
+
+            return new FileDownloadContext(
+                    convertResult.fileName(),
+                    convertResult.fileName(),
+                    convertResult.mimeType(),
+                    convertResult.contentLength(),
+                    byteArrayInputStream);
+
+        } catch (Exception e) {
+            log.error(String.format("文件格式转换失败: attachmentId=%s, err=%s", attachmentId, e.getMessage()), e);
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "文件格式转换失败: %s", e.getMessage());
+        }
     }
 
     /**
@@ -209,7 +290,7 @@ public class FileServiceImpl implements FileService {
             return MinioUtil.presignedGetUrl(minioClient, bucketName, attachment.getFilePath(), effectiveExpire);
         } catch (Exception exception) {
             log.error(String.format("获取文件预览链接失败: attachmentId=%s", attachmentId), exception);
-            throw new BusinessException(ResultCode.FILE_DOWNLOAD_FAILED, "获取文件预览链接失败");
+            throw BusinessException.of(ResultCode.FILE_DOWNLOAD_FAILED, "获取文件预览链接失败");
         }
     }
 
@@ -292,7 +373,7 @@ public class FileServiceImpl implements FileService {
         // 3. 删除数据库记录与关联
         var operatorId = LoginUserUtil.getCurrentUserId().orElse(null);
         if (!sysAttachmentRepo.markDeleted(attachmentId, operatorId)) {
-            throw new BusinessException(ResultCode.FILE_DOWNLOAD_FAILED, "删除数据库记录失败");
+            throw BusinessException.of(ResultCode.FILE_DOWNLOAD_FAILED, "删除数据库记录失败");
         }
         sysAttachmentRelationRepo.deleteByAttachmentId(attachmentId);
 
@@ -309,7 +390,7 @@ public class FileServiceImpl implements FileService {
     @Override
     public FileDuplicateCheckResp checkDuplicate(FileCheckDuplicateReq req) {
         if (req == null || !StringUtils.hasText(req.md5())) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "文件MD5不能为空");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "文件MD5不能为空");
         }
         var attachment = sysAttachmentRepo.findByMd5(req.md5());
         if (attachment == null) {
@@ -326,14 +407,14 @@ public class FileServiceImpl implements FileService {
      */
     private void validateUploadRequest(FileUploadReq req) {
         if (req == null || req.getFile() == null || req.getFile().isEmpty()) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "上传文件不能为空");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "上传文件不能为空");
         }
         if (FileUtil.isFileSizeExceeded(req.getFile().getSize())) {
-            throw new BusinessException(ResultCode.FILE_SIZE_EXCEEDED);
+            throw BusinessException.of(ResultCode.FILE_SIZE_EXCEEDED);
         }
         if (!FileUtil.isSupportedFileType(req.getFile().getOriginalFilename())
                 && !FileUtil.isSupportedMimeType(req.getFile().getContentType())) {
-            throw new BusinessException(ResultCode.FILE_TYPE_NOT_SUPPORTED);
+            throw BusinessException.of(ResultCode.FILE_TYPE_NOT_SUPPORTED);
         }
     }
 
@@ -351,7 +432,7 @@ public class FileServiceImpl implements FileService {
             return AttachmentCategoryStatus.fromCode(attachmentType);
         } catch (IllegalArgumentException exception) {
             log.warn(String.format("不支持的附件类型: attachmentType=%s", attachmentType));
-            throw new BusinessException(ResultCode.BAD_REQUEST, "不支持的附件类型");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "不支持的附件类型");
         }
     }
 
@@ -364,7 +445,7 @@ public class FileServiceImpl implements FileService {
         var hasRelationType = StringUtils.hasText(req.getRelationType());
         if (!hasRelationType) {
             if (req.getRelationId() != null || StringUtils.hasText(req.getRelationName())) {
-                throw new BusinessException(ResultCode.BAD_REQUEST, "未指定关联类型时不能提供关联对象信息");
+                throw BusinessException.of(ResultCode.BAD_REQUEST, "未指定关联类型时不能提供关联对象信息");
             }
             return;
         }
@@ -373,11 +454,7 @@ public class FileServiceImpl implements FileService {
             AttachmentRelationStatus.fromCode(req.getRelationType());
         } catch (IllegalArgumentException exception) {
             log.warn(String.format("不支持的附件关联类型: relationType=%s", req.getRelationType()));
-            throw new BusinessException(ResultCode.BAD_REQUEST, "不支持的附件关联类型");
-        }
-
-        if (req.getRelationId() == null) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "附件关联对象ID不能为空");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "不支持的附件关联类型");
         }
     }
 
@@ -388,7 +465,7 @@ public class FileServiceImpl implements FileService {
      */
     private void validateBatchUploadRequest(FileBatchUploadReq req) {
         if (req == null || req.files() == null || req.files().length == 0) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "上传文件列表不能为空");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "上传文件列表不能为空");
         }
     }
 
@@ -436,7 +513,7 @@ public class FileServiceImpl implements FileService {
             MinioUtil.upload(minioClient, bucketName, objectName, inputStream, size, mimeType);
         } catch (Exception exception) {
             log.error(String.format("上传文件到 MinIO 失败: objectName=%s", objectName), exception);
-            throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED, "上传文件到存储失败");
+            throw BusinessException.of(ResultCode.FILE_UPLOAD_FAILED, "上传文件到存储失败");
         }
     }
 
@@ -452,15 +529,17 @@ public class FileServiceImpl implements FileService {
 
     /**
      * 保存附件关联
+     * 注意：如果 relationId 为 null，使用临时值 0 表示待关联
      */
     private void saveRelationIfNecessary(FileUploadReq req, Long attachmentId) {
-        if (!StringUtils.hasText(req.getRelationType()) || req.getRelationId() == null) {
+        if (!StringUtils.hasText(req.getRelationType())) {
             return;
         }
         var relation = new SysAttachmentRelation();
         relation.setAttachmentId(attachmentId);
         relation.setRelationType(req.getRelationType());
-        relation.setRelationId(req.getRelationId());
+        // 如果 relationId 为 null，使用临时值 0 表示待关联
+        relation.setRelationId(req.getRelationId() != null ? req.getRelationId() : 0L);
         relation.setRelationName(req.getRelationName());
         relation.setAttachmentType(req.getAttachmentType());
         relation.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
@@ -557,7 +636,7 @@ public class FileServiceImpl implements FileService {
     private SysAttachment obtainAttachment(Long attachmentId) {
         SysAttachment attachment = sysAttachmentRepo.findById(attachmentId);
         if (attachment == null || DeleteStatus.DELETED.getCode().equals(attachment.getIsDeleted())) {
-            throw new BusinessException(ResultCode.FILE_NOT_FOUND);
+            throw BusinessException.of(ResultCode.FILE_NOT_FOUND);
         }
         return attachment;
     }
@@ -574,8 +653,8 @@ public class FileServiceImpl implements FileService {
         } catch (Exception exception) {
             bucketInitialized.set(false);
             log.error(String.format("初始化 MinIO 桶失败: bucket=%s", bucketName), exception);
-            throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED,
-                    String.format("初始化存储桶失败: %s", exception.getMessage()));
+            throw BusinessException.of(ResultCode.FILE_UPLOAD_FAILED,
+                    "初始化存储桶失败: %s", exception.getMessage());
         }
     }
 
@@ -607,7 +686,7 @@ public class FileServiceImpl implements FileService {
             return DigestUtils.md5DigestAsHex(inputStream);
         } catch (IOException exception) {
             log.error("计算文件MD5失败", exception);
-            throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED, "计算文件MD5失败");
+            throw BusinessException.of(ResultCode.FILE_UPLOAD_FAILED, "计算文件MD5失败");
         }
     }
 
@@ -664,7 +743,7 @@ public class FileServiceImpl implements FileService {
     private Long persistAttachment(SysAttachment attachment) {
         var attachmentId = sysAttachmentRepo.save(attachment);
         if (attachmentId == null) {
-            throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED, "附件保存失败");
+            throw BusinessException.of(ResultCode.FILE_UPLOAD_FAILED, "附件保存失败");
         }
         attachment.setId(attachmentId);
         return attachmentId;
@@ -704,7 +783,7 @@ public class FileServiceImpl implements FileService {
                     response);
         } catch (Exception exception) {
             log.error(String.format("文件下载失败: attachmentId=%s", attachmentId), exception);
-            throw new BusinessException(ResultCode.FILE_DOWNLOAD_FAILED, "文件下载失败");
+            throw BusinessException.of(ResultCode.FILE_DOWNLOAD_FAILED, "文件下载失败");
         }
     }
 
@@ -720,8 +799,19 @@ public class FileServiceImpl implements FileService {
             MinioUtil.deleteObject(minioClient, bucketName, attachment.getFilePath());
         } catch (Exception exception) {
             log.error(String.format("删除 MinIO 对象失败: attachmentId=%s", attachmentId), exception);
-            throw new BusinessException(ResultCode.FILE_DOWNLOAD_FAILED, "删除存储对象失败");
+            throw BusinessException.of(ResultCode.FILE_DOWNLOAD_FAILED, "删除存储对象失败");
         }
+    }
+
+    /**
+     * 同步文件到 Dify
+     *
+     * @param req FileSyncDifyReq 同步请求
+     * @return FileSyncDifyResp 同步结果（包含 Dify 文件ID）
+     */
+    @Override
+    public FileSyncDifyResp syncToDify(FileSyncDifyReq req) {
+        return difyWorkflowService.syncFileToDify(req);
     }
 
     /**

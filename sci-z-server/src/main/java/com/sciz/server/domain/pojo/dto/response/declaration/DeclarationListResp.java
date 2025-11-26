@@ -73,7 +73,12 @@ public class DeclarationListResp {
     private LocalDateTime submitTime;
 
     /**
-     * 是否有附件（申报书）- 用于控制下载按钮显示
+     * 是否有附件（申报书）- 用于控制下载、预览按钮显示
      */
     private Boolean hasAttachment;
+
+    /**
+     * 附件ID（申报书）- 用于下载和预览，有附件时返回，没有则为null
+     */
+    private Long attachmentId;
 }

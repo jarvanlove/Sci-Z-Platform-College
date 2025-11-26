@@ -4,10 +4,13 @@ import com.sciz.server.domain.pojo.dto.request.user.UserAdminResetPasswordReq;
 import com.sciz.server.domain.pojo.dto.request.user.UserCreateReq;
 import com.sciz.server.domain.pojo.dto.request.user.UserListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.user.UserUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.user.DifyApiKeyResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserCreateResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserListResp;
 import com.sciz.server.domain.pojo.dto.response.user.UserUpdateResp;
 import com.sciz.server.infrastructure.shared.result.PageResult;
+
+import java.util.List;
 
 /**
  * 用户应用服务
@@ -76,4 +79,12 @@ public interface UserService {
      * @param req UserAdminResetPasswordReq 重置密码请求
      */
     void adminResetPassword(UserAdminResetPasswordReq req);
+
+    /**
+     * 获取所有工作流 API 密钥
+     * 获取所有激活的 Dify API 密钥列表
+     *
+     * @return List<DifyApiKeyResp> API 密钥列表
+     */
+    List<DifyApiKeyResp> listAllApiKeys();
 }

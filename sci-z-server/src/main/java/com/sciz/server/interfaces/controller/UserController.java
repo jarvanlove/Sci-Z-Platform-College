@@ -13,6 +13,7 @@ import com.sciz.server.domain.pojo.dto.request.system.RoleUpdateReq;
 import com.sciz.server.domain.pojo.dto.request.system.UserRoleUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.system.PermissionTreeResp;
 import com.sciz.server.domain.pojo.dto.response.system.RoleResp;
+import com.sciz.server.domain.pojo.dto.response.user.DifyApiKeyResp;
 import com.sciz.server.domain.pojo.dto.response.user.IndustryConfigResp;
 import com.sciz.server.domain.pojo.dto.response.user.IndustryProfileFieldOptionResp;
 import com.sciz.server.domain.pojo.dto.response.user.IndustryProfileFieldResp;
@@ -171,7 +172,7 @@ public class UserController {
     public Result<RoleResp> updateRole(@PathVariable Long id, @Valid @RequestBody RoleUpdateReq req) {
         // 确保路径参数和请求体中的ID一致
         if (!id.equals(req.id())) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "路径参数中的角色ID与请求体中的角色ID不一致");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "路径参数中的角色ID与请求体中的角色ID不一致");
         }
         var resp = userRoleService.update(req);
         return Result.success(resp);
@@ -248,7 +249,7 @@ public class UserController {
     public Result<UserUpdateResp> updateUser(@PathVariable Long id, @Valid @RequestBody UserUpdateReq req) {
         // 确保路径参数和请求体中的ID一致
         if (!id.equals(req.id())) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "路径参数中的用户ID与请求体中的用户ID不一致");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "路径参数中的用户ID与请求体中的用户ID不一致");
         }
         var resp = userService.update(req);
         return Result.success(resp);
@@ -307,6 +308,13 @@ public class UserController {
     @GetMapping("/operation/logs/{logId}")
     public Result<OperationLogResp> operationLogDetail(@PathVariable Long logId) {
         var resp = operationLogService.findDetail(logId);
+        return Result.success(resp);
+    }
+
+    @Operation(summary = "获取所有工作流", description = "获取所有激活的 Dify API 密钥列表（工作流）")
+    @GetMapping("/workflows")
+    public Result<List<DifyApiKeyResp>> listAllWorkflows() {
+        var resp = userService.listAllApiKeys();
         return Result.success(resp);
     }
 }

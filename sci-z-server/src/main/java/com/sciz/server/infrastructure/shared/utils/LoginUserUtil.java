@@ -83,7 +83,7 @@ public final class LoginUserUtil {
      */
     public static LoginUserContext requireCurrentUser() {
         return getCurrentUser()
-                .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "用户未登录或会话已失效"));
+                .orElseThrow(() -> BusinessException.of(ResultCode.UNAUTHORIZED, "用户未登录或会话已失效"));
     }
 
     /**
@@ -102,6 +102,6 @@ public final class LoginUserUtil {
      */
     public static Long requireCurrentUserId() {
         return getCurrentUserId()
-                .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "用户未登录或会话已失效"));
+                .orElseThrow(() -> BusinessException.of(ResultCode.UNAUTHORIZED, "用户未登录或会话已失效"));
     }
 }

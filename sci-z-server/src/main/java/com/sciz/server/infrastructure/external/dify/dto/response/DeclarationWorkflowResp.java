@@ -1,104 +1,102 @@
 package com.sciz.server.infrastructure.external.dify.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.util.List;
 import java.util.Map;
 
 /**
- * 申报工作流响应 DTO
+ * 申报工作流输出参数配置
+ * 类型安全的工作流输出参数定义
+ * <p>
+ * 字段名与 Dify 工作流输出保持一致，集中管理，避免硬编码
+ * <p>
+ * 根据工作流配置，输出变量包括：fileName, fileUrl, fileType, files
  *
- * @param taskId        String 任务ID
- * @param workflowRunId String 工作流运行ID
- * @param data          WorkflowData 工作流数据
+ * @param fileName String 文件名
+ * @param fileUrl  String 文件下载URL
+ * @param fileType String 文件类型
+ * @param files    List<Object> 文件列表
  * @author JiaWen.Wu
  * @className DeclarationWorkflowResp
- * @date 2025-01-20 15:00
+ * @date 2025-01-26 16:00
  */
-@Schema(description = "申报工作流响应结果")
 public record DeclarationWorkflowResp(
-        @Schema(description = "任务ID") String taskId,
-
-        @Schema(description = "工作流运行ID") @JsonProperty("workflow_run_id") String workflowRunId,
-
-        @Schema(description = "工作流数据") WorkflowData data) {
+        String fileName,
+        String fileUrl,
+        String fileType,
+        List<Object> files) {
 
     /**
-     * 工作流数据详情
-     *
-     * @param id          String 工作流运行ID
-     * @param workflowId  String 工作流ID
-     * @param status      String 执行状态
-     * @param outputs     WorkflowOutputs 输出结果
-     * @param error       String 错误信息
-     * @param elapsedTime Double 执行时间（秒）
-     * @param totalTokens Integer 总Token数
-     * @param totalSteps  Integer 总步骤数
-     * @param createdAt   Long 创建时间
-     * @param finishedAt  Long 完成时间
+     * 工作流输出字段名常量
      */
-    @Schema(description = "工作流数据详情")
-    public record WorkflowData(
-            @Schema(description = "工作流运行ID") String id,
+    private static final String FIELD_FILE_NAME = "fileName";
+    private static final String FIELD_FILE_URL = "fileUrl";
+    private static final String FIELD_FILE_TYPE = "fileType";
+    private static final String FIELD_FILES = "files";
 
-            @Schema(description = "工作流ID") @JsonProperty("workflow_id") String workflowId,
-
-            @Schema(description = "执行状态") String status,
-
-            @Schema(description = "输出结果") WorkflowOutputs outputs,
-
-            @Schema(description = "错误信息") String error,
-
-            @Schema(description = "执行时间（秒）") @JsonProperty("elapsed_time") Double elapsedTime,
-
-            @Schema(description = "总Token数") @JsonProperty("total_tokens") Integer totalTokens,
-
-            @Schema(description = "总步骤数") @JsonProperty("total_steps") Integer totalSteps,
-
-            @Schema(description = "创建时间") @JsonProperty("created_at") Long createdAt,
-
-            @Schema(description = "完成时间") @JsonProperty("finished_at") Long finishedAt) {
+    /**
+     * 使用部分参数创建（最常用）
+     * <p>
+     * 当前业务只需要 fileUrl 字段，其他字段使用默认值
+     *
+     * @param fileUrl String 文件下载URL
+     * @return DeclarationWorkflowResp 工作流输出参数
+     */
+    public static DeclarationWorkflowResp of(String fileUrl) {
+        return new DeclarationWorkflowResp("", fileUrl, "", null);
     }
 
     /**
-     * 工作流输出结果
+     * 从 outputs Map 中解析工作流输出参数（类型安全）
+     * <p>
+     * 从其他对象转换创建，支持所有字段
      *
-     * @param files List<WorkflowFile> 生成的文件列表
-     * @param text  String 文本输出
-     * @param json  List<Map<String, Object>> JSON输出
+     * @param outputs Map<String, Object> 工作流 outputs Map
+     * @return DeclarationWorkflowResp 工作流输出参数
      */
-    @Schema(description = "工作流输出结果")
-    public record WorkflowOutputs(
-            @Schema(description = "生成的文件列表") List<WorkflowFile> files,
+    public static DeclarationWorkflowResp from(Map<String, Object> outputs) {
+        if (outputs == null) {
+            return new DeclarationWorkflowResp("", "", "", null);
+        }
 
-            @Schema(description = "文本输出") String text,
+        String fileName = extractString(outputs, FIELD_FILE_NAME);
+        String fileUrl = extractString(outputs, FIELD_FILE_URL);
+        String fileType = extractString(outputs, FIELD_FILE_TYPE);
+        List<Object> files = extractList(outputs, FIELD_FILES);
 
-            @Schema(description = "JSON输出") List<Map<String, Object>> json) {
+        return new DeclarationWorkflowResp(fileName, fileUrl, fileType, files);
     }
 
     /**
-     * 工作流生成的文件
+     * 从 Map 中安全提取字符串值
      *
-     * @param id        String 文件ID
-     * @param filename  String 文件名
-     * @param extension String 文件扩展名
-     * @param mimeType  String MIME类型
-     * @param size      Long 文件大小（字节）
-     * @param url       String 文件URL（用于下载）
+     * @param outputs   Map<String, Object> outputs Map
+     * @param fieldName String 字段名
+     * @return String 字段值，如果不存在则返回空字符串
      */
-    @Schema(description = "工作流生成的文件")
-    public record WorkflowFile(
-            @Schema(description = "文件ID") String id,
+    private static String extractString(Map<String, Object> outputs, String fieldName) {
+        if (!outputs.containsKey(fieldName)) {
+            return "";
+        }
+        Object value = outputs.get(fieldName);
+        return value != null ? value.toString() : "";
+    }
 
-            @Schema(description = "文件名") String filename,
-
-            @Schema(description = "文件扩展名") String extension,
-
-            @Schema(description = "MIME类型") @JsonProperty("mime_type") String mimeType,
-
-            @Schema(description = "文件大小（字节）") Long size,
-
-            @Schema(description = "文件URL（用于下载）") String url) {
+    /**
+     * 从 Map 中安全提取列表值
+     *
+     * @param outputs   Map<String, Object> outputs Map
+     * @param fieldName String 字段名
+     * @return List<Object> 字段值，如果不存在则返回 null
+     */
+    @SuppressWarnings("unchecked")
+    private static List<Object> extractList(Map<String, Object> outputs, String fieldName) {
+        if (!outputs.containsKey(fieldName)) {
+            return null;
+        }
+        Object value = outputs.get(fieldName);
+        if (value instanceof List) {
+            return (List<Object>) value;
+        }
+        return null;
     }
 }

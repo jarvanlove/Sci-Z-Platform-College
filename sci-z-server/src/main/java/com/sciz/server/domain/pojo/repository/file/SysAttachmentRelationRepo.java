@@ -36,4 +36,24 @@ public interface SysAttachmentRelationRepo {
      * @return boolean 是否成功
      */
     boolean deleteByAttachmentId(Long attachmentId);
+
+    /**
+     * 查找待关联的附件关联记录（relationId 为临时值 0）
+     *
+     * @param relationType String 关联类型
+     * @param relationName String 关联名称
+     * @param userId       Long 用户ID（通过附件表关联查询）
+     * @return List<SysAttachmentRelation> 待关联的记录列表
+     */
+    List<SysAttachmentRelation> findPendingRelations(String relationType, String relationName, Long userId);
+
+    /**
+     * 批量更新关联记录的 relationId
+     *
+     * @param relationIds List<Long> 关联记录ID列表
+     * @param relationId  Long 新的关联对象ID
+     * @param userId      Long 更新人ID
+     * @return boolean 是否更新成功
+     */
+    boolean updateRelationIds(List<Long> relationIds, Long relationId, Long userId);
 }

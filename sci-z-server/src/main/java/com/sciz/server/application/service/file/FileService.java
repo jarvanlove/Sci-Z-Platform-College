@@ -3,10 +3,12 @@ package com.sciz.server.application.service.file;
 import com.sciz.server.domain.pojo.dto.request.file.FileBatchUploadReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileCheckDuplicateReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileListQueryReq;
+import com.sciz.server.domain.pojo.dto.request.file.FileSyncDifyReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.file.FileDownloadContext;
 import com.sciz.server.domain.pojo.dto.response.file.FileDuplicateCheckResp;
 import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
+import com.sciz.server.domain.pojo.dto.response.file.FileSyncDifyResp;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import java.util.List;
 
@@ -52,6 +54,15 @@ public interface FileService {
     FileDownloadContext download(Long attachmentId);
 
     /**
+     * 文件下载（支持格式转换）
+     *
+     * @param attachmentId Long 附件ID
+     * @param targetFormat String 目标格式（docx/pdf，null表示不转换）
+     * @return FileDownloadContext 下载上下文
+     */
+    FileDownloadContext download(Long attachmentId, String targetFormat);
+
+    /**
      * 预览地址
      *
      * @param attachmentId  Long 附件ID
@@ -84,4 +95,12 @@ public interface FileService {
      * @return FileDuplicateCheckResp 去重结果
      */
     FileDuplicateCheckResp checkDuplicate(FileCheckDuplicateReq req);
+
+    /**
+     * 同步文件到 Dify
+     *
+     * @param req FileSyncDifyReq 同步请求
+     * @return FileSyncDifyResp 同步结果（包含 Dify 文件ID）
+     */
+    FileSyncDifyResp syncToDify(FileSyncDifyReq req);
 }

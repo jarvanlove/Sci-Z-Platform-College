@@ -7,6 +7,15 @@ export * from './Dashboard'
 // 申报模块组件
 export * from './Declaration'
 
+// 详情模块组件
+export * from './Detail'
+
+// 表单模块组件
+export * from './Form'
+
+// 列表模块组件
+export * from './List'
+
 // 项目模块组件
 export * from './Project'
 

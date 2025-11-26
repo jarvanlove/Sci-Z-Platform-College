@@ -50,12 +50,14 @@ export const AUTH_API = {
 
 export const DECLARATION_API = {
   BASE_PATH: buildApiUrl('/declaration'),
-  LIST: buildApiUrl('/declaration/list'),
-  CREATE: buildApiUrl('/declaration'),
-  DETAIL: (id) => buildApiUrl(`/declaration/${id}`),
-  UPDATE: (id) => buildApiUrl(`/declaration/${id}`),
-  DELETE: (id) => buildApiUrl(`/declaration/${id}`),
-  SUBMIT: (id) => buildApiUrl(`/declaration/${id}/submit`)
+  LIST: buildApiUrl('/declaration/list'), // 获取申报列表
+  CREATE: buildApiUrl('/declaration/create'), // 创建申报
+  DETAIL: (id) => buildApiUrl(`/declaration/detail/${id}`), // 获取申报详情
+  UPDATE: (id) => buildApiUrl(`/declaration/${id}`), // 更新申报
+  DELETE: (id) => buildApiUrl(`/declaration/${id}`), // 删除申报
+  SUBMIT: (id) => buildApiUrl(`/declaration/${id}/submit`), // 提交申报
+  RED_HEADER_FILE_UPLOAD: buildApiUrl('/declaration/red-header-file/upload'), // 上传红头文件
+  WORKFLOW_STATUS: (id) => buildApiUrl(`/declaration/${id}/workflow/status`) // 获取工作流状态
 }
 
 // ================================
@@ -239,7 +241,8 @@ export const USER_API = {
   INFO: buildApiUrl('/user/info'),  // 更新用户信息
   PROFILE_FIELDS: buildApiUrl('/user/profile/fields'), // 获取用户信息字段
   UPLOAD_AVATAR: buildApiUrl('/user/avatar'), // 上传头像
-  LOGIN_LOGS: buildApiUrl('/user/login/logs')  // 登录日志查询
+  LOGIN_LOGS: buildApiUrl('/user/login/logs'),  // 登录日志查询
+  WORKFLOWS: buildApiUrl('/user/workflows')  // 获取所有工作流
 }
 
 // ================================

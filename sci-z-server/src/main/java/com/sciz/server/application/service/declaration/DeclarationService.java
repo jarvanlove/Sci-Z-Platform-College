@@ -2,8 +2,10 @@ package com.sciz.server.application.service.declaration;
 
 import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationCreateReq;
 import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationListQueryReq;
+import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationDetailResp;
 import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationListResp;
+import com.sciz.server.domain.pojo.dto.response.declaration.RedHeaderFileParseResp;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 
 /**
@@ -46,4 +48,12 @@ public interface DeclarationService {
      * @return 工作流状态信息
      */
     DeclarationDetailResp.WorkflowResult getWorkflowStatus(Long id);
+
+    /**
+     * 上传红头文件
+     *
+     * @param req 文件上传请求
+     * @return 红头文件解析响应（包含研究领域、研究方向、研究课题）
+     */
+    RedHeaderFileParseResp uploadRedHeaderFile(FileUploadReq req);
 }

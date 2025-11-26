@@ -7,11 +7,7 @@
 <template>
     <div class="declaration-create-container">
       <div class="page-header">
-        <el-tooltip :content="$t('common.backToList')" placement="bottom">
-          <div class="back-icon" @click="handleBack">
-            <el-icon><ArrowLeft /></el-icon>
-          </div>
-        </el-tooltip>
+        <BackButton @click="handleBack" />
         <h1 class="page-title">{{ $t('declaration.newDeclaration') }}</h1>
       </div>
   
@@ -33,7 +29,7 @@
               <input
                 ref="fileInputRef"
                 type="file"
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                :accept="redHeaderAccept"
                 style="display: none"
                 @change="handleFileChange"
               />
@@ -80,12 +76,19 @@
                   {{ $t('declaration.aiAnalysisResult') }}
                 </div>
                 <p>
+                  <strong>{{ $t('declaration.fields') }}：</strong>
+                  <template v-if="analysisResult.researchField">
+                    {{ typeof analysisResult.researchField === 'string' ? analysisResult.researchField : analysisResult.researchField.join('、') }}
+                  </template>
+                  <template v-else>（空）</template>
+                </p>
+                <p>
                   <strong>{{ $t('declaration.direction') }}：</strong>
-                  {{ analysisResult.researchDirection }}
+                  {{ analysisResult.researchDirection || '（空）' }}
                 </p>
                 <p>
                   <strong>{{ $t('declaration.topic') }}：</strong>
-                  {{ analysisResult.researchTopic }}
+                  {{ analysisResult.researchTopic || '（空）' }}
                 </p>
                 <div class="analysis-hint">
                   💡 {{ $t('declaration.aiHint') }}
@@ -180,7 +183,7 @@
                 :placeholder="$t('declaration.directionPlaceholder')"
               />
               <div
-                v-if="analysisResult && uploadStatus === 'success'"
+                v-if="analysisResult && uploadStatus === 'success' && analysisResult.researchDirection !== undefined"
                 class="auto-filled-hint"
               >
                 ✨ {{ $t('declaration.autoFilled') }}
@@ -199,7 +202,7 @@
                 :placeholder="$t('declaration.topicPlaceholder')"
               />
               <div
-                v-if="analysisResult && uploadStatus === 'success'"
+                v-if="analysisResult && uploadStatus === 'success' && analysisResult.researchTopic !== undefined"
                 class="auto-filled-hint"
               >
                 ✨ {{ $t('declaration.autoFilled') }}
@@ -233,6 +236,12 @@
               <div class="tag-hint">
                 {{ $t('declaration.fieldCount', { current: form.researchField.length, max: 10 }) }}
               </div>
+              <div
+                v-if="analysisResult && analysisResult.researchField !== undefined && uploadStatus === 'success'"
+                class="auto-filled-hint"
+              >
+                ✨ {{ $t('declaration.autoFilled') }}
+              </div>
               <div v-if="formErrors.researchField" class="error-message">
                 {{ formErrors.researchField }}
               </div>
@@ -245,30 +254,14 @@
               {{ $t('declaration.workflow') }} <span class="required-mark">*</span>
             </div>
             <el-form-item :label="$t('declaration.selectWorkflow')" prop="workflow">
-              <el-select
+              <WorkflowSelect
                 v-model="form.workflow"
+                :options="workflowOptions"
                 :placeholder="$t('declaration.workflowPlaceholder')"
                 :loading="workflowLoading"
-                style="width: 100%"
-                filterable
-                :filter-method="filterWorkflow"
-              >
-                <el-option
-                  v-for="workflow in filteredWorkflowOptions"
-                  :key="workflow.id"
-                  :label="workflow.name"
-                  :value="workflow.id"
-                >
-                  <div class="workflow-option">
-                    <div class="workflow-name">{{ workflow.name }}</div>
-                    <div class="workflow-description">{{ workflow.description }}</div>
-                  </div>
-                </el-option>
-              </el-select>
-              <div v-if="selectedWorkflow" class="workflow-info">
-                <div class="workflow-info-title">{{ selectedWorkflow.name }}</div>
-                <div class="workflow-info-description">{{ selectedWorkflow.description }}</div>
-              </div>
+                :no-match-text="$t('declaration.workflowNoMatch')"
+                :no-data-text="$t('declaration.workflowNoData')"
+              />
             </el-form-item>
           </div>
   
@@ -295,19 +288,20 @@
   import { ref, reactive, computed, onMounted } from 'vue'
   import { useRouter } from 'vue-router'
   import { useI18n } from 'vue-i18n'
-  import { ElMessage, ElMessageBox, ElTooltip } from 'element-plus'
+  import { ElMessage, ElMessageBox } from 'element-plus'
   import {
-    ArrowLeft,
     Loading,
     MagicStick,
     UploadFilled,
     Document
   } from '@element-plus/icons-vue'
-  import { BaseCard, BaseButton, BaseDatePicker } from '@/components/Common'
+  import { BaseCard, BaseButton, BaseDatePicker, BackButton } from '@/components/Common'
+  import { WorkflowSelect } from '@/components/Business/Form'
   import { DECLARATION_DEPARTMENT_OPTIONS } from '@/utils/constants'
-  import { useFileUpload } from '@/composables/useFileUpload'
-  import { ATTACHMENT_RELATION, ATTACHMENT_CATEGORY } from '@/constants/attachment'
   import { createLogger } from '@/utils/simpleLogger'
+  import { uploadRedHeaderFile, createDeclaration } from '@/api/Declaration/declaration'
+  import { getWorkflows } from '@/api/User/user'
+  import { validateFileSize, validateFileType } from '@/constants/attachment'
   
   const router = useRouter()
   const { t } = useI18n()
@@ -413,29 +407,12 @@
   const uploadProgress = ref(0)
   const analysisResult = ref(null)
   
-  // 文件上传
-  const fileUploader = useFileUpload({
-    maxSizeMB: 10,
-    allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
-    getExtraFormData: () => ({
-      relationType: ATTACHMENT_RELATION.DECLARATION,
-      attachmentType: ATTACHMENT_CATEGORY.DOCUMENT
-    })
-  })
-  
   // 部门选项
   const departmentOptions = DECLARATION_DEPARTMENT_OPTIONS
   
   // 工作流选项
   const workflowOptions = ref([])
   const workflowLoading = ref(false)
-  const workflowSearchQuery = ref('')
-  const filteredWorkflowOptions = ref([])
-  
-  // 选中的工作流
-  const selectedWorkflow = computed(() => {
-    return workflowOptions.value.find(workflow => workflow.id === form.workflow)
-  })
   
   // 标签输入
   const tagInput = ref('')
@@ -448,71 +425,111 @@
     fileInputRef.value?.click()
   }
   
+  // 红头文件允许的文件类型（扩展名）
+  const RED_HEADER_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png']
+  // 红头文件大小限制（MB）
+  const RED_HEADER_MAX_SIZE_MB = 10
+  // 文件选择器的 accept 属性值
+  const redHeaderAccept = computed(() => {
+    return RED_HEADER_ALLOWED_EXTENSIONS.map(ext => `.${ext}`).join(',')
+  })
+
   // 文件选择处理
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
   
+    // 使用封装好的文件大小校验函数
+    const sizeValidation = validateFileSize(file, RED_HEADER_MAX_SIZE_MB)
+    if (!sizeValidation.passed) {
+      ElMessage.error(sizeValidation.reason || t('declaration.uploadError'))
+      return
+    }
+  
+    // 使用封装好的文件类型校验函数
+    const typeValidation = validateFileType(file, RED_HEADER_ALLOWED_EXTENSIONS)
+    if (!typeValidation.passed) {
+      ElMessage.error(typeValidation.reason || t('declaration.uploadError'))
+      return
+    }
+  
     try {
-      uploadStatus.value = 'uploading'
+      // 接口同时处理上传和分析，直接显示分析状态
+      uploadStatus.value = 'analyzing'
       uploadProgress.value = 0
   
-      logger.info('Starting file upload', { fileName: file.name, fileSize: file.size })
+      logger.info('Starting file upload and analysis', { fileName: file.name, fileSize: file.size })
   
-      // TODO: 后端接口开发完成后替换为实际接口调用
-      // const result = await fileUploader.uploadWithCheck(file)
-      // if (!result) return
-      // uploadedFile.value = result.fileInfo
-      // form.documentFile = result.fileInfo
-  
-      // 临时模拟文件上传过程（后端开发完成后删除）
-      const uploadInterval = setInterval(() => {
-        uploadProgress.value += 10
-        if (uploadProgress.value >= 100) {
-          clearInterval(uploadInterval)
-          uploadedFile.value = file
-          form.documentFile = file
-          analyzeDocument(file)
-        }
-      }, 200)
-  
-      logger.info('File upload completed', { fileName: file.name })
-    } catch (error) {
-      logger.error('File upload failed', error)
-      uploadStatus.value = 'error'
-      ElMessage.error(t('declaration.uploadError'))
-    }
-  }
-  
-  // 文档分析处理
-  const analyzeDocument = async (file) => {
-    try {
-      uploadStatus.value = 'analyzing'
-      logger.info('Starting document analysis', { fileName: file.name })
-  
-      // TODO: 后端接口开发完成后替换为实际接口调用
-      // const response = await analyzeDeclarationDocument(file.id || file.name)
-      // analysisResult.value = response.data.analysis
-      // form.researchDirection = response.data.analysis.researchDirection
-      // form.researchTopic = response.data.analysis.researchTopic
-  
-      // 临时模拟AI分析过程（后端开发完成后删除）
-      await new Promise(resolve => setTimeout(resolve, 3000))
-  
-      const mockResult = {
-        researchDirection: t('declaration.sampleDirection') || '人工智能与机器学习研究',
-        researchTopic: t('declaration.sampleTopic') || '基于深度学习的智能推荐系统研究'
+      // 调用红头文件上传接口（上传和分析合并在一个接口中，只需要传 file 对象）
+      const response = await uploadRedHeaderFile(file)
+      
+      // 处理响应数据
+      const analysisData = response?.data || {}
+      
+      logger.info('Received analysis data from API', { 
+        response, 
+        analysisData,
+        hasResearchField: 'researchField' in analysisData,
+        hasResearchDirection: 'researchDirection' in analysisData,
+        hasResearchTopic: 'researchTopic' in analysisData
+      })
+      
+      // 保存文件信息
+      uploadedFile.value = file
+      form.documentFile = file
+      
+      // 处理分析结果
+      // 无论字段是否为空，只要接口返回了数据就处理
+      const analysisResultData = {
+        researchDirection: analysisData.researchDirection ?? '',
+        researchTopic: analysisData.researchTopic ?? '',
+        researchField: analysisData.researchField ?? ''
       }
-  
-      analysisResult.value = mockResult
-      form.researchDirection = mockResult.researchDirection
-      form.researchTopic = mockResult.researchTopic
-  
+      
+      logger.info('Processed analysis result data', { analysisResultData })
+      
+      analysisResult.value = analysisResultData
+      
+      // 自动填充表单字段
+      // 研究方向：无论是否为空都填充（接口返回空字符串也填充，表示AI分析结果是空的）
+      if (analysisData.researchDirection !== undefined) {
+        form.researchDirection = analysisData.researchDirection ? String(analysisData.researchDirection).trim() : ''
+        logger.info('Auto-filled researchDirection', { value: form.researchDirection })
+      }
+      
+      // 研究课题：无论是否为空都填充
+      if (analysisData.researchTopic !== undefined) {
+        form.researchTopic = analysisData.researchTopic ? String(analysisData.researchTopic).trim() : ''
+        logger.info('Auto-filled researchTopic', { value: form.researchTopic })
+      }
+      
+      // 研究领域：在接口返回中是字符串（如："人工智能、具身智能、工业软件"），需要转换为数组
+      // 无论接口是否返回了 researchField 字段，都进行处理（即使为空也要清空表单，表示AI分析结果是空的）
+      if (analysisData.researchField !== undefined) {
+        if (analysisData.researchField && String(analysisData.researchField).trim()) {
+          // 如果返回的是字符串，尝试按分隔符拆分（支持顿号、逗号、中英文逗号）
+          const fieldValue = String(analysisData.researchField).trim()
+          const fields = typeof analysisData.researchField === 'string'
+            ? fieldValue.split(/[、，,]/).map(f => f.trim()).filter(f => f)
+            : Array.isArray(analysisData.researchField)
+            ? analysisData.researchField.map(f => typeof f === 'string' ? f.trim() : String(f)).filter(f => f)
+            : []
+          
+          // 清空现有字段，替换为接口返回的字段（避免重复）
+          form.researchField = fields.slice(0, 10) // 最多保留10个字段
+          logger.info('Auto-filled researchField', { fields, count: form.researchField.length })
+        } else {
+          // 如果接口返回了 researchField 但值为空，清空表单字段
+          form.researchField = []
+          logger.info('Cleared researchField (empty value from API)')
+        }
+      }
+      
       uploadStatus.value = 'success'
       ElMessage.success(t('declaration.analysisSuccess'))
-      logger.info('Document analysis completed successfully')
+      logger.info('File upload and analysis completed successfully', { analysisData })
     } catch (error) {
-      logger.error('Document analysis failed', error)
+      logger.error('File upload or analysis failed', error)
       uploadStatus.value = 'error'
       ElMessage.error(t('declaration.analysisError'))
     }
@@ -563,71 +580,71 @@
     }
   }
   
-  // 工作流过滤
-  const filterWorkflow = (query) => {
-    workflowSearchQuery.value = query
-    if (!query) {
-      filteredWorkflowOptions.value = [...workflowOptions.value]
-      return
-    }
-  
-    const lowerQuery = query.toLowerCase()
-    filteredWorkflowOptions.value = workflowOptions.value.filter(workflow => {
-      return (
-        workflow.name.toLowerCase().includes(lowerQuery) ||
-        workflow.description?.toLowerCase().includes(lowerQuery)
-      )
-    })
-  }
-  
   // 加载工作流选项
   const loadWorkflowOptions = async () => {
     try {
       workflowLoading.value = true
       logger.info('Loading workflow options')
-  
-      // TODO: 后端接口开发完成后替换为实际接口调用
-      // const response = await getWorkflowOptions()
-      // workflowOptions.value = response.data.options
-      // filteredWorkflowOptions.value = [...workflowOptions.value]
-  
-      // 临时模拟工作流数据（后端开发完成后删除）
-      await new Promise(resolve => setTimeout(resolve, 500))
-  
-      workflowOptions.value = [
-        {
-          id: 'workflow_001',
-          name: t('declaration.workflowOption1') || '标准申报流程',
-          description: t('declaration.workflowDesc1') || '适用于常规科研项目申报'
-        },
-        {
-          id: 'workflow_002',
-          name: t('declaration.workflowOption2') || '快速申报流程',
-          description: t('declaration.workflowDesc2') || '适用于紧急项目申报'
-        },
-        {
-          id: 'workflow_003',
-          name: t('declaration.workflowOption3') || '专家评审流程',
-          description: t('declaration.workflowDesc3') || '适用于需要专家评审的项目'
-        },
-        {
-          id: 'workflow_004',
-          name: t('declaration.workflowOption4') || '简化申报流程',
-          description: t('declaration.workflowDesc4') || '适用于小型项目申报'
-        }
-      ]
-  
-      filteredWorkflowOptions.value = [...workflowOptions.value]
-      logger.info('Workflow options loaded successfully', { count: workflowOptions.value.length })
+
+      // 调用工作流列表接口
+      const response = await getWorkflows()
+      
+      // 处理响应数据：支持多种响应格式
+      // 标准响应格式：{ code, message, data: [...] } 或直接是数组
+      let workflowsData = []
+      
+      // 检查 response.data 是否为数组（标准格式：{ data: [...] }）
+      if (Array.isArray(response?.data)) {
+        workflowsData = response.data
+      } 
+      // 检查 response.data.data 是否为数组（嵌套格式：{ data: { data: [...] } }）
+      else if (Array.isArray(response?.data?.data)) {
+        workflowsData = response.data.data
+      }
+      // 如果 response 本身就是数组（直接返回数组）
+      else if (Array.isArray(response)) {
+        workflowsData = response
+      }
+      // 如果都没有，尝试从 data 字段获取
+      else {
+        workflowsData = response?.data || []
+      }
+      
+      logger.info('Raw workflows data received', { 
+        rawData: workflowsData, 
+        count: workflowsData.length,
+        responseType: typeof response,
+        isArray: Array.isArray(response),
+        hasData: !!response?.data,
+        isDataArray: Array.isArray(response?.data)
+      })
+      
+      // 转换数据格式：将后端返回的格式转换为组件需要的格式
+      // 后端格式：{ id, userId, keyType, resourceId, keyName, description }
+      // 组件格式：{ id, name, description }
+      // 注意：后端已经过滤了 keyType === 'workflow' 的工作流，前端不需要再过滤
+      workflowOptions.value = workflowsData.map(workflow => ({
+        id: workflow.resourceId, // 使用 resourceId 作为工作流ID
+        name: workflow.keyName || '',
+        description: workflow.description || ''
+      }))
+      
+      logger.info('Workflow options loaded successfully', { 
+        total: workflowsData.length,
+        loaded: workflowOptions.value.length,
+        options: workflowOptions.value
+      })
     } catch (error) {
       logger.error('Failed to load workflow options', error)
       ElMessage.error(t('declaration.workflowLoadError'))
+      // 加载失败时设置为空数组，避免组件报错
+      workflowOptions.value = []
     } finally {
       workflowLoading.value = false
     }
   }
   
-  // 提交处理
+  // 提交申报
   const handleSubmit = async () => {
     try {
       await formRef.value.validate()
@@ -635,7 +652,7 @@
       ElMessage.error(t('declaration.formIncomplete'))
       return
     }
-  
+
     try {
       await ElMessageBox.confirm(
         t('declaration.confirmSubmit'),
@@ -645,27 +662,40 @@
           cancelButtonText: t('common.cancel')
         }
       )
-  
+
       submitting.value = true
-  
-      logger.info('Submitting declaration', { form })
-  
-      // TODO: 后端接口开发完成后替换为实际接口调用
-      // const response = await createDeclaration({
-      //   ...form,
-      //   documentFileId: form.documentFile?.id
-      // })
-      // const declarationId = response.data.id
-  
-      // 临时模拟提交申报（后端开发完成后删除）
-      await new Promise(resolve => setTimeout(resolve, 2000))
+
+      logger.info('Submitting declaration (calling createDeclaration API)', { form })
+
+      // 构建提交数据
+      const submitData = {
+        department: form.department,
+        projectLeader: form.projectLeader,
+        documentPublishTime: form.documentPublishTime,
+        projectStartTime: form.projectStartTime,
+        projectEndTime: form.projectEndTime,
+        researchFields: form.researchField, // 数组格式
+        researchDirection: form.researchDirection,
+        researchTopic: form.researchTopic,
+        workflowId: form.workflow // workflowId 对应表单中的 workflow 字段
+      }
+
+      // 调用创建申报接口
+      const response = await createDeclaration(submitData)
+      
+      // 处理响应数据，获取申报ID
+      const responseData = response?.data || response
+      const declarationId = responseData?.data || responseData?.id
   
       ElMessage.success(t('declaration.submitSuccess'))
   
       // 跳转到申报详情页面
-      setTimeout(() => {
-        router.push('/declaration/detail/1')
-      }, 1000)
+      if (declarationId) {
+        router.push(`/declaration/detail/${declarationId}`)
+      } else {
+        // 如果没有返回ID，跳转到列表页
+        router.push('/declaration/list')
+      }
     } catch (error) {
       if (error !== 'cancel') {
         logger.error('Submit failed', error)
@@ -716,30 +746,6 @@
     align-items: center;
     margin-bottom: 20px;
     gap: 12px;
-  
-    .back-icon {
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      color: var(--text-2);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      
-      &:hover {
-        color: var(--color-primary);
-        background: var(--hover);
-        border-color: var(--color-primary);
-      }
-      
-      .el-icon {
-        font-size: 18px;
-      }
-    }
   
     .page-title {
       font-size: 24px;
@@ -1022,54 +1028,6 @@
     color: #dc2626;
     font-size: 12px;
     margin-top: 4px;
-  }
-  
-  // 工作流选择样式
-  :deep(.el-select-dropdown__item) {
-    height: auto !important;
-    padding: 10px 20px !important;
-    line-height: normal !important;
-  }
-  
-  .workflow-option {
-    padding: 0;
-    width: 100%;
-  
-    .workflow-name {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text);
-      line-height: 1.5;
-      margin-bottom: 4px;
-    }
-  
-    .workflow-description {
-      font-size: 12px;
-      color: var(--text-3);
-      line-height: 1.4;
-      margin-top: 2px;
-    }
-  }
-  
-  .workflow-info {
-    margin-top: 12px;
-    padding: 16px;
-    background: var(--bg);
-    border-radius: 8px;
-    border: 1px solid var(--border);
-  
-    .workflow-info-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--color-primary);
-      margin-bottom: 8px;
-    }
-  
-    .workflow-info-description {
-      font-size: 14px;
-      color: var(--text-2);
-      line-height: 1.5;
-    }
   }
   
   // 表单操作按钮

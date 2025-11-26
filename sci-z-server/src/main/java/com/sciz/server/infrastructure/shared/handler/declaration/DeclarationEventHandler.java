@@ -2,6 +2,7 @@ package com.sciz.server.infrastructure.shared.handler.declaration;
 
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationCreatedEvent;
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationUpdatedEvent;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class DeclarationEventHandler {
 
     /**
@@ -151,16 +153,19 @@ public class DeclarationEventHandler {
     /**
      * 发送申报状态变更通知
      * <p>
-     * TODO: 根据实际需求实现通知逻辑
+     * 使用事件中的 description 和 updateReason 字段构建通知内容
      * 可能的实现方式：
      * 1. 当申报状态变为"申报成功"时，发送成功通知给申报人
      * 2. 当申报状态变为"申报失败"时，发送失败通知并说明原因
      * 3. 发送邮件、站内消息或短信通知
      */
     private void sendDeclarationStatusChangeNotification(DeclarationUpdatedEvent event) {
-        log.info("发送申报状态变更通知: declarationId={}, oldStatus={}, newStatus={}, applicantId={}",
-                event.getDeclarationId(), event.getOldStatus(), event.getNewStatus(), event.getApplicantId());
+        log.info(
+                "发送申报状态变更通知: declarationId={}, declarationName={}, oldStatus={}, newStatus={}, applicantId={}, applicantName={}, description={}, updateReason={}",
+                event.getDeclarationId(), event.getDeclarationName(), event.getOldStatus(), event.getNewStatus(),
+                event.getApplicantId(), event.getApplicantName(), event.getDescription(), event.getUpdateReason());
         // TODO: 实现发送通知的逻辑
+        // 可以使用 event.getDescription() 和 event.getUpdateReason() 构建通知内容
         // 示例：根据状态变更类型发送不同的通知
     }
 
@@ -180,7 +185,7 @@ public class DeclarationEventHandler {
     /**
      * 记录申报更新审计日志
      * <p>
-     * TODO: 根据实际需求实现审计日志记录逻辑
+     * 使用事件中的 description 和 updateReason 字段记录详细的更新信息
      * 可能的实现方式：
      * 1. 写入专门的审计日志表
      * 2. 发送到日志系统（如 ELK、Splunk 等）
@@ -189,16 +194,19 @@ public class DeclarationEventHandler {
      * 注意：操作日志已由 OperationLogRecorderUtil 记录，此方法用于额外的审计需求
      */
     private void logDeclarationUpdate(DeclarationUpdatedEvent event) {
-        log.info("记录申报更新审计日志: declarationId={}, oldStatus={}, newStatus={}, updateReason={}",
-                event.getDeclarationId(), event.getOldStatus(), event.getNewStatus(), event.getUpdateReason());
+        log.info(
+                "记录申报更新审计日志: declarationId={}, declarationName={}, oldStatus={}, newStatus={}, description={}, updateReason={}",
+                event.getDeclarationId(), event.getDeclarationName(), event.getOldStatus(), event.getNewStatus(),
+                event.getDescription(), event.getUpdateReason());
         // TODO: 实现记录审计日志的逻辑
         // 注意：操作日志已由 OperationLogRecorderUtil 记录，此方法用于额外的审计需求
+        // 可以使用 event.getDescription() 和 event.getUpdateReason() 记录更详细的更新信息
     }
 
     /**
      * 触发后续流程
      * <p>
-     * TODO: 根据实际需求实现后续流程触发逻辑
+     * 使用事件中的 description 和 updateReason 字段判断是否需要触发后续流程
      * 可能的实现方式：
      * 1. 当申报状态变为"申报成功"时，自动创建项目记录
      * 2. 触发审批流程（如果需要）
@@ -206,9 +214,12 @@ public class DeclarationEventHandler {
      * 4. 同步到其他系统
      */
     private void triggerFollowUpProcess(DeclarationUpdatedEvent event) {
-        log.info("触发后续流程: declarationId={}, oldStatus={}, newStatus={}, description={}",
-                event.getDeclarationId(), event.getOldStatus(), event.getNewStatus(), event.getDescription());
+        log.info(
+                "触发后续流程: declarationId={}, declarationName={}, oldStatus={}, newStatus={}, description={}, updateReason={}",
+                event.getDeclarationId(), event.getDeclarationName(), event.getOldStatus(), event.getNewStatus(),
+                event.getDescription(), event.getUpdateReason());
         // TODO: 实现触发后续流程的逻辑
+        // 可以使用 event.getDescription() 和 event.getUpdateReason() 判断是否需要触发后续流程
         // 示例：当状态为"申报成功"时，创建项目记录
         // if (DeclarationStatus.SUCCESS.getCode().equals(event.getNewStatus())) {
         // // 创建项目记录

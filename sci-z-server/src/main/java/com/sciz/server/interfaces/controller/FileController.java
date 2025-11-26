@@ -4,10 +4,12 @@ import com.sciz.server.application.service.file.FileService;
 import com.sciz.server.domain.pojo.dto.request.file.FileBatchUploadReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileCheckDuplicateReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileListQueryReq;
+import com.sciz.server.domain.pojo.dto.request.file.FileSyncDifyReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.file.FileDuplicateCheckResp;
 import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
 import com.sciz.server.domain.pojo.dto.response.file.FileDownloadContext;
+import com.sciz.server.domain.pojo.dto.response.file.FileSyncDifyResp;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.Result;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -71,10 +73,11 @@ public class FileController {
         return Result.success(pageResult);
     }
 
-    @Operation(summary = "文件下载", description = "根据ID下载文件")
+    @Operation(summary = "文件下载", description = "根据ID下载文件，支持格式转换（format参数：docx/pdf）")
     @GetMapping("/download/{id}")
-    public void download(@PathVariable Long id, HttpServletResponse response) {
-        try (FileDownloadContext context = fileService.download(id);
+    public void download(@PathVariable Long id, @RequestParam(required = false) String format,
+            HttpServletResponse response) {
+        try (FileDownloadContext context = fileService.download(id, format);
                 var inputStream = context.inputStream()) {
             response.setContentType(context.contentType());
             if (context.contentLength() != null) {
@@ -86,8 +89,8 @@ public class FileController {
             StreamUtils.copy(inputStream, response.getOutputStream());
             response.flushBuffer();
         } catch (Exception e) {
-            log.error(String.format("文件下载失败: attachmentId=%s", id), e);
-            throw new BusinessException(ResultCode.FILE_DOWNLOAD_FAILED, "文件下载失败");
+            log.error(String.format("文件下载失败: attachmentId=%s, format=%s", id, format), e);
+            throw BusinessException.of(ResultCode.FILE_DOWNLOAD_FAILED, "文件下载失败");
         }
     }
 
@@ -114,7 +117,8 @@ public class FileController {
 
     @Operation(summary = "同步到Dify", description = "文件同步到Dify知识库")
     @PostMapping("/sync-dify")
-    public Result<Object> syncDify(@RequestBody Object request) {
-        return Result.success(null);
+    public Result<FileSyncDifyResp> syncDify(@Valid @ModelAttribute FileSyncDifyReq req) {
+        FileSyncDifyResp resp = fileService.syncToDify(req);
+        return Result.success(resp, ResultCode.FILE_UPLOAD_SUCCESS.getMessage());
     }
 }

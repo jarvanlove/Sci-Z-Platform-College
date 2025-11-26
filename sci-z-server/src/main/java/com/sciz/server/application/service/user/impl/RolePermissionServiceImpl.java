@@ -55,12 +55,12 @@ public class RolePermissionServiceImpl implements RolePermissionService {
         var industryType = industryConfigCache.get().getType();
         var roleList = roleRepo.findByIds(List.of(roleId));
         if (CollectionUtils.isEmpty(roleList)) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, String.format("角色不存在: roleId=%s", roleId));
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "角色不存在: roleId=%s", roleId);
         }
         SysRole role = roleList.getFirst();
         if (!industryType.equals(role.getIndustryType())) {
-            throw new BusinessException(ResultCode.BAD_REQUEST,
-                    String.format("角色行业不匹配: roleId=%s, industryType=%s", roleId, role.getIndustryType()));
+            throw BusinessException.of(ResultCode.BAD_REQUEST,
+                    "角色行业不匹配: roleId=%s, industryType=%s", roleId, role.getIndustryType());
         }
         var relations = rolePermissionRepo.findNotDeletedByRoleId(roleId);
         if (CollectionUtils.isEmpty(relations)) {
@@ -77,27 +77,27 @@ public class RolePermissionServiceImpl implements RolePermissionService {
         var roleId = req.roleId();
         var industryType = industryConfigCache.get().getType();
         var permissionIdList = Optional.ofNullable(req.permissionIdList())
-                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "权限列表不能为空"));
+                .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST, "权限列表不能为空"));
 
         // 1. 校验角色
         var roleList = roleRepo.findByIds(List.of(roleId));
         if (CollectionUtils.isEmpty(roleList)) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, String.format("角色不存在: roleId=%s", roleId));
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "角色不存在: roleId=%s", roleId);
         }
         SysRole role = roleList.getFirst();
         if (!industryType.equals(role.getIndustryType())) {
-            throw new BusinessException(ResultCode.BAD_REQUEST,
-                    String.format("角色行业不匹配: roleId=%s, industryType=%s", roleId, role.getIndustryType()));
+            throw BusinessException.of(ResultCode.BAD_REQUEST,
+                    "角色行业不匹配: roleId=%s, industryType=%s", roleId, role.getIndustryType());
         }
         Optional.ofNullable(role.getStatus())
                 .filter(status -> EnableStatus.ENABLED.getCode().equals(status))
-                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST,
-                        String.format("角色未启用: roleId=%s", roleId)));
+                .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST,
+                        "角色未启用: roleId=%s", roleId));
         if (Optional.ofNullable(role.getIsDeleted())
                 .map(DeleteStatus.DELETED.getCode()::equals)
                 .orElse(false)) {
-            throw new BusinessException(ResultCode.BAD_REQUEST,
-                    String.format("角色已删除: roleId=%s", roleId));
+            throw BusinessException.of(ResultCode.BAD_REQUEST,
+                    "角色已删除: roleId=%s", roleId);
         }
 
         // 2. 查询并校验权限
@@ -109,22 +109,22 @@ public class RolePermissionServiceImpl implements RolePermissionService {
         }
         for (Long permissionId : permissionIds) {
             SysPermission permission = Optional.ofNullable(permissionMap.get(permissionId))
-                    .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST,
-                            String.format("权限不存在: permissionId=%s", permissionId)));
+                    .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST,
+                            "权限不存在: permissionId=%s", permissionId));
             if (!industryType.equals(permission.getIndustryType())) {
-                throw new BusinessException(ResultCode.BAD_REQUEST,
-                        String.format("权限行业不匹配: permissionId=%s, industryType=%s", permissionId,
-                                permission.getIndustryType()));
+                throw BusinessException.of(ResultCode.BAD_REQUEST,
+                        "权限行业不匹配: permissionId=%s, industryType=%s", permissionId,
+                        permission.getIndustryType());
             }
             Optional.ofNullable(permission.getStatus())
                     .filter(status -> EnableStatus.ENABLED.getCode().equals(status))
-                    .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST,
-                            String.format("权限未启用: permissionId=%s", permissionId)));
+                    .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST,
+                            "权限未启用: permissionId=%s", permissionId));
             if (Optional.ofNullable(permission.getIsDeleted())
                     .map(DeleteStatus.DELETED.getCode()::equals)
                     .orElse(false)) {
-                throw new BusinessException(ResultCode.BAD_REQUEST,
-                        String.format("权限已删除: permissionId=%s", permissionId));
+                throw BusinessException.of(ResultCode.BAD_REQUEST,
+                        "权限已删除: permissionId=%s", permissionId);
             }
         }
 

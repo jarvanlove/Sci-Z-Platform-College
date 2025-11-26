@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.sciz.server.domain.pojo.entity.BaseEntity;
+import com.sciz.server.infrastructure.shared.typehandler.JsonTypeHandler;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import lombok.Getter;
@@ -87,7 +88,7 @@ public class Declaration extends BaseEntity {
     /**
      * 研究领域(JSON数组)
      */
-    @TableField("research_fields")
+    @TableField(value = "research_fields", typeHandler = JsonTypeHandler.class)
     private String researchFields;
 
     /**
@@ -117,7 +118,7 @@ public class Declaration extends BaseEntity {
     /**
      * 工作流结果(JSON)
      */
-    @TableField("workflow_result")
+    @TableField(value = "workflow_result", typeHandler = JsonTypeHandler.class)
     private String workflowResult;
 
     /**

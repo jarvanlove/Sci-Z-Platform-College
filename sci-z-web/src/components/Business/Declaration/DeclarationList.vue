@@ -27,7 +27,7 @@
         
         <el-select
           v-model="searchForm.status"
-          :placeholder="$t('declaration.declarationStatusPlaceholder') || '请选择申报状态'"
+          :placeholder="$t('declaration.declarationStatusPlaceholder')"
           clearable
           style="width: 150px"
         >
@@ -133,7 +133,7 @@
             class="workflow-status-tag"
             :class="`workflow-status-${row.workflowStatus}`"
           >
-            {{ getWorkflowStatusLabel(row.workflowStatus) }}
+            {{ getWorkflowStatusLabel(row.workflowStatus, row.workflowStatusDescription) }}
           </span>
         </template>
 
@@ -146,8 +146,10 @@
             >
               {{ $t('common.view') }}
             </button>
-            <div v-if="row.statusType === 'success'" class="action-row" @click.stop.prevent>
+            <!-- 根据详细判断规则显示下载和预览按钮 -->
+            <div v-if="canDownloadPreview(row)" class="action-row" @click.stop.prevent>
               <el-dropdown
+                v-if="canDownload(row)"
                 @command="handleDownload"
                 trigger="click"
               >
@@ -161,13 +163,13 @@
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item
-                      :command="{id: row.id, format: 'word'}"
+                      :command="{id: row.id, attachmentId: row.attachmentId, format: 'word'}"
                     >
                       <el-icon><Edit /></el-icon>
                       Word格式
                     </el-dropdown-item>
                     <el-dropdown-item
-                      :command="{id: row.id, format: 'pdf'}"
+                      :command="{id: row.id, attachmentId: row.attachmentId, format: 'pdf'}"
                     >
                       <el-icon><Document /></el-icon>
                       PDF格式
@@ -176,8 +178,9 @@
                 </template>
               </el-dropdown>
               <button
+                v-if="canPreview(row)"
                 class="action-btn btn-info"
-                @click.stop="handlePreview(row.id)"
+                @click.stop="handlePreview(row)"
               >
                 {{ $t('declaration.preview') }}
               </button>
@@ -197,7 +200,13 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, Document, Edit } from '@element-plus/icons-vue'
 import { BaseCard, BaseTable } from '@/components/Common'
 import { DECLARATION_STATUS_CONFIG } from '@/utils/constants'
-import { getDeclarationList, updateDeclarationStatus, downloadDeclaration, getDeclarationPreview } from '@/api/Declaration'
+import { 
+  getDeclarationList, 
+  updateDeclarationStatus, 
+  getDeclarationPreview,
+  getDeclarationWorkflowStatus
+} from '@/api/Declaration'
+import { downloadFile } from '@/api/File'
 import { createLogger } from '@/utils/simpleLogger'
 
 const router = useRouter()
@@ -221,12 +230,18 @@ const pagination = reactive({
   total: 0
 })
 
-// 状态选项
+// 排序信息
+const sortInfo = reactive({
+  sortBy: 'submitTime',
+  sortOrder: 'DESC'
+})
+
+// 状态选项（后端使用数字状态：1-申报中，2-申报成功，3-申报失败）
 const statusOptions = computed(() => [
   { label: t('common.all'), value: '' },
-  { label: t('declaration.statusSubmitting'), value: 'submitting' },
-  { label: t('declaration.statusSuccess'), value: 'success' },
-  { label: t('declaration.statusFailed'), value: 'failed' }
+  { label: t('declaration.statusSubmitting'), value: '1' },
+  { label: t('declaration.statusSuccess'), value: '2' },
+  { label: t('declaration.statusFailed'), value: '3' }
 ])
 
 // 可编辑状态选项
@@ -236,17 +251,18 @@ const editableStatusOptions = computed(() => [
   { label: t('declaration.statusFailed'), value: 'failed' }
 ])
 
-// 工作流状态配置
-const WORKFLOW_STATUS_CONFIG = {
-  pending: { label: '待处理', color: '#f59e0b', bgColor: '#fef3c7' },
-  running: { label: '处理中', color: '#3b82f6', bgColor: '#dbeafe' },
-  completed: { label: '已完成', color: '#16a34a', bgColor: '#dcfce7' },
-  failed: { label: '失败', color: '#dc2626', bgColor: '#fee2e2' }
-}
-
-// 获取工作流状态标签
-const getWorkflowStatusLabel = (status) => {
-  return WORKFLOW_STATUS_CONFIG[status]?.label || status || '-'
+// 获取工作流状态标签（使用后端返回的 workflowStatusDescription，如果没有则使用默认标签）
+const getWorkflowStatusLabel = (status, description) => {
+  if (description) return description
+  
+  // 如果后端没有返回描述，使用默认映射
+  const defaultLabels = {
+    pending: t('declaration.workflowStatusPending') || '待处理',
+    running: t('declaration.workflowStatusRunning') || '处理中',
+    completed: t('declaration.workflowStatusCompleted') || '已完成',
+    failed: t('declaration.workflowStatusFailed') || '失败'
+  }
+  return defaultLabels[status] || status || '-'
 }
 
 // 表格列配置 - 使用自适应策略
@@ -303,126 +319,117 @@ const tableColumns = computed(() => [
   }
 ])
 
+// 状态数字到字符串的映射
+const STATUS_MAP = {
+  1: { type: 'submitting', label: '申报中' },
+  2: { type: 'success', label: '申报成功' },
+  3: { type: 'failed', label: '申报失败' }
+}
+
+// 将后端状态数字转换为前端状态类型
+const mapStatusType = (status) => {
+  return STATUS_MAP[status]?.type || 'submitting'
+}
+
+// 判断是否可以下载/预览（详细判断规则，不简化）
+// 规则：工作流完成后 → hasAttachment = true → attachmentId 有值 → 可以下载/预览
+const canDownloadPreview = (record) => {
+  // 完整判断逻辑：三个条件必须同时满足
+  return (
+    record.workflowStatus === 'completed' &&
+    record.hasAttachment === true &&
+    record.attachmentId != null
+  )
+}
+
+// 判断是否可以下载
+const canDownload = (record) => {
+  return canDownloadPreview(record)
+}
+
+// 判断是否可以预览
+const canPreview = (record) => {
+  return canDownloadPreview(record)
+}
+
+// 格式化提交时间
+const formatSubmitTime = (timeStr) => {
+  if (!timeStr) return '-'
+  try {
+    const date = new Date(timeStr)
+    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  } catch (e) {
+    return timeStr
+  }
+}
+
 // 加载申报列表
 const loadDeclarations = async () => {
   try {
     loading.value = true
-    logger.info('Starting to load declaration list data')
+    logger.info('Starting to load declaration list data', { 
+      pageNo: pagination.current, 
+      pageSize: pagination.size,
+      keyword: searchForm.keyword,
+      status: searchForm.status
+    })
     
-    // TODO: 后端接口开发完成后替换为实际接口调用
-    // const response = await getDeclarationList({
-    //   page: pagination.current,
-    //   size: pagination.size,
-    //   keyword: searchForm.keyword,
-    //   status: searchForm.status
-    // })
-    // declarations.value = response.data?.list || []
-    // pagination.total = response.data?.total || 0
+    // 构建请求参数
+    const requestParams = {
+      pageNo: pagination.current,
+      pageSize: pagination.size,
+      sortBy: sortInfo.sortBy,
+      sortOrder: sortInfo.sortOrder,
+      keyword: searchForm.keyword || undefined,
+      status: searchForm.status ? parseInt(searchForm.status) : undefined
+    }
     
-    // 临时模拟数据（后端开发完成后删除）
-    await new Promise(resolve => setTimeout(resolve, 500)) // 模拟网络延迟
-    
-    const mockData = [
-      {
-        id: 1,
-        number: 'SK20251032101',
-        applicant: '张教授',
-        direction: '科学家智能体前沿技术研究',
-        topic: '具身智能体操作系统与工具链技术',
-        fields: ['人工智能', '前沿技术研究与应用'],
-        submitTime: '2025-11-03',
-        status: '申报成功',
-        statusType: 'success',
-        workflowStatus: 'completed'
-      },
-      {
-        id: 2,
-        number: 'SK20251032102',
-        applicant: '李博士',
-        direction: '区块链技术在供应链管理中的应用',
-        topic: '面向供应链透明度的区块链溯源技术研究',
-        fields: ['区块链', '供应链', '分布式系统'],
-        submitTime: '2025-01-14',
-        status: '申报成功',
-        statusType: 'success',
-        workflowStatus: 'running'
-      },
-      {
-        id: 3,
-        number: 'SK20251032103',
-        applicant: '王研究员',
-        direction: '量子计算算法优化研究',
-        topic: '量子近似优化算法的改进与应用',
-        fields: ['量子计算', '算法优化', '物理'],
-        submitTime: '2025-01-13',
-        status: '申报失败',
-        statusType: 'failed',
-        workflowStatus: 'failed'
-      },
-      {
-        id: 4,
-        number: 'SK20251032104',
-        applicant: '刘教授',
-        direction: '生物信息学数据分析方法研究',
-        topic: '多组学数据整合分析新方法研究',
-        fields: ['生物信息学', '数据分析', '统计学'],
-        submitTime: '2025-01-12',
-        status: '申报成功',
-        statusType: 'success',
-        workflowStatus: 'pending'
-      },
-      {
-        id: 5,
-        number: 'SK20251032105',
-        applicant: '陈博士',
-        direction: '物联网安全防护技术研究',
-        topic: '轻量级物联网设备安全认证机制研究',
-        fields: ['物联网', '网络安全', '加密技术'],
-        submitTime: '2025-01-11',
-        status: '申报失败',
-        statusType: 'failed',
-        workflowStatus: 'failed'
-      },
-      {
-        id: 6,
-        number: 'SK20251032106',
-        applicant: '赵教授',
-        direction: '机器学习在医疗诊断中的应用',
-        topic: '基于联邦学习的医疗影像诊断系统',
-        fields: ['机器学习', '医疗诊断', '深度学习'],
-        submitTime: '2025-01-10',
-        status: '申报中',
-        statusType: 'submitting',
-        workflowStatus: 'running'
+    // 移除空值
+    Object.keys(requestParams).forEach(key => {
+      if (requestParams[key] === undefined || requestParams[key] === '') {
+        delete requestParams[key]
       }
-    ]
+    })
     
-    // 应用搜索和分页
-    let filteredData = mockData
-    if (searchForm.keyword) {
-      const keyword = searchForm.keyword.toLowerCase()
-      filteredData = filteredData.filter(item => 
-        item.number?.toLowerCase().includes(keyword) ||
-        item.applicant?.toLowerCase().includes(keyword) ||
-        item.direction?.toLowerCase().includes(keyword) ||
-        item.topic?.toLowerCase().includes(keyword) ||
-        item.fields?.some(field => field.toLowerCase().includes(keyword))
-      )
-    }
-    if (searchForm.status) {
-      filteredData = filteredData.filter(item => item.statusType === searchForm.status)
-    }
+    // 调用接口
+    const response = await getDeclarationList(requestParams)
     
-    // 分页处理
-    const start = (pagination.current - 1) * pagination.size
-    const end = start + pagination.size
-    declarations.value = filteredData.slice(start, end)
-    pagination.total = filteredData.length
+    // 处理响应数据
+    const responseData = response?.data || response
+    const listData = responseData?.data || {}
+    const records = listData?.records || []
     
-    logger.info('Declaration list data loaded successfully', { count: declarations.value.length })
+    // 数据映射：后端字段 -> 前端字段
+    declarations.value = records.map(record => ({
+      id: record.id,
+      number: record.number || '-',
+      applicant: record.applicantName || '-',
+      direction: record.researchDirection || '-',
+      topic: record.researchTopic || '-',
+      fields: Array.isArray(record.researchFields) ? record.researchFields : [],
+      submitTime: formatSubmitTime(record.submitTime),
+      status: record.statusDescription || STATUS_MAP[record.status]?.label || '-',
+      statusType: mapStatusType(record.status),
+      workflowStatus: record.workflowStatus || 'pending',
+      workflowStatusDescription: record.workflowStatusDescription || '',
+      hasAttachment: record.hasAttachment || false,
+      attachmentId: record.attachmentId || null // 新增：附件ID，有附件时返回
+    }))
+    
+    // 更新分页信息
+    pagination.total = listData?.total || 0
+    pagination.current = listData?.current || pagination.current
+    pagination.size = listData?.size || pagination.size
+    
+    logger.info('Declaration list data loaded successfully', { 
+      count: declarations.value.length, 
+      total: pagination.total 
+    })
   } catch (error) {
     logger.error('Declaration list data loading failed', error)
     ElMessage.error(t('declaration.loadError'))
+    declarations.value = []
+    pagination.total = 0
   } finally {
     loading.value = false
   }
@@ -430,10 +437,9 @@ const loadDeclarations = async () => {
 
 // 搜索处理
 const handleSearch = () => {
-  logger.info('User performed search', { status: searchForm.status })
+  logger.info('User performed search', { keyword: searchForm.keyword, status: searchForm.status })
   pagination.current = 1
   loadDeclarations()
-  ElMessage.info(t('declaration.searchComplete'))
 }
 
 // 状态筛选处理
@@ -450,7 +456,6 @@ const handleReset = () => {
   searchForm.status = ''
   pagination.current = 1
   loadDeclarations()
-  ElMessage.info(t('declaration.resetComplete'))
 }
 
 
@@ -474,54 +479,96 @@ const handleRowClick = (row) => {
 
 // 下载处理
 const handleDownload = async (command) => {
-  const { id, format } = command
+  const { id, attachmentId, format } = command
   const formatNames = {
     pdf: 'PDF',
+    docx: 'Word',
     word: 'Word'
   }
   
   try {
-    logger.info('User started download', { id, format })
-    ElMessage.info(t('declaration.downloading', { format: formatNames[format] }) || `正在下载${formatNames[format]}格式文档...`)
+    logger.info('User started download', { id, attachmentId, format })
     
-    // TODO: 后端接口开发完成后替换为实际接口调用
-    // const response = await downloadDeclaration({ id, format })
-    // const blob = new Blob([response.data], { type: response.headers['content-type'] })
-    // const url = URL.createObjectURL(blob)
-    // const link = document.createElement('a')
-    // link.href = url
-    // link.download = response.headers['content-disposition']?.split('filename=')[1] || `申报文档_${id}.${format === 'word' ? 'docx' : format}`
-    // document.body.appendChild(link)
-    // link.click()
-    // document.body.removeChild(link)
-    // URL.revokeObjectURL(url)
+    // 必须有 attachmentId 才能下载
+    if (!attachmentId) {
+      ElMessage.error(t('declaration.attachmentIdNotFound'))
+      logger.warn('Download failed: attachmentId is missing', { id })
+      return
+    }
+  
+    const fileFormat = format === 'word' ? 'docx' : format // 将 word 转换为 docx
+    const response = await downloadFile(attachmentId, fileFormat)
     
-    // 临时模拟下载过程（后端开发完成后删除）
-    await new Promise(resolve => setTimeout(resolve, 1000)) // 模拟网络延迟
+    // 处理下载响应
+    const blob = new Blob([response.data], { 
+      type: response.headers['content-type'] || 'application/octet-stream' 
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
     
-    ElMessage.success(t('declaration.downloadComplete', { format: formatNames[format] }) || `${formatNames[format]}格式文档下载完成`)
-    logger.info('Download completed successfully', { id, format })
+    // 从响应头获取文件名，或使用默认文件名
+    const contentDisposition = response.headers['content-disposition']
+    const fileName = contentDisposition 
+      ? decodeURIComponent(contentDisposition.split('filename=')[1]?.replace(/"/g, ''))
+      : `申报文档_${id}.${fileFormat || 'pdf'}`
+    
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    ElMessage.success(t('declaration.downloadComplete', { format: formatNames[format] || '文件' }) || '文档下载完成')
+    logger.info('Download completed successfully', { id, attachmentId, format: fileFormat })
   } catch (error) {
     logger.error('Download failed', error)
-    ElMessage.error(t('declaration.downloadFailed') || '下载失败')
+    ElMessage.error(t('declaration.downloadFailed'))
   }
 }
 
 // 预览处理
-const handlePreview = async (id) => {
+const handlePreview = async (row) => {
+  const { id, attachmentId } = row
+  
   try {
-    logger.info('User started preview', { id })
-    ElMessage.info(t('declaration.previewing'))
+    logger.info('User started preview', { id, attachmentId })
     
-    // TODO: 后端接口开发完成后替换为实际接口调用
-    // const response = await getDeclarationPreview({ id })
-    // const previewContent = response.data.content
+    // 如果有 attachmentId，使用工作流状态接口获取 fileUrl 进行预览
+    if (attachmentId) {
+      // 获取工作流状态（包含 fileUrl 和 fileFormat）
+      const workflowResponse = await getDeclarationWorkflowStatus(id)
+      const workflowData = workflowResponse?.data?.data || workflowResponse?.data || {}
+      const fileUrl = workflowData.fileUrl
+      const fileFormat = workflowData.fileFormat // 'pdf' 或 'word'
+      
+      if (fileUrl) {
+        // 在新窗口打开预览（PDF 可以直接预览，Word 需要下载）
+        if (fileFormat === 'pdf') {
+          window.open(fileUrl, '_blank')
+          ElMessage.success(t('declaration.previewSuccess'))
+        } else {
+          // Word 格式，直接下载
+          const link = document.createElement('a')
+          link.href = fileUrl
+          link.download = `申报文档_${id}.${fileFormat === 'word' ? 'docx' : fileFormat}`
+          link.target = '_blank'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          ElMessage.info(t('declaration.wordPreviewHint'))
+        }
+        logger.info('Preview opened successfully', { id, fileUrl, fileFormat })
+        return
+      }
+    }
     
-    // 临时模拟预览内容（后端开发完成后删除）
-    await new Promise(resolve => setTimeout(resolve, 500)) // 模拟网络延迟
-    
-    const previewContent = t('declaration.previewContent', { 
-      id: declarations.value.find(d => d.id === id)?.number || `SB2024${String(id).padStart(3, '0')}`
+    // 如果没有 fileUrl，使用原来的预览接口
+    const response = await getDeclarationPreview({ id })
+    const responseData = response?.data || response
+    const previewData = responseData?.data || responseData
+    const previewContent = previewData?.content || previewData?.preview || t('declaration.previewContent', { 
+      id: declarations.value.find(d => d.id === id)?.number || id
     })
     
     ElMessageBox.alert(
@@ -541,8 +588,15 @@ const handlePreview = async (id) => {
   }
 }
 
+// 状态字符串到数字的映射（用于更新状态接口）
+const STATUS_TYPE_TO_NUMBER = {
+  submitting: 1,
+  success: 2,
+  failed: 3
+}
+
 // 状态编辑处理
-const handleStatusEdit = async (id, newStatus) => {
+const handleStatusEdit = async (id, newStatusType) => {
   const statusLabels = {
     submitting: t('declaration.statusSubmitting'),
     success: t('declaration.statusSuccess'),
@@ -552,84 +606,48 @@ const handleStatusEdit = async (id, newStatus) => {
   const declaration = declarations.value.find(d => d.id === id)
   if (!declaration) return
   
-  const oldStatus = declaration.statusType
-  const oldStatusLabel = declaration.status
+  const oldStatusType = declaration.statusType
   
-  if (newStatus === oldStatus) return
+  if (newStatusType === oldStatusType) return
   
   try {
-    // 🔥 参考原型图：选择非当前状态后，弹出确认对话框
     await ElMessageBox.confirm(
-      t('declaration.confirmStatusChange', { status: statusLabels[newStatus] }) || 
-      `确定要将申报状态修改为"${statusLabels[newStatus]}"吗？`,
-      t('declaration.confirmTitle') || '确认修改',
+      t('declaration.confirmStatusChange', { status: statusLabels[newStatusType] }) || 
+      `确定要将申报状态修改为"${statusLabels[newStatusType]}"吗？`,
+      t('declaration.confirmTitle'),
       {
-        confirmButtonText: t('common.confirm') || '确定',
-        cancelButtonText: t('common.cancel') || '取消',
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning',
         customClass: 'modern-confirm-dialog',
         center: false,
         showClose: true,
         closeOnClickModal: false,
-        closeOnPressEscape: true,
-        beforeClose: (action, instance, done) => {
-          if (action === 'confirm') {
-            instance.confirmButtonLoading = true
-            instance.confirmButtonText = t('declaration.statusChanging') || '修改中...'
-            // 🔥 真实场景时需要调用后端接口
-            // TODO: 后端接口开发完成后替换为实际接口调用
-            // updateDeclarationStatus({ id, status: newStatus })
-            //   .then(() => {
-            //     done()
-            //     setTimeout(() => {
-            //       instance.confirmButtonLoading = false
-            //     }, 300)
-            //   })
-            //   .catch((error) => {
-            //     instance.confirmButtonLoading = false
-            //     ElMessage.error('状态更新失败')
-            //     throw error
-            //   })
-            
-            // 临时模拟接口调用（后端开发完成后删除）
-            setTimeout(() => {
-              done()
-              setTimeout(() => {
-                instance.confirmButtonLoading = false
-              }, 300)
-            }, 800)
-          } else {
-            done()
-          }
-        }
+        closeOnPressEscape: true
       }
     )
     
-    logger.info('User confirmed status change', { id, oldStatus, newStatus })
+    logger.info('User confirmed status change', { id, oldStatusType, newStatusType })
     
-    // 🔥 真实场景时需要调用后端接口
-    // TODO: 后端接口开发完成后替换为实际接口调用
-    // await updateDeclarationStatus({ id, status: newStatus })
+    // 调用后端接口更新状态（后端需要数字状态）
+    const statusNumber = STATUS_TYPE_TO_NUMBER[newStatusType]
+    await updateDeclarationStatus({ id, status: statusNumber })
     
-    // 临时模拟状态更新（后端开发完成后删除）
-    await new Promise(resolve => setTimeout(resolve, 500)) // 模拟网络延迟
+    // 更新本地状态
+    declaration.statusType = newStatusType
+    declaration.status = statusLabels[newStatusType]
     
-    // 更新申报状态
-    declaration.statusType = newStatus
-    declaration.status = statusLabels[newStatus]
-    
-    ElMessage.success(t('declaration.statusChanged', { status: statusLabels[newStatus] }) || 
-      `申报状态已修改为"${statusLabels[newStatus]}"`)
-    logger.info('Status updated successfully', { id, newStatus })
+    ElMessage.success(t('declaration.statusChanged', { status: statusLabels[newStatusType] }) || 
+      `申报状态已修改为"${statusLabels[newStatusType]}"`)
+    logger.info('Status updated successfully', { id, newStatusType })
   } catch (error) {
     if (error === 'cancel') {
       // 用户取消
-      ElMessage.info(t('common.cancelled') || '已取消修改')
       logger.info('User cancelled status change', { id })
     } else {
       // 接口错误
       logger.error('Status update failed', error)
-      ElMessage.error(t('declaration.statusUpdateFailed') || '状态更新失败')
+      ElMessage.error(t('declaration.statusUpdateFailed'))
     }
   }
 }
@@ -645,6 +663,7 @@ const handleCurrentChange = (current) => {
   pagination.current = current
   loadDeclarations()
 }
+
 
 onMounted(() => {
   loadDeclarations()

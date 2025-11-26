@@ -2,6 +2,8 @@ package com.sciz.server.domain.pojo.dto.response.file;
 
 import io.minio.GetObjectResponse;
 
+import java.io.InputStream;
+
 /**
  * 文件下载上下文
  *
@@ -13,7 +15,7 @@ import io.minio.GetObjectResponse;
  * @param originalName  String 原始文件名
  * @param contentType   String 内容类型
  * @param contentLength Long 内容长度
- * @param inputStream   GetObjectResponse 文件数据流
+ * @param inputStream   InputStream 文件数据流（支持 GetObjectResponse 和普通 InputStream）
  *
  * @author JiaWen.Wu
  * @className FileDownloadContext
@@ -24,7 +26,7 @@ public record FileDownloadContext(
         String originalName,
         String contentType,
         Long contentLength,
-        GetObjectResponse inputStream) implements AutoCloseable {
+        InputStream inputStream) implements AutoCloseable {
 
     @Override
     public void close() throws Exception {

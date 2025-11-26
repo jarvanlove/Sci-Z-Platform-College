@@ -1,23 +1,13 @@
 <!--
 /**
- * @description 申报详情页面
- * 查看申报项目的详细信息
+ * @description 申报详情视图页面
+ * 路由包装层，仅负责引入业务组件
  */
 -->
 <template>
-  <div class="declaration-detail-page">
-    <h1>申报详情页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <DeclarationDetail />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import { DeclarationDetail } from '@/components/Business/Declaration'
 </script>
-
-<style lang="scss" scoped>
-.declaration-detail-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
-</style>

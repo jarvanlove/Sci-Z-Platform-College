@@ -57,4 +57,37 @@ public class SysAttachmentRelationRepoImpl implements SysAttachmentRelationRepo 
                 .set(SysAttachmentRelation::getUpdatedTime, LocalDateTime.now())
                 .last("LIMIT 1")) > 0;
     }
+
+    @Override
+    public List<SysAttachmentRelation> findPendingRelations(String relationType, String relationName, Long userId) {
+        if (!StringUtils.hasText(relationType) || !StringUtils.hasText(relationName) || userId == null) {
+            return Collections.emptyList();
+        }
+
+        // 查询待关联的记录（relationId = 0 表示待关联）
+        List<SysAttachmentRelation> relations = mapper.selectList(new LambdaQueryWrapper<SysAttachmentRelation>()
+                .eq(SysAttachmentRelation::getRelationType, relationType)
+                .eq(SysAttachmentRelation::getRelationName, relationName)
+                .eq(SysAttachmentRelation::getRelationId, 0L) // 0 表示待关联
+                .eq(SysAttachmentRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .orderByDesc(SysAttachmentRelation::getCreatedTime)
+                .last("LIMIT 10")); // 最多查询最近10条
+
+        // 需要通过附件表验证 uploaderId，这里先返回，由调用方通过附件表验证
+        return relations;
+    }
+
+    @Override
+    public boolean updateRelationIds(List<Long> relationIds, Long relationId, Long userId) {
+        if (relationIds == null || relationIds.isEmpty() || relationId == null) {
+            return false;
+        }
+
+        var now = LocalDateTime.now();
+        return mapper.update(null, new LambdaUpdateWrapper<SysAttachmentRelation>()
+                .in(SysAttachmentRelation::getId, relationIds)
+                .set(SysAttachmentRelation::getRelationId, relationId)
+                .set(SysAttachmentRelation::getUpdatedBy, userId)
+                .set(SysAttachmentRelation::getUpdatedTime, now)) > 0;
+    }
 }

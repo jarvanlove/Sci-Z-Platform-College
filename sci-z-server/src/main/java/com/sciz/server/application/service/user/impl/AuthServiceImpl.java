@@ -190,7 +190,7 @@ public class AuthServiceImpl implements AuthService {
     private void validateLoginParams(String username, String rawPassword) {
         if (!StringUtils.hasText(username) || !StringUtils.hasText(rawPassword)) {
             log.warn(String.format("login bad request, username=%s", username));
-            throw new BusinessException(ResultCode.BAD_REQUEST);
+            throw BusinessException.of(ResultCode.BAD_REQUEST);
         }
     }
 
@@ -208,7 +208,7 @@ public class AuthServiceImpl implements AuthService {
         if (!StringUtils.hasText(captcha) || !StringUtils.hasText(captchaKey)) {
             log.warn(String.format("验证码参数不完整, username=%s, hasCaptcha=%s, hasCaptchaKey=%s",
                     username, StringUtils.hasText(captcha), StringUtils.hasText(captchaKey)));
-            throw new BusinessException(ResultCode.CAPTCHA_REQUIRED);
+            throw BusinessException.of(ResultCode.CAPTCHA_REQUIRED);
         }
 
         // 从 Redis 获取验证码
@@ -216,7 +216,7 @@ public class AuthServiceImpl implements AuthService {
         var cachedCaptcha = Optional.ofNullable(RedisUtil.get(stringRedisTemplate, cacheKey))
                 .orElseThrow(() -> {
                     log.warn(String.format("验证码已过期, username=%s, captchaKey=%s", username, captchaKey));
-                    return new BusinessException(ResultCode.CAPTCHA_EXPIRED);
+                    return BusinessException.of(ResultCode.CAPTCHA_EXPIRED);
                 });
 
         // 验证码不匹配
@@ -225,7 +225,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (!CaptchaUtil.verify(normalizedUserCaptcha, normalizedCachedCaptcha)) {
             log.warn(String.format("验证码错误, username=%s, input=%s", username, captcha));
-            throw new BusinessException(ResultCode.CAPTCHA_INVALID);
+            throw BusinessException.of(ResultCode.CAPTCHA_INVALID);
         }
 
         // 验证码校验成功，删除已使用的验证码
@@ -242,21 +242,21 @@ public class AuthServiceImpl implements AuthService {
     private void validateCaptchaStrict(String captcha, String captchaKey) {
         if (!StringUtils.hasText(captcha) || !StringUtils.hasText(captchaKey)) {
             log.warn("captcha missing for strict validation");
-            throw new BusinessException(ResultCode.CAPTCHA_REQUIRED);
+            throw BusinessException.of(ResultCode.CAPTCHA_REQUIRED);
         }
 
         var cacheKey = String.format(CacheConstant.CAPTCHA_KEY_PREFIX, captchaKey);
         var cachedCaptcha = RedisUtil.get(stringRedisTemplate, cacheKey);
         if (!StringUtils.hasText(cachedCaptcha)) {
             log.warn(String.format("captcha expired or not found, captchaKey=%s", captchaKey));
-            throw new BusinessException(ResultCode.CAPTCHA_EXPIRED);
+            throw BusinessException.of(ResultCode.CAPTCHA_EXPIRED);
         }
 
         var normalizedUserCaptcha = captcha.trim().toUpperCase(Locale.ROOT);
         var normalizedCachedCaptcha = cachedCaptcha.trim().toUpperCase(Locale.ROOT);
         if (!CaptchaUtil.verify(normalizedUserCaptcha, normalizedCachedCaptcha)) {
             log.warn(String.format("captcha invalid, input=%s", captcha));
-            throw new BusinessException(ResultCode.CAPTCHA_INVALID);
+            throw BusinessException.of(ResultCode.CAPTCHA_INVALID);
         }
 
         RedisUtil.delete(stringRedisTemplate, cacheKey);
@@ -273,17 +273,17 @@ public class AuthServiceImpl implements AuthService {
         Optional.ofNullable(sysUserRepo.findByUsername(username))
                 .ifPresent(existing -> {
                     log.warn(String.format("register username exists, username=%s", username));
-                    throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "用户名已存在");
+                    throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "用户名已存在");
                 });
         Optional.ofNullable(sysUserRepo.findByEmail(email))
                 .ifPresent(existing -> {
                     log.warn(String.format("register email exists, email=%s", email));
-                    throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "邮箱已被注册");
+                    throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "邮箱已被注册");
                 });
         Optional.ofNullable(sysUserRepo.findByPhone(phone))
                 .ifPresent(existing -> {
                     log.warn(String.format("register phone exists, phone=%s", phone));
-                    throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "手机号已被注册");
+                    throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "手机号已被注册");
                 });
     }
 
@@ -370,7 +370,7 @@ public class AuthServiceImpl implements AuthService {
         var locked = RedisUtil.get(stringRedisTemplate, lockKey);
         if (StringUtils.hasText(locked)) {
             log.warn(String.format("login locked, username=%s", username));
-            throw new BusinessException(ResultCode.USER_ACCOUNT_LOCKED);
+            throw BusinessException.of(ResultCode.USER_ACCOUNT_LOCKED);
         }
     }
 
@@ -385,8 +385,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> {
                     onFail(username);
                     log.warn(String.format("login user invalid, username=%s", username));
-                    return new BusinessException(ResultCode.UNAUTHORIZED.getCode(),
-                            ResultCode.USER_LOGIN_FAILED.getMessage());
+                    return BusinessException.of(ResultCode.USER_LOGIN_FAILED);
                 });
     }
 
@@ -398,7 +397,7 @@ public class AuthServiceImpl implements AuthService {
         if (!match) {
             onFail(username);
             log.warn(String.format("login password mismatch, username=%s", username));
-            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), ResultCode.USER_LOGIN_FAILED.getMessage());
+            throw BusinessException.of(ResultCode.USER_LOGIN_FAILED);
         }
     }
 
@@ -525,7 +524,7 @@ public class AuthServiceImpl implements AuthService {
      */
     private void saveUserTitle(Long userId, String industryType, String titleCode) {
         var profileField = findProfileFieldByCode(industryType, PROFILE_TITLE_CODE)
-                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "当前行业未配置职称字段"));
+                .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST, "当前行业未配置职称字段"));
         validateProfileOption(profileField, titleCode);
         upsertUserProfileAttribute(userId, profileField.getFieldCode(), titleCode, profileField.getFieldType());
     }
@@ -610,7 +609,7 @@ public class AuthServiceImpl implements AuthService {
                 .stream()
                 .anyMatch(option -> optionValue.equals(option.getOptionValue()));
         if (!matched) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "职称编码不存在或已禁用");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "职称编码不存在或已禁用");
         }
     }
 
@@ -697,7 +696,7 @@ public class AuthServiceImpl implements AuthService {
         var exists = RedisUtil.get(stringRedisTemplate, limitKey);
         if (StringUtils.hasText(exists)) {
             log.warn(String.format("邮箱验证码发送频繁: email=%s", email));
-            throw new BusinessException(ResultCode.EMAIL_CODE_RATE_LIMITED);
+            throw BusinessException.of(ResultCode.EMAIL_CODE_RATE_LIMITED);
         }
     }
 
@@ -725,17 +724,17 @@ public class AuthServiceImpl implements AuthService {
      */
     private void validateEmailVerificationCode(String email, String emailCode) {
         if (!StringUtils.hasText(emailCode)) {
-            throw new BusinessException(ResultCode.EMAIL_CODE_INVALID);
+            throw BusinessException.of(ResultCode.EMAIL_CODE_INVALID);
         }
 
         var cacheKey = String.format(CacheConstant.AUTH_EMAIL_VERIFICATION_CODE_KEY, email);
         var cachedCode = RedisUtil.get(stringRedisTemplate, cacheKey);
         if (!StringUtils.hasText(cachedCode)) {
-            throw new BusinessException(ResultCode.EMAIL_CODE_EXPIRED);
+            throw BusinessException.of(ResultCode.EMAIL_CODE_EXPIRED);
         }
 
         if (!cachedCode.equals(emailCode.trim())) {
-            throw new BusinessException(ResultCode.EMAIL_CODE_INVALID);
+            throw BusinessException.of(ResultCode.EMAIL_CODE_INVALID);
         }
     }
 
@@ -761,7 +760,7 @@ public class AuthServiceImpl implements AuthService {
         var exists = RedisUtil.get(stringRedisTemplate, limitKey);
         if (StringUtils.hasText(exists)) {
             log.warn(String.format("短信验证码发送频繁: phone=%s", phone));
-            throw new BusinessException(ResultCode.SMS_CODE_RATE_LIMITED);
+            throw BusinessException.of(ResultCode.SMS_CODE_RATE_LIMITED);
         }
     }
 
@@ -791,7 +790,7 @@ public class AuthServiceImpl implements AuthService {
         var phone = Optional.ofNullable(req.phone())
                 .map(this::normalizePhone)
                 .filter(StringUtils::hasText)
-                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "手机号不能为空"));
+                .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST, "手机号不能为空"));
 
         log.info(String.format("发送短信验证码: phone=%s", phone));
 
@@ -800,7 +799,7 @@ public class AuthServiceImpl implements AuthService {
         var user = Optional.ofNullable(sysUserRepo.findByPhone(phone))
                 .orElseThrow(() -> {
                     log.warn(String.format("发送短信验证码失败，手机号不存在: phone=%s", phone));
-                    return new BusinessException(ResultCode.PHONE_NOT_FOUND);
+                    return BusinessException.of(ResultCode.PHONE_NOT_FOUND);
                 });
 
         ensureSmsVerificationRateLimit(phone);
@@ -934,7 +933,7 @@ public class AuthServiceImpl implements AuthService {
         var email = Optional.ofNullable(req.email())
                 .map(this::normalizeEmail)
                 .filter(StringUtils::hasText)
-                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "邮箱不能为空"));
+                .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST, "邮箱不能为空"));
 
         log.info(String.format("发送邮箱验证码: email=%s", email));
 
@@ -943,7 +942,7 @@ public class AuthServiceImpl implements AuthService {
         var user = Optional.ofNullable(sysUserRepo.findByEmail(email))
                 .orElseThrow(() -> {
                     log.warn(String.format("发送邮箱验证码失败，邮箱不存在: email=%s", email));
-                    return new BusinessException(ResultCode.EMAIL_NOT_FOUND);
+                    return BusinessException.of(ResultCode.EMAIL_NOT_FOUND);
                 });
 
         ensureEmailVerificationRateLimit(email);
@@ -952,7 +951,7 @@ public class AuthServiceImpl implements AuthService {
         cacheEmailVerificationCode(email, verificationCode);
 
         var mailProvider = Optional.ofNullable(req.provider())
-                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "邮箱服务商不能为空"));
+                .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST, "邮箱服务商不能为空"));
 
         log.info(String.format("邮箱验证码生成成功: email=%s, provider=%s, code=%s",
                 email, mailProvider, verificationCode));
@@ -971,7 +970,7 @@ public class AuthServiceImpl implements AuthService {
         var email = Optional.ofNullable(req.email())
                 .map(this::normalizeEmail)
                 .filter(StringUtils::hasText)
-                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "邮箱不能为空"));
+                .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST, "邮箱不能为空"));
         log.info(String.format("重置密码开始: email=%s", email));
 
         validateCaptchaStrict(req.captcha(), req.captchaKey());
@@ -979,7 +978,7 @@ public class AuthServiceImpl implements AuthService {
         var user = Optional.ofNullable(sysUserRepo.findByEmail(email))
                 .orElseThrow(() -> {
                     log.warn(String.format("重置密码失败，邮箱不存在: email=%s", email));
-                    return new BusinessException(ResultCode.EMAIL_NOT_FOUND);
+                    return BusinessException.of(ResultCode.EMAIL_NOT_FOUND);
                 });
 
         validateEmailVerificationCode(email, req.emailCode());
@@ -989,7 +988,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (!sysUserRepo.updateById(user)) {
             log.error(String.format("重置密码更新数据库失败: userId=%s, email=%s", user.getId(), email));
-            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+            throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
         }
 
         clearEmailVerificationCode(email);
@@ -1014,19 +1013,19 @@ public class AuthServiceImpl implements AuthService {
         // 3. 校验原密码
         if (!bcryptMatches(req.oldPassword(), user.getPassword())) {
             log.warn(String.format("修改密码失败，原密码错误: userId=%s", userId));
-            throw new BusinessException(ResultCode.USER_LOGIN_FAILED, "原密码错误");
+            throw BusinessException.of(ResultCode.USER_LOGIN_FAILED, "原密码错误");
         }
 
         // 4. 校验新密码与确认密码是否一致
         if (!req.newPassword().equals(req.confirmPassword())) {
             log.warn(String.format("修改密码失败，新密码与确认密码不一致: userId=%s", userId));
-            throw new BusinessException(ResultCode.BAD_REQUEST, "新密码与确认密码不一致");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "新密码与确认密码不一致");
         }
 
         // 5. 校验新密码不能与原密码相同
         if (bcryptMatches(req.newPassword(), user.getPassword())) {
             log.warn(String.format("修改密码失败，新密码不能与原密码相同: userId=%s", userId));
-            throw new BusinessException(ResultCode.BAD_REQUEST, "新密码不能与原密码相同");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "新密码不能与原密码相同");
         }
 
         // 6. 更新密码
@@ -1035,7 +1034,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (!sysUserRepo.updateById(user)) {
             log.error(String.format("修改密码更新数据库失败: userId=%s", userId));
-            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+            throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
         }
 
         log.info(String.format("修改密码成功: userId=%s", userId));
@@ -1071,7 +1070,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> {
                     log.warn(String.format("register department invalid, departmentCode=%s, industryType=%s",
                             departmentCode, industryType));
-                    return new BusinessException(ResultCode.BAD_REQUEST, "院系/部门不存在或已停用");
+                    return BusinessException.of(ResultCode.BAD_REQUEST, "院系/部门不存在或已停用");
                 });
 
         // 4. 构造并持久化用户实体
@@ -1081,7 +1080,7 @@ public class AuthServiceImpl implements AuthService {
         Optional.ofNullable(sysUserRepo.save(user))
                 .orElseThrow(() -> {
                     log.error(String.format("register failed when saving user, username=%s", username));
-                    return new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+                    return BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
                 });
 
         // 5. 绑定默认角色并刷新权限缓存
@@ -1100,15 +1099,15 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public ProfileResp profile() {
         if (!StpUtil.isLogin()) {
-            throw new BusinessException(ResultCode.UNAUTHORIZED);
+            throw BusinessException.of(ResultCode.UNAUTHORIZED);
         }
 
         var userId = StpUtil.getLoginIdAsLong();
         var user = Optional.ofNullable(sysUserRepo.findById(userId))
                 .filter(found -> !DeleteStatus.DELETED.getCode().equals(found.getIsDeleted()))
-                .orElseThrow(() -> new BusinessException(ResultCode.USER_NOT_FOUND));
+                .orElseThrow(() -> BusinessException.of(ResultCode.USER_NOT_FOUND));
         if (UserStatus.DISABLED.getCode().equals(user.getStatus())) {
-            throw new BusinessException(ResultCode.USER_ACCOUNT_DISABLED);
+            throw BusinessException.of(ResultCode.USER_ACCOUNT_DISABLED);
         }
 
         var industryType = Optional.ofNullable(user.getIndustryType())
@@ -1185,7 +1184,7 @@ public class AuthServiceImpl implements AuthService {
      */
     private Long validateLoginAndGetUserId() {
         if (!StpUtil.isLogin()) {
-            throw new BusinessException(ResultCode.UNAUTHORIZED);
+            throw BusinessException.of(ResultCode.UNAUTHORIZED);
         }
         return StpUtil.getLoginIdAsLong();
     }
@@ -1199,10 +1198,10 @@ public class AuthServiceImpl implements AuthService {
     private SysUser findAndValidateUser(Long userId) {
         var user = Optional.ofNullable(sysUserRepo.findById(userId))
                 .filter(found -> !DeleteStatus.DELETED.getCode().equals(found.getIsDeleted()))
-                .orElseThrow(() -> new BusinessException(ResultCode.USER_NOT_FOUND));
+                .orElseThrow(() -> BusinessException.of(ResultCode.USER_NOT_FOUND));
 
         if (UserStatus.DISABLED.getCode().equals(user.getStatus())) {
-            throw new BusinessException(ResultCode.USER_ACCOUNT_DISABLED);
+            throw BusinessException.of(ResultCode.USER_ACCOUNT_DISABLED);
         }
 
         return user;
@@ -1221,7 +1220,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> {
                     log.warn(String.format("update user info department invalid: userId=%s, department=%s, industry=%s",
                             userId, departmentCode, industryType));
-                    return new BusinessException(ResultCode.BAD_REQUEST, "所属部门不存在或已停用");
+                    return BusinessException.of(ResultCode.BAD_REQUEST, "所属部门不存在或已停用");
                 });
     }
 
@@ -1253,7 +1252,7 @@ public class AuthServiceImpl implements AuthService {
     private void saveUserEntity(SysUser user, Long userId) {
         if (!sysUserRepo.updateById(user)) {
             log.error(String.format("update user info failed when updating record: userId=%s", userId));
-            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+            throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
         }
     }
 
@@ -1332,7 +1331,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (!sysUserRepo.updateById(user)) {
             log.error(String.format("更新用户头像失败: userId=%s", userId));
-            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+            throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
         }
 
         // 保存头像附件ID到扩展属性
@@ -1347,7 +1346,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public RefreshTokenResp refreshToken() {
         if (!StpUtil.isLogin()) {
-            throw new BusinessException(ResultCode.UNAUTHORIZED);
+            throw BusinessException.of(ResultCode.UNAUTHORIZED);
         }
 
         // 续期逻辑：若当前 token 有限期，则续至配置的会话时长与当前剩余的较大值
@@ -1391,7 +1390,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public CheckRoleResp checkRole(String roleCode) {
         if (!StringUtils.hasText(roleCode)) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "roleCode 不能为空");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "roleCode 不能为空");
         }
 
         var normalizedRoleCode = roleCode.trim();
@@ -1414,7 +1413,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public CheckPermResp checkPermission(String permissionCode) {
         if (!StringUtils.hasText(permissionCode)) {
-            throw new BusinessException(ResultCode.BAD_REQUEST, "permissionCode 不能为空");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "permissionCode 不能为空");
         }
         var normalizedPermissionCode = permissionCode.trim();
         var normalizedIndustry = resolveIndustryType();
@@ -1450,7 +1449,7 @@ public class AuthServiceImpl implements AuthService {
                 .map(String::trim)
                 .filter(StringUtils::hasText)
                 .map(value -> value.toUpperCase(Locale.ROOT))
-                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "所属部门不能为空"));
+                .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST, "所属部门不能为空"));
     }
 
     /**

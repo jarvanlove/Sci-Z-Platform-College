@@ -9,22 +9,19 @@ import { DECLARATION_API, HTTP_METHODS } from '../Common/constants'
 /**
  * 获取申报列表
  * @param {Object} params - 查询参数
- * @param {number} params.page - 页码
- * @param {number} params.size - 每页数量
+ * @param {number} params.pageNo - 页码（从1开始）
+ * @param {number} params.pageSize - 每页数量
+ * @param {string} params.sortBy - 排序字段（如：submitTime）
+ * @param {string} params.sortOrder - 排序顺序（ASC/DESC）
  * @param {string} params.keyword - 关键词搜索
- * @param {string} params.status - 状态筛选
- * @param {number} params.applicantId - 申报人ID
- * @param {number} params.departmentId - 部门ID
- * @param {string} params.type - 申报类型
- * @param {string} params.startDate - 开始日期
- * @param {string} params.endDate - 结束日期
+ * @param {number} params.status - 状态筛选（数字类型）
  * @returns {Promise} 申报列表响应
  */
 export const getDeclarationList = (params) => {
   return request({
     url: DECLARATION_API.LIST,
-    method: HTTP_METHODS.GET,
-    params
+    method: HTTP_METHODS.POST,
+    data: params
   })
 }
 
@@ -41,15 +38,36 @@ export const getDeclarationDetail = (id) => {
 }
 
 /**
+ * 上传红头文件并分析
+ * @param {File} file - 文件对象
+ * @returns {Promise} 上传和分析响应，包含分析结果
+ */
+export const uploadRedHeaderFile = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  return request({
+    url: DECLARATION_API.RED_HEADER_FILE_UPLOAD,
+    method: HTTP_METHODS.POST,
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+/**
  * 创建申报
  * @param {Object} data - 申报数据
- * @param {string} data.title - 申报标题
- * @param {string} data.description - 申报描述
- * @param {string} data.type - 申报类型
- * @param {number} data.budget - 预算金额
- * @param {string} data.startDate - 开始日期
- * @param {string} data.endDate - 结束日期
- * @param {Array} data.attachments - 附件列表
+ * @param {string} data.department - 部门
+ * @param {string} data.projectLeader - 项目负责人
+ * @param {string} data.documentPublishTime - 红头文件发布时间 (YYYY-MM-DD)
+ * @param {string} data.projectStartTime - 项目开始时间 (YYYY-MM-DD)
+ * @param {string} data.projectEndTime - 项目结束时间 (YYYY-MM-DD)
+ * @param {Array<string>} data.researchFields - 研究领域数组
+ * @param {string} data.researchDirection - 研究方向（富文本）
+ * @param {string} data.researchTopic - 研究课题
+ * @param {string} data.workflowId - 工作流ID
  * @returns {Promise} 创建申报响应
  */
 export const createDeclaration = (data) => {
@@ -102,7 +120,7 @@ export const submitDeclaration = (id) => {
  * 更新申报状态
  * @param {Object} params - 更新参数
  * @param {number} params.id - 申报ID
- * @param {string} params.status - 新状态 (submitting/success/failed)
+ * @param {number} params.status - 新状态（数字：1-申报中，2-申报成功，3-申报失败）
  * @returns {Promise} 更新状态响应
  */
 export const updateDeclarationStatus = (params) => {
@@ -117,14 +135,23 @@ export const updateDeclarationStatus = (params) => {
  * 下载申报文档
  * @param {Object} params - 下载参数
  * @param {number} params.id - 申报ID
- * @param {string} params.format - 下载格式 (pdf/word/markdown)
+ * @param {string} [params.format] - 下载格式 (pdf/word/markdown)，当有 attachmentId 时可传 'original' 表示源文件格式
+ * @param {number} [params.attachmentId] - 附件ID，有附件时传递（返回源文件格式，不支持转换）
  * @returns {Promise} 下载响应（Blob）
  */
 export const downloadDeclaration = (params) => {
+  const requestParams = {}
+  if (params.format) {
+    requestParams.format = params.format
+  }
+  if (params.attachmentId) {
+    requestParams.attachmentId = params.attachmentId
+  }
+  
   return request({
     url: `${DECLARATION_API.DETAIL(params.id)}/download`,
     method: HTTP_METHODS.GET,
-    params: { format: params.format },
+    params: requestParams,
     responseType: 'blob'
   })
 }
@@ -138,6 +165,33 @@ export const downloadDeclaration = (params) => {
 export const getDeclarationPreview = (params) => {
   return request({
     url: `${DECLARATION_API.DETAIL(params.id)}/preview`,
+    method: HTTP_METHODS.GET
+  })
+}
+
+/**
+ * 获取申报工作流状态
+ * @param {number} id - 申报ID
+ * @returns {Promise} 工作流状态响应
+ * 响应数据结构：
+ * {
+ *   code: 200,
+ *   message: "操作成功",
+ *   data: {
+ *     steps: [
+ *       { name: "申报提交", status: "success", timestamp: "2025-01-15T10:30:00" },
+ *       ...
+ *     ],
+ *     fileUrl: "https://...", // 工作流完成后有值，执行中为null
+ *     fileFormat: "pdf", // 工作流完成后有值，执行中为null
+ *     timestamp: 1706428800000,
+ *     traceId: "trace-abc123"
+ *   }
+ * }
+ */
+export const getDeclarationWorkflowStatus = (id) => {
+  return request({
+    url: DECLARATION_API.WORKFLOW_STATUS(id),
     method: HTTP_METHODS.GET
   })
 }

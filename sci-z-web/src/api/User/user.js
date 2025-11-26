@@ -102,3 +102,14 @@ export const getLoginLogs = (data) => {
     data
   })
 }
+
+/**
+ * 获取所有工作流列表
+ * @returns {Promise} 工作流列表响应
+ */
+export const getWorkflows = () => {
+  return request({
+    url: USER_API.WORKFLOWS,
+    method: HTTP_METHODS.GET
+  })
+}

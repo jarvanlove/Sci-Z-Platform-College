@@ -64,13 +64,20 @@ export const getFileList = (params) => {
 
 /**
  * 文件下载
- * @param {number} id - 文件ID
- * @returns {Promise} 文件下载响应
+ * @param {number} id - 文件ID（attachmentId）
+ * @param {string} [format] - 下载格式（可选：docx/pdf），如果业务上没有要求就不传
+ * @returns {Promise} 文件下载响应（Blob）
  */
-export const downloadFile = (id) => {
+export const downloadFile = (id, format) => {
+  const params = {}
+  if (format) {
+    params.format = format
+  }
+  
   return request({
     url: FILE_API.DOWNLOAD(id),
     method: HTTP_METHODS.GET,
+    params: Object.keys(params).length > 0 ? params : undefined,
     responseType: 'blob'
   })
 }

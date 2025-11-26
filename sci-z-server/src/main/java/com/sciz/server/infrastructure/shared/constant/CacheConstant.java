@@ -89,6 +89,52 @@ public class CacheConstant {
      */
     public static final Long SESSION_CACHE_EXPIRE = 1800L;
 
+    // ==================== 文件转换相关缓存常量 ====================
+    /**
+     * 文件转换缓存前缀
+     * 格式：file:convert:{md5}:{sourceFormat}:{targetFormat}:{fileName}
+     */
+    public static final String FILE_CONVERT_CACHE_PREFIX = "file:convert:";
+
+    /**
+     * 文件转换缓存过期时间（24小时）
+     * 单位：秒
+     */
+    public static final Long FILE_CONVERT_CACHE_EXPIRE = 24 * 3600L;
+
+    /**
+     * 文件转换缓存目录（MinIO）
+     * 用于存储转换后的文件
+     */
+    public static final String FILE_CONVERT_CACHE_DIR = "convert-cache/";
+
+    /**
+     * 最大转换文件大小（300MB）
+     * 单位：字节
+     */
+    public static final Long FILE_CONVERT_MAX_SIZE = 300L * 1024 * 1024;
+
+    /**
+     * 文件转换超时时间（秒）
+     * 默认：5分钟
+     * 注意：当前为同步转换，超时控制需要在调用方实现（使用 CompletableFuture 或 ExecutorService 的 Future）
+     * 实现示例：
+     * 
+     * <pre>
+     * CompletableFuture&lt;ConvertResult&gt; future = CompletableFuture.supplyAsync(() -&gt; {
+     *     return fileConvertService.convert(inputStream, sourceFormat, targetFormat, fileName);
+     * });
+     * try {
+     *     ConvertResult result = future.get(CacheConstant.FILE_CONVERT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+     *     return result;
+     * } catch (TimeoutException e) {
+     *     future.cancel(true);
+     *     throw new BusinessException(ResultCode.SERVER_ERROR, "文件转换超时");
+     * }
+     * </pre>
+     */
+    public static final int FILE_CONVERT_TIMEOUT_SECONDS = 300;
+
     /**
      * 验证码缓存过期时间（秒）
      */

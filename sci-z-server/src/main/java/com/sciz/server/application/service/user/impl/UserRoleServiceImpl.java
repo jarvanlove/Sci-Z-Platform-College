@@ -98,7 +98,7 @@ public class UserRoleServiceImpl implements UserRoleService {
                         var existingRole = roleRepo.findByCode(req.roleCode(), industryType);
                         if (existingRole != null) {
                                 log.warn(String.format("%s失败，角色编码已存在: roleCode=%s", operation, req.roleCode()));
-                                throw new BusinessException(ResultCode.BAD_REQUEST, "角色编码已存在");
+                                throw BusinessException.of(ResultCode.BAD_REQUEST, "角色编码已存在");
                         }
 
                         // 3. 获取当前登录用户ID
@@ -124,7 +124,7 @@ public class UserRoleServiceImpl implements UserRoleService {
                                         .orElseThrow(() -> {
                                                 log.error(String.format("%s失败，保存数据库失败: roleCode=%s", operation,
                                                                 req.roleCode()));
-                                                return new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+                                                return BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
                                         });
 
                         // 5. 记录操作日志（成功）
@@ -174,7 +174,7 @@ public class UserRoleServiceImpl implements UserRoleService {
                         var role = Optional.ofNullable(roleRepo.findById(req.id()))
                                         .orElseThrow(() -> {
                                                 log.warn(String.format("%s失败，角色不存在: roleId=%s", operation, req.id()));
-                                                return new BusinessException(ResultCode.BAD_REQUEST, "角色不存在");
+                                                return BusinessException.of(ResultCode.BAD_REQUEST, "角色不存在");
                                         });
 
                         // 2. 获取当前登录用户ID
@@ -192,7 +192,7 @@ public class UserRoleServiceImpl implements UserRoleService {
 
                         if (!roleRepo.updateById(role)) {
                                 log.error(String.format("%s失败，保存数据库失败: roleId=%s", operation, req.id()));
-                                throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+                                throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
                         }
 
                         // 4. 记录操作日志（成功）
@@ -241,13 +241,13 @@ public class UserRoleServiceImpl implements UserRoleService {
                         var role = Optional.ofNullable(roleRepo.findById(id))
                                         .orElseThrow(() -> {
                                                 log.warn(String.format("%s失败，角色不存在: roleId=%s", operation, id));
-                                                return new BusinessException(ResultCode.BAD_REQUEST, "角色不存在");
+                                                return BusinessException.of(ResultCode.BAD_REQUEST, "角色不存在");
                                         });
 
                         // 2. 检查是否为系统角色（系统角色不允许删除）
                         if ("system".equals(role.getRoleType())) {
                                 log.warn(String.format("%s失败，系统角色不允许删除: roleId=%s", operation, id));
-                                throw new BusinessException(ResultCode.BAD_REQUEST, "系统角色不允许删除");
+                                throw BusinessException.of(ResultCode.BAD_REQUEST, "系统角色不允许删除");
                         }
 
                         // 3. 检查是否有用户绑定此角色
@@ -255,13 +255,13 @@ public class UserRoleServiceImpl implements UserRoleService {
                         if (!CollectionUtils.isEmpty(userRoles)) {
                                 log.warn(String.format("%s失败，角色已被用户使用: roleId=%s, userCount=%d", operation, id,
                                                 userRoles.size()));
-                                throw new BusinessException(ResultCode.BAD_REQUEST, "角色已被用户使用，无法删除");
+                                throw BusinessException.of(ResultCode.BAD_REQUEST, "角色已被用户使用，无法删除");
                         }
 
                         // 4. 软删除角色
                         if (!roleRepo.deleteById(id)) {
                                 log.error(String.format("%s失败，保存数据库失败: roleId=%s", operation, id));
-                                throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+                                throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
                         }
 
                         // 5. 记录操作日志（成功）
@@ -427,7 +427,7 @@ public class UserRoleServiceImpl implements UserRoleService {
                 var userId = req.userId();
                 var industryType = industryConfigCache.get().getType();
                 var roleIdList = new ArrayList<>(Optional.ofNullable(req.roleIdList())
-                                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST, "角色列表不能为空")));
+                                .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST, "角色列表不能为空")));
 
                 // 1. 查询角色并校验行业、状态
                 var roleList = roleRepo.findByIds(roleIdList);
@@ -437,22 +437,22 @@ public class UserRoleServiceImpl implements UserRoleService {
                 }
                 for (Long roleId : roleIdList) {
                         SysRole role = Optional.ofNullable(roleMap.get(roleId))
-                                        .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST,
-                                                        String.format("角色不存在: roleId=%s", roleId)));
+                                        .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST,
+                                                        "角色不存在: roleId=%s", roleId));
                         if (!industryType.equals(role.getIndustryType())) {
-                                throw new BusinessException(ResultCode.BAD_REQUEST,
-                                                String.format("角色行业不匹配: roleId=%s, industryType=%s", roleId,
-                                                                role.getIndustryType()));
+                                throw BusinessException.of(ResultCode.BAD_REQUEST,
+                                                "角色行业不匹配: roleId=%s, industryType=%s", roleId,
+                                                role.getIndustryType());
                         }
                         Optional.ofNullable(role.getStatus())
                                         .filter(status -> EnableStatus.ENABLED.getCode().equals(status))
-                                        .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST,
-                                                        String.format("角色未启用: roleId=%s", roleId)));
+                                        .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST,
+                                                        "角色未启用: roleId=%s", roleId));
                         if (Optional.ofNullable(role.getIsDeleted())
                                         .map(DeleteStatus.DELETED.getCode()::equals)
                                         .orElse(false)) {
-                                throw new BusinessException(ResultCode.BAD_REQUEST,
-                                                String.format("角色已删除: roleId=%s", roleId));
+                                throw BusinessException.of(ResultCode.BAD_REQUEST,
+                                                "角色已删除: roleId=%s", roleId);
                         }
                 }
 
@@ -523,7 +523,7 @@ public class UserRoleServiceImpl implements UserRoleService {
                 Optional.ofNullable(roleRepo.findById(roleId))
                                 .orElseThrow(() -> {
                                         log.warn(String.format("查询角色下的用户失败，角色不存在: roleId=%s", roleId));
-                                        return new BusinessException(ResultCode.BAD_REQUEST, "角色不存在");
+                                        return BusinessException.of(ResultCode.BAD_REQUEST, "角色不存在");
                                 });
 
                 // 2. 构建查询请求（设置 roleId 参数）
@@ -554,7 +554,7 @@ public class UserRoleServiceImpl implements UserRoleService {
                 var role = Optional.ofNullable(roleRepo.findById(roleId))
                                 .orElseThrow(() -> {
                                         log.warn(String.format("查询角色绑定的用户ID列表失败，角色不存在: roleId=%s", roleId));
-                                        return new BusinessException(ResultCode.BAD_REQUEST, "角色不存在");
+                                        return BusinessException.of(ResultCode.BAD_REQUEST, "角色不存在");
                                 });
 
                 // 2. 校验行业类型
@@ -562,9 +562,9 @@ public class UserRoleServiceImpl implements UserRoleService {
                 if (!industryType.equals(role.getIndustryType())) {
                         log.warn(String.format("查询角色绑定的用户ID列表失败，角色行业不匹配: roleId=%s, industryType=%s", roleId,
                                         role.getIndustryType()));
-                        throw new BusinessException(ResultCode.BAD_REQUEST,
-                                        String.format("角色行业不匹配: roleId=%s, industryType=%s", roleId,
-                                                        role.getIndustryType()));
+                        throw BusinessException.of(ResultCode.BAD_REQUEST,
+                                        "角色行业不匹配: roleId=%s, industryType=%s", roleId,
+                                        role.getIndustryType());
                 }
 
                 // 3. 查询角色绑定的用户ID列表（仅查询当前行业下的用户）

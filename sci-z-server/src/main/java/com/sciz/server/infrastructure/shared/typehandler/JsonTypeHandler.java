@@ -19,14 +19,16 @@ import java.sql.SQLException;
  * @className JsonTypeHandler
  * @date 2025-11-18 10:00
  */
-@MappedTypes({String.class})
-@MappedJdbcTypes({JdbcType.OTHER})
+@MappedTypes({ String.class })
+@MappedJdbcTypes({ JdbcType.OTHER })
 public class JsonTypeHandler extends BaseTypeHandler<String> {
 
     @Override
-    public void setNonNullParameter(PreparedStatement ps, int i, String parameter, JdbcType jdbcType) throws SQLException {
+    public void setNonNullParameter(PreparedStatement ps, int i, String parameter, JdbcType jdbcType)
+            throws SQLException {
         PGobject pgObject = new PGobject();
-        pgObject.setType("json");
+        // 支持 PostgreSQL 的 json 和 jsonb 类型
+        pgObject.setType("jsonb");
         pgObject.setValue(parameter);
         ps.setObject(i, pgObject);
     }
@@ -67,6 +69,3 @@ public class JsonTypeHandler extends BaseTypeHandler<String> {
         return value.toString();
     }
 }
-
-
-

@@ -9,10 +9,7 @@ import com.sciz.server.domain.pojo.repository.file.SysAttachmentRelationRepo;
 import com.sciz.server.infrastructure.external.dify.dto.request.DeclarationWorkflowReq;
 import com.sciz.server.infrastructure.external.dify.dto.response.DeclarationWorkflowResp;
 import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
-import com.sciz.server.infrastructure.shared.enums.AttachmentRelationStatus;
-import com.sciz.server.infrastructure.shared.enums.DeclarationStatus;
-import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
-import com.sciz.server.infrastructure.shared.enums.WorkflowStatus;
+import com.sciz.server.infrastructure.shared.enums.*;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationUpdatedEvent;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
@@ -57,17 +54,19 @@ public class DeclarationWorkflowTask {
 
     /**
      * 处理申报工作流（异步）
+     * 使用类型安全的工作流输入参数构建
      *
      * @param declarationId 申报ID
-     * @param workflowId    工作流ID
-     * @param inputs        工作流输入参数
+     * @param resourceId    资源ID（工作流ID，用于查找 API Key）
+     * @param inputs        工作流输入参数（类型安全）
      * @param userId        用户ID
+     * @param keyType       密钥类型（workflow/file/chatbot）
      */
     @Async("globalTaskExecutor")
-    public void processDeclarationWorkflow(Long declarationId, String workflowId,
-            Map<String, Object> inputs, Long userId) {
-        log.info(String.format("开始异步处理申报工作流: declarationId=%s, workflowId=%s",
-                declarationId, workflowId));
+    public void processDeclarationWorkflow(Long declarationId, String resourceId,
+            DeclarationWorkflowReq inputs, Long userId, String keyType) {
+        log.info(String.format("开始异步处理申报工作流: declarationId=%s, resourceId=%s, keyType=%s",
+                declarationId, resourceId, keyType));
 
         try {
             // 1. 更新工作流状态为"处理中"
@@ -76,64 +75,59 @@ public class DeclarationWorkflowTask {
             // 2. 记录工作流启动步骤
             addWorkflowStep(declarationId, "工作流启动", "success");
 
-            // 3. 构建工作流请求
-            var workflowRequest = new DeclarationWorkflowReq(
-                    userId,
-                    workflowId,
-                    "workflow",
-                    inputs,
-                    "blocking",
-                    String.valueOf(userId));
+            // 3. 调用申报工作流
+            log.info(String.format("调用 Dify 工作流 API: declarationId=%s, resourceId=%s", declarationId, resourceId));
+            DeclarationWorkflowResp workflowOutputs = difyWorkflowService.executeDeclarationWorkflow(
+                    inputs, userId, resourceId, keyType);
+            String fileUrl = workflowOutputs.fileUrl();
 
-            // 4. 调用 Dify 工作流 API（阻塞等待完成，3-5分钟）
-            log.info(String.format("调用 Dify 工作流 API: declarationId=%s", declarationId));
-            var workflowResponse = difyWorkflowService.executeDeclarationWorkflow(workflowRequest);
-
-            // 5. 记录 AI 内容分析步骤
+            // 4. 记录 AI 内容分析步骤
             addWorkflowStep(declarationId, "AI 内容分析", "success");
 
-            // 6. 记录项目信息生成步骤
+            // 5. 记录项目信息生成步骤
             addWorkflowStep(declarationId, "项目信息生成", "success");
 
-            // 7. 记录数据库存储步骤
+            // 6. 记录数据库存储步骤
             addWorkflowStep(declarationId, "数据库存储", "success");
 
-            // 8. 解析工作流响应，获取文件下载 URL
-            var fileUrl = extractFileUrl(workflowResponse);
             if (fileUrl == null || fileUrl.isEmpty()) {
-                throw new BusinessException(ResultCode.SERVER_ERROR, "工作流未返回文件下载URL");
+                throw BusinessException.of(ResultCode.SERVER_ERROR, "工作流未返回文件下载URL");
             }
 
             log.info(String.format("工作流执行完成，获取文件URL: declarationId=%s, fileUrl=%s",
                     declarationId, fileUrl));
 
-            // 9. 从 URL 下载文件
+            // 7. 从 URL 下载文件
             var fileData = downloadFileFromUrl(fileUrl);
 
-            // 10. 上传文件到 MinIO
+            // 8. 上传文件到 MinIO
             var attachmentId = uploadFileToMinio(declarationId, fileData, fileUrl, userId);
 
-            // 11. 创建附件关联
+            // 9. 创建附件关联
             createAttachmentRelation(declarationId, attachmentId, userId);
 
-            // 12. 记录申报书生成步骤
+            // 10. 记录申报书生成步骤
             addWorkflowStep(declarationId, "申报书生成", "success");
 
-            // 13. 更新工作流状态为"已完成"，申报状态为"申报成功"
+            // 11. 更新工作流状态为"已完成"，申报状态为"申报成功"
             updateWorkflowStatus(declarationId, WorkflowStatus.COMPLETED, fileUrl);
-            updateDeclarationStatus(declarationId, DeclarationStatus.SUCCESS);
 
-            // 14. 发布申报更新事件
-            var event = new DeclarationUpdatedEvent(
-                    String.valueOf(declarationId),
-                    null,
-                    String.valueOf(userId),
-                    null,
-                    String.valueOf(DeclarationStatus.IN_PROGRESS.getCode()),
-                    String.valueOf(DeclarationStatus.SUCCESS.getCode()),
-                    "申报书生成完成",
-                    "工作流执行成功");
-            eventPublisher.publish(event);
+            // 12. 发布申报更新事件
+            var declaration = declarationRepo.findById(declarationId);
+            if (declaration != null) {
+                var event = new DeclarationUpdatedEvent(
+                        String.valueOf(declarationId),
+                        declaration.getResearchTopic(), // 申报名称（研究课题）
+                        String.valueOf(userId),
+                        declaration.getApplicantName(), // 申报人姓名
+                        String.valueOf(DeclarationStatus.IN_PROGRESS.getCode()),
+                        String.valueOf(DeclarationStatus.SUCCESS.getCode()),
+                        "申报书生成完成",
+                        "工作流执行成功");
+                eventPublisher.publish(event);
+            } else {
+                log.warn(String.format("发布申报更新事件失败：申报不存在: declarationId=%s", declarationId));
+            }
 
             log.info(String.format("申报工作流处理完成: declarationId=%s, attachmentId=%s",
                     declarationId, attachmentId));
@@ -142,9 +136,8 @@ public class DeclarationWorkflowTask {
             log.error(String.format("申报工作流处理失败: declarationId=%s, err=%s",
                     declarationId, e.getMessage()), e);
 
-            // 更新工作流状态为"失败"，申报状态为"申报失败"
+            // 更新工作流状态为"失败"
             updateWorkflowStatus(declarationId, WorkflowStatus.FAILED, null);
-            updateDeclarationStatus(declarationId, DeclarationStatus.FAILED);
 
             // 记录失败步骤
             addWorkflowStep(declarationId, "申报书生成", "failed");
@@ -250,23 +243,6 @@ public class DeclarationWorkflowTask {
     }
 
     /**
-     * 从工作流响应中提取文件下载 URL
-     */
-    private String extractFileUrl(DeclarationWorkflowResp response) {
-        if (response == null || response.data() == null ||
-                response.data().outputs() == null) {
-            return null;
-        }
-
-        var outputs = response.data().outputs();
-        if (outputs.files() != null && !outputs.files().isEmpty()) {
-            return outputs.files().get(0).url();
-        }
-
-        return null;
-    }
-
-    /**
      * 从 URL 下载文件
      */
     private FileData downloadFileFromUrl(String fileUrl) {
@@ -286,8 +262,8 @@ public class DeclarationWorkflowTask {
             var response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
 
             if (response.statusCode() != 200) {
-                throw new BusinessException(ResultCode.SERVER_ERROR,
-                        "文件下载失败: HTTP " + response.statusCode());
+                throw BusinessException.of(ResultCode.SERVER_ERROR,
+                        "文件下载失败: HTTP %d", response.statusCode());
             }
 
             var fileName = extractFileNameFromUrl(fileUrl);
@@ -301,7 +277,7 @@ public class DeclarationWorkflowTask {
 
         } catch (Exception e) {
             log.error(String.format("文件下载失败: fileUrl=%s, err=%s", fileUrl, e.getMessage()), e);
-            throw new BusinessException(ResultCode.SERVER_ERROR, "文件下载失败: " + e.getMessage());
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "文件下载失败: %s", e.getMessage());
         }
     }
 
@@ -335,8 +311,8 @@ public class DeclarationWorkflowTask {
             // 查询申报信息，用于设置 relation_name
             var declaration = declarationRepo.findById(declarationId);
             if (declaration == null) {
-                throw new BusinessException(ResultCode.DECLARATION_NOT_FOUND,
-                        "申报不存在: " + declarationId);
+                throw BusinessException.of(ResultCode.DECLARATION_NOT_FOUND,
+                        "申报不存在: %s", declarationId);
             }
 
             // 构建上传请求
@@ -345,7 +321,7 @@ public class DeclarationWorkflowTask {
             uploadReq.setRelationType(AttachmentRelationStatus.DECLARATION.getCode());
             uploadReq.setRelationId(declarationId);
             uploadReq.setRelationName(buildDeclarationRelationName(declaration));
-            uploadReq.setAttachmentType("document");
+            uploadReq.setAttachmentType(AttachmentCategoryStatus.DOCUMENT.getCode());
             uploadReq.setIsPublic(0);
 
             // 上传文件
@@ -359,7 +335,7 @@ public class DeclarationWorkflowTask {
         } catch (Exception e) {
             log.error(String.format("文件上传失败: declarationId=%s, err=%s",
                     declarationId, e.getMessage()), e);
-            throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED, "文件上传失败: " + e.getMessage());
+            throw BusinessException.of(ResultCode.FILE_UPLOAD_FAILED, "文件上传失败: %s", e.getMessage());
         }
     }
 
@@ -370,8 +346,8 @@ public class DeclarationWorkflowTask {
         // 查询申报信息，用于设置 relation_name
         var declaration = declarationRepo.findById(declarationId);
         if (declaration == null) {
-            throw new BusinessException(ResultCode.DECLARATION_NOT_FOUND,
-                    "申报不存在: " + declarationId);
+            throw BusinessException.of(ResultCode.DECLARATION_NOT_FOUND,
+                    "申报不存在: %s", declarationId);
         }
 
         // 构建 relation_name：申报编号/研究课题（类似 user 的 "admin/系统管理员" 格式）
@@ -382,7 +358,7 @@ public class DeclarationWorkflowTask {
         relation.setRelationType(AttachmentRelationStatus.DECLARATION.getCode());
         relation.setRelationId(declarationId);
         relation.setRelationName(relationName);
-        relation.setAttachmentType("document");
+        relation.setAttachmentType(AttachmentCategoryStatus.DOCUMENT.getCode());
         relation.setSortOrder(0);
         relation.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
         relation.setCreatedBy(userId);

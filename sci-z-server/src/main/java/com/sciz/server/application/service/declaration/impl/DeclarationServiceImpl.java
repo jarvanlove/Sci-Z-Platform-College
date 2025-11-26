@@ -5,10 +5,16 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.application.service.declaration.DeclarationService;
 import com.sciz.server.application.service.file.FileService;
 import com.sciz.server.application.task.DeclarationWorkflowTask;
+import com.sciz.server.domain.pojo.dto.request.file.FileSyncDifyReq;
 import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationCreateReq;
 import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationListQueryReq;
+import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationDetailResp;
 import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationListResp;
+import com.sciz.server.domain.pojo.dto.response.declaration.RedHeaderFileParseResp;
+import com.sciz.server.infrastructure.external.dify.dto.request.DeclarationWorkflowReq;
+import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
+import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
 import com.sciz.server.domain.pojo.entity.declaration.Declaration;
 import com.sciz.server.domain.pojo.repository.declaration.DeclarationRepo;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRelationRepo;
@@ -16,6 +22,7 @@ import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.enums.AttachmentRelationStatus;
 import com.sciz.server.infrastructure.shared.enums.DeclarationStatus;
 import com.sciz.server.infrastructure.shared.enums.WorkflowStatus;
+import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationCreatedEvent;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
@@ -57,6 +64,7 @@ public class DeclarationServiceImpl implements DeclarationService {
     private final DeclarationWorkflowTask declarationWorkflowTask;
     private final SysAttachmentRelationRepo sysAttachmentRelationRepo;
     private final FileService fileService;
+    private final DifyWorkflowService difyWorkflowService;
 
     /**
      * 创建申报
@@ -93,7 +101,7 @@ public class DeclarationServiceImpl implements DeclarationService {
             // 5. 保存申报
             var declarationId = declarationRepo.save(entity);
             if (declarationId == null) {
-                throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED, "申报保存失败");
+                throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED, "申报保存失败");
             }
 
             log.info(String.format("申报保存成功: declarationId=%s, number=%s", declarationId, entity.getNumber()));
@@ -137,7 +145,7 @@ public class DeclarationServiceImpl implements DeclarationService {
                     String.format("%s失败：研究课题 %s", operation, req.researchTopic()),
                     e.getClass().getSimpleName(), executionTime);
             log.error(String.format("申报创建失败: err=%s", e.getMessage()), e);
-            throw new BusinessException(ResultCode.SERVER_ERROR, "申报创建失败: " + e.getMessage());
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "申报创建失败: %s", e.getMessage());
         }
     }
 
@@ -156,17 +164,22 @@ public class DeclarationServiceImpl implements DeclarationService {
 
         IPage<Declaration> declarationPage = declarationRepo.page(page, req.keyword(), req.status(), sortBy, asc);
 
-        // 批量查询附件信息（用于判断是否有附件）
+        // 批量查询附件信息（用于判断是否有附件和获取附件ID）
         var declarationIds = declarationPage.getRecords().stream()
                 .map(Declaration::getId)
                 .toList();
 
         var attachmentMap = new HashMap<Long, Boolean>();
+        var attachmentIdMap = new HashMap<Long, Long>();
         if (!declarationIds.isEmpty()) {
             declarationIds.forEach(declarationId -> {
                 var attachmentIds = sysAttachmentRelationRepo.findAttachmentIds(
                         AttachmentRelationStatus.DECLARATION.getCode(), declarationId);
                 attachmentMap.put(declarationId, !attachmentIds.isEmpty());
+                // 如果有附件，取第一个附件ID
+                if (!attachmentIds.isEmpty()) {
+                    attachmentIdMap.put(declarationId, attachmentIds.get(0));
+                }
             });
         }
 
@@ -199,8 +212,10 @@ public class DeclarationServiceImpl implements DeclarationService {
                         }
                     }
 
-                    // 设置是否有附件
-                    resp.setHasAttachment(attachmentMap.getOrDefault(declaration.getId(), false));
+                    // 设置是否有附件和附件ID
+                    var hasAttachment = attachmentMap.getOrDefault(declaration.getId(), false);
+                    resp.setHasAttachment(hasAttachment);
+                    resp.setAttachmentId(attachmentIdMap.get(declaration.getId()));
 
                     // 设置研究领域
                     if (declaration.getResearchFields() != null && !declaration.getResearchFields().isEmpty()) {
@@ -236,7 +251,7 @@ public class DeclarationServiceImpl implements DeclarationService {
         // 1. 查询申报实体
         var declaration = declarationRepo.findById(id);
         if (declaration == null) {
-            throw new BusinessException(ResultCode.DECLARATION_NOT_FOUND);
+            throw BusinessException.of(ResultCode.DECLARATION_NOT_FOUND);
         }
 
         // 2. 转换为响应对象
@@ -312,7 +327,7 @@ public class DeclarationServiceImpl implements DeclarationService {
         // 1. 查询申报实体
         var declaration = declarationRepo.findById(id);
         if (declaration == null) {
-            throw new BusinessException(ResultCode.DECLARATION_NOT_FOUND);
+            throw BusinessException.of(ResultCode.DECLARATION_NOT_FOUND);
         }
 
         // 2. 解析工作流结果
@@ -374,14 +389,19 @@ public class DeclarationServiceImpl implements DeclarationService {
         var currentUser = LoginUserUtil.requireCurrentUser();
         var userId = currentUser.userId();
 
-        // 构建工作流输入参数
-        var inputs = buildWorkflowInputs(req);
+        // 构建类型安全的工作流输入参数
+        var inputs = DeclarationWorkflowReq.of(
+                req.researchFields(), req.researchDirection(), req.researchTopic());
 
-        // 调用异步任务处理类
-        declarationWorkflowTask.processDeclarationWorkflow(declarationId, req.workflowId(), inputs, userId);
+        // 使用 workflowId 作为 resourceId 调用工作流
+        String resourceId = req.workflowId();
+        String keyType = DifyApiKey.KeyType.WORKFLOW.getCode();
 
-        log.info(String.format("异步触发工作流处理: declarationId=%s, workflowId=%s",
-                declarationId, req.workflowId()));
+        // 调用异步任务处理类（传递类型安全的 inputs 对象）
+        declarationWorkflowTask.processDeclarationWorkflow(declarationId, resourceId, inputs, userId, keyType);
+
+        log.info(String.format("异步触发工作流处理: declarationId=%s, workflowId=%s, resourceId=%s",
+                declarationId, req.workflowId(), resourceId));
     }
 
     /**
@@ -391,8 +411,7 @@ public class DeclarationServiceImpl implements DeclarationService {
      * @param userId   用户ID
      * @param realName 用户真实姓名
      */
-    private void initializeDeclarationEntity(com.sciz.server.domain.pojo.entity.declaration.Declaration entity,
-            Long userId, String realName) {
+    private void initializeDeclarationEntity(Declaration entity, Long userId, String realName) {
         var now = LocalDateTime.now();
         entity.setNumber(DeclarationUtil.generateDeclarationNumber());
         entity.setApplicantId(userId);
@@ -400,7 +419,11 @@ public class DeclarationServiceImpl implements DeclarationService {
         entity.setStatus(String.valueOf(DeclarationStatus.IN_PROGRESS.getCode()));
         entity.setWorkflowStatus(WorkflowStatus.RUNNING.getCode());
         entity.setSubmitTime(now);
-        entity.setIsDeleted(0);
+        // 研究内容摘要（初始为空，后续由工作流生成）
+        if (entity.getContentSummary() == null) {
+            entity.setContentSummary("");
+        }
+        entity.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
         entity.setCreatedBy(userId);
         entity.setUpdatedBy(userId);
         entity.setCreatedTime(now);
@@ -408,21 +431,83 @@ public class DeclarationServiceImpl implements DeclarationService {
     }
 
     /**
-     * 构建工作流输入参数
+     * 上传红头文件
      *
-     * @param req 创建请求
-     * @return 工作流输入参数
+     * @param req 文件上传请求
+     * @return 红头文件解析响应（包含研究领域、研究方向、研究课题）
      */
-    private Map<String, Object> buildWorkflowInputs(DeclarationCreateReq req) {
-        var inputs = new HashMap<String, Object>();
-        inputs.put("department", req.department());
-        inputs.put("projectLeader", req.projectLeader());
-        inputs.put("documentPublishTime", req.documentPublishTime().toString());
-        inputs.put("projectStartTime", req.projectStartTime().toString());
-        inputs.put("projectEndTime", req.projectEndTime().toString());
-        inputs.put("researchFields", req.researchFields());
-        inputs.put("researchDirection", req.researchDirection());
-        inputs.put("researchTopic", req.researchTopic());
-        return inputs;
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RedHeaderFileParseResp uploadRedHeaderFile(FileUploadReq req) {
+        var startTime = DateUtil.now();
+        var operationType = OperationLogRecorderStatus.DECLARATION_UPLOAD_RED_HEADER_FILE;
+        var operation = operationType.getCode();
+
+        try {
+            var fileName = Optional.ofNullable(req.getFile())
+                    .map(file -> Optional.ofNullable(file.getOriginalFilename()).orElse("unknown"))
+                    .orElse("unknown");
+            log.info(String.format("开始上传红头文件: fileName=%s", fileName));
+
+            // 1. 获取当前登录用户
+            var currentUser = LoginUserUtil.requireCurrentUser();
+            Long userId = currentUser.userId();
+
+            // 2. 准备 Dify 同步参数
+            String resourceId = "workflow_002";
+            String keyType = DifyApiKey.KeyType.WORKFLOW.getCode();
+
+            // 3. 构建同步请求
+            var syncReq = new FileSyncDifyReq(req.getFile(), resourceId, keyType);
+
+            // 4. 同步上传文件到 Dify
+            log.info(String.format("开始同步文件到 Dify: fileName=%s, resourceId=%s, keyType=%s",
+                    fileName, resourceId, keyType));
+            var syncResp = fileService.syncToDify(syncReq);
+            String difyFileId = syncResp.difyFileId();
+
+            log.info(String.format("文件已上传到 Dify: difyFileId=%s", difyFileId));
+
+            // 5. 调用红头文件解析工作流
+            log.info(String.format("开始调用红头文件解析工作流: difyFileId=%s, workflowId=%s", difyFileId, resourceId));
+            RedHeaderFileParseResp resp = difyWorkflowService.executeRedHeaderFileWorkflow(
+                    difyFileId, userId, resourceId, keyType);
+
+            // 6. 记录操作日志
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var detail = String.format("%s：%s（Dify文件ID: %s）",
+                    operationType.getDescription(), fileName, difyFileId);
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
+
+            log.info(String.format("红头文件上传完成: fileName=%s, difyFileId=%s", fileName, difyFileId));
+            return resp;
+
+        } catch (BusinessException e) {
+            // 记录操作日志（失败）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var fileName = Optional.ofNullable(req.getFile())
+                    .map(file -> Optional.ofNullable(file.getOriginalFilename()).orElse("unknown"))
+                    .orElse("unknown");
+            operationLogRecorderUtil.recordFailure(operation,
+                    String.format("%s失败：文件名 %s", operation, fileName),
+                    e.getMessage(), executionTime);
+            log.error(String.format("红头文件上传失败: err=%s", e.getMessage()), e);
+            throw e;
+        } catch (Exception e) {
+            // 记录操作日志（失败）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var fileName = Optional.ofNullable(req.getFile())
+                    .map(file -> Optional.ofNullable(file.getOriginalFilename()).orElse("unknown"))
+                    .orElse("unknown");
+            operationLogRecorderUtil.recordFailure(operation,
+                    String.format("%s失败：文件名 %s", operation, fileName),
+                    e.getClass().getSimpleName(), executionTime);
+            log.error(String.format("红头文件上传异常: err=%s", e.getMessage()), e);
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "红头文件上传失败: %s", e.getMessage());
+        }
     }
+
 }
