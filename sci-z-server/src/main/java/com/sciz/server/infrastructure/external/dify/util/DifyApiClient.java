@@ -11,9 +11,10 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
-
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
+import java.time.Duration;
 import java.util.Map;
-
 /**
  * Dify API 客户端工具类
  * 封装 HTTP 请求和 Authorization 认证
@@ -25,12 +26,11 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class DifyApiClient {
-    
     private final DifyConfig difyConfig;
     private final RestTemplate restTemplate;
     private final DifyApiKeyService difyApiKeyService;
     private final ObjectMapper objectMapper;
-    
+    private final WebClient webClient;
     /**
      * 统一请求方法（使用动态密钥）
      * 
@@ -240,7 +240,7 @@ public class DifyApiClient {
 
 
     /**
-     * 流式请求方法（改为普通 HTTP 请求）
+     * 流式请求方法（使用 WebClient 处理 text/event-stream 响应）
      * 
      * @param method 请求类型 (POST)
      * @param path 请求路径
@@ -252,28 +252,64 @@ public class DifyApiClient {
      */
     public ResponseEntity<String> requestStream(String method, String path, Object body,
                                                 Long userId, String resourceId, String keyType) {
-        HttpMethod httpMethod = HttpMethod.valueOf(method.toUpperCase());
         String url = buildUrl(path, null, 0);
         HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType, 0);
-        
-        // 为流式请求添加 Accept 头，接收 text/event-stream 格式
-        HttpHeaders headers = new HttpHeaders();
-        headers.putAll(entity.getHeaders());
-        headers.setAccept(java.util.Collections.singletonList(MediaType.TEXT_EVENT_STREAM));
-        HttpEntity<?> streamEntity = new HttpEntity<>(entity.getBody(), headers);
         
         log.debug(String.format("Dify %s 流式请求: %s, userId=%s, resourceId=%s, keyType=%s, hasBody=%s", 
                 method, url, userId, resourceId, keyType, body != null));
         
-        // 使用 URI.create() 避免 RestTemplate 将 URL 中的 {} 当作 URI 模板变量处理
         try {
-            java.net.URI uri = java.net.URI.create(url);
-            ResponseEntity<String> response = restTemplate.exchange(uri, httpMethod, streamEntity, String.class);
+            // 构建请求体
+            String jsonBody;
+            if (entity.getBody() instanceof String) {
+                jsonBody = (String) entity.getBody();
+            } else if (entity.getBody() != null) {
+                jsonBody = objectMapper.writeValueAsString(entity.getBody());
+            } else {
+                jsonBody = "{}";
+            }
+            // 构建 WebClient 请求
+            WebClient.RequestBodySpec requestSpec = webClient.method(HttpMethod.valueOf(method.toUpperCase()))
+                    .uri(url)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.TEXT_EVENT_STREAM);
+            // 添加请求头（从 entity 中获取）
+            HttpHeaders headers = entity.getHeaders();
+            if (headers != null) {
+                headers.forEach((name, values) -> {
+                    if (values != null && !values.isEmpty() && !name.equalsIgnoreCase("Content-Type")) {
+                        requestSpec.header(name, values.get(0));
+                    }
+                });
+            }
+            // 使用 bodyToFlux 接收流式响应，然后收集所有数据
+            Flux<String> eventStream = requestSpec
+                    .bodyValue(jsonBody)
+                    .retrieve()
+                    .bodyToFlux(String.class);
+            // 收集所有流式数据为字符串
+            StringBuilder responseBodyBuilder = new StringBuilder();
+            eventStream
+                    .doOnNext(event -> {
+                        responseBodyBuilder.append(event).append("\n");
+                    })
+                    .blockLast(Duration.ofMinutes(10)); // 阻塞等待流结束，最多等待10分钟
+            String responseBody = responseBodyBuilder.toString();
+            log.debug(String.format("流式响应读取成功: url=%s, bodyLength=%d", url, responseBody.length()));
+            // 构建 ResponseEntity<String>
+            HttpHeaders responseHeaders = new HttpHeaders();
+            responseHeaders.setContentType(MediaType.TEXT_EVENT_STREAM);
+            ResponseEntity<String> response = new ResponseEntity<>(
+                    responseBody, 
+                    responseHeaders, 
+                    HttpStatus.OK);
+            
             validateResponse(url, response);
             return response;
-        } catch (IllegalArgumentException e) {
-            log.error(String.format("URL 格式错误: url=%s, err=%s", url, e.getMessage()));
-            throw new RuntimeException("URL 格式错误: " + url, e);
+            
+        } catch (Exception e) {
+            log.error(String.format("Dify 流式请求异常: url=%s, err=%s", url, e.getMessage()), e);
+            throw new RuntimeException("Dify 流式请求异常: " + url, e);
         }
     }
 

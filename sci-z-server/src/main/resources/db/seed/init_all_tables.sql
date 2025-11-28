@@ -545,10 +545,12 @@ CREATE TABLE IF NOT EXISTS report_management (
     project_code VARCHAR(50),
     project_knowledge_id VARCHAR(100),
     report_type VARCHAR(20) NOT NULL,
+    dify_api_keys_id VARCHAR(100),
     creator_id BIGINT NOT NULL,
     creator_name VARCHAR(50) NOT NULL,
     summary TEXT,
     status VARCHAR(20) DEFAULT 'pending',
+    attachment_id BIGINT,
     is_deleted SMALLINT DEFAULT 0,
     created_by BIGINT,
     updated_by BIGINT,
@@ -564,10 +566,12 @@ COMMENT ON COLUMN report_management.project_name IS '项目名称';
 COMMENT ON COLUMN report_management.project_code IS '项目编号';
 COMMENT ON COLUMN report_management.project_knowledge_id IS '项目知识库ID';
 COMMENT ON COLUMN report_management.report_type IS '报告类型(tech=科技报告/self=自评报告)';
+COMMENT ON COLUMN report_management.dify_api_keys_id IS 'Dify API Keys 表 ID（从 dify_api_keys 表的 id 获取）';
 COMMENT ON COLUMN report_management.creator_id IS '创建人ID';
 COMMENT ON COLUMN report_management.creator_name IS '创建人姓名';
 COMMENT ON COLUMN report_management.summary IS '报告摘要';
 COMMENT ON COLUMN report_management.status IS '状态(pending/generating/completed/failed)';
+COMMENT ON COLUMN report_management.attachment_id IS 'MinIO 附件 ID（从 sys_attachment 表的 id 获取）';
 COMMENT ON COLUMN report_management.is_deleted IS '逻辑删除标识：0=未删除，1=已删除';
 COMMENT ON COLUMN report_management.created_by IS '创建人ID';
 COMMENT ON COLUMN report_management.updated_by IS '更新人ID';

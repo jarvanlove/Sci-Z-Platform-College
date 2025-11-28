@@ -228,6 +228,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, ArrowDown, Loading, MagicStick } from '@element-plus/icons-vue'
 import { BaseCard, BaseButton, BaseDatePicker, BasePagination, BaseDialog } from '@/components/Common'
 import { getReportManagementList, deleteReportManagement, createReportManagement } from '@/api/Report'
+import { previewFile, downloadFile } from '@/api/File/file'
 import ReportGenerateForm from './ReportGenerateForm.vue'
 import { createLogger } from '@/utils/simpleLogger'
 import { formatDate } from '@/utils/date'
@@ -457,17 +458,97 @@ const handleGenerate = async () => {
 }
 
 // 预览报告
-const handlePreview = (report) => {
-  logger.info('User previewed report', { id: report.id })
-  // TODO: 实现预览功能
-  ElMessage.info(t('report.listPage.previewError') || '预览功能开发中')
+const handlePreview = async (report) => {
+  try {
+    logger.info('User previewed report', { id: report.id, attachmentId: report.attachmentId })
+    
+    // 检查是否有附件 ID
+    if (!report.attachmentId) {
+      ElMessage.warning(t('report.listPage.noAttachment') || '报告文件尚未生成，无法预览')
+      return
+    }
+    
+    // 调用预览接口获取预览 URL
+    const response = await previewFile(report.attachmentId)
+    const responseData = response?.data || response
+    const previewUrl = responseData?.data || responseData
+    
+    if (previewUrl) {
+      // 在新窗口打开预览
+      window.open(previewUrl, '_blank')
+      ElMessage.success(t('report.listPage.previewSuccess') || '预览已打开')
+      logger.info('Preview opened successfully', { id: report.id, previewUrl })
+    } else {
+      throw new Error('预览 URL 为空')
+    }
+  } catch (error) {
+    logger.error('Failed to preview report', error)
+    const errorMessage = error.response?.data?.message || error.message || t('report.listPage.previewError') || '预览失败'
+    ElMessage.error(errorMessage)
+  }
 }
 
 // 下载报告
 const handleDownload = async (report, format) => {
-  logger.info('User downloaded report', { id: report.id, format })
-  // TODO: 实现下载功能
-  ElMessage.info(`${format.toUpperCase()} ${t('report.listPage.downloadError') || '格式报告下载功能开发中'}`)
+  try {
+    logger.info('User downloaded report', { id: report.id, attachmentId: report.attachmentId, format })
+    
+    // 检查是否有附件 ID
+    if (!report.attachmentId) {
+      ElMessage.warning(t('report.listPage.noAttachment') || '报告文件尚未生成，无法下载')
+      return
+    }
+    
+    // 根据格式参数决定下载格式
+    let downloadFormat = null
+    if (format === 'pdf') {
+      downloadFormat = 'pdf'
+    } else if (format === 'word') {
+      downloadFormat = 'docx'
+    }
+    // markdown 格式不转换，直接下载原文件
+    
+    // 调用下载接口
+    const response = await downloadFile(report.attachmentId, downloadFormat)
+    
+    // 创建 Blob 对象
+    const blob = new Blob([response.data], { 
+      type: response.headers['content-type'] || 'application/octet-stream' 
+    })
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    
+    // 从响应头获取文件名，或使用默认文件名
+    const contentDisposition = response.headers['content-disposition']
+    let fileName = `报告_${report.number || report.id}`
+    
+    if (contentDisposition) {
+      const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+      if (fileNameMatch && fileNameMatch[1]) {
+        fileName = decodeURIComponent(fileNameMatch[1].replace(/['"]/g, ''))
+      }
+    } else {
+      // 根据格式添加扩展名
+      const ext = format === 'pdf' ? '.pdf' : format === 'word' ? '.docx' : format === 'markdown' ? '.md' : ''
+      fileName += ext
+    }
+    
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success(t('report.listPage.downloadSuccess') || '下载成功')
+    logger.info('Download completed successfully', { id: report.id, fileName, format })
+  } catch (error) {
+    logger.error('Failed to download report', error)
+    const errorMessage = error.response?.data?.message || error.message || t('report.listPage.downloadError') || '下载失败'
+    ElMessage.error(errorMessage)
+  }
 }
 
 // 重新生成报告
