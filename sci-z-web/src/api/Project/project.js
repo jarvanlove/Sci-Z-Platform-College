@@ -9,22 +9,19 @@ import { PROJECT_API, HTTP_METHODS } from '../Common/constants'
 /**
  * 获取项目列表
  * @param {Object} params - 查询参数
- * @param {number} params.page - 页码
- * @param {number} params.size - 每页数量
- * @param {string} params.keyword - 关键词搜索
- * @param {string} params.status - 状态筛选
- * @param {number} params.leaderId - 负责人ID
- * @param {number} params.departmentId - 部门ID
- * @param {string} params.type - 项目类型
- * @param {string} params.startDate - 开始日期
- * @param {string} params.endDate - 结束日期
+ * @param {number} params.pageNo - 页码（从1开始）
+ * @param {number} params.pageSize - 每页数量
+ * @param {string} params.keyword - 关键词搜索（可选）
+ * @param {string} params.status - 状态筛选（可选，如 "1"）
+ * @param {string} params.sortBy - 排序字段（可选，如 "createdTime"）
+ * @param {string} params.sortOrder - 排序方向（可选，如 "DESC"）
  * @returns {Promise} 项目列表响应
  */
 export const getProjectList = (params) => {
   return request({
     url: PROJECT_API.LIST,
-    method: HTTP_METHODS.GET,
-    params
+    method: HTTP_METHODS.POST,
+    data: params
   })
 }
 

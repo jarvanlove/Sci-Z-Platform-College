@@ -220,10 +220,17 @@ const props = defineProps({
 
 // 计算属性
 const displayPercentage = computed(() => {
-  if (props.total > 0) {
+  // 如果传入了 percentage，优先使用 percentage
+  // 确保 percentage 是有效的数字
+  const percentageValue = Number(props.percentage)
+  if (!isNaN(percentageValue) && percentageValue >= 0 && percentageValue <= 100) {
+    return Math.round(percentageValue)
+  }
+  // 否则使用 current / total 计算
+  if (props.total > 0 && props.current >= 0) {
     return Math.round((props.current / props.total) * 100)
   }
-  return Math.round(props.percentage)
+  return 0
 })
 
 const trackStyle = computed(() => {

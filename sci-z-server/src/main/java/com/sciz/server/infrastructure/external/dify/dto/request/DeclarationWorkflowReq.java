@@ -38,12 +38,22 @@ public record DeclarationWorkflowReq(
 
     /**
      * 转换为 Map（用于 DifyWorkflowRequest）
+     * <p>
+     * 注意：researchField 在工作流中需要是字符串类型（逗号分隔），
+     * 虽然前端传的是数组，但这里需要转换为逗号分隔的字符串
      *
      * @return Map<String, Object> 工作流输入参数 Map
      */
     public Map<String, Object> toInputsMap() {
         var inputs = new HashMap<String, Object>();
-        inputs.put("researchFields", researchFields.values());
+
+        // 将研究领域数组转换为逗号分隔的字符串（工作流要求）
+        var researchFieldList = researchFields.values();
+        var researchFieldString = researchFieldList != null && !researchFieldList.isEmpty()
+                ? String.join(",", researchFieldList) // 使用英文逗号分隔
+                : "";
+        inputs.put("researchField", researchFieldString);
+
         inputs.put("researchDirection", researchDirection.value());
         inputs.put("researchTopic", researchTopic.value());
         return inputs;

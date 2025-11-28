@@ -140,16 +140,30 @@ const displayText = computed(() => {
 
 <style lang="scss" scoped>
 .status-tag {
-  display: inline-flex;
-  align-items: center;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   gap: 4px;
+  // 固定宽度和高度，确保所有状态标签大小一致
+  min-width: 60px !important;
+  max-width: 60px !important;
+  width: 60px !important;
+  height: 24px !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
   
   .status-icon {
     font-size: 12px;
+    flex-shrink: 0;
   }
   
   .status-text {
     font-weight: 500;
+    text-align: center;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

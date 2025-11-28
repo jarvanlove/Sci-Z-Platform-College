@@ -104,7 +104,8 @@ const routes = [
         meta: { 
           title: '项目详情', 
           requiresAuth: true,
-          permission: 'menu:project:detail',
+          // 🔥 详情页和进度页不是独立菜单，继承列表页权限
+          permission: 'menu:project:list',
           layout: 'main'
         }
       },
@@ -115,7 +116,8 @@ const routes = [
         meta: { 
           title: '项目进度', 
           requiresAuth: true,
-          permission: 'menu:project:progress',
+          // 🔥 详情页和进度页不是独立菜单，继承列表页权限
+          permission: 'menu:project:list',
           layout: 'main'
         }
       }

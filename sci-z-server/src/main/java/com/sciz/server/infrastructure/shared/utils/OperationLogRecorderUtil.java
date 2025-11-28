@@ -44,7 +44,7 @@ public class OperationLogRecorderUtil {
      */
     public void record(String operation, String detail, Integer status, String errorMessage, Integer executionTime,
             String responseResult) {
-        record(operation, detail, status, errorMessage, executionTime, responseResult, null);
+        record(operation, detail, status, errorMessage, executionTime, responseResult, null, null, null);
     }
 
     /**
@@ -57,7 +57,7 @@ public class OperationLogRecorderUtil {
      * @param executionTime Integer 执行耗时
      */
     public void record(String operation, String detail, Integer status, String errorMessage, Integer executionTime) {
-        record(operation, detail, status, errorMessage, executionTime, null);
+        record(operation, detail, status, errorMessage, executionTime, null, null, null, null);
     }
 
     /**
@@ -68,7 +68,20 @@ public class OperationLogRecorderUtil {
      * @param executionTime Integer 执行耗时（毫秒）
      */
     public void recordSuccess(String operation, String detail, Integer executionTime) {
-        record(operation, detail, 1, null, executionTime, null);
+        record(operation, detail, 1, null, executionTime, null, null, null, null);
+    }
+
+    /**
+     * 记录成功操作日志（支持传入用户信息，用于异步上下文）
+     *
+     * @param operation     String 操作名称
+     * @param detail        String 详细描述（可选）
+     * @param executionTime Integer 执行耗时（毫秒）
+     * @param userId        Long 用户ID（可选，如果为null则尝试从上下文获取）
+     * @param username      String 用户名（可选，如果为null则尝试从上下文获取）
+     */
+    public void recordSuccess(String operation, String detail, Integer executionTime, Long userId, String username) {
+        record(operation, detail, 1, null, executionTime, null, null, userId, username);
     }
 
     /**
@@ -80,7 +93,7 @@ public class OperationLogRecorderUtil {
      * @param responseResult String 响应结果
      */
     public void recordSuccess(String operation, String detail, Integer executionTime, String responseResult) {
-        record(operation, detail, 1, null, executionTime, responseResult);
+        record(operation, detail, 1, null, executionTime, responseResult, null, null, null);
     }
 
     /**
@@ -92,7 +105,22 @@ public class OperationLogRecorderUtil {
      * @param executionTime Integer 执行耗时（毫秒）
      */
     public void recordFailure(String operation, String detail, String errorMessage, Integer executionTime) {
-        record(operation, detail, 0, errorMessage, executionTime, null);
+        record(operation, detail, 0, errorMessage, executionTime, null, null, null, null);
+    }
+
+    /**
+     * 记录失败操作日志（支持传入用户信息，用于异步上下文）
+     *
+     * @param operation     String 操作名称
+     * @param detail        String 详细描述（可选）
+     * @param errorMessage  String 错误信息
+     * @param executionTime Integer 执行耗时（毫秒）
+     * @param userId        Long 用户ID（可选，如果为null则尝试从上下文获取）
+     * @param username      String 用户名（可选，如果为null则尝试从上下文获取）
+     */
+    public void recordFailure(String operation, String detail, String errorMessage, Integer executionTime,
+            Long userId, String username) {
+        record(operation, detail, 0, errorMessage, executionTime, null, null, userId, username);
     }
 
     /**
@@ -103,7 +131,7 @@ public class OperationLogRecorderUtil {
      * @param executionTime Integer 执行耗时（毫秒）
      */
     public void recordWarning(String operation, String detail, Integer executionTime) {
-        record(operation, detail, 1, null, executionTime, null, LogLevelStatus.WARN);
+        record(operation, detail, 1, null, executionTime, null, LogLevelStatus.WARN, null, null);
     }
 
     /**
@@ -115,11 +143,11 @@ public class OperationLogRecorderUtil {
      * @param responseResult String 响应结果
      */
     public void recordWarning(String operation, String detail, Integer executionTime, String responseResult) {
-        record(operation, detail, 1, null, executionTime, responseResult, LogLevelStatus.WARN);
+        record(operation, detail, 1, null, executionTime, responseResult, LogLevelStatus.WARN, null, null);
     }
 
     /**
-     * 记录操作日志（支持指定日志级别）
+     * 记录操作日志（支持指定日志级别和用户信息）
      *
      * @param operation      String 操作名称
      * @param detail         String 详细描述
@@ -128,11 +156,14 @@ public class OperationLogRecorderUtil {
      * @param executionTime  Integer 执行耗时
      * @param responseResult String 响应结果
      * @param level          LogLevelStatus 日志级别（可选，默认根据status自动判断）
+     * @param userId         Long 用户ID（可选，如果为null则尝试从上下文获取）
+     * @param username       String 用户名（可选，如果为null则尝试从上下文获取）
      */
     private void record(String operation, String detail, Integer status, String errorMessage, Integer executionTime,
-            String responseResult, LogLevelStatus level) {
+            String responseResult, LogLevelStatus level, Long userId, String username) {
         try {
-            var event = buildEvent(operation, detail, status, errorMessage, executionTime, responseResult, level);
+            var event = buildEvent(operation, detail, status, errorMessage, executionTime, responseResult, level,
+                    userId, username);
             eventPublisher.publishAsync(event);
         } catch (Exception e) {
             System.err.println(String.format("[OperationLogRecorder] 记录操作日志失败: operation=%s, err=%s",
@@ -150,18 +181,27 @@ public class OperationLogRecorderUtil {
      * @param executionTime  Integer 执行耗时
      * @param responseResult String 响应结果
      * @param level          LogLevelStatus 日志级别（可选，默认根据status自动判断）
+     * @param userId         Long 用户ID（可选，如果为null则尝试从上下文获取）
+     * @param username       String 用户名（可选，如果为null则尝试从上下文获取）
      * @return OperationLoggedEvent 操作日志事件
      */
     private OperationLoggedEvent buildEvent(String operation, String detail, Integer status,
-            String errorMessage, Integer executionTime, String responseResult, LogLevelStatus level) {
+            String errorMessage, Integer executionTime, String responseResult, LogLevelStatus level,
+            Long userId, String username) {
         var event = new OperationLoggedEvent();
 
-        // 获取当前登录用户信息
-        var currentUser = LoginUserUtil.getCurrentUser();
-        currentUser.ifPresent(user -> {
-            event.setUserId(user.userId());
-            event.setUsername(user.username());
-        });
+        // 设置用户信息：优先使用传入的参数，否则尝试从上下文获取
+        if (userId != null && username != null) {
+            event.setUserId(userId);
+            event.setUsername(username);
+        } else {
+            // 获取当前登录用户信息
+            var currentUser = LoginUserUtil.getCurrentUser();
+            currentUser.ifPresent(user -> {
+                event.setUserId(user.userId());
+                event.setUsername(user.username());
+            });
+        }
 
         // 获取请求信息
         var request = getCurrentRequest();

@@ -1741,8 +1741,14 @@ if (operationType != null) {
 **使用规范**：
 
 - **INFO**：正常操作成功（默认）
+  - 适用于：用户操作成功、数据创建/更新/删除成功、状态变更成功等
+  - 示例：创建用户成功、更新项目信息成功、删除知识库成功
 - **WARN**：操作成功但存在警告（如：数据校验警告、业务规则提醒）
+  - 适用于：操作成功但存在潜在问题、数据校验警告、业务规则提醒等
+  - 示例：批量导入时部分数据格式不正确但已处理、操作成功但触发了业务规则提醒
 - **ERROR**：操作失败
+  - 适用于：操作失败、异常抛出、业务校验失败等
+  - 示例：创建用户失败、知识库名称重复、数据库操作失败
 
 **方法**：
 
@@ -1756,6 +1762,12 @@ operationLogRecorderUtil.recordWarning(operation, detail, executionTime);
 // 记录失败操作（ERROR级别）
 operationLogRecorderUtil.recordFailure(operation, detail, errorMessage, executionTime);
 ```
+
+**日志级别自动设置规则**：
+
+- `recordSuccess()` → 自动设置为 **INFO** 级别
+- `recordWarning()` → 自动设置为 **WARN** 级别
+- `recordFailure()` → 自动设置为 **ERROR** 级别（`status=0`，`level=ERROR`）
 
 #### 4. Detail 字段格式规范
 
@@ -1808,7 +1820,21 @@ operationLogRecorderUtil.recordFailure(operation, detail, errorMessage, executio
 - **执行时机**：Controller 方法执行完成后，响应写入前
 - **使用方式**：无需手动调用，Spring 自动注册并执行
 
-#### 6. 使用示例
+#### 6. 同步上下文 vs 异步上下文
+
+**重要说明**：操作日志工具类会根据执行上下文自动获取用户信息，但在异步上下文中（如 `@Async` 方法、事件处理器），无法自动获取 Web 上下文，需要手动传入用户信息。
+
+##### 6.1 同步上下文（Web 请求上下文）
+
+**适用场景**：Controller、Service 中的同步方法（在 Web 请求线程中执行）
+
+**特点**：
+
+- ✅ 自动获取当前登录用户信息（通过 `LoginUserUtil.getCurrentUser()`）
+- ✅ 自动获取请求信息（IP、浏览器、操作系统等）
+- ✅ 自动获取请求参数和响应结果
+
+**使用方式**：
 
 ```java
 @Service
@@ -1825,15 +1851,14 @@ public class UserServiceImpl implements UserService {
         try {
             // 业务逻辑...
 
-            // 记录成功日志
+            // 记录成功日志（自动获取用户信息）
             var endTime = DateUtil.now();
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
-            // 使用 OperationType 枚举获取操作名称和描述
             var detail = String.format("%s：%s（ID: %s）",
                     operationType.getDescription(), user.getUsername(), userId);
             operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
         } catch (Exception e) {
-            // 记录失败日志
+            // 记录失败日志（自动获取用户信息）
             var endTime = DateUtil.now();
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
             var errorMessage = e instanceof BusinessException ? e.getMessage() : e.getClass().getSimpleName();
@@ -1846,10 +1871,195 @@ public class UserServiceImpl implements UserService {
 }
 ```
 
-#### 7. 注意事项
+##### 6.2 异步上下文（非 Web 请求上下文）
+
+**适用场景**：`@Async` 方法、`@EventListener` 事件处理器、定时任务等
+
+**特点**：
+
+- ❌ 无法自动获取当前登录用户信息（异步线程中没有 Sa-Token 上下文）
+- ❌ 无法自动获取请求信息（异步线程中没有 RequestContextHolder）
+- ⚠️ **必须手动传入用户信息**，否则日志中的 `userId` 和 `username` 可能为 `null`
+
+**使用方式**：
+
+```java
+@Component
+@RequiredArgsConstructor
+public class DeclarationEventHandler {
+    private final OperationLogRecorderUtil operationLogRecorderUtil;
+
+    @EventListener
+    @Async
+    @Transactional(rollbackFor = Exception.class)
+    public void handleDeclarationSuccess(DeclarationSuccessEvent event) {
+        var startTime = DateUtil.now();
+        var operationType = OperationLogRecorderStatus.KNOWLEDGE_CREATE;
+        var operation = operationType.getCode();
+
+        try {
+            // 业务逻辑：创建知识库...
+            var knowledgeResp = knowledgeService.create(knowledgeCreateReq);
+
+            // 记录成功日志（手动传入用户信息）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var detail = String.format("%s：%s（ID: %s）",
+                    operationType.getDescription(), researchTopic, knowledgeResp.getId());
+            // ⚠️ 关键：在异步上下文中，必须手动传入 userId 和 username
+            var operatorId = event.getOperatorId() != null ? event.getOperatorId() : event.getApplicantId();
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime,
+                    operatorId, event.getApplicantName());
+
+        } catch (Exception e) {
+            // 记录失败日志（手动传入用户信息）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var errorMessage = e instanceof BusinessException ? e.getMessage() : e.getClass().getSimpleName();
+            // ⚠️ 关键：在异步上下文中，必须手动传入 userId 和 username
+            var operatorId = event.getOperatorId() != null ? event.getOperatorId() : event.getApplicantId();
+            operationLogRecorderUtil.recordFailure(operation,
+                    String.format("%s失败：研究课题 %s，项目ID %s", operation, researchTopic, projectId),
+                    errorMessage, executionTime, operatorId, event.getApplicantName());
+            throw e;
+        }
+    }
+}
+```
+
+**异步上下文方法签名**：
+
+```java
+// 记录成功操作日志（支持传入用户信息，用于异步上下文）
+public void recordSuccess(String operation, String detail, Integer executionTime,
+        Long userId, String username);
+
+// 记录失败操作日志（支持传入用户信息，用于异步上下文）
+public void recordFailure(String operation, String detail, String errorMessage, Integer executionTime,
+        Long userId, String username);
+```
+
+**参数说明**：
+
+- `userId`：用户 ID（可选，如果为 `null` 则尝试从上下文获取，但在异步上下文中通常为 `null`）
+- `username`：用户名（可选，如果为 `null` 则尝试从上下文获取，但在异步上下文中通常为 `null`）
+
+**最佳实践**：
+
+- ✅ 在事件对象中携带 `operatorId` 和 `operatorName`（或 `applicantId` 和 `applicantName`）
+- ✅ 在异步方法中，从事件对象获取用户信息并传递给日志记录方法
+- ✅ 如果事件中没有用户信息，使用业务相关的用户 ID（如申报人 ID）作为后备方案
+
+#### 7. 使用示例
+
+**同步上下文示例**：
+
+```java
+@Service
+@RequiredArgsConstructor
+public class UserServiceImpl implements UserService {
+    private final OperationLogRecorderUtil operationLogRecorderUtil;
+
+    @Transactional(rollbackFor = Exception.class)
+    public void disableById(Long userId, boolean disabled) {
+        var startTime = DateUtil.now();
+        var operationType = disabled ? OperationType.USER_DISABLE : OperationType.USER_ENABLE;
+        var operation = operationType.getCode();
+
+        try {
+            // 业务逻辑...
+
+            // 记录成功日志（自动获取用户信息）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var detail = String.format("%s：%s（ID: %s）",
+                    operationType.getDescription(), user.getUsername(), userId);
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
+        } catch (Exception e) {
+            // 记录失败日志（自动获取用户信息）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var errorMessage = e instanceof BusinessException ? e.getMessage() : e.getClass().getSimpleName();
+            operationLogRecorderUtil.recordFailure(operation,
+                    String.format("%s失败：用户ID %s", operation, userId),
+                    errorMessage, executionTime);
+            throw e;
+        }
+    }
+}
+```
+
+**异步上下文示例**：
+
+```java
+@Component
+@RequiredArgsConstructor
+public class DeclarationEventHandler {
+    private final OperationLogRecorderUtil operationLogRecorderUtil;
+
+    @EventListener
+    @Async
+    @Transactional(rollbackFor = Exception.class)
+    public void handleDeclarationSuccess(DeclarationSuccessEvent event) {
+        var startTime = DateUtil.now();
+        var operationType = OperationLogRecorderStatus.KNOWLEDGE_CREATE;
+        var operation = operationType.getCode();
+
+        try {
+            // 业务逻辑：创建知识库...
+            var knowledgeResp = knowledgeService.create(knowledgeCreateReq);
+
+            // 记录成功日志（手动传入用户信息）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var detail = String.format("%s：%s（ID: %s）",
+                    operationType.getDescription(), researchTopic, knowledgeResp.getId());
+            var operatorId = event.getOperatorId() != null ? event.getOperatorId() : event.getApplicantId();
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime,
+                    operatorId, event.getApplicantName());
+
+        } catch (Exception e) {
+            // 记录失败日志（手动传入用户信息）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var errorMessage = e instanceof BusinessException ? e.getMessage() : e.getClass().getSimpleName();
+            var operatorId = event.getOperatorId() != null ? event.getOperatorId() : event.getApplicantId();
+            operationLogRecorderUtil.recordFailure(operation,
+                    String.format("%s失败：研究课题 %s", operation, researchTopic),
+                    errorMessage, executionTime, operatorId, event.getApplicantName());
+            throw e;
+        }
+    }
+}
+```
+
+#### 8. 注意事项
+
+**通用注意事项**：
 
 - 操作日志记录是异步的，不会影响主业务流程
 - `createdBy` 和 `updatedBy` 字段自动从当前登录用户获取，与 `username` 字段取值一致
 - 执行时间使用 `DateUtil.millisBetween()` 计算
 - **操作名称和描述必须使用 `OperationLogRecorderStatus` 枚举**，禁止硬编码
 - 新增操作类型时，只需在 `OperationLogRecorderStatus` 枚举中添加一个条目即可
+
+**同步上下文注意事项**：
+
+- ✅ 可以自动获取用户信息和请求信息，无需手动传入
+- ✅ 推荐使用标准方法：`recordSuccess()`, `recordFailure()`, `recordWarning()`
+
+**异步上下文注意事项**：
+
+- ⚠️ **必须手动传入用户信息**（`userId` 和 `username`），否则日志中的用户信息可能为 `null`
+- ⚠️ 无法自动获取请求信息（IP、浏览器、操作系统等），这些字段在异步上下文中为 `null`
+- ⚠️ 无法自动获取请求参数和响应结果，这些字段在异步上下文中为 `null`
+- ✅ 推荐使用重载方法：`recordSuccess(operation, detail, executionTime, userId, username)`
+- ✅ 推荐使用重载方法：`recordFailure(operation, detail, errorMessage, executionTime, userId, username)`
+- ✅ 在事件对象中携带用户信息，便于在异步方法中使用
+
+**日志级别注意事项**：
+
+- ✅ `recordSuccess()` 自动设置为 **INFO** 级别（`status=1`, `level=INFO`）
+- ✅ `recordWarning()` 自动设置为 **WARN** 级别（`status=1`, `level=WARN`）
+- ✅ `recordFailure()` 自动设置为 **ERROR** 级别（`status=0`, `level=ERROR`）
+- ⚠️ 确保 ERROR 级别的日志能正确保存到数据库，特别是在异步上下文中需要传入用户信息

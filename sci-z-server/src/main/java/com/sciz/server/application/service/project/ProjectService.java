@@ -25,6 +25,15 @@ public interface ProjectService {
     Long create(ProjectCreateReq req);
 
     /**
+     * 使用指定的用户ID创建项目（用于异步事件处理，避免Web上下文问题）
+     *
+     * @param req    创建请求
+     * @param userId 用户ID（用于设置 createdBy/updatedBy）
+     * @return 项目ID
+     */
+    Long createWithUserId(ProjectCreateReq req, Long userId);
+
+    /**
      * 分页查询项目列表
      *
      * @param req 查询请求

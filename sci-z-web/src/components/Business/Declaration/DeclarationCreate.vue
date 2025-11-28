@@ -684,16 +684,23 @@
       const response = await createDeclaration(submitData)
       
       // 处理响应数据，获取申报ID
-      const responseData = response?.data || response
-      const declarationId = responseData?.data || responseData?.id
+      const declarationId = response?.data
+      
+      logger.info('Declaration created', { 
+        response, 
+        declarationId 
+      })
   
       ElMessage.success(t('declaration.submitSuccess'))
   
       // 跳转到申报详情页面
       if (declarationId) {
+        logger.info('Redirecting to declaration detail', { id: declarationId })
         router.push(`/declaration/detail/${declarationId}`)
       } else {
-        // 如果没有返回ID，跳转到列表页
+        // 如果没有返回ID，记录警告并跳转到列表页
+        logger.warn('Declaration ID not found in response, redirecting to list', { response })
+        ElMessage.warning(t('declaration.idNotFound') || '未获取到申报ID，已跳转到列表页')
         router.push('/declaration/list')
       }
     } catch (error) {
@@ -1049,6 +1056,7 @@
     padding-bottom: 8px !important;
     font-weight: 500 !important;
     color: var(--text) !important;
+    white-space: nowrap !important;
   }
   
   :deep(.el-form-item__content) {

@@ -42,7 +42,7 @@
     <!-- 卡片内容 -->
     <div class="card-content">
       <!-- 信息列表 -->
-      <div v-if="showInfoList" class="info-list">
+      <div v-if="showInfoList" class="info-list" :class="`layout-${layout}`">
         <div
           v-for="item in infoItems"
           :key="item.key"
@@ -308,7 +308,7 @@ const formatNumber = (number, format = {}) => {
       }
       
       &.layout-grid {
-        grid-template-columns: repeat(v-bind(gridColumns), 1fr);
+        grid-template-columns: repeat(v-bind('gridColumns'), 1fr);
       }
       
       .info-item {

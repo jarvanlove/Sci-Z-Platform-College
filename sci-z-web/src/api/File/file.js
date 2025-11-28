@@ -84,15 +84,19 @@ export const downloadFile = (id, format) => {
 
 /**
  * 文件预览
- * @param {number} id - 文件ID
- * @returns {Promise} 文件预览响应
+ * @param {number} id - 文件ID（attachmentId）
+ * @param {Object} [options] - 可选参数
+ * @param {number} [options.expireSeconds] - URL 有效期（秒），默认 3600
+ * @returns {Promise} 文件预览响应，返回预签名 URL
+ * 响应格式：{ code: 200, message: "文件下载成功", data: "http://..." }
  */
 export const previewFile = (id, options = {}) => {
   return request({
     url: FILE_API.PREVIEW(id),
     method: HTTP_METHODS.GET,
-    responseType: 'blob',
-    ...options
+    params: {
+      expireSeconds: options.expireSeconds || 3600
+    }
   })
 }
 

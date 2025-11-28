@@ -5,19 +5,9 @@
  */
 -->
 <template>
-  <div class="project-detail-page">
-    <h1>项目详情页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <ProjectDetail />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import ProjectDetail from '@/components/Business/Project/ProjectDetail.vue'
 </script>
-
-<style lang="scss" scoped>
-.project-detail-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
-</style>

@@ -120,6 +120,49 @@ public class FileServiceImpl implements FileService {
     }
 
     /**
+     * 单文件上传（支持异步上下文）
+     * <p>
+     * 用于异步任务等非 Web 上下文场景，需要手动传入用户信息
+     *
+     * @param req      FileUploadReq 上传请求
+     * @param userId   Long 上传人ID
+     * @param realName String 上传人姓名
+     * @return FileInfoResp 文件信息
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public FileInfoResp upload(FileUploadReq req, Long userId, String realName) {
+        // 1. 参数校验
+        validateUploadRequest(req);
+        // 2. 解析附件分类并校验关联信息
+        var category = normalizeAttachmentCategory(req.getAttachmentType());
+        req.setAttachmentType(category.getCode());
+        validateRelationParams(req);
+        // 3. 使用传入的用户信息（不依赖 Web 上下文）
+        log.info(String.format("文件上传开始（异步上下文）: originalName=%s, uploaderId=%s",
+                req.getFile().getOriginalFilename(), userId));
+        // 4. 确保存储桶可用
+        ensureBucket();
+        // 5. 构建附件实体
+        var attachment = buildAttachment(req, userId, realName, category);
+        // 6. 上传至对象存储
+        uploadToObjectStorage(req, attachment);
+        // 7. 持久化附件记录
+        var attachmentId = persistAttachment(attachment);
+        // 8. 记录业务关联（可选）
+        saveRelationIfNecessary(req, attachmentId);
+
+        // 9. 发布上传事件
+        publishUploadEvent(req, userId, realName, attachment);
+
+        // 10. 构建响应并返回
+        FileInfoResp resp = buildFileInfoResp(attachment, SystemConstant.DEFAULT_PREVIEW_EXPIRE_SECONDS);
+        log.info(String.format("文件上传完成（异步上下文）: attachmentId=%s, uploaderId=%s",
+                attachment.getId(), userId));
+        return resp;
+    }
+
+    /**
      * 批量文件上传
      *
      * @param req FileBatchUploadReq 上传请求
@@ -232,6 +275,17 @@ public class FileServiceImpl implements FileService {
         GetObjectResponse sourceFile;
         try {
             sourceFile = MinioUtil.download(minioClient, bucketName, attachment.getFilePath());
+
+            // 验证文件大小（从数据库记录中获取）
+            if (attachment.getFileSize() != null && attachment.getFileSize() == 0) {
+                log.error(String.format("源文件大小为0，无法转换: attachmentId=%s, filePath=%s",
+                        attachmentId, attachment.getFilePath()));
+                throw BusinessException.of(ResultCode.FILE_DOWNLOAD_FAILED,
+                        "源文件为空（0字节），无法进行格式转换");
+            }
+
+            log.info(String.format("从MinIO下载源文件成功: attachmentId=%s, fileSize=%d, filePath=%s",
+                    attachmentId, attachment.getFileSize(), attachment.getFilePath()));
         } catch (Exception e) {
             log.error(String.format("下载源文件失败: attachmentId=%s, err=%s", attachmentId, e.getMessage()), e);
             throw BusinessException.of(ResultCode.FILE_DOWNLOAD_FAILED, "下载源文件失败: %s", e.getMessage());
@@ -254,9 +308,12 @@ public class FileServiceImpl implements FileService {
             var convertedBytes = convertResult.inputStream().readAllBytes();
             var byteArrayInputStream = new ByteArrayInputStream(convertedBytes);
 
+            // 转换后的文件名已经通过 changeFileExtension 处理，直接使用即可
+            var convertedFileName = convertResult.fileName();
+
             return new FileDownloadContext(
-                    convertResult.fileName(),
-                    convertResult.fileName(),
+                    convertedFileName,
+                    convertedFileName,
                     convertResult.mimeType(),
                     convertResult.contentLength(),
                     byteArrayInputStream);

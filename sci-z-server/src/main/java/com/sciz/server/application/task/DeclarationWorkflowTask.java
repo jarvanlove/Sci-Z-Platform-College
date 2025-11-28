@@ -6,6 +6,7 @@ import com.sciz.server.domain.pojo.entity.declaration.Declaration;
 import com.sciz.server.domain.pojo.entity.file.SysAttachmentRelation;
 import com.sciz.server.domain.pojo.repository.declaration.DeclarationRepo;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRelationRepo;
+import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
 import com.sciz.server.infrastructure.external.dify.dto.request.DeclarationWorkflowReq;
 import com.sciz.server.infrastructure.external.dify.dto.response.DeclarationWorkflowResp;
 import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
@@ -50,7 +51,106 @@ public class DeclarationWorkflowTask {
     private final DeclarationRepo declarationRepo;
     private final FileService fileService;
     private final SysAttachmentRelationRepo sysAttachmentRelationRepo;
+    private final SysUserRepo sysUserRepo;
     private final EventPublisher eventPublisher;
+
+    /**
+     * 处理申报工作流（同步调试版本）
+     * 用于本地debug，不包含 @Async 注解，可以同步执行和调试
+     * 
+     * ⚠️ 注意：此方法仅用于本地调试，生产环境请使用 processDeclarationWorkflow 异步方法
+     *
+     * @param declarationId 申报ID
+     * @param resourceId    资源ID（工作流ID，用于查找 API Key）
+     * @param inputs        工作流输入参数（类型安全）
+     * @param userId        用户ID
+     * @param keyType       密钥类型（workflow/file/chatbot）
+     */
+    public void processDeclarationWorkflowSync(Long declarationId, String resourceId,
+            DeclarationWorkflowReq inputs, Long userId, String keyType) {
+        log.info(String.format("开始同步处理申报工作流（调试模式）: declarationId=%s, resourceId=%s, keyType=%s",
+                declarationId, resourceId, keyType));
+
+        try {
+            // 1. 更新工作流状态为"处理中"
+            updateWorkflowStatus(declarationId, WorkflowStatus.RUNNING, null);
+
+            // 2. 记录工作流启动步骤
+            addWorkflowStep(declarationId, "工作流启动", "success");
+
+            // 3. 调用申报工作流
+            log.info(String.format("调用 Dify 工作流 API: declarationId=%s, resourceId=%s", declarationId, resourceId));
+            DeclarationWorkflowResp workflowOutputs = difyWorkflowService.executeDeclarationWorkflow(
+                    inputs, userId, resourceId, keyType);
+            String fileUrl = workflowOutputs.fileUrl();
+
+            // 去除 URL 中的所有空格（前后和中间）
+            if (fileUrl != null) {
+                fileUrl = fileUrl.trim().replaceAll("\\s+", "");
+            }
+
+            // 4. 记录 AI 内容分析步骤
+            addWorkflowStep(declarationId, "AI 内容分析", "success");
+
+            // 5. 记录项目信息生成步骤
+            addWorkflowStep(declarationId, "申报信息生成", "success");
+
+            // 6. 记录数据库存储步骤
+            addWorkflowStep(declarationId, "数据库存储", "success");
+
+            if (fileUrl == null || fileUrl.isEmpty()) {
+                throw BusinessException.of(ResultCode.SERVER_ERROR, "工作流未返回文件下载URL");
+            }
+
+            log.info(String.format("工作流执行完成，获取文件URL: declarationId=%s, fileUrl=%s",
+                    declarationId, fileUrl));
+
+            // 7. 从 URL 下载文件
+            var fileData = downloadFileFromUrl(fileUrl);
+
+            // 8. 上传文件到 MinIO
+            var attachmentId = uploadFileToMinio(declarationId, fileData, fileUrl, userId);
+
+            // 9. 创建附件关联
+            createAttachmentRelation(declarationId, attachmentId, userId);
+
+            // 10. 记录申报书生成步骤
+            addWorkflowStep(declarationId, "申报书生成", "success");
+
+            // 11. 更新工作流状态为"已完成"，申报状态为"申报成功"
+            updateWorkflowStatus(declarationId, WorkflowStatus.COMPLETED, fileUrl);
+
+            // 12. 发布申报更新事件
+            var declaration = declarationRepo.findById(declarationId);
+            if (declaration != null) {
+                var event = new DeclarationUpdatedEvent(
+                        String.valueOf(declarationId),
+                        declaration.getResearchTopic(), // 申报名称（研究课题）
+                        String.valueOf(userId),
+                        declaration.getApplicantName(), // 申报人姓名
+                        String.valueOf(DeclarationStatus.IN_PROGRESS.getCode()),
+                        String.valueOf(DeclarationStatus.SUCCESS.getCode()),
+                        "申报书生成完成",
+                        "工作流执行成功");
+                eventPublisher.publish(event);
+            } else {
+                log.warn(String.format("发布申报更新事件失败：申报不存在: declarationId=%s", declarationId));
+            }
+
+            log.info(String.format("申报工作流处理完成: declarationId=%s, attachmentId=%s",
+                    declarationId, attachmentId));
+
+        } catch (Exception e) {
+            log.error(String.format("申报工作流处理失败: declarationId=%s, err=%s",
+                    declarationId, e.getMessage()), e);
+
+            // 更新工作流状态为"失败"
+            updateWorkflowStatus(declarationId, WorkflowStatus.FAILED, null);
+
+            // 记录失败步骤
+            addWorkflowStep(declarationId, "申报书生成", "failed");
+        }
+    }
 
     /**
      * 处理申报工作流（异步）
@@ -81,11 +181,16 @@ public class DeclarationWorkflowTask {
                     inputs, userId, resourceId, keyType);
             String fileUrl = workflowOutputs.fileUrl();
 
+            // 去除 URL 中的所有空格（前后和中间）
+            if (fileUrl != null) {
+                fileUrl = fileUrl.trim().replaceAll("\\s+", "");
+            }
+
             // 4. 记录 AI 内容分析步骤
             addWorkflowStep(declarationId, "AI 内容分析", "success");
 
             // 5. 记录项目信息生成步骤
-            addWorkflowStep(declarationId, "项目信息生成", "success");
+            addWorkflowStep(declarationId, "申报信息生成", "success");
 
             // 6. 记录数据库存储步骤
             addWorkflowStep(declarationId, "数据库存储", "success");
@@ -247,6 +352,11 @@ public class DeclarationWorkflowTask {
      */
     private FileData downloadFileFromUrl(String fileUrl) {
         try {
+            // 去除 URL 中的所有空格（前后和中间）
+            if (fileUrl != null) {
+                fileUrl = fileUrl.trim().replaceAll("\\s+", "");
+            }
+
             log.info(String.format("开始下载文件: fileUrl=%s", fileUrl));
 
             var client = HttpClient.newBuilder()
@@ -270,10 +380,18 @@ public class DeclarationWorkflowTask {
             var contentType = response.headers().firstValue("Content-Type")
                     .orElse("application/octet-stream");
 
-            log.info(String.format("文件下载成功: fileName=%s, size=%d, contentType=%s",
-                    fileName, response.body().length, contentType));
+            var fileContent = response.body();
 
-            return new FileData(fileName, response.body(), contentType);
+            // 检查文件是否为空
+            if (fileContent == null || fileContent.length == 0) {
+                throw BusinessException.of(ResultCode.SERVER_ERROR,
+                        "文件下载失败: 文件为空（0字节）");
+            }
+
+            log.info(String.format("文件下载成功: fileName=%s, size=%d, contentType=%s",
+                    fileName, fileContent.length, contentType));
+
+            return new FileData(fileName, fileContent, contentType);
 
         } catch (Exception e) {
             log.error(String.format("文件下载失败: fileUrl=%s, err=%s", fileUrl, e.getMessage()), e);
@@ -293,10 +411,46 @@ public class DeclarationWorkflowTask {
             if (fileName.contains("?")) {
                 fileName = fileName.substring(0, fileName.indexOf('?'));
             }
-            return fileName;
+            // 清理文件名：去除 Content-Disposition 格式的内容
+            return cleanFileName(fileName);
         } catch (Exception e) {
             return "declaration_file_" + System.currentTimeMillis();
         }
+    }
+
+    /**
+     * 清理文件名，去除 Content-Disposition 格式的内容
+     * <p>
+     * 处理以下情况：
+     * 1. 去除 `; filename=...` 之后的所有内容
+     * 2. 去除 `filename*=UTF-8''...` 格式的内容
+     * 3. 去除引号
+     *
+     * @param fileName 原始文件名
+     * @return 清理后的文件名
+     */
+    private String cleanFileName(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return "file";
+        }
+
+        // 去除分号之后的所有内容（Content-Disposition 格式）
+        if (fileName.contains(";")) {
+            fileName = fileName.substring(0, fileName.indexOf(';'));
+        }
+
+        // 去除引号
+        fileName = fileName.replace("\"", "").replace("'", "");
+
+        // 去除前后空格
+        fileName = fileName.trim();
+
+        // 如果清理后为空，返回默认文件名
+        if (fileName.isEmpty()) {
+            return "file";
+        }
+
+        return fileName;
     }
 
     /**
@@ -305,30 +459,57 @@ public class DeclarationWorkflowTask {
     private Long uploadFileToMinio(Long declarationId, FileData fileData,
             String originalUrl, Long userId) {
         try {
-            log.info(String.format("开始上传文件到 MinIO: declarationId=%s, fileName=%s",
-                    declarationId, fileData.fileName));
+            // 1. 验证文件内容不为空
+            if (fileData.content == null || fileData.content.length == 0) {
+                log.error(String.format("文件内容为空，无法上传: declarationId=%s, fileName=%s",
+                        declarationId, fileData.fileName));
+                throw BusinessException.of(ResultCode.FILE_UPLOAD_FAILED,
+                        "文件内容为空（0字节），无法上传到 MinIO");
+            }
 
-            // 查询申报信息，用于设置 relation_name
+            log.info(String.format("开始上传文件到 MinIO: declarationId=%s, fileName=%s, fileSize=%d",
+                    declarationId, fileData.fileName, fileData.content.length));
+
+            // 2. 查询申报信息，用于设置 relation_name
             var declaration = declarationRepo.findById(declarationId);
             if (declaration == null) {
                 throw BusinessException.of(ResultCode.DECLARATION_NOT_FOUND,
                         "申报不存在: %s", declarationId);
             }
 
-            // 构建上传请求
+            // 3. 查询用户信息，获取 realName（用于异步上下文）
+            var user = sysUserRepo.findById(userId);
+            if (user == null) {
+                throw BusinessException.of(ResultCode.USER_NOT_FOUND,
+                        "用户不存在: %s", userId);
+            }
+            var realName = user.getRealName() != null ? user.getRealName() : user.getUsername();
+
+            // 4. 生成有意义的文件名：申报编号_申报书.docx（如果研究课题不为空，则使用研究课题）
+            var meaningfulFileName = buildMeaningfulFileName(declaration, fileData.fileName);
+
+            // 5. 构建上传请求
             var uploadReq = new FileUploadReq();
-            uploadReq.setFile(new ByteArrayMultipartFile(fileData.fileName, fileData.content, fileData.contentType));
+            uploadReq.setFile(new ByteArrayMultipartFile(meaningfulFileName, fileData.content, fileData.contentType));
             uploadReq.setRelationType(AttachmentRelationStatus.DECLARATION.getCode());
             uploadReq.setRelationId(declarationId);
             uploadReq.setRelationName(buildDeclarationRelationName(declaration));
             uploadReq.setAttachmentType(AttachmentCategoryStatus.DOCUMENT.getCode());
             uploadReq.setIsPublic(0);
 
-            // 上传文件
-            var fileInfo = fileService.upload(uploadReq);
+            // 6. 再次验证 MultipartFile 不为空
+            if (uploadReq.getFile().isEmpty()) {
+                log.error(String.format("MultipartFile 为空，无法上传: declarationId=%s, fileName=%s",
+                        declarationId, meaningfulFileName));
+                throw BusinessException.of(ResultCode.FILE_UPLOAD_FAILED,
+                        "文件内容为空，无法上传到 MinIO");
+            }
 
-            log.info(String.format("文件上传成功: declarationId=%s, attachmentId=%s",
-                    declarationId, fileInfo.id()));
+            // 7. 上传文件（使用支持异步上下文的重载方法，传入 userId 和 realName）
+            var fileInfo = fileService.upload(uploadReq, userId, realName);
+
+            log.info(String.format("文件上传成功: declarationId=%s, attachmentId=%s, fileSize=%d",
+                    declarationId, fileInfo.id(), fileData.content.length));
 
             return fileInfo.id();
 
@@ -389,6 +570,50 @@ public class DeclarationWorkflowTask {
 
         // 格式：申报编号/研究课题
         return String.format("%s/%s", number, researchTopic);
+    }
+
+    /**
+     * 构建有意义的文件名
+     * <p>
+     * 格式：申报编号_申报书.扩展名 或 研究课题_申报书.扩展名
+     * 如果从URL提取的文件名是UUID格式，则使用申报信息生成有意义的文件名
+     *
+     * @param declaration 申报实体
+     * @param urlFileName 从URL提取的文件名
+     * @return 有意义的文件名
+     */
+    private String buildMeaningfulFileName(Declaration declaration, String urlFileName) {
+        // 从URL文件名中提取扩展名
+        var extension = "";
+        if (urlFileName != null && urlFileName.contains(".")) {
+            extension = urlFileName.substring(urlFileName.lastIndexOf('.'));
+        } else {
+            extension = ".docx"; // 默认扩展名
+        }
+
+        // 判断是否为UUID格式的文件名（UUID格式：xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.扩展名）
+        var isUuidFormat = urlFileName != null
+                && urlFileName.matches("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[^.]+$");
+
+        if (isUuidFormat) {
+            // 如果是UUID格式，使用申报信息生成有意义的文件名
+            var number = declaration.getNumber();
+            var researchTopic = declaration.getResearchTopic();
+
+            // 优先使用研究课题，如果为空或过长则使用申报编号
+            if (researchTopic != null && !researchTopic.isEmpty() && researchTopic.length() <= 50) {
+                // 清理研究课题中的特殊字符，避免文件名问题
+                var cleanTopic = researchTopic.replaceAll("[\\\\/:*?\"<>|]", "_");
+                return String.format("%s_申报书%s", cleanTopic, extension);
+            } else if (number != null && !number.isEmpty()) {
+                return String.format("%s_申报书%s", number, extension);
+            } else {
+                return String.format("申报_%s_申报书%s", declaration.getId(), extension);
+            }
+        } else {
+            // 如果不是UUID格式，直接使用原文件名
+            return urlFileName != null ? urlFileName : "申报书" + extension;
+        }
     }
 
     /**

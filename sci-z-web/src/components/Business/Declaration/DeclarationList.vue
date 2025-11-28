@@ -64,7 +64,6 @@
         :empty-text="$t('declaration.noData')"
         stripe
         class="declaration-table"
-        @row-click="handleRowClick"
         @current-change="handleCurrentChange"
         @size-change="handleSizeChange"
       >
@@ -94,7 +93,9 @@
         <!-- 申报状态列自定义 -->
         <template #declarationStatus="{ row }">
           <div @click.stop.prevent>
+            <!-- 只有处理状态为已完成时才能操作申报状态 -->
             <el-dropdown
+              v-if="row.workflowStatus === 'completed'"
               @command="(command) => handleStatusEdit(row.id, command)"
               trigger="click"
               class="status-dropdown"
@@ -124,6 +125,18 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
+            <!-- 处理状态未完成时，显示不可点击的状态标签 -->
+            <BaseTooltip
+              :content="$t('declaration.workflowNotCompletedHint') || '处理状态未完成，无法修改申报状态'"
+              placement="top"
+            >
+              <span
+                class="status-tag status-disabled"
+                :class="`status-${row.statusType}`"
+              >
+                {{ row.status }}
+              </span>
+            </BaseTooltip>
           </div>
         </template>
 
@@ -189,6 +202,13 @@
         </template>
       </BaseTable>
     </BaseCard>
+
+    <!-- 文件预览组件 -->
+    <FilePreview
+      v-model="showPreviewDialog"
+      :file-info="previewFileInfo"
+      @close="closePreview"
+    />
   </div>
 </template>
 
@@ -198,13 +218,11 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, Document, Edit } from '@element-plus/icons-vue'
-import { BaseCard, BaseTable } from '@/components/Common'
+import { BaseCard, BaseTable, FilePreview, BaseTooltip } from '@/components/Common'
 import { DECLARATION_STATUS_CONFIG } from '@/utils/constants'
 import { 
   getDeclarationList, 
-  updateDeclarationStatus, 
-  getDeclarationPreview,
-  getDeclarationWorkflowStatus
+  updateDeclarationStatus
 } from '@/api/Declaration'
 import { downloadFile } from '@/api/File'
 import { createLogger } from '@/utils/simpleLogger'
@@ -216,6 +234,10 @@ const logger = createLogger('DeclarationList')
 // 响应式数据
 const loading = ref(false)
 const declarations = ref([])
+
+// 文件预览相关
+const showPreviewDialog = ref(false)
+const previewFileInfo = ref(null)
 
 // 搜索表单
 const searchForm = reactive({
@@ -270,7 +292,7 @@ const tableColumns = computed(() => [
   {
     prop: 'number',
     label: t('declaration.number'),
-    minWidth: 140, // 使用 minWidth 而非固定 width，允许自适应
+    minWidth: 160, // 使用 minWidth 而非固定 width，允许自适应
     align: 'center'
   },
   {
@@ -352,12 +374,15 @@ const canPreview = (record) => {
   return canDownloadPreview(record)
 }
 
-// 格式化提交时间
+// 格式化提交时间 - 格式：yyyy-mm-dd
 const formatSubmitTime = (timeStr) => {
   if (!timeStr) return '-'
   try {
     const date = new Date(timeStr)
-    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
   } catch (e) {
     return timeStr
   }
@@ -395,9 +420,17 @@ const loadDeclarations = async () => {
     const response = await getDeclarationList(requestParams)
     
     // 处理响应数据
-    const responseData = response?.data || response
-    const listData = responseData?.data || {}
+    const listData = response?.data || {}
     const records = listData?.records || []
+    
+    // 调试日志：输出原始响应数据结构
+    logger.info('Response data structure', { 
+      responseKeys: Object.keys(response || {}),
+      hasData: !!response?.data,
+      listDataKeys: Object.keys(listData),
+      recordsCount: records.length,
+      firstRecord: records[0] || null
+    })
     
     // 数据映射：后端字段 -> 前端字段
     declarations.value = records.map(record => ({
@@ -471,11 +504,6 @@ const handleView = (id) => {
   router.push(`/declaration/detail/${id}`)
 }
 
-// 行点击
-const handleRowClick = (row) => {
-  logger.info('User clicked declaration row', { id: row.id, number: row.number })
-  handleView(row.id)
-}
 
 // 下载处理
 const handleDownload = async (command) => {
@@ -528,64 +556,34 @@ const handleDownload = async (command) => {
 }
 
 // 预览处理
-const handlePreview = async (row) => {
-  const { id, attachmentId } = row
+const handlePreview = (row) => {
+  const { id, attachmentId, direction } = row
   
-  try {
-    logger.info('User started preview', { id, attachmentId })
-    
-    // 如果有 attachmentId，使用工作流状态接口获取 fileUrl 进行预览
-    if (attachmentId) {
-      // 获取工作流状态（包含 fileUrl 和 fileFormat）
-      const workflowResponse = await getDeclarationWorkflowStatus(id)
-      const workflowData = workflowResponse?.data?.data || workflowResponse?.data || {}
-      const fileUrl = workflowData.fileUrl
-      const fileFormat = workflowData.fileFormat // 'pdf' 或 'word'
-      
-      if (fileUrl) {
-        // 在新窗口打开预览（PDF 可以直接预览，Word 需要下载）
-        if (fileFormat === 'pdf') {
-          window.open(fileUrl, '_blank')
-          ElMessage.success(t('declaration.previewSuccess'))
-        } else {
-          // Word 格式，直接下载
-          const link = document.createElement('a')
-          link.href = fileUrl
-          link.download = `申报文档_${id}.${fileFormat === 'word' ? 'docx' : fileFormat}`
-          link.target = '_blank'
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          ElMessage.info(t('declaration.wordPreviewHint'))
-        }
-        logger.info('Preview opened successfully', { id, fileUrl, fileFormat })
-        return
-      }
-    }
-    
-    // 如果没有 fileUrl，使用原来的预览接口
-    const response = await getDeclarationPreview({ id })
-    const responseData = response?.data || response
-    const previewData = responseData?.data || responseData
-    const previewContent = previewData?.content || previewData?.preview || t('declaration.previewContent', { 
-      id: declarations.value.find(d => d.id === id)?.number || id
-    })
-    
-    ElMessageBox.alert(
-      previewContent,
-      t('declaration.previewTitle'),
-      {
-        confirmButtonText: t('common.close'),
-        type: 'info',
-        customClass: 'preview-dialog'
-      }
-    )
-    
-    logger.info('Preview displayed successfully', { id })
-  } catch (error) {
-    logger.error('Preview failed', error)
-    ElMessage.error(t('declaration.previewFailed'))
+  logger.info('User started preview', { id, attachmentId })
+  
+  // 必须有 attachmentId 才能预览
+  if (!attachmentId) {
+    ElMessage.error(t('declaration.attachmentIdNotFound'))
+    logger.warn('Preview failed: attachmentId is missing', { id })
+    return
   }
+  
+  // 使用通用预览组件
+  // 注意：由于列表接口可能没有返回文件名，使用默认的 .docx 扩展名
+  // FilePreview 组件会从预览 URL 中自动识别文件类型
+  previewFileInfo.value = {
+    name: `${direction || '申报文件'}.docx`, // 添加默认扩展名，帮助识别文件类型
+    attachmentId
+  }
+  showPreviewDialog.value = true
+}
+
+/**
+ * 关闭预览
+ */
+const closePreview = () => {
+  showPreviewDialog.value = false
+  previewFileInfo.value = null
 }
 
 // 状态字符串到数字的映射（用于更新状态接口）
@@ -906,6 +904,13 @@ onMounted(() => {
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
+}
+
+.status-disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  display: inline-flex;
+  align-items: center;
 }
 
 // 下拉菜单样式

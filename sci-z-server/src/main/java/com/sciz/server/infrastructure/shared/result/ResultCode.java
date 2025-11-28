@@ -238,6 +238,11 @@ public enum ResultCode {
     KNOWLEDGE_NOT_FOUND(6001, "知识库不存在"),
 
     /**
+     * 知识库已存在
+     */
+    KNOWLEDGE_NAME_DUPLICATE(6002, "知识库已存在"),
+
+    /**
      * 知识库创建成功
      */
     KNOWLEDGE_CREATE_SUCCESS(6100, "知识库创建成功"),

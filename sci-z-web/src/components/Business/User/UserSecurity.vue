@@ -102,11 +102,11 @@
           <BaseDatePicker
             v-model="logFilters.dateRange"
             type="daterange"
-            unlink-panels
+            :unlink-panels="true"
             :range-separator="t('common.to')"
             :start-placeholder="t('common.startDate')"
             :end-placeholder="t('common.endDate')"
-            style="width: 320px"
+            style="width: 200px"
             @change="handleFilterChange"
           />
         </div>

@@ -45,7 +45,7 @@ import java.util.Optional;
 
 /**
  * 知识库应用服务实现类
- * 
+ *
  * @author ShiHang.Shang
  * @className KnowledgeServiceImpl
  * @date 2025-01-28 14:30
@@ -77,56 +77,63 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public KnowledgeResp create(KnowledgeCreateReq req) {
-//        // 1. 获取当前登录用户ID
-//        if (!StpUtil.isLogin()) {
-//            throw new BusinessException(ResultCode.UNAUTHORIZED);
-//        }
-        Long userId = StpUtil.getLoginIdAsLong();
+        // 1. 校验知识库名称是否重复
+        if (req.getName() == null || req.getName().trim().isEmpty()) {
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "知识库名称不能为空");
+        }
+        var existingKnowledge = knowledgeBaseRepo.findByName(req.getName().trim());
+        if (existingKnowledge != null) {
+            log.warn(String.format("知识库名称已存在: name=%s, existingId=%s", req.getName(), existingKnowledge.getId()));
+            throw BusinessException.of(ResultCode.KNOWLEDGE_NAME_DUPLICATE, "知识库名称已存在: %s", req.getName());
+        }
+
+        // 2. 获取用户ID（优先从请求参数获取，否则从上下文获取）
+        Long userId = req.getUserId() != null ? req.getUserId() : StpUtil.getLoginIdAsLong();
         log.info(String.format("创建知识库: userId=%s, name=%s", userId, req.getName()));
 
-//        // 2. 查询用户信息
+        // 3. 查询用户信息
         SysUser user = userRepo.findById(userId);
         if (user == null) {
             throw new BusinessException(ResultCode.USER_NOT_FOUND);
         }
 
-        // 3. 构建 Dify API 请求
+        // 4. 构建 Dify API 请求
         DifyDatasetRequest difyRequest = new DifyDatasetRequest();
-        difyRequest.setName(userId+"_"+req.getName());
+        difyRequest.setName(req.getName());
+        // difyRequest.setName(userId + "_" + req.getName());
         difyRequest.setDescription(req.getDescription());
 
-        // 4. 获取用户的 Dify API Key（用于调用 Dify API）
+        // 5. 获取用户的 Dify API Key（用于调用 Dify API）
 
         // 查询用户的 DifyApiKey 实体（如果存在）
         DifyApiKey difyApiKey = null;
         QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId)
 
-                   .eq("key_type", "dataset")
-                   .eq("is_active", true)
-                   .last("LIMIT 1");
+                .eq("key_type", "dataset")
+                .eq("is_active", true)
+                .last("LIMIT 1");
         difyApiKey = difyApiKeyService.getOne(queryWrapper);
-        
 
-        
-        // 5. 确定 resourceId（优先使用 API Key 的 resourceId，否则使用默认值）
-        String resourceId = (difyApiKey != null && difyApiKey.getResourceId() != null) 
-            ? difyApiKey.getResourceId() 
-            : defaultResourceId;
-        
-        // 6. 调用 Dify API 创建数据集
+        // 6. 确定 resourceId（优先使用 API Key 的 resourceId，否则使用默认值）
+        String resourceId = (difyApiKey != null && difyApiKey.getResourceId() != null)
+                ? difyApiKey.getResourceId()
+                : defaultResourceId;
+
+        // 7. 调用 Dify API 创建数据集
         ResponseEntity<String> response = difyApiService.createDataset(
                 difyRequest, userId, resourceId, "dataset");
 
-        // 7. 检查响应状态
+        // 8. 检查响应状态
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-            log.error(String.format("Dify API调用失败: status=%s, body=%s", 
+            log.error(String.format("Dify API调用失败: status=%s, body=%s",
                     response.getStatusCode(), response.getBody()));
-            throw new BusinessException(ResultCode.SERVER_ERROR, "创建知识库失败: Dify API调用失败"+String.format("Dify API调用失败: status=%s, body=%s",
-                    response.getStatusCode(), response.getBody()));
+            throw new BusinessException(ResultCode.SERVER_ERROR,
+                    "创建知识库失败: Dify API调用失败" + String.format("Dify API调用失败: status=%s, body=%s",
+                            response.getStatusCode(), response.getBody()));
         }
 
-        // 8. 解析返回的JSON
+        // 9. 解析返回的JSON
         JsonNode responseJson;
         try {
             responseJson = objectMapper.readTree(response.getBody());
@@ -135,18 +142,20 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             throw new BusinessException(ResultCode.SERVER_ERROR, "解析Dify API响应失败");
         }
 
-        // 9. 提取关键信息
+        // 10. 提取关键信息
         String difyKnowdataId = responseJson.has("id") ? responseJson.get("id").asText() : null;
-        String difyName = responseJson.has("name") ? responseJson.get("name").asText() : req.getName();
+        // String difyName = responseJson.has("name") ?
+        // responseJson.get("name").asText() : req.getName();
         if (difyKnowdataId == null) {
             log.error(String.format("Dify API返回数据缺少id字段: body=%s", response.getBody()));
             throw new BusinessException(ResultCode.SERVER_ERROR, "创建知识库失败: Dify API返回数据异常");
         }
-        // 10. 将完整的返回数据存入callback字段（JSON格式）
+        // 11. 将完整的返回数据存入callback字段（JSON格式）
         String callbackJson = response.getBody();
-        // 11. 创建知识库实体
+        // 12. 创建知识库实体
         SysKnowledgeBase entity = new SysKnowledgeBase();
-        entity.setName(difyName);
+        // entity.setName(difyName);
+        entity.setName(req.getName());
         entity.setDescription(req.getDescription()); // 使用用户输入的描述
         entity.setOwnerId(userId);
         entity.setOwnerName(user.getRealName());
@@ -160,12 +169,12 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         entity.setFolderCount(0);
         entity.setCreatedBy(userId);
         entity.setUpdatedBy(userId);
-        // 12. 保存到数据库
+        // 13. 保存到数据库
         Long id = knowledgeBaseRepo.save(entity);
         if (id == null) {
             throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
         }
-        // 13. 构建响应
+        // 14. 构建响应
         KnowledgeResp resp = new KnowledgeResp();
         resp.setId(id);
         resp.setName(entity.getName());
@@ -210,22 +219,21 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
         // 2. 创建分页对象
         Page<SysKnowledgeBase> pageParam = new Page<>(page, size);
-        
+
         // 3. 执行分页查询
         var pageResult = knowledgeBaseRepo.pageByCondition(pageParam, userId);
-        
+
         // 4. 转换为响应DTO列表
         var respList = knowledgeConverter.toRespList(pageResult.getRecords());
-        
+
         // 5. 构建分页结果
         var result = new PageResult<KnowledgeResp>(
                 respList,
                 pageResult.getTotal(),
                 pageResult.getCurrent(),
-                pageResult.getSize()
-        );
-        
-        log.info(String.format("分页查询知识库成功: total=%s, current=%s, size=%s", 
+                pageResult.getSize());
+
+        log.info(String.format("分页查询知识库成功: total=%s, current=%s, size=%s",
                 result.getTotal(), result.getCurrent(), result.getSize()));
         return result;
     }
@@ -234,15 +242,15 @@ public class KnowledgeServiceImpl implements KnowledgeService {
      * 上传文件到知识库
      *
      * @param knowledgeId 知识库ID（Dify知识库ID，String类型）
-     * @param file 上传的文件
-     * @param folderId 文件夹ID（可选，0为根目录）
+     * @param file        上传的文件
+     * @param folderId    文件夹ID（可选，0为根目录）
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void uploadFile(String knowledgeId, MultipartFile file, Long folderId) {
         // 1. 获取当前登录用户ID
         Long userId = StpUtil.getLoginIdAsLong();
-        log.info(String.format("上传文件到知识库: userId=%s, knowledgeId=%s, fileName=%s, folderId=%s", 
+        log.info(String.format("上传文件到知识库: userId=%s, knowledgeId=%s, fileName=%s, folderId=%s",
                 userId, knowledgeId, file.getOriginalFilename(), folderId));
 
         // 2. 根据Dify知识库ID查询知识库信息
@@ -297,9 +305,9 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
         // 9. 检查响应状态
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-            log.error(String.format("Dify API上传文档失败: status=%s, body=%s", 
+            log.error(String.format("Dify API上传文档失败: status=%s, body=%s",
                     response.getStatusCode(), response.getBody()));
-            throw new BusinessException(ResultCode.SERVER_ERROR, 
+            throw new BusinessException(ResultCode.SERVER_ERROR,
                     String.format("上传文件失败: Dify API调用失败, status=%s", response.getStatusCode()));
         }
 
@@ -358,7 +366,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED, "保存文件关联记录失败");
         }
 
-        log.info(String.format("上传文件成功: knowledgeId=%s, attachmentId=%s, relationId=%s, difyDocId=%s, batch=%s", 
+        log.info(String.format("上传文件成功: knowledgeId=%s, attachmentId=%s, relationId=%s, difyDocId=%s, batch=%s",
                 knowledgeId, attachmentId, relationId, difyDocId, batch));
     }
 
@@ -404,7 +412,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     public SseEmitter chatbotStream(KnowledgeChatbotStreamReq req) {
         // 1. 获取当前登录用户ID
         Long userId = StpUtil.getLoginIdAsLong();
-        log.info(String.format("知识库Chatbot流式对话: userId=%s, knowledgeId=%s, query=%s", 
+        log.info(String.format("知识库Chatbot流式对话: userId=%s, knowledgeId=%s, query=%s",
                 userId, req.getKnowledgeId(), req.getQuery()));
 
         // 2. 创建 SSE Emitter（超时时间设置为30秒）
@@ -467,7 +475,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                         if (trimmedLine.isEmpty()) {
                             return;
                         }
-                        
+
                         // 处理 SSE 格式的数据行
                         if (trimmedLine.startsWith("data:")) {
                             String data = trimmedLine.substring(5).trim();
@@ -490,17 +498,17 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                         log.warn(String.format("处理流式数据行失败: line=%s, err=%s", line, e.getMessage()));
                     }
                 });
-                
+
                 // 发送完成事件
                 emitter.send(SseEmitter.event()
                         .name("message_end")
                         .data("{}"));
                 emitter.complete();
-                
-                log.info(String.format("知识库Chatbot流式对话完成: userId=%s, knowledgeId=%s", 
+
+                log.info(String.format("知识库Chatbot流式对话完成: userId=%s, knowledgeId=%s",
                         userId, req.getKnowledgeId()));
             } catch (Exception e) {
-                log.error(String.format("知识库Chatbot流式对话失败: userId=%s, knowledgeId=%s, err=%s", 
+                log.error(String.format("知识库Chatbot流式对话失败: userId=%s, knowledgeId=%s, err=%s",
                         userId, req.getKnowledgeId(), e.getMessage()), e);
                 try {
                     emitter.send(SseEmitter.event()
@@ -544,28 +552,28 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 // 获取用户的 Dify API Key
                 QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
                 queryWrapper.eq("user_id", userId)
-                           .eq("key_type", "dataset")
-                           .eq("is_active", true)
-                           .last("LIMIT 1");
+                        .eq("key_type", "dataset")
+                        .eq("is_active", true)
+                        .last("LIMIT 1");
                 DifyApiKey difyApiKey = difyApiKeyService.getOne(queryWrapper);
-                
-                String resourceId = (difyApiKey != null && difyApiKey.getResourceId() != null) 
-                    ? difyApiKey.getResourceId() 
-                    : defaultResourceId;
+
+                String resourceId = (difyApiKey != null && difyApiKey.getResourceId() != null)
+                        ? difyApiKey.getResourceId()
+                        : defaultResourceId;
 
                 // 调用 Dify API 删除数据集
                 ResponseEntity<String> response = difyApiService.deleteDataset(
                         entity.getDifyKnowdataId(), userId, resourceId, "dataset");
-                
+
                 if (!response.getStatusCode().is2xxSuccessful()) {
-                    log.warn(String.format("Dify API删除数据集失败: datasetId=%s, status=%s, body=%s", 
+                    log.warn(String.format("Dify API删除数据集失败: datasetId=%s, status=%s, body=%s",
                             entity.getDifyKnowdataId(), response.getStatusCode(), response.getBody()));
                     // 即使 Dify API 删除失败，也继续删除本地数据（避免数据不一致）
                 } else {
                     log.info(String.format("Dify API删除数据集成功: datasetId=%s", entity.getDifyKnowdataId()));
                 }
             } catch (Exception e) {
-                log.error(String.format("调用 Dify API 删除数据集异常: datasetId=%s, err=%s", 
+                log.error(String.format("调用 Dify API 删除数据集异常: datasetId=%s, err=%s",
                         entity.getDifyKnowdataId(), e.getMessage()), e);
                 // 即使 Dify API 调用异常，也继续删除本地数据（避免数据不一致）
             }

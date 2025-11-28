@@ -44,52 +44,15 @@ public class ProjectController {
     }
 
     /**
-     * 分页查询项目列表（兼容旧接口）
-     *
-     * @param page    Integer 页码（旧参数，兼容）
-     * @param size    Integer 每页数量（旧参数，兼容）
-     * @param keyword String 搜索关键字
-     * @param status  String 项目状态（支持 active 字符串，兼容旧接口）
-     * @return 分页结果
-     */
-    @Operation(summary = "分页查询项目列表（兼容接口）", description = "根据关键字、状态分页查询项目列表，兼容旧的参数格式")
-    @GetMapping("/list")
-    public Result<PageResult<ProjectListResp>> pageProjectList(
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String status) {
-        // 兼容旧参数格式：page/size -> pageNo/pageSize
-        Integer pageNo = page != null ? page : 1;
-        Integer pageSize = size != null ? size : 10;
-        
-        // 处理 status=active 的情况（转换为进行中状态）
-        String normalizedStatus = normalizeStatus(status);
-        
-        // 构建查询请求
-        var req = new ProjectListQueryReq(pageNo, pageSize, null, "DESC", keyword, normalizedStatus);
-        PageResult<ProjectListResp> pageResult = projectService.page(req);
-        return Result.success(pageResult);
-    }
-
-    /**
      * 分页查询项目列表
      *
-     * @param req 查询请求
-     * @return 分页结果
+     * @param req ProjectListQueryReq 查询请求
+     * @return Result<PageResult<ProjectListResp>> 分页结果
      */
-    @Operation(summary = "分页查询项目列表", description = "根据关键字、状态分页查询项目列表")
-    @GetMapping
-    public Result<PageResult<ProjectListResp>> pageProject(@Valid ProjectListQueryReq req) {
-        // 处理 status=active 的情况
-        if (req.status() != null && "active".equalsIgnoreCase(req.status())) {
-            var normalizedReq = new ProjectListQueryReq(
-                    req.pageNo(), req.pageSize(), req.sortBy(), req.sortOrder(),
-                    req.keyword(), "3"); // 3 = 进行中
-            PageResult<ProjectListResp> pageResult = projectService.page(normalizedReq);
-            return Result.success(pageResult);
-        }
-        PageResult<ProjectListResp> pageResult = projectService.page(req);
+    @Operation(summary = "分页查询项目列表", description = "根据关键字、状态分页查询项目列表，支持按项目编号、项目名称搜索")
+    @PostMapping("/list")
+    public Result<PageResult<ProjectListResp>> pageProject(@Valid @RequestBody ProjectListQueryReq req) {
+        var pageResult = projectService.page(req);
         return Result.success(pageResult);
     }
 
@@ -134,25 +97,4 @@ public class ProjectController {
         return Result.success();
     }
 
-    // ==================== 私有方法 ====================
-
-    /**
-     * 规范化项目状态
-     * 将前端传入的状态字符串转换为后端识别的状态值
-     *
-     * @param status String 原始状态值
-     * @return String 规范化后的状态值（null 或状态码字符串）
-     */
-    private String normalizeStatus(String status) {
-        if (status == null || status.isBlank()) {
-            return null;
-        }
-        String trimmed = status.trim();
-        // 兼容旧接口：active -> 3（进行中）
-        if ("active".equalsIgnoreCase(trimmed)) {
-            return "3";
-        }
-        // 其他状态值直接返回（0-7）
-        return trimmed;
-    }
 }

@@ -30,6 +30,18 @@ public interface FileService {
     FileInfoResp upload(FileUploadReq req);
 
     /**
+     * 单文件上传（支持异步上下文）
+     * <p>
+     * 用于异步任务等非 Web 上下文场景，需要手动传入用户信息
+     *
+     * @param req      FileUploadReq 上传请求
+     * @param userId   Long 上传人ID
+     * @param realName String 上传人姓名
+     * @return FileInfoResp 文件信息
+     */
+    FileInfoResp upload(FileUploadReq req, Long userId, String realName);
+
+    /**
      * 批量上传
      *
      * @param req FileBatchUploadReq 上传请求

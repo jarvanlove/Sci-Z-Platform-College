@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  *
  * @author JiaWen.Wu
  * @className ProjectDetailResp
- * @date 2025-01-24 16:00
+ * @date 2025-11-24 16:00
  */
 @Getter
 @Setter
@@ -82,4 +82,3 @@ public class ProjectDetailResp {
      */
     private LocalDateTime updatedTime;
 }
-
