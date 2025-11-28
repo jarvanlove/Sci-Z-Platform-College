@@ -5,13 +5,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
 
 /**
  * HTTP 客户端配置
  * <p>
- * 配置 RestTemplate 的超时时间，支持长时间运行的工作流（3-15分钟）
+ * 配置 RestTemplate 和 WebClient 的超时时间，支持长时间运行的工作流（3-15分钟）
  *
  * @author JiaWen.Wu
  * @className HttpClientConfig
@@ -36,6 +37,22 @@ public class HttpClientConfig {
                 .setConnectTimeout(Duration.ofSeconds(10)) // 连接超时：10秒
                 .setReadTimeout(Duration.ofSeconds(900)) // 读取超时：15分钟（900秒），支持长时间运行的工作流
                 .requestFactory(SimpleClientHttpRequestFactory.class)
+                .build();
+    }
+
+    /**
+     * 创建 WebClient Bean
+     * <p>
+     * 用于处理流式 API（SSE），配置超时时间：
+     * - 连接超时：10秒（建立连接的时间）
+     * - 响应超时：10分钟（600秒），支持长时间运行的流式响应
+     *
+     * @return WebClient
+     */
+    @Bean
+    public WebClient webClient() {
+        return WebClient.builder()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024)) // 10MB 缓冲区
                 .build();
     }
 }

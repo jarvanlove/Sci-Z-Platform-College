@@ -15,8 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -284,29 +282,6 @@ public class DifyApiService {
         }
     }
 
-    /**
-     * 根据文件扩展名获取MIME类型
-     */
-    private String getMimeType(String ext) {
-        switch (ext) {
-            case ".txt":
-                return "text/plain";
-            case ".pdf":
-                return "application/pdf";
-            case ".doc":
-                return "application/msword";
-            case ".docx":
-                return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-            case ".md":
-                return "text/markdown";
-            case ".csv":
-                return "text/csv";
-            case ".json":
-                return "application/json";
-            default:
-                return "application/octet-stream";
-        }
-    }
 
     /**
      * 构建默认配置JSON
@@ -345,177 +320,34 @@ public class DifyApiService {
     }
 
     /**
-     * 上传文档到数据集（先存储文件，再调用Dify API）
+     * 上传文档到数据集（直接使用传入的文件，不存储到本地）
      */
     public ResponseEntity<String> uploadDocumentWithFileStorage(String datasetId, MultipartFile file, Long userId,
             String resourceId, String keyType) {
         try {
-            // 1. 先验证文件
+            // 1. 验证文件
             validateFile(file);
 
-            // 2. 存储文件到本地
-            String storedFilePath = storeFile(file);
-            log.info("📁 文件已存储到: {}", storedFilePath);
-
-            // 3. 从存储的文件创建新的MultipartFile并调用Dify API
-            File storedFile = new File(storedFilePath);
-            MultipartFile newMultipartFile = createMultipartFileFromFile(storedFile, file.getOriginalFilename());
+            // 2. 直接使用传入的 MultipartFile 调用 Dify API
             Map<String, Object> data = new HashMap<>();
             data.put("data", buildDefaultConfigJson());
+            log.info("直接上传文件到 Dify API: fileName={}, size={}", file.getOriginalFilename(), file.getSize());
             return difyApiClient.uploadFile("POST", "/datasets/" + datasetId + "/document/create-by-file",
-                    newMultipartFile, data, userId, resourceId, keyType);
+                    file, data, userId, resourceId, keyType);
         } catch (HttpClientErrorException e) {
             log.error("Dify API调用失败: {}", e.getMessage());
             // 直接返回Dify的错误响应给前端
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.error("文件存储并上传失败: {}", e.getMessage(), e);
-            throw new RuntimeException("文件存储并上传失败: " + e.getMessage(), e);
+            log.error("上传文件到 Dify API 失败: {}", e.getMessage(), e);
+            throw new RuntimeException("上传文件到 Dify API 失败: " + e.getMessage(), e);
         }
-    }
-
-    /**
-     * 存储文件到本地
-     */
-    private String storeFile(MultipartFile file) throws IOException {
-        // 检查配置是否存在
-        if (difyConfig.getUpload() == null) {
-            throw new RuntimeException("Dify上传配置未设置，请在配置文件中添加 dify.upload 配置");
-        }
-
-        // 从配置文件获取上传目录，如果为空则使用默认值
-        String uploadDir = difyConfig.getUpload().getDir();
-        if (uploadDir == null || uploadDir.trim().isEmpty()) {
-            uploadDir = "upload"; // 默认上传目录
-            log.warn("⚠️ 未配置上传目录，使用默认目录: {}", uploadDir);
-        }
-
-        // 如果是相对路径，转换为绝对路径（相对于项目根目录）
-        File uploadDirFile = new File(uploadDir);
-        if (!uploadDirFile.isAbsolute()) {
-            // 获取项目根目录
-            String projectRoot = System.getProperty("user.dir");
-            uploadDirFile = new File(projectRoot, uploadDir);
-            uploadDir = uploadDirFile.getAbsolutePath();
-        }
-
-        // 确保目录以/结尾（Windows使用\）
-        String separator = File.separator;
-        if (!uploadDir.endsWith("/") && !uploadDir.endsWith("\\")) {
-            uploadDir += separator;
-        }
-
-        // 创建上传目录（如果不存在）
-        File directory = new File(uploadDir);
-        if (!directory.exists()) {
-            boolean created = directory.mkdirs();
-            if (created) {
-                log.info("📁 创建上传目录: {}", uploadDir);
-            } else {
-                throw new IOException("无法创建上传目录: " + uploadDir);
-            }
-        } else if (!directory.isDirectory()) {
-            throw new IOException("上传路径已存在但不是目录: " + uploadDir);
-        }
-        // 验证文件大小
-        if (difyConfig.getUpload().getMaxFileSize() != null &&
-                file.getSize() > difyConfig.getUpload().getMaxFileSize()) {
-            throw new RuntimeException("文件大小超过限制: " + (difyConfig.getUpload().getMaxFileSize() / 1024 / 1024) + "MB");
-        }
-        // 验证文件扩展名
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename != null && difyConfig.getUpload().getAllowedExtensions() != null) {
-            String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            String[] allowedExts = difyConfig.getUpload().getAllowedExtensions().split(",");
-            boolean isAllowed = false;
-            for (String ext : allowedExts) {
-                if (extension.equalsIgnoreCase(ext.trim())) {
-                    isAllowed = true;
-                    break;
-                }
-            }
-            if (!isAllowed) {
-                throw new RuntimeException(
-                        "不支持的文件类型: " + extension + "，支持的类型: " + difyConfig.getUpload().getAllowedExtensions());
-            }
-        }
-        // 生成唯一文件名
-        String extension = "";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        }
-        String filename = System.currentTimeMillis() + "_" + (originalFilename != null ? originalFilename : "file")
-                + extension;
-
-        // 存储文件
-        String filePath = uploadDir + filename;
-        File destFile = new File(filePath);
-        file.transferTo(destFile);
-
-        log.info("📁 文件已存储: {} (大小: {} KB)", filePath, file.getSize() / 1024);
-
-        // 返回绝对路径
-        return destFile.getAbsolutePath();
     }
 
     /**
      * 验证文件
      */
     private void validateFile(MultipartFile file) {
-    }
-
-    /**
-     * 从文件创建MultipartFile
-     */
-    private MultipartFile createMultipartFileFromFile(File file, String originalFilename) throws IOException {
-        byte[] content = java.nio.file.Files.readAllBytes(file.toPath());
-        String filename = originalFilename != null ? originalFilename : file.getName();
-
-        // 获取文件扩展名和MIME类型
-        String ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
-        String mimeType = getMimeType(ext);
-
-        return new MultipartFile() {
-            @Override
-            public String getName() {
-                return "file";
-            }
-
-            @Override
-            public String getOriginalFilename() {
-                return filename;
-            }
-
-            @Override
-            public String getContentType() {
-                return mimeType;
-            }
-
-            @Override
-            public boolean isEmpty() {
-                return content.length == 0;
-            }
-
-            @Override
-            public long getSize() {
-                return content.length;
-            }
-
-            @Override
-            public byte[] getBytes() {
-                return content;
-            }
-
-            @Override
-            public java.io.InputStream getInputStream() {
-                return new java.io.ByteArrayInputStream(content);
-            }
-
-            @Override
-            public void transferTo(File dest) throws IOException {
-                java.nio.file.Files.write(dest.toPath(), content);
-            }
-        };
     }
 
     /**
