@@ -13,22 +13,30 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
+import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /**
@@ -47,6 +55,21 @@ public class FileConvertServiceImpl implements FileConvertService {
      * 并发控制：最多同时转换 3 个文件
      */
     private static final Semaphore CONVERT_SEMAPHORE = new Semaphore(3);
+
+    /**
+     * PDF 页面边距（单位：点）
+     */
+    private static final float PDF_MARGIN = 50f;
+
+    /**
+     * PDF 行高（单位：点）
+     */
+    private static final float PDF_LINE_HEIGHT = 16f;
+
+    /**
+     * PDF 字体大小
+     */
+    private static final float PDF_FONT_SIZE = 12f;
 
     /**
      * Redis 模板（用于缓存转换结果）
@@ -78,10 +101,10 @@ public class FileConvertServiceImpl implements FileConvertService {
      * 缓存文件信息（用于序列化到 Redis）
      */
     private record CachedFileInfo(
-            String objectName, // MinIO 对象路径
-            String fileName, // 文件名
-            String mimeType, // MIME 类型
-            Long contentLength) { // 文件大小
+            String objectName,
+            String fileName,
+            String mimeType,
+            Long contentLength) {
     }
 
     /**
@@ -99,52 +122,38 @@ public class FileConvertServiceImpl implements FileConvertService {
         log.info(String.format("开始文件格式转换: sourceFormat=%s, targetFormat=%s, originalFileName=%s",
                 sourceFormat, targetFormat, originalFileName));
 
-        // 1. 校验转换支持
         if (!isSupported(sourceFormat, targetFormat)) {
             throw BusinessException.of(ResultCode.BAD_REQUEST,
                     "不支持的文件格式转换: %s → %s", sourceFormat, targetFormat);
         }
 
-        // 2. 如果源格式和目标格式相同，直接返回原文件
         if (sourceFormat.equalsIgnoreCase(targetFormat)) {
             log.info("源格式和目标格式相同，无需转换");
             return convertSameFormat(sourceInputStream, originalFileName, sourceFormat);
         }
 
-        // 3. 生成缓存 key（基于文件内容和转换参数）
-        var cacheKey = generateCacheKey(sourceInputStream, sourceFormat, targetFormat, originalFileName);
+        // 保存源文件到临时文件
+        var tempSourceFile = saveToTempFile(sourceInputStream, sourceFormat);
 
-        // 4. 检查缓存
-        var cachedResult = getCachedResult(cacheKey);
-        if (cachedResult != null) {
-            log.info(String.format("从缓存获取转换结果: cacheKey=%s", cacheKey));
-            return cachedResult;
-        }
-
-        // 5. 获取转换许可（并发控制）
         try {
-            CONVERT_SEMAPHORE.acquire();
-            log.info(String.format("获取转换许可，开始转换: sourceFormat=%s, targetFormat=%s", sourceFormat, targetFormat));
+            // 生成缓存 key
+            var cacheKey = generateCacheKey(tempSourceFile, sourceFormat, targetFormat, originalFileName);
 
-            // 6. 执行格式转换
-            var result = switch (sourceFormat.toLowerCase()) {
-                case "docx" -> convertDocxToPdf(sourceInputStream, originalFileName);
-                case "pdf" -> convertPdfToDocx(sourceInputStream, originalFileName);
-                default -> throw BusinessException.of(ResultCode.BAD_REQUEST,
-                        "不支持的源文件格式: %s", sourceFormat);
-            };
+            // 检查缓存
+            var cachedResult = getCachedResult(cacheKey);
+            if (cachedResult != null) {
+                cleanupTempFile(tempSourceFile);
+                log.info(String.format("从缓存获取转换结果: cacheKey=%s", cacheKey));
+                return cachedResult;
+            }
 
-            // 7. 缓存转换结果
-            cacheResult(cacheKey, result);
+            // 执行转换
+            return executeConversion(tempSourceFile, sourceFormat, targetFormat, originalFileName, cacheKey);
 
-            return result;
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw BusinessException.of(ResultCode.SERVER_ERROR, "转换被中断: %s", e.getMessage());
-        } finally {
-            CONVERT_SEMAPHORE.release();
-            log.info("释放转换许可");
+        } catch (Exception e) {
+            cleanupTempFile(tempSourceFile);
+            log.error(String.format("文件格式转换失败: err=%s", e.getMessage()), e);
+            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "文件格式转换失败: %s", e.getMessage());
         }
     }
 
@@ -160,439 +169,505 @@ public class FileConvertServiceImpl implements FileConvertService {
         if (sourceFormat == null || targetFormat == null) {
             return false;
         }
-
         var source = sourceFormat.toLowerCase();
         var target = targetFormat.toLowerCase();
-
-        // 支持 docx ↔ pdf 转换
         return (source.equals("docx") && target.equals("pdf")) ||
                 (source.equals("pdf") && target.equals("docx")) ||
-                source.equals(target); // 相同格式也支持（直接返回）
+                source.equals(target);
     }
 
     /**
      * 相同格式转换（直接返回原文件）
-     * 使用临时文件避免大文件内存占用
      */
     private ConvertResult convertSameFormat(InputStream sourceInputStream, String originalFileName, String format) {
-        final Path[] tempFileRef = new Path[1];
-        try {
-            // 创建临时文件
-            tempFileRef[0] = Files.createTempFile("convert_", "." + format);
-            final Path tempFile = tempFileRef[0];
+        var tempFile = saveToTempFile(sourceInputStream, format);
+        var fileSize = getFileSize(tempFile);
+        validateFileSize(fileSize);
 
-            // 流式复制到临时文件
-            Files.copy(sourceInputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-
-            var fileSize = Files.size(tempFile);
-            var mimeType = getMimeType(format);
-            var fileName = changeFileExtension(originalFileName, format);
-
-            // 检查文件大小
-            if (fileSize > CacheConstant.FILE_CONVERT_MAX_SIZE) {
-                Files.deleteIfExists(tempFile);
-                throw BusinessException.of(ResultCode.BAD_REQUEST,
-                        "文件过大，无法转换（最大支持 %dMB，当前文件约 %dMB）",
-                        CacheConstant.FILE_CONVERT_MAX_SIZE / 1024 / 1024, fileSize / 1024 / 1024);
-            }
-
-            // 返回文件输入流（使用临时文件）
-            var fileInputStream = new FileInputStream(tempFile.toFile()) {
-                @Override
-                public void close() throws IOException {
-                    super.close();
-                    // 关闭时删除临时文件
-                    Files.deleteIfExists(tempFile);
-                }
-            };
-
-            return new ConvertResult(
-                    fileInputStream,
-                    fileName,
-                    mimeType,
-                    fileSize);
-
-        } catch (IOException e) {
-            if (tempFileRef[0] != null) {
-                try {
-                    Files.deleteIfExists(tempFileRef[0]);
-                } catch (IOException ignored) {
-                }
-            }
-            log.error(String.format("读取文件流失败: err=%s", e.getMessage()), e);
-            throw BusinessException.of(ResultCode.SERVER_ERROR, "文件读取失败: %s", e.getMessage());
-        }
+        return new ConvertResult(
+                createAutoCloseInputStream(tempFile),
+                changeFileExtension(originalFileName, format),
+                getMimeType(format),
+                fileSize);
     }
 
     /**
      * DOCX 转 PDF
-     * 使用临时文件优化大文件处理
      */
-    private ConvertResult convertDocxToPdf(InputStream docxInputStream, String originalFileName) {
-        final Path[] tempDocxFileRef = new Path[1];
-        final Path[] tempPdfFileRef = new Path[1];
-        XWPFDocument document = null;
-        final PDDocument[] pdfDocumentRef = new PDDocument[1];
+    private ConvertResult convertDocxToPdf(Path docxFile, String originalFileName) {
+        try (var docxStream = Files.newInputStream(docxFile);
+                var document = new XWPFDocument(docxStream)) {
 
-        try {
-            log.info("开始 DOCX → PDF 转换");
+            var pdfFile = Files.createTempFile("pdf_", ".pdf");
+            var pdfDoc = new PDDocument();
 
-            // 1. 将输入流保存到临时文件（避免内存占用）
-            tempDocxFileRef[0] = Files.createTempFile("docx_", ".docx");
-            final Path tempDocxFile = tempDocxFileRef[0];
-            Files.copy(docxInputStream, tempDocxFile, StandardCopyOption.REPLACE_EXISTING);
-
-            var fileSize = Files.size(tempDocxFile);
-            if (fileSize > CacheConstant.FILE_CONVERT_MAX_SIZE) {
-                throw BusinessException.of(ResultCode.BAD_REQUEST,
-                        "文件过大，无法转换（最大支持 %dMB，当前文件约 %dMB）",
-                        CacheConstant.FILE_CONVERT_MAX_SIZE / 1024 / 1024, fileSize / 1024 / 1024);
-            }
-
-            // 2. 从临时文件读取 DOCX 文档
-            try (var fileInputStream = Files.newInputStream(tempDocxFile)) {
-                document = new XWPFDocument(fileInputStream);
-            }
-
-            // 3. 提取文本内容（流式处理，避免一次性加载所有内容）
-            var textContent = extractTextFromDocx(document);
-            document.close();
-            document = null;
-
-            // 4. 创建 PDF 文档（使用临时文件）
-            tempPdfFileRef[0] = Files.createTempFile("pdf_", ".pdf");
-            final Path tempPdfFile = tempPdfFileRef[0];
-            pdfDocumentRef[0] = new PDDocument();
-            var pageRef = new PDPage[] { new PDPage() };
-            pdfDocumentRef[0].addPage(pageRef[0]);
-            var contentStreamRef = new PDPageContentStream[] { new PDPageContentStream(pdfDocumentRef[0], pageRef[0]) };
-
-            // 5. 设置字体和写入文本
-            contentStreamRef[0].setFont(PDType1Font.HELVETICA, 12f);
-            contentStreamRef[0].beginText();
-            contentStreamRef[0].newLineAtOffset(50, 750);
-
-            // 6. 写入文本（优化：使用 Stream API 处理，避免传统循环）
-            var lines = Arrays.stream(textContent.split("\n"));
-            var yPositionRef = new float[] { 750f };
-            var lineHeight = 15f;
-            var maxLineWidth = 100; // 每行最大字符数
-
-            // 使用 Stream API 处理每一行
-            lines.forEach(line -> {
-                // 检查是否需要创建新页面
-                if (yPositionRef[0] < 50) {
-                    try {
-                        contentStreamRef[0].endText();
-                        contentStreamRef[0].close();
-                        pageRef[0] = new PDPage();
-                        pdfDocumentRef[0].addPage(pageRef[0]);
-                        contentStreamRef[0] = new PDPageContentStream(pdfDocumentRef[0], pageRef[0]);
-                        contentStreamRef[0].setFont(PDType1Font.HELVETICA, 12f);
-                        contentStreamRef[0].beginText();
-                        yPositionRef[0] = 750f;
-                    } catch (IOException e) {
-                        log.error("创建新页面失败", e);
-                        throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "创建新页面失败: %s", e.getMessage());
-                    }
-                }
-
-                // 处理长行（自动换行）
-                if (line.length() > maxLineWidth) {
-                    var chunks = splitLongLine(line, maxLineWidth);
-                    // 使用 Stream API 处理每个 chunk
-                    Arrays.stream(chunks).forEach(chunk -> {
-                        try {
-                            contentStreamRef[0].newLineAtOffset(0, -lineHeight);
-                            contentStreamRef[0].showText(chunk);
-                            yPositionRef[0] -= lineHeight;
-
-                            // 检查是否需要创建新页面
-                            if (yPositionRef[0] < 50) {
-                                try {
-                                    contentStreamRef[0].endText();
-                                    contentStreamRef[0].close();
-                                    pageRef[0] = new PDPage();
-                                    pdfDocumentRef[0].addPage(pageRef[0]);
-                                    contentStreamRef[0] = new PDPageContentStream(pdfDocumentRef[0], pageRef[0]);
-                                    contentStreamRef[0].setFont(PDType1Font.HELVETICA, 12f);
-                                    contentStreamRef[0].beginText();
-                                    yPositionRef[0] = 750f;
-                                } catch (IOException e) {
-                                    log.error("创建新页面失败", e);
-                                    throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "创建新页面失败: %s",
-                                            e.getMessage());
-                                }
-                            }
-                        } catch (IOException e) {
-                            log.error("写入文本失败", e);
-                            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "写入文本失败: %s", e.getMessage());
-                        }
-                    });
-                } else {
-                    try {
-                        contentStreamRef[0].newLineAtOffset(0, -lineHeight);
-                        contentStreamRef[0].showText(line);
-                        yPositionRef[0] -= lineHeight;
-                    } catch (IOException e) {
-                        log.error("写入文本失败", e);
-                        throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "写入文本失败: %s", e.getMessage());
-                    }
-                }
-            });
-
-            contentStreamRef[0].endText();
-            contentStreamRef[0].close();
-
-            // 7. 保存 PDF 到临时文件
-            pdfDocumentRef[0].save(tempPdfFile.toFile());
-            pdfDocumentRef[0].close();
-            pdfDocumentRef[0] = null;
-
-            var pdfFileSize = Files.size(tempPdfFile);
-            var fileName = changeFileExtension(originalFileName, "pdf");
-            var mimeType = "application/pdf";
-
-            log.info(String.format("DOCX → PDF 转换成功: fileName=%s, size=%d", fileName, pdfFileSize));
-
-            // 8. 返回文件输入流（使用临时文件，关闭时自动删除）
-            var fileInputStream = new FileInputStream(tempPdfFile.toFile()) {
-                @Override
-                public void close() throws IOException {
-                    super.close();
-                    // 清理临时文件
-                    Files.deleteIfExists(tempPdfFile);
-                    Files.deleteIfExists(tempDocxFile);
-                }
-            };
-
-            return new ConvertResult(
-                    fileInputStream,
-                    fileName,
-                    mimeType,
-                    pdfFileSize);
-
-        } catch (Exception e) {
-            // 清理资源
-            if (document != null) {
-                try {
-                    document.close();
-                } catch (IOException ignored) {
-                }
-            }
-            if (pdfDocumentRef[0] != null) {
-                try {
-                    pdfDocumentRef[0].close();
-                } catch (IOException ignored) {
-                }
-            }
             try {
-                if (tempPdfFileRef[0] != null)
-                    Files.deleteIfExists(tempPdfFileRef[0]);
-                if (tempDocxFileRef[0] != null)
-                    Files.deleteIfExists(tempDocxFileRef[0]);
-            } catch (IOException ignored) {
-            }
+                var font = loadSystemFont(pdfDoc);
+                var paragraphs = document.getParagraphs();
 
-            log.error(String.format("DOCX → PDF 转换失败: err=%s", e.getMessage()), e);
-            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "文件格式转换失败: %s", e.getMessage());
+                if (paragraphs.isEmpty()) {
+                    createEmptyPdf(pdfDoc, pdfFile);
+                } else {
+                    createPdfFromParagraphs(pdfDoc, pdfFile, font, paragraphs);
+                }
+
+                var pdfSize = Files.size(pdfFile);
+                log.info(String.format("DOCX → PDF 转换成功: size=%d", pdfSize));
+
+                return new ConvertResult(
+                        createAutoCloseInputStream(pdfFile, docxFile),
+                        changeFileExtension(originalFileName, "pdf"),
+                        "application/pdf",
+                        pdfSize);
+
+            } catch (Exception e) {
+                pdfDoc.close();
+                cleanupTempFile(pdfFile);
+                throw e;
+            }
+        } catch (IOException e) {
+            log.error("DOCX → PDF 转换失败", e);
+            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "DOCX 转 PDF 失败: %s", e.getMessage());
         }
     }
 
     /**
      * PDF 转 DOCX
-     * 使用临时文件优化大文件处理
      */
-    private ConvertResult convertPdfToDocx(InputStream pdfInputStream, String originalFileName) {
-        final Path[] tempPdfFileRef = new Path[1];
-        final Path[] tempDocxFileRef = new Path[1];
-        final PDDocument[] pdfDocumentRef = new PDDocument[1];
-        final XWPFDocument[] docxDocumentRef = new XWPFDocument[1];
+    private ConvertResult convertPdfToDocx(Path pdfFile, String originalFileName) {
+        try (var pdfStream = Files.newInputStream(pdfFile);
+                var pdfDoc = PDDocument.load(pdfStream)) {
 
-        try {
-            log.info("开始 PDF → DOCX 转换");
-
-            // 1. 将输入流保存到临时文件（避免内存占用）
-            tempPdfFileRef[0] = Files.createTempFile("pdf_", ".pdf");
-            final Path tempPdfFile = tempPdfFileRef[0];
-            Files.copy(pdfInputStream, tempPdfFile, StandardCopyOption.REPLACE_EXISTING);
-
-            var fileSize = Files.size(tempPdfFile);
-            if (fileSize > CacheConstant.FILE_CONVERT_MAX_SIZE) {
-                throw BusinessException.of(ResultCode.BAD_REQUEST,
-                        "文件过大，无法转换（最大支持 %dMB，当前文件约 %dMB）",
-                        CacheConstant.FILE_CONVERT_MAX_SIZE / 1024 / 1024, fileSize / 1024 / 1024);
-            }
-
-            // 2. 从临时文件加载 PDF 文档
-            try (var fileInputStream = Files.newInputStream(tempPdfFile)) {
-                pdfDocumentRef[0] = PDDocument.load(fileInputStream);
-            }
-
-            // 3. 提取文本内容（优化：分批处理大文件）
             var textStripper = new PDFTextStripper();
-            // 设置提取策略：保留段落结构
             textStripper.setParagraphStart("\n");
             textStripper.setParagraphEnd("\n");
-            textStripper.setPageStart("\n");
-            textStripper.setPageEnd("\n");
+            var textContent = textStripper.getText(pdfDoc);
 
-            var textContent = textStripper.getText(pdfDocumentRef[0]);
-            pdfDocumentRef[0].close();
-            pdfDocumentRef[0] = null;
-
-            // 4. 创建 DOCX 文档（使用临时文件）
-            tempDocxFileRef[0] = Files.createTempFile("docx_", ".docx");
-            final Path tempDocxFile = tempDocxFileRef[0];
-            docxDocumentRef[0] = new XWPFDocument();
-
-            // 5. 将文本内容写入 DOCX（优化：使用 Stream API 处理，保留段落结构）
-            var maxParagraphs = 10000; // 限制段落数量，避免内存溢出
-            var paragraphCountRef = new int[] { 0 };
-
-            // 使用 Stream API 处理每一行
-            Arrays.stream(textContent.split("\n"))
-                    .takeWhile(line -> paragraphCountRef[0] < maxParagraphs) // Java 21: takeWhile 限制处理数量
-                    .forEach(line -> {
-                        if (paragraphCountRef[0] >= maxParagraphs) {
-                            log.warn(String.format("段落数量超过限制（%d），截断处理", maxParagraphs));
-                            return;
-                        }
-
-                        var trimmedLine = line.trim();
-                        if (trimmedLine.isEmpty()) {
-                            // 空行：创建空段落
-                            docxDocumentRef[0].createParagraph();
-                            paragraphCountRef[0]++;
-                        } else {
-                            // 非空行：创建段落并写入文本
-                            var paragraph = docxDocumentRef[0].createParagraph();
-                            var run = paragraph.createRun();
-                            run.setText(trimmedLine);
-                            paragraphCountRef[0]++;
-                        }
-                    });
-
-            // 6. 保存 DOCX 到临时文件
-            try (var fileOutputStream = Files.newOutputStream(tempDocxFile)) {
-                docxDocumentRef[0].write(fileOutputStream);
+            var docxFile = Files.createTempFile("docx_", ".docx");
+            try (var docxDoc = new XWPFDocument()) {
+                createDocxFromText(docxDoc, textContent);
+                try (var outputStream = Files.newOutputStream(docxFile)) {
+                    docxDoc.write(outputStream);
+                }
             }
-            docxDocumentRef[0].close();
-            docxDocumentRef[0] = null;
 
-            var docxFileSize = Files.size(tempDocxFile);
-            var fileName = changeFileExtension(originalFileName, "docx");
-            var mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            var docxSize = Files.size(docxFile);
+            log.info(String.format("PDF → DOCX 转换成功: size=%d", docxSize));
 
-            log.info(String.format("PDF → DOCX 转换成功: fileName=%s, size=%d, paragraphs=%d",
-                    fileName, docxFileSize, paragraphCountRef[0]));
+            return new ConvertResult(
+                    createAutoCloseInputStream(docxFile, pdfFile),
+                    changeFileExtension(originalFileName, "docx"),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    docxSize);
 
-            // 7. 返回文件输入流（使用临时文件，关闭时自动删除）
-            var fileInputStream = new FileInputStream(tempDocxFile.toFile()) {
+        } catch (IOException e) {
+            log.error("PDF → DOCX 转换失败", e);
+            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "PDF 转 DOCX 失败: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * 从段落创建 PDF
+     */
+    private void createPdfFromParagraphs(PDDocument pdfDoc, Path pdfFile, PDFont font, List<XWPFParagraph> paragraphs)
+            throws IOException {
+        var page = new PDPage(PDRectangle.A4);
+        pdfDoc.addPage(page);
+        var pageHeight = page.getMediaBox().getHeight();
+        var maxWidth = page.getMediaBox().getWidth() - 2 * PDF_MARGIN;
+
+        var context = new PdfContext(pdfDoc, page, font, pageHeight, maxWidth);
+
+        try {
+            context.startPage();
+
+            paragraphs.stream()
+                    .map(this::extractParagraphText)
+                    .filter(text -> text != null && !text.isBlank())
+                    .flatMap(text -> {
+                        try {
+                            return wrapText(text, font, PDF_FONT_SIZE, maxWidth).stream();
+                        } catch (IOException e) {
+                            log.error("文本换行失败", e);
+                            return Stream.empty();
+                        }
+                    })
+                    .forEach(context::writeLine);
+
+            context.endPage();
+        } finally {
+            context.close();
+        }
+
+        pdfDoc.save(pdfFile.toFile());
+    }
+
+    /**
+     * PDF 写入上下文（管理页面和内容流）
+     */
+    private static class PdfContext {
+        private final PDDocument pdfDoc;
+        private final PDFont font;
+        private final float pageHeight;
+        private PDPage page;
+        private PDPageContentStream contentStream;
+        private float yPosition;
+
+        PdfContext(PDDocument pdfDoc, PDPage page, PDFont font, float pageHeight, float maxWidth) {
+            this.pdfDoc = pdfDoc;
+            this.page = page;
+            this.font = font;
+            this.pageHeight = pageHeight;
+            this.yPosition = pageHeight - PDF_MARGIN;
+        }
+
+        void startPage() throws IOException {
+            this.contentStream = new PDPageContentStream(pdfDoc, page);
+            contentStream.setFont(font, PDF_FONT_SIZE);
+            contentStream.beginText();
+            contentStream.newLineAtOffset(PDF_MARGIN, yPosition);
+        }
+
+        void writeLine(String line) {
+            try {
+                if (yPosition < PDF_MARGIN) {
+                    newPage();
+                }
+                contentStream.newLineAtOffset(0, -PDF_LINE_HEIGHT);
+                contentStream.showText(line);
+                yPosition -= PDF_LINE_HEIGHT;
+            } catch (IOException e) {
+                log.error("写入PDF行失败", e);
+                throw new RuntimeException(e);
+            }
+        }
+
+        void newPage() throws IOException {
+            contentStream.endText();
+            contentStream.close();
+            page = new PDPage(PDRectangle.A4);
+            pdfDoc.addPage(page);
+            yPosition = pageHeight - PDF_MARGIN;
+            startPage();
+        }
+
+        void endPage() throws IOException {
+            if (contentStream != null) {
+                contentStream.endText();
+            }
+        }
+
+        void close() throws IOException {
+            if (contentStream != null) {
+                contentStream.close();
+            }
+        }
+    }
+
+    /**
+     * 创建空 PDF
+     */
+    private void createEmptyPdf(PDDocument pdfDoc, Path pdfFile) throws IOException {
+        var page = new PDPage(PDRectangle.A4);
+        pdfDoc.addPage(page);
+        pdfDoc.save(pdfFile.toFile());
+    }
+
+    /**
+     * 从文本创建 DOCX
+     */
+    private void createDocxFromText(XWPFDocument docxDoc, String textContent) {
+        Arrays.stream(textContent.split("\n"))
+                .map(String::trim)
+                .forEach(line -> {
+                    var paragraph = docxDoc.createParagraph();
+                    if (!line.isEmpty()) {
+                        paragraph.createRun().setText(line);
+                    }
+                });
+    }
+
+    /**
+     * 提取段落文本
+     */
+    private String extractParagraphText(XWPFParagraph paragraph) {
+        return paragraph.getRuns().stream()
+                .map(run -> run.getText(0))
+                .filter(text -> text != null && !text.isEmpty())
+                .collect(java.util.stream.Collectors.joining());
+    }
+
+    /**
+     * 文本换行处理（支持中英文混合）
+     * 确保文本不会超出右边距
+     */
+    private List<String> wrapText(String text, PDFont font, float fontSize, float maxWidth) throws IOException {
+        // 文本换行状态
+        record WrapState(List<String> lines, StringBuilder currentLine) {
+        }
+
+        // 使用 Stream API 处理每个字符
+        var result = IntStream.range(0, text.length())
+                .mapToObj(text::charAt)
+                .reduce(
+                        new WrapState(new java.util.ArrayList<>(), new StringBuilder()),
+                        (state, ch) -> {
+                            try {
+                                var testLine = state.currentLine().toString() + ch;
+                                var width = font.getStringWidth(testLine) / 1000 * fontSize;
+
+                                // 如果添加当前字符会超出边界，且当前行不为空，则换行
+                                if (width > maxWidth && !state.currentLine().isEmpty()) {
+                                    var newLines = new java.util.ArrayList<>(state.lines());
+                                    newLines.add(state.currentLine().toString());
+                                    return new WrapState(newLines, new StringBuilder(String.valueOf(ch)));
+                                } else {
+                                    var newCurrentLine = new StringBuilder(state.currentLine());
+                                    newCurrentLine.append(ch);
+                                    return new WrapState(state.lines(), newCurrentLine);
+                                }
+                            } catch (IOException e) {
+                                throw new UncheckedIOException(e);
+                            }
+                        },
+                        (state1, state2) -> {
+                            // 合并器（并行流时使用，但这里不需要并行）
+                            throw new UnsupportedOperationException("不支持并行流");
+                        });
+
+        // 添加最后一行
+        var finalLines = new ArrayList<>(result.lines());
+        if (!result.currentLine().isEmpty()) {
+            finalLines.add(result.currentLine().toString());
+        }
+
+        return finalLines.isEmpty() ? List.of("") : finalLines;
+    }
+
+    /**
+     * 加载系统字体（支持中文）
+     * 使用 Java GraphicsEnvironment 动态获取系统可用字体
+     */
+    private PDFont loadSystemFont(PDDocument document) {
+        var ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        var availableFonts = ge.getAvailableFontFamilyNames();
+
+        // 优先尝试的中文字体名称（按优先级排序）
+        var preferredFontNames = new String[] {
+                "SimSun", "宋体", // Windows 宋体
+                "SimHei", "黑体", // Windows 黑体
+                "Microsoft YaHei", "微软雅黑", // Windows 微软雅黑
+                "WenQuanYi Micro Hei", // Linux 文泉驿微米黑
+                "WenQuanYi Zen Hei", // Linux 文泉驿正黑
+                "Noto Sans CJK SC", // Linux Noto Sans
+                "STHeiti", "华文黑体", // macOS 黑体
+                "PingFang SC", "苹方" // macOS 苹方
+        };
+
+        // 查找可用的中文字体
+        var fontName = Arrays.stream(preferredFontNames)
+                .filter(name -> Arrays.asList(availableFonts).contains(name))
+                .findFirst()
+                .orElse(null);
+
+        if (fontName != null) {
+            var fontFile = getFontFile(fontName);
+            if (fontFile != null) {
+                try (var fontStream = Files.newInputStream(fontFile)) {
+                    var font = PDType0Font.load(document, fontStream);
+                    log.info(String.format("成功加载字体: %s (%s)", fontName, fontFile));
+                    return font;
+                } catch (Exception e) {
+                    log.debug(String.format("加载字体文件失败: %s", fontFile), e);
+                }
+            }
+        }
+
+        // 如果都失败，使用备用字体
+        log.warn("无法加载系统字体，使用备用字体（不支持中文）");
+        return PDType1Font.HELVETICA;
+    }
+
+    /**
+     * 获取字体文件路径
+     * 根据字体名称查找对应的字体文件
+     */
+    private Path getFontFile(String fontName) {
+        return findFontFileInSystemDirectory(fontName);
+    }
+
+    /**
+     * 从系统字体目录查找字体文件
+     */
+    private Path findFontFileInSystemDirectory(String fontFamily) {
+        var osName = System.getProperty("os.name").toLowerCase();
+        var fontDir = getSystemFontDirectory(osName);
+
+        if (fontDir == null) {
+            return null;
+        }
+
+        // 字体名称到文件名的映射（支持多个可能的文件名）
+        var fontMappings = new java.util.HashMap<String, String[]>();
+        fontMappings.put("SimSun", new String[] { "simsun.ttc", "simsun.ttf" });
+        fontMappings.put("宋体", new String[] { "simsun.ttc", "simsun.ttf" });
+        fontMappings.put("SimHei", new String[] { "simhei.ttf" });
+        fontMappings.put("黑体", new String[] { "simhei.ttf" });
+        fontMappings.put("Microsoft YaHei", new String[] { "msyh.ttc", "msyh.ttf" });
+        fontMappings.put("微软雅黑", new String[] { "msyh.ttc", "msyh.ttf" });
+        fontMappings.put("WenQuanYi Micro Hei", new String[] { "wqy-microhei.ttc", "wqy-microhei.ttf" });
+        fontMappings.put("WenQuanYi Zen Hei", new String[] { "wqy-zenhei.ttc", "wqy-zenhei.ttf" });
+        fontMappings.put("Noto Sans CJK SC", new String[] { "NotoSansCJK-Regular.ttc", "NotoSansCJK-Regular.otf" });
+        fontMappings.put("STHeiti", new String[] { "STHeiti Light.ttc", "STHeiti.ttc" });
+        fontMappings.put("华文黑体", new String[] { "STHeiti Light.ttc", "STHeiti.ttc" });
+        fontMappings.put("PingFang SC", new String[] { "PingFang.ttc" });
+        fontMappings.put("苹方", new String[] { "PingFang.ttc" });
+
+        var fileNames = fontMappings.get(fontFamily);
+        if (fileNames != null) {
+            for (var fileName : fileNames) {
+                var fontPath = Path.of(fontDir, fileName);
+                if (Files.exists(fontPath) && Files.isReadable(fontPath)) {
+                    return fontPath;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 获取系统字体目录
+     */
+    private String getSystemFontDirectory(String osName) {
+        if (osName.contains("win")) {
+            return "C:/Windows/Fonts";
+        } else if (osName.contains("linux")) {
+            return "/usr/share/fonts";
+        } else if (osName.contains("mac")) {
+            return "/System/Library/Fonts";
+        }
+        return null;
+    }
+
+    /**
+     * 保存输入流到临时文件
+     */
+    private Path saveToTempFile(InputStream inputStream, String format) {
+        try {
+            var tempFile = Files.createTempFile("convert_", "." + format);
+            Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+            return tempFile;
+        } catch (IOException e) {
+            log.error("保存临时文件失败", e);
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "保存临时文件失败: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * 获取文件大小
+     */
+    private long getFileSize(Path file) {
+        try {
+            return Files.size(file);
+        } catch (IOException e) {
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "获取文件大小失败: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * 验证文件大小
+     */
+    private void validateFileSize(long fileSize) {
+        if (fileSize == 0) {
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "文件为空（0字节），无法转换");
+        }
+        if (fileSize > CacheConstant.FILE_CONVERT_MAX_SIZE) {
+            throw BusinessException.of(ResultCode.BAD_REQUEST,
+                    "文件过大，无法转换（最大支持 %dMB，当前文件约 %dMB）",
+                    CacheConstant.FILE_CONVERT_MAX_SIZE / 1024 / 1024, fileSize / 1024 / 1024);
+        }
+    }
+
+    /**
+     * 清理临时文件
+     */
+    private void cleanupTempFile(Path file) {
+        if (file != null) {
+            try {
+                Files.deleteIfExists(file);
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    /**
+     * 创建自动关闭的输入流（关闭时删除临时文件）
+     */
+    private InputStream createAutoCloseInputStream(Path file) {
+        return createAutoCloseInputStream(file, null);
+    }
+
+    /**
+     * 创建自动关闭的输入流（关闭时删除多个临时文件）
+     */
+    private InputStream createAutoCloseInputStream(Path file, Path additionalFile) {
+        try {
+            return new FileInputStream(file.toFile()) {
                 @Override
                 public void close() throws IOException {
                     super.close();
-                    // 清理临时文件
-                    Files.deleteIfExists(tempDocxFile);
-                    Files.deleteIfExists(tempPdfFile);
+                    cleanupTempFile(file);
+                    cleanupTempFile(additionalFile);
                 }
             };
-
-            return new ConvertResult(
-                    fileInputStream,
-                    fileName,
-                    mimeType,
-                    docxFileSize);
-
-        } catch (Exception e) {
-            // 清理资源
-            if (pdfDocumentRef[0] != null) {
-                try {
-                    pdfDocumentRef[0].close();
-                } catch (IOException ignored) {
-                }
-            }
-            if (docxDocumentRef[0] != null) {
-                try {
-                    docxDocumentRef[0].close();
-                } catch (IOException ignored) {
-                }
-            }
-            try {
-                if (tempDocxFileRef[0] != null)
-                    Files.deleteIfExists(tempDocxFileRef[0]);
-                if (tempPdfFileRef[0] != null)
-                    Files.deleteIfExists(tempPdfFileRef[0]);
-            } catch (IOException ignored) {
-            }
-
-            log.error(String.format("PDF → DOCX 转换失败: err=%s", e.getMessage()), e);
-            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "文件格式转换失败: %s", e.getMessage());
+        } catch (FileNotFoundException e) {
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "文件不存在: %s", file);
         }
     }
 
     /**
-     * 从 DOCX 文档中提取文本
-     * 优化：使用 Stream API 流式处理，避免一次性加载所有内容
+     * 执行转换
      */
-    private String extractTextFromDocx(XWPFDocument document) {
-        return document.getParagraphs().stream()
-                .map(paragraph -> paragraph.getRuns().stream()
-                        .map(run -> run.getText(0))
-                        .filter(text -> text != null && !text.isEmpty())
-                        .collect(java.util.stream.Collectors.joining()))
-                .filter(text -> !text.isEmpty())
-                .collect(java.util.stream.Collectors.joining("\n"));
-    }
+    private ConvertResult executeConversion(Path tempSourceFile, String sourceFormat, String targetFormat,
+            String originalFileName, String cacheKey) throws Exception {
+        try {
+            CONVERT_SEMAPHORE.acquire();
+            log.info(String.format("获取转换许可，开始转换: sourceFormat=%s, targetFormat=%s", sourceFormat, targetFormat));
 
-    /**
-     * 分割长行（自动换行）
-     * 使用 Stream API 优化
-     */
-    private String[] splitLongLine(String line, int maxWidth) {
-        if (line.length() <= maxWidth) {
-            return new String[] { line };
+            ConvertResult result;
+            try (var fileInputStream = Files.newInputStream(tempSourceFile)) {
+                result = switch (sourceFormat.toLowerCase()) {
+                    case "docx" -> convertDocxToPdf(tempSourceFile, originalFileName);
+                    case "pdf" -> convertPdfToDocx(tempSourceFile, originalFileName);
+                    default -> throw BusinessException.of(ResultCode.BAD_REQUEST,
+                            "不支持的源文件格式: %s", sourceFormat);
+                };
+            }
+
+            cacheResult(cacheKey, result);
+            cleanupTempFile(tempSourceFile);
+            return result;
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "转换被中断: %s", e.getMessage());
+        } finally {
+            CONVERT_SEMAPHORE.release();
+            log.info("释放转换许可");
         }
-
-        // 使用 Stream API 生成 chunks
-        return Stream.iterate(0, start -> start < line.length(), start -> start + maxWidth)
-                .map(start -> {
-                    var end = Math.min(start + maxWidth, line.length());
-                    return line.substring(start, end);
-                })
-                .toArray(String[]::new);
     }
 
     /**
      * 生成缓存 key
-     * 基于文件内容 MD5 + 转换参数
-     * 
-     * 注意：此方法会读取输入流，如果流不支持 mark/reset，需要在调用前处理
      */
-    private String generateCacheKey(InputStream sourceInputStream, String sourceFormat,
-            String targetFormat, String originalFileName) {
-        try {
-            // 如果流支持 mark，先标记位置
-            if (sourceInputStream.markSupported()) {
-                sourceInputStream.mark(Integer.MAX_VALUE);
-            }
-
-            // 计算文件内容的 MD5（用于缓存 key）
-            var md5 = DigestUtils.md5DigestAsHex(sourceInputStream);
-
-            // 重置流（如果支持）
-            if (sourceInputStream.markSupported()) {
-                sourceInputStream.reset();
-            } else {
-                // 如果流不支持 reset，记录警告
-                log.warn("输入流不支持 reset，缓存 key 生成后流可能无法重用");
-            }
-
+    private String generateCacheKey(Path tempFile, String sourceFormat, String targetFormat, String originalFileName) {
+        try (var fileInputStream = Files.newInputStream(tempFile)) {
+            var md5 = DigestUtils.md5DigestAsHex(fileInputStream);
             return String.format("%s%s:%s:%s:%s",
                     CacheConstant.FILE_CONVERT_CACHE_PREFIX, md5, sourceFormat, targetFormat, originalFileName);
         } catch (IOException e) {
             log.warn("无法生成缓存 key，使用文件名: {}", e.getMessage());
-            // 降级方案：使用文件名和格式
             return String.format("%s%s:%s:%s",
                     CacheConstant.FILE_CONVERT_CACHE_PREFIX, originalFileName, sourceFormat, targetFormat);
         }
@@ -600,27 +675,18 @@ public class FileConvertServiceImpl implements FileConvertService {
 
     /**
      * 从缓存获取转换结果
-     * 从 Redis 读取文件信息，然后从 MinIO 下载文件
      */
     private ConvertResult getCachedResult(String cacheKey) {
         try {
-            // 1. 从 Redis 获取缓存的文件信息
             var cachedInfoJson = stringRedisTemplate.opsForValue().get(cacheKey);
             if (cachedInfoJson == null || cachedInfoJson.isEmpty()) {
                 return null;
             }
 
-            // 2. 反序列化文件信息
             var cachedInfo = objectMapper.readValue(cachedInfoJson, CachedFileInfo.class);
-
-            // 3. 确保存储桶存在
             ensureBucket();
 
-            // 4. 从 MinIO 下载文件
             var getObjectResponse = MinioUtil.download(minioClient, bucketName, cachedInfo.objectName());
-
-            // 5. 创建 ConvertResult（使用 MinIO 响应流）
-            // 注意：GetObjectResponse 实现了 InputStream，可以直接使用
             return new ConvertResult(
                     getObjectResponse,
                     cachedInfo.fileName(),
@@ -635,24 +701,20 @@ public class FileConvertServiceImpl implements FileConvertService {
 
     /**
      * 缓存转换结果
-     * 将转换结果保存到 MinIO，然后在 Redis 中缓存文件信息
      */
     private void cacheResult(String cacheKey, ConvertResult result) {
         Path tempFile = null;
         try {
-            // 1. 确保存储桶存在
             ensureBucket();
 
-            // 2. 生成 MinIO 对象路径（使用缓存 key 的哈希值，避免路径过长）
             var objectNameHash = DigestUtils.md5DigestAsHex(cacheKey.getBytes());
             var fileExtension = FileUtil.getFileExtension(result.fileName());
             var objectName = String.format("%s%s/%s.%s",
                     CacheConstant.FILE_CONVERT_CACHE_DIR,
-                    objectNameHash.substring(0, 2), // 使用前2位作为子目录
+                    objectNameHash.substring(0, 2),
                     objectNameHash,
                     fileExtension);
 
-            // 3. 将 InputStream 保存到临时文件（因为 MinIO 上传需要知道文件大小）
             tempFile = Files.createTempFile("convert_cache_", "." + fileExtension);
             try (var inputStream = result.inputStream();
                     var outputStream = Files.newOutputStream(tempFile)) {
@@ -660,21 +722,17 @@ public class FileConvertServiceImpl implements FileConvertService {
             }
 
             var fileSize = Files.size(tempFile);
-
-            // 4. 上传到 MinIO
             try (var fileInputStream = Files.newInputStream(tempFile)) {
                 MinioUtil.upload(minioClient, bucketName, objectName,
                         fileInputStream, fileSize, result.mimeType());
             }
 
-            // 5. 构建缓存信息
             var cachedInfo = new CachedFileInfo(
                     objectName,
                     result.fileName(),
                     result.mimeType(),
                     result.contentLength());
 
-            // 6. 序列化并保存到 Redis
             var cachedInfoJson = objectMapper.writeValueAsString(cachedInfo);
             stringRedisTemplate.opsForValue().set(
                     cacheKey,
@@ -686,15 +744,8 @@ public class FileConvertServiceImpl implements FileConvertService {
 
         } catch (Exception e) {
             log.warn(String.format("缓存转换结果失败: cacheKey=%s, err=%s", cacheKey, e.getMessage()));
-            // 缓存失败不影响主流程，只记录警告
         } finally {
-            // 清理临时文件
-            if (tempFile != null) {
-                try {
-                    Files.deleteIfExists(tempFile);
-                } catch (IOException ignored) {
-                }
-            }
+            cleanupTempFile(tempFile);
         }
     }
 
@@ -717,8 +768,22 @@ public class FileConvertServiceImpl implements FileConvertService {
 
     /**
      * 修改文件扩展名
+     * 如果原始文件名已经包含目标扩展名，则直接返回，避免重复拼接
      */
     private String changeFileExtension(String fileName, String newExtension) {
+        if (fileName == null || fileName.isEmpty()) {
+            return "file." + newExtension;
+        }
+
+        // 获取原始文件的扩展名
+        var originalExtension = FileUtil.getFileExtension(fileName);
+
+        // 如果扩展名已经匹配，直接返回原文件名（避免重复拼接）
+        if (newExtension.equalsIgnoreCase(originalExtension)) {
+            return fileName;
+        }
+
+        // 提取基础名称并拼接新扩展名
         var baseName = FileUtil.getFileNameWithoutExtension(fileName);
         return baseName + "." + newExtension;
     }

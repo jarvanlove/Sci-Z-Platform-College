@@ -5,19 +5,9 @@
  */
 -->
 <template>
-  <div class="project-list-page">
-    <h1>项目列表页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <ProjectList />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import ProjectList from '@/components/Business/Project/ProjectList.vue'
 </script>
-
-<style lang="scss" scoped>
-.project-list-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
-</style>

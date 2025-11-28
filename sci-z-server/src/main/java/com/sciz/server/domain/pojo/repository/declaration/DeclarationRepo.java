@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.domain.pojo.entity.declaration.Declaration;
 
+import java.util.List;
+
 /**
  * 申报仓储（领域层抽象）
  * 
@@ -59,4 +61,12 @@ public interface DeclarationRepo {
      * @return boolean 是否更新成功
      */
     boolean updateStatus(Long id, String status);
+
+    /**
+     * 根据申报ID列表批量查询申报信息
+     *
+     * @param declarationIds List<Long> 申报ID列表
+     * @return Map<Long, Declaration> 申报ID -> 申报实体
+     */
+    java.util.Map<Long, Declaration> findByIds(List<Long> declarationIds);
 }

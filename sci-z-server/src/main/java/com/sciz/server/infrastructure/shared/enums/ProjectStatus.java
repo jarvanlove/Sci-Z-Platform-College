@@ -13,44 +13,24 @@ import lombok.Getter;
 public enum ProjectStatus {
 
     /**
-     * 草稿
-     */
-    DRAFT(0, "草稿"),
-
-    /**
-     * 待审批
-     */
-    PENDING(1, "待审批"),
-
-    /**
-     * 已审批
-     */
-    APPROVED(2, "已审批"),
-
-    /**
      * 进行中
      */
-    IN_PROGRESS(3, "进行中"),
+    IN_PROGRESS(1, "进行中"),
 
     /**
      * 已完成
      */
-    COMPLETED(4, "已完成"),
+    COMPLETED(2, "已完成"),
 
     /**
-     * 已暂停
+     * 已延期
      */
-    SUSPENDED(5, "已暂停"),
+    DELAYED(3, "已延期"),
 
     /**
      * 已取消
      */
-    CANCELLED(6, "已取消"),
-
-    /**
-     * 已驳回
-     */
-    REJECTED(7, "已驳回");
+    CANCELLED(4, "已取消");
 
     private final Integer code;
     private final String description;
@@ -76,33 +56,6 @@ public enum ProjectStatus {
     }
 
     /**
-     * 判断是否为草稿状态
-     *
-     * @return 是否为草稿状态
-     */
-    public boolean isDraft() {
-        return this == DRAFT;
-    }
-
-    /**
-     * 判断是否为待审批状态
-     *
-     * @return 是否为待审批状态
-     */
-    public boolean isPending() {
-        return this == PENDING;
-    }
-
-    /**
-     * 判断是否为已审批状态
-     *
-     * @return 是否为已审批状态
-     */
-    public boolean isApproved() {
-        return this == APPROVED;
-    }
-
-    /**
      * 判断是否为进行中状态
      *
      * @return 是否为进行中状态
@@ -121,12 +74,12 @@ public enum ProjectStatus {
     }
 
     /**
-     * 判断是否为已暂停状态
+     * 判断是否为已延期状态
      *
-     * @return 是否为已暂停状态
+     * @return 是否为已延期状态
      */
-    public boolean isSuspended() {
-        return this == SUSPENDED;
+    public boolean isDelayed() {
+        return this == DELAYED;
     }
 
     /**
@@ -136,14 +89,5 @@ public enum ProjectStatus {
      */
     public boolean isCancelled() {
         return this == CANCELLED;
-    }
-
-    /**
-     * 判断是否为已驳回状态
-     *
-     * @return 是否为已驳回状态
-     */
-    public boolean isRejected() {
-        return this == REJECTED;
     }
 }

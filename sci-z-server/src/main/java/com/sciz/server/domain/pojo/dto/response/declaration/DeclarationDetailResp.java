@@ -145,6 +145,11 @@ public class DeclarationDetailResp {
     @Setter
     public static class WorkflowResult {
         /**
+         * 工作流状态（pending/running/completed/failed）
+         */
+        private String workflowStatus;
+
+        /**
          * 工作流步骤列表
          */
         private List<WorkflowStep> steps;

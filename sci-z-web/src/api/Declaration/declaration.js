@@ -79,20 +79,6 @@ export const createDeclaration = (data) => {
 }
 
 /**
- * 更新申报
- * @param {number} id - 申报ID
- * @param {Object} data - 申报数据
- * @returns {Promise} 更新申报响应
- */
-export const updateDeclaration = (id, data) => {
-  return request({
-    url: DECLARATION_API.UPDATE(id),
-    method: HTTP_METHODS.PUT,
-    data
-  })
-}
-
-/**
  * 删除申报
  * @param {number} id - 申报ID
  * @returns {Promise} 删除申报响应
@@ -119,15 +105,18 @@ export const submitDeclaration = (id) => {
 /**
  * 更新申报状态
  * @param {Object} params - 更新参数
- * @param {number} params.id - 申报ID
- * @param {number} params.status - 新状态（数字：1-申报中，2-申报成功，3-申报失败）
- * @returns {Promise} 更新状态响应
+ * @param {number} params.id - 申报ID（必须与路径参数中的id一致）
+ * @param {number} params.status - 新状态（数字：1=申报中，2=申报成功，3=申报失败）
+ * @returns {Promise} 更新状态响应 
  */
 export const updateDeclarationStatus = (params) => {
   return request({
-    url: DECLARATION_API.UPDATE(params.id),
+    url: DECLARATION_API.UPDATE_STATUS(params.id),
     method: HTTP_METHODS.PUT,
-    data: { status: params.status }
+    data: {
+      id: params.id,
+      status: params.status 
+    }
   })
 }
 

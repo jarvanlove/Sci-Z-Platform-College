@@ -35,12 +35,14 @@
           <span class="filter-label">{{ t('system.logs.dateRange') }}</span>
           <BaseDatePicker
             v-model="searchForm.dateRange"
-            type="datetimerange"
-            range-separator="~"
+            type="daterange"
+            :unlink-panels="true"
             :start-placeholder="t('system.logs.startDate')"
             :end-placeholder="t('system.logs.endDate')"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            style="width: 320px"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            style="width: 300px"
+            @change="handleSearch"
           />
         </div>
 
@@ -279,8 +281,9 @@ const buildQueryParams = () => {
     payload.user = searchForm.user.trim()
   }
   if (searchForm.dateRange && searchForm.dateRange.length === 2) {
-    payload.startTime = searchForm.dateRange[0]
-    payload.endTime = searchForm.dateRange[1]
+    // 将日期格式化为时间格式：开始时间为 00:00:00，结束时间为 23:59:59
+    payload.startTime = `${searchForm.dateRange[0]} 00:00:00`
+    payload.endTime = `${searchForm.dateRange[1]} 23:59:59`
   }
   return payload
 }

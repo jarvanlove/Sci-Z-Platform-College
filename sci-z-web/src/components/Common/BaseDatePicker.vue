@@ -8,7 +8,7 @@
   <el-config-provider :locale="datePickerLocale">
     <el-date-picker
       :model-value="modelValue"
-      v-bind="$attrs"
+      v-bind="attrs"
       :type="type"
       :placeholder="placeholder"
       :format="format"
@@ -18,6 +18,7 @@
       :range-separator="rangeSeparator"
       :start-placeholder="startPlaceholder"
       :end-placeholder="endPlaceholder"
+      :unlink-panels="unlinkPanels"
       @update:model-value="handleChange"
       @blur="handleBlur"
       @focus="handleFocus"
@@ -27,7 +28,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, useAttrs } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElConfigProvider } from 'element-plus'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
@@ -76,10 +77,18 @@ const props = defineProps({
   endPlaceholder: {
     type: String,
     default: '结束日期'
+  },
+  // 明确支持 unlink-panels 属性
+  unlinkPanels: {
+    type: Boolean,
+    default: false
   }
 })
 
 const emit = defineEmits(['update:modelValue', 'change', 'blur', 'focus'])
+
+// 获取所有 attrs，确保未定义的属性也能传递
+const attrs = useAttrs()
 
 const { locale } = useI18n()
 

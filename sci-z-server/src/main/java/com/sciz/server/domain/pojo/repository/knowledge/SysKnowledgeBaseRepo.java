@@ -30,6 +30,14 @@ public interface SysKnowledgeBaseRepo {
     SysKnowledgeBase findById(Long id);
 
     /**
+     * 根据名称查询知识库
+     *
+     * @param name 知识库名称
+     * @return 知识库实体
+     */
+    SysKnowledgeBase findByName(String name);
+
+    /**
      * 根据Dify知识库ID查询知识库
      *
      * @param difyKnowdataId Dify知识库ID
@@ -40,7 +48,7 @@ public interface SysKnowledgeBaseRepo {
     /**
      * 分页查询知识库列表
      *
-     * @param page 分页对象
+     * @param page   分页对象
      * @param userId 用户ID（可选，如果为null则查询所有）
      * @return 分页结果
      */

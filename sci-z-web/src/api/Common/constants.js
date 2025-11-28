@@ -53,7 +53,7 @@ export const DECLARATION_API = {
   LIST: buildApiUrl('/declaration/list'), // 获取申报列表
   CREATE: buildApiUrl('/declaration/create'), // 创建申报
   DETAIL: (id) => buildApiUrl(`/declaration/detail/${id}`), // 获取申报详情
-  UPDATE: (id) => buildApiUrl(`/declaration/${id}`), // 更新申报
+  UPDATE_STATUS: (id) => buildApiUrl(`/declaration/${id}/status`), // 更新申报状态
   DELETE: (id) => buildApiUrl(`/declaration/${id}`), // 删除申报
   SUBMIT: (id) => buildApiUrl(`/declaration/${id}/submit`), // 提交申报
   RED_HEADER_FILE_UPLOAD: buildApiUrl('/declaration/red-header-file/upload'), // 上传红头文件

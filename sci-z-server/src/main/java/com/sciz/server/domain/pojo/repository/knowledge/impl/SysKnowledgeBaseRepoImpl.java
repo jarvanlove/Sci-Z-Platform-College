@@ -42,6 +42,14 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
     }
 
     @Override
+    public SysKnowledgeBase findByName(String name) {
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysKnowledgeBase::getName, name)
+                .eq(SysKnowledgeBase::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .one();
+    }
+
+    @Override
     public SysKnowledgeBase findByDifyKnowdataId(String difyKnowdataId) {
         return new LambdaQueryChainWrapper<>(mapper)
                 .eq(SysKnowledgeBase::getDifyKnowdataId, difyKnowdataId)
@@ -52,7 +60,7 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
     /**
      * 分页查询知识库列表
      *
-     * @param page 分页对象
+     * @param page   分页对象
      * @param userId 用户ID（可选，如果为null则查询所有）
      * @return 分页结果
      */
@@ -60,15 +68,15 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
     public IPage<SysKnowledgeBase> pageByCondition(Page<SysKnowledgeBase> page, Long userId) {
         LambdaQueryWrapper<SysKnowledgeBase> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(SysKnowledgeBase::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
-        
+
         // 如果指定了用户ID，则只查询该用户的知识库
         if (userId != null) {
             queryWrapper.eq(SysKnowledgeBase::getOwnerId, userId);
         }
-        
+
         // 按创建时间倒序排列
         queryWrapper.orderByDesc(SysKnowledgeBase::getCreatedTime);
-        
+
         return mapper.selectPage(page, queryWrapper);
     }
 

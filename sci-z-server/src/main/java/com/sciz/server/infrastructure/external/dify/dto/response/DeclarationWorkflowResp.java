@@ -60,6 +60,10 @@ public record DeclarationWorkflowResp(
 
         String fileName = extractString(outputs, FIELD_FILE_NAME);
         String fileUrl = extractString(outputs, FIELD_FILE_URL);
+        // 对 fileUrl 特殊处理：去除所有空格（包括中间的空格），避免 URL 解析错误
+        if (fileUrl != null && !fileUrl.isEmpty()) {
+            fileUrl = fileUrl.replaceAll("\\s+", "");
+        }
         String fileType = extractString(outputs, FIELD_FILE_TYPE);
         List<Object> files = extractList(outputs, FIELD_FILES);
 
@@ -78,7 +82,7 @@ public record DeclarationWorkflowResp(
             return "";
         }
         Object value = outputs.get(fieldName);
-        return value != null ? value.toString() : "";
+        return value != null ? value.toString().trim() : "";
     }
 
     /**

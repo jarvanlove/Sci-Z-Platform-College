@@ -8,6 +8,7 @@ import com.sciz.server.application.task.DeclarationWorkflowTask;
 import com.sciz.server.domain.pojo.dto.request.file.FileSyncDifyReq;
 import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationCreateReq;
 import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationListQueryReq;
+import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationUpdateStatusReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationDetailResp;
 import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationListResp;
@@ -25,6 +26,7 @@ import com.sciz.server.infrastructure.shared.enums.WorkflowStatus;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationCreatedEvent;
+import com.sciz.server.infrastructure.shared.event.declaration.DeclarationSuccessEvent;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.infrastructure.shared.utils.DateUtil;
@@ -333,6 +335,9 @@ public class DeclarationServiceImpl implements DeclarationService {
         // 2. 解析工作流结果
         var workflowResult = new DeclarationDetailResp.WorkflowResult();
 
+        // 设置工作流状态
+        workflowResult.setWorkflowStatus(declaration.getWorkflowStatus());
+
         if (declaration.getWorkflowResult() != null && !declaration.getWorkflowResult().isEmpty()) {
             var workflowResultMap = JsonUtil.fromJsonToMap(declaration.getWorkflowResult());
             if (workflowResultMap != null) {
@@ -397,10 +402,21 @@ public class DeclarationServiceImpl implements DeclarationService {
         String resourceId = req.workflowId();
         String keyType = DifyApiKey.KeyType.WORKFLOW.getCode();
 
-        // 调用异步任务处理类（传递类型安全的 inputs 对象）
-        declarationWorkflowTask.processDeclarationWorkflow(declarationId, resourceId, inputs, userId, keyType);
+        // ==================== 本地调试模式 ====================
+        // 方案一：临时改为同步执行（推荐用于本地debug）
+        // 取消下面的注释，注释掉异步调用，即可同步调试
+        // declarationWorkflowTask.processDeclarationWorkflowSync(declarationId,
+        // resourceId, inputs, userId, keyType);
+        // log.info(String.format("同步触发工作流处理（调试模式）: declarationId=%s, workflowId=%s,
+        // resourceId=%s",
+        // declarationId, req.workflowId(), resourceId));
+        // return; // 调试模式下直接返回，避免继续执行后续代码
 
-        log.info(String.format("异步触发工作流处理: declarationId=%s, workflowId=%s, resourceId=%s",
+        // ==================== 生产模式 ====================
+        // 调用异步任务处理类（传递类型安全的 inputs 对象）
+        declarationWorkflowTask.processDeclarationWorkflow(declarationId, resourceId,
+                inputs, userId, keyType);
+        log.info(String.format("异步触发工作流处理: declarationId=%s, workflowId=%s,resourceId=%s",
                 declarationId, req.workflowId(), resourceId));
     }
 
@@ -507,6 +523,84 @@ public class DeclarationServiceImpl implements DeclarationService {
                     e.getClass().getSimpleName(), executionTime);
             log.error(String.format("红头文件上传异常: err=%s", e.getMessage()), e);
             throw BusinessException.of(ResultCode.SERVER_ERROR, "红头文件上传失败: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * 更新申报状态
+     *
+     * @param req 更新状态请求
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStatus(DeclarationUpdateStatusReq req) {
+        var startTime = DateUtil.now();
+        var operationType = OperationLogRecorderStatus.DECLARATION_UPDATE;
+        var operation = operationType.getCode();
+
+        try {
+            log.info(String.format("开始更新申报状态: declarationId=%s, status=%s", req.id(), req.status()));
+
+            // 1. 查询申报实体
+            var declaration = declarationRepo.findById(req.id());
+            if (declaration == null) {
+                throw BusinessException.of(ResultCode.DECLARATION_NOT_FOUND);
+            }
+
+            // 2. 解析申报状态
+            var newStatus = DeclarationStatus.fromCode(req.status());
+            var oldStatus = DeclarationStatus.fromCode(Integer.parseInt(declaration.getStatus()));
+
+            // 3. 更新申报状态
+            var success = declarationRepo.updateStatus(req.id(), String.valueOf(newStatus.getCode()));
+            if (!success) {
+                throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED, "申报状态更新失败");
+            }
+
+            // 4. 如果更新为"申报成功"，发布异步事件创建项目和知识库
+            if (newStatus.isSuccess()) {
+                log.info(String.format("申报状态更新为成功，发布异步事件创建项目和知识库: declarationId=%s", req.id()));
+                // 获取当前操作人ID（在Web上下文中获取，传递给异步事件）
+                var operatorId = LoginUserUtil.requireCurrentUserId();
+                var successEvent = new DeclarationSuccessEvent(
+                        declaration.getId(),
+                        declaration.getNumber(),
+                        declaration.getResearchTopic(),
+                        declaration.getApplicantId(),
+                        declaration.getApplicantName(),
+                        operatorId);
+                eventPublisher.publish(successEvent);
+            }
+
+            // 5. 记录操作日志（成功）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var detail = String.format("%s：申报编号 %s（ID: %s），状态从 %s 更新为 %s",
+                    operationType.getDescription(), declaration.getNumber(), req.id(),
+                    oldStatus.getDescription(), newStatus.getDescription());
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
+
+            log.info(String.format("更新申报状态成功: declarationId=%s, oldStatus=%s, newStatus=%s",
+                    req.id(), oldStatus.getDescription(), newStatus.getDescription()));
+
+        } catch (BusinessException e) {
+            // 记录操作日志（失败）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            operationLogRecorderUtil.recordFailure(operation,
+                    String.format("%s失败：申报ID %s", operation, req.id()),
+                    e.getMessage(), executionTime);
+            log.error(String.format("更新申报状态失败: declarationId=%s, err=%s", req.id(), e.getMessage()), e);
+            throw e;
+        } catch (Exception e) {
+            // 记录操作日志（失败）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            operationLogRecorderUtil.recordFailure(operation,
+                    String.format("%s失败：申报ID %s", operation, req.id()),
+                    e.getClass().getSimpleName(), executionTime);
+            log.error(String.format("更新申报状态异常: declarationId=%s, err=%s", req.id(), e.getMessage()), e);
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "更新申报状态失败: %s", e.getMessage());
         }
     }
 

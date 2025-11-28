@@ -83,7 +83,10 @@ public class FileController {
             if (context.contentLength() != null) {
                 response.setContentLengthLong(context.contentLength());
             }
-            String encodedName = URLEncoder.encode(context.originalName(), StandardCharsets.UTF_8);
+
+            // 清理文件名：去除 Content-Disposition 格式的内容
+            String cleanFileName = cleanFileName(context.originalName());
+            String encodedName = URLEncoder.encode(cleanFileName, StandardCharsets.UTF_8);
             response.setHeader("Content-Disposition",
                     String.format("attachment; filename=%s; filename*=UTF-8''%s", encodedName, encodedName));
             StreamUtils.copy(inputStream, response.getOutputStream());
@@ -92,6 +95,41 @@ public class FileController {
             log.error(String.format("文件下载失败: attachmentId=%s, format=%s", id, format), e);
             throw BusinessException.of(ResultCode.FILE_DOWNLOAD_FAILED, "文件下载失败");
         }
+    }
+
+    /**
+     * 清理文件名，去除 Content-Disposition 格式的内容
+     * <p>
+     * 处理以下情况：
+     * 1. 去除 `; filename=...` 之后的所有内容
+     * 2. 去除 `filename*=UTF-8''...` 格式的内容
+     * 3. 去除引号
+     *
+     * @param fileName 原始文件名
+     * @return 清理后的文件名
+     */
+    private String cleanFileName(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return "file";
+        }
+
+        // 去除分号之后的所有内容（Content-Disposition 格式）
+        if (fileName.contains(";")) {
+            fileName = fileName.substring(0, fileName.indexOf(';'));
+        }
+
+        // 去除引号
+        fileName = fileName.replace("\"", "").replace("'", "");
+
+        // 去除前后空格
+        fileName = fileName.trim();
+
+        // 如果清理后为空，返回默认文件名
+        if (fileName.isEmpty()) {
+            return "file";
+        }
+
+        return fileName;
     }
 
     @Operation(summary = "文件预览", description = "根据ID获取预览签名链接")

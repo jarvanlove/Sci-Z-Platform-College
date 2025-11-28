@@ -10,8 +10,16 @@ import com.sciz.server.domain.pojo.entity.declaration.Declaration;
 import com.sciz.server.domain.pojo.mapper.declaration.DeclarationMapper;
 import com.sciz.server.domain.pojo.repository.declaration.DeclarationRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
+import com.sciz.server.infrastructure.shared.exception.BusinessException;
+import com.sciz.server.infrastructure.shared.result.ResultCode;
+import org.postgresql.util.PGobject;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 申报仓储实现
@@ -111,11 +119,33 @@ public class DeclarationRepoImpl implements DeclarationRepo {
                 .eq(Declaration::getId, id)
                 .set(Declaration::getWorkflowStatus, workflowStatus);
 
+        // 如果 workflowResult 不为空，手动转换为 PGobject（jsonb 类型）
+        // 这样可以在一次数据库操作中完成更新，且能正确处理 JSONB 类型
         if (workflowResult != null) {
-            updateWrapper.set(Declaration::getWorkflowResult, workflowResult);
+            var pgObject = convertToPGobject(workflowResult);
+            updateWrapper.set(Declaration::getWorkflowResult, pgObject);
         }
 
         return updateWrapper.update();
+    }
+
+    /**
+     * 将 JSON 字符串转换为 PostgreSQL 的 PGobject（jsonb 类型）
+     * 复用 JsonTypeHandler 的转换逻辑，确保类型正确
+     *
+     * @param jsonString JSON 字符串
+     * @return PGobject 对象
+     */
+    private PGobject convertToPGobject(String jsonString) {
+        try {
+            var pgObject = new PGobject();
+            pgObject.setType("jsonb");
+            pgObject.setValue(jsonString);
+            return pgObject;
+        } catch (Exception e) {
+            throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED,
+                    "转换 JSON 字符串为 PGobject 失败: %s", e.getMessage());
+        }
     }
 
     @Override
@@ -124,5 +154,19 @@ public class DeclarationRepoImpl implements DeclarationRepo {
                 .eq(Declaration::getId, id)
                 .set(Declaration::getStatus, status)
                 .update();
+    }
+
+    @Override
+    public Map<Long, Declaration> findByIds(List<Long> declarationIds) {
+        if (CollectionUtils.isEmpty(declarationIds)) {
+            return Map.of();
+        }
+
+        var queryWrapper = new LambdaQueryWrapper<Declaration>()
+                .in(Declaration::getId, declarationIds)
+                .eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        return mapper.selectList(queryWrapper).stream()
+                .collect(Collectors.toMap(Declaration::getId, declaration -> declaration));
     }
 }

@@ -68,12 +68,12 @@ public class SysAttachmentRepoImpl implements SysAttachmentRepo {
         if (id == null) {
             return false;
         }
+        // PostgreSQL 不支持 UPDATE 语句中使用 LIMIT，直接使用 WHERE 条件即可（id 是主键，唯一）
         return mapper.update(null, new LambdaUpdateWrapper<SysAttachment>()
                 .eq(SysAttachment::getId, id)
                 .set(SysAttachment::getIsDeleted, DeleteStatus.DELETED.getCode())
                 .set(SysAttachment::getUpdatedBy, userId)
-                .set(SysAttachment::getUpdatedTime, LocalDateTime.now())
-                .last("LIMIT 1")) > 0;
+                .set(SysAttachment::getUpdatedTime, LocalDateTime.now())) > 0;
     }
 
     @Override
@@ -81,12 +81,12 @@ public class SysAttachmentRepoImpl implements SysAttachmentRepo {
         if (id == null) {
             return false;
         }
+        // PostgreSQL 不支持 UPDATE 语句中使用 LIMIT，直接使用 WHERE 条件即可（id 是主键，唯一）
         return mapper.update(null, new LambdaUpdateWrapper<SysAttachment>()
                 .eq(SysAttachment::getId, id)
                 .set(SysAttachment::getUpdatedBy, userId)
                 .set(SysAttachment::getUpdatedTime, LocalDateTime.now())
-                .setSql("download_count = COALESCE(download_count,0) + 1")
-                .last("LIMIT 1")) > 0;
+                .setSql("download_count = COALESCE(download_count,0) + 1")) > 0;
     }
 
     @Override

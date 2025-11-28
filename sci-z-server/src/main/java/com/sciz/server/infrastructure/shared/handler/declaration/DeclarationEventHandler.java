@@ -1,12 +1,25 @@
 package com.sciz.server.infrastructure.shared.handler.declaration;
 
+import com.sciz.server.application.service.knowledge.KnowledgeService;
+import com.sciz.server.application.service.project.ProjectService;
+import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeCreateReq;
+import com.sciz.server.domain.pojo.dto.request.project.ProjectCreateReq;
+import com.sciz.server.domain.pojo.dto.request.project.ProjectUpdateReq;
+import com.sciz.server.infrastructure.shared.enums.ProjectStatus;
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationCreatedEvent;
+import com.sciz.server.infrastructure.shared.event.declaration.DeclarationSuccessEvent;
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationUpdatedEvent;
+import com.sciz.server.infrastructure.shared.exception.BusinessException;
+import com.sciz.server.infrastructure.shared.result.ResultCode;
+import com.sciz.server.infrastructure.shared.utils.DateUtil;
+import com.sciz.server.infrastructure.shared.utils.OperationLogRecorderUtil;
+import com.sciz.server.infrastructure.shared.enums.OperationLogRecorderStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 申报事件处理器
@@ -20,6 +33,10 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class DeclarationEventHandler {
+
+    private final ProjectService projectService;
+    private final KnowledgeService knowledgeService;
+    private final OperationLogRecorderUtil operationLogRecorderUtil;
 
     /**
      * 处理申报创建事件
@@ -224,5 +241,267 @@ public class DeclarationEventHandler {
         // if (DeclarationStatus.SUCCESS.getCode().equals(event.getNewStatus())) {
         // // 创建项目记录
         // }
+    }
+
+    /**
+     * 处理申报成功事件
+     * <p>
+     * 当申报状态更新为"申报成功"时，异步创建项目和知识库
+     * <p>
+     * 注意：使用事务确保原子性，如果任何步骤失败，整个流程回滚
+     *
+     * @param event 申报成功事件
+     */
+    @EventListener
+    @Async
+    @Transactional(rollbackFor = Exception.class)
+    public void handleDeclarationSuccess(DeclarationSuccessEvent event) {
+        var startTime = DateUtil.now();
+        var operationType = OperationLogRecorderStatus.DECLARATION_UPDATE;
+        var operation = operationType.getCode();
+
+        try {
+            log.info(String.format("处理申报成功事件: declarationId=%s, researchTopic=%s, applicantId=%s",
+                    event.getDeclarationId(), event.getResearchTopic(), event.getApplicantId()));
+
+            // 1. 验证研究课题是否存在
+            var researchTopic = event.getResearchTopic();
+            if (researchTopic == null || researchTopic.trim().isEmpty()) {
+                log.error(String.format("研究课题为空，无法创建项目和知识库: declarationId=%s", event.getDeclarationId()));
+                recordFailureLog(operation, event.getDeclarationId(), "研究课题不能为空", startTime, event);
+                throw BusinessException.of(ResultCode.BAD_REQUEST, "研究课题不能为空");
+            }
+
+            // 2. 创建项目（内部会记录操作日志）
+            var projectId = createProject(event, researchTopic);
+
+            // 3. 创建知识库（内部会记录操作日志）
+            createKnowledgeBase(event, researchTopic, projectId);
+
+            // 4. 记录整体流程操作日志（成功）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var detail = String.format("%s：申报编号 %s（ID: %s），已创建项目和知识库",
+                    operationType.getDescription(), event.getDeclarationNumber(), event.getDeclarationId());
+            // 在异步上下文中，手动传入用户信息
+            var operatorId = event.getOperatorId() != null ? event.getOperatorId() : event.getApplicantId();
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime, operatorId,
+                    event.getApplicantName());
+
+            log.info(String.format("申报成功事件处理完成: declarationId=%s, projectId=%s",
+                    event.getDeclarationId(), projectId));
+
+        } catch (Exception e) {
+            log.error(String.format("处理申报成功事件失败: declarationId=%s, err=%s",
+                    event.getDeclarationId(), e.getMessage()), e);
+            recordFailureLog(operation, event.getDeclarationId(), e.getMessage(), startTime, event);
+            // 抛出异常，触发事务回滚
+            throw e;
+        }
+    }
+
+    /**
+     * 创建项目
+     *
+     * @param event         申报成功事件
+     * @param researchTopic 研究课题
+     * @return 项目ID
+     */
+    private Long createProject(DeclarationSuccessEvent event, String researchTopic) {
+        var startTime = DateUtil.now();
+        var operationType = OperationLogRecorderStatus.PROJECT_CREATE;
+        var operation = operationType.getCode();
+
+        try {
+            log.info(String.format("开始创建项目: researchTopic=%s, declarationId=%s",
+                    researchTopic, event.getDeclarationId()));
+
+            var projectCreateReq = new ProjectCreateReq(
+                    researchTopic, // 项目名称 = 研究课题
+                    researchTopic, // 项目描述 = 研究课题
+                    event.getDeclarationId(), // 关联申报ID
+                    null, // 预算（可选）
+                    null, // 进度（可选）
+                    String.valueOf(ProjectStatus.IN_PROGRESS.getCode()), // 状态 = 进行中
+                    null // Dify知识库ID（创建知识库后更新）
+            );
+
+            // 注意：项目编号会在 ProjectServiceImpl.initializeProjectEntity 中自动生成（PRJ+时间戳）
+            // 使用事件中的操作人ID创建项目，避免在异步线程中获取Web上下文
+            var operatorId = event.getOperatorId();
+            if (operatorId == null) {
+                // 如果没有操作人ID，使用申报人ID作为后备方案
+                operatorId = event.getApplicantId();
+                log.warn(String.format("事件中缺少操作人ID，使用申报人ID作为后备: applicantId=%s", operatorId));
+            }
+            var projectId = projectService.createWithUserId(projectCreateReq, operatorId);
+            log.info(String.format("项目创建成功: projectId=%s, name=%s, operatorId=%s", projectId, researchTopic,
+                    operatorId));
+
+            // 记录操作日志（成功）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var detail = String.format("%s：%s（ID: %s）", operationType.getDescription(), researchTopic, projectId);
+            // 在异步上下文中，手动传入用户信息
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime, operatorId,
+                    event.getApplicantName());
+
+            return projectId;
+
+        } catch (Exception e) {
+            log.error(String.format("创建项目失败: declarationId=%s, err=%s",
+                    event.getDeclarationId(), e.getMessage()), e);
+            // 记录操作日志（失败）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var errorMessage = e instanceof BusinessException ? e.getMessage() : e.getClass().getSimpleName();
+            // 在异步上下文中，手动传入用户信息
+            var operatorId = event.getOperatorId() != null ? event.getOperatorId() : event.getApplicantId();
+            operationLogRecorderUtil.recordFailure(operation,
+                    String.format("%s失败：研究课题 %s", operation, researchTopic),
+                    errorMessage, executionTime, operatorId, event.getApplicantName());
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "创建项目失败: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * 创建知识库
+     *
+     * @param event         申报成功事件
+     * @param researchTopic 研究课题
+     * @param projectId     项目ID
+     */
+    private void createKnowledgeBase(DeclarationSuccessEvent event, String researchTopic, Long projectId) {
+        var startTime = DateUtil.now();
+        var operationType = OperationLogRecorderStatus.KNOWLEDGE_CREATE;
+        var operation = operationType.getCode();
+
+        try {
+            log.info(String.format("开始创建知识库: name=%s, description=%s, projectId=%s",
+                    researchTopic, researchTopic, projectId));
+
+            var knowledgeCreateReq = new KnowledgeCreateReq();
+            knowledgeCreateReq.setName(researchTopic); // 知识库名称 = 研究课题
+            knowledgeCreateReq.setDescription(researchTopic); // 知识库描述 = 研究课题
+            knowledgeCreateReq.setProjectId(projectId); // 关联项目ID
+            // 设置操作人ID（用于创建知识库，避免在异步线程中获取Web上下文）
+            var operatorId = event.getOperatorId();
+            if (operatorId == null) {
+                // 如果没有操作人ID，使用申报人ID作为后备方案
+                operatorId = event.getApplicantId();
+                log.warn(String.format("事件中缺少操作人ID，使用申报人ID作为后备: applicantId=%s", operatorId));
+            }
+            knowledgeCreateReq.setUserId(operatorId); // 设置用户ID，避免从上下文获取
+
+            var knowledgeResp = knowledgeService.create(knowledgeCreateReq);
+            log.info(String.format("知识库创建成功: knowledgeId=%s, name=%s, difyKnowdataId=%s",
+                    knowledgeResp.getId(), knowledgeResp.getName(), knowledgeResp.getDifyKnowdataId()));
+
+            // 更新项目的 Dify 知识库ID（使用 knowledgeResp.getId()，即本地知识库ID）
+            updateProjectDifyKnowledgeId(event, projectId, String.valueOf(knowledgeResp.getId()));
+
+            // 记录操作日志（成功）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var detail = String.format("%s：%s（ID: %s）", operationType.getDescription(), researchTopic,
+                    knowledgeResp.getId());
+            // 在异步上下文中，手动传入用户信息
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime, operatorId,
+                    event.getApplicantName());
+
+        } catch (Exception e) {
+            log.error(String.format("创建知识库失败: declarationId=%s, projectId=%s, err=%s",
+                    event.getDeclarationId(), projectId, e.getMessage()), e);
+            // 记录操作日志（失败）
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            var errorMessage = e instanceof BusinessException ? e.getMessage() : e.getClass().getSimpleName();
+            // 在异步上下文中，手动传入用户信息
+            var operatorId = event.getOperatorId() != null ? event.getOperatorId() : event.getApplicantId();
+            operationLogRecorderUtil.recordFailure(operation,
+                    String.format("%s失败：研究课题 %s，项目ID %s", operation, researchTopic, projectId),
+                    errorMessage, executionTime, operatorId, event.getApplicantName());
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "创建知识库失败: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * 更新项目的 Dify 知识库ID
+     *
+     * @param event           申报成功事件（用于获取操作人ID）
+     * @param projectId       项目ID
+     * @param difyKnowledgeId Dify知识库ID（本地知识库ID）
+     */
+    private void updateProjectDifyKnowledgeId(DeclarationSuccessEvent event, Long projectId, String difyKnowledgeId) {
+        try {
+            log.info(String.format("开始更新项目的Dify知识库ID: projectId=%s, difyKnowledgeId=%s",
+                    projectId, difyKnowledgeId));
+
+            // 查询项目实体
+            var project = projectService.findDetail(projectId);
+            if (project == null) {
+                log.error(String.format("项目不存在，无法更新Dify知识库ID: projectId=%s", projectId));
+                return;
+            }
+
+            // 获取操作人ID（用于更新项目，避免在异步线程中获取Web上下文）
+            var operatorId = event.getOperatorId();
+            if (operatorId == null) {
+                // 如果没有操作人ID，使用申报人ID作为后备方案
+                operatorId = event.getApplicantId();
+                log.warn(String.format("事件中缺少操作人ID，使用申报人ID作为后备: applicantId=%s", operatorId));
+            }
+
+            // 构建更新请求
+            var updateReq = new ProjectUpdateReq(
+                    projectId,
+                    null, // name 不更新
+                    null, // description 不更新
+                    null, // declarationId 不更新
+                    null, // budget 不更新
+                    null, // progress 不更新
+                    null, // status 不更新
+                    difyKnowledgeId, // 只更新 difyKnowledgeId
+                    operatorId // 设置用户ID，避免从上下文获取
+            );
+
+            // 更新项目
+            projectService.update(updateReq);
+
+            log.info(String.format("项目Dify知识库ID更新成功: projectId=%s, difyKnowledgeId=%s",
+                    projectId, difyKnowledgeId));
+
+        } catch (Exception e) {
+            log.error(String.format("更新项目Dify知识库ID失败: projectId=%s, difyKnowledgeId=%s, err=%s",
+                    projectId, difyKnowledgeId, e.getMessage()), e);
+            // 注意：不抛出异常，避免影响主流程
+        }
+    }
+
+    /**
+     * 记录失败日志
+     *
+     * @param operation     操作名称
+     * @param declarationId 申报ID
+     * @param errorMessage  错误信息
+     * @param startTime     开始时间
+     * @param event         申报成功事件（用于获取用户信息）
+     */
+    private void recordFailureLog(String operation, Long declarationId, String errorMessage,
+            java.time.LocalDateTime startTime, DeclarationSuccessEvent event) {
+        try {
+            var endTime = DateUtil.now();
+            var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
+            // 在异步上下文中，手动传入用户信息
+            var operatorId = event != null && event.getOperatorId() != null
+                    ? event.getOperatorId()
+                    : (event != null ? event.getApplicantId() : null);
+            var username = event != null ? event.getApplicantName() : null;
+            operationLogRecorderUtil.recordFailure(operation,
+                    String.format("%s失败：申报ID %s（创建项目和知识库）", operation, declarationId),
+                    errorMessage, executionTime, operatorId, username);
+        } catch (Exception e) {
+            log.error(String.format("记录失败日志异常: declarationId=%s, err=%s", declarationId, e.getMessage()), e);
+        }
     }
 }

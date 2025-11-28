@@ -3,12 +3,15 @@ package com.sciz.server.interfaces.controller;
 import com.sciz.server.application.service.declaration.DeclarationService;
 import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationCreateReq;
 import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationListQueryReq;
+import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationUpdateStatusReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationDetailResp;
 import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationListResp;
 import com.sciz.server.domain.pojo.dto.response.declaration.RedHeaderFileParseResp;
+import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.Result;
+import com.sciz.server.infrastructure.shared.result.ResultCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -63,7 +66,7 @@ public class DeclarationController {
      * @return 申报详情
      */
     @Operation(summary = "获取申报详情", description = "根据ID获取申报详细信息，包含工作流进度")
-    @GetMapping("/{id}")
+    @GetMapping("/detail/{id}")
     public Result<DeclarationDetailResp> getDeclarationDetail(@PathVariable Long id) {
         DeclarationDetailResp resp = declarationService.findDetail(id);
         return Result.success(resp);
@@ -93,5 +96,22 @@ public class DeclarationController {
     public Result<RedHeaderFileParseResp> uploadRedHeaderFile(@Valid @ModelAttribute FileUploadReq req) {
         RedHeaderFileParseResp resp = declarationService.uploadRedHeaderFile(req);
         return Result.success(resp);
+    }
+
+    /**
+     * 更新申报状态
+     *
+     * @param id  申报ID
+     * @param req 更新状态请求
+     * @return 操作结果
+     */
+    @Operation(summary = "更新申报状态", description = "更新申报状态，当状态更新为申报成功时，会自动创建项目和该项目的知识库")
+    @PutMapping("/{id}/status")
+    public Result<Void> updateStatus(@PathVariable Long id, @Valid @RequestBody DeclarationUpdateStatusReq req) {
+        if (!id.equals(req.id())) {
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "路径参数中的申报ID与请求体中的ID不一致");
+        }
+        declarationService.updateStatus(req);
+        return Result.success();
     }
 }

@@ -13,10 +13,12 @@ export { default as BasePagination } from './BasePagination.vue'
 export { default as BaseScrollbar } from './BaseScrollbar.vue'
 export { default as BaseDatePicker } from './BaseDatePicker.vue'
 export { default as BaseSwitch } from './BaseSwitch.vue'
+export { default as BaseTooltip } from './BaseTooltip.vue'
 
 // 功能组件
 export { default as AgreementNotice } from './AgreementNotice.vue'
 export { default as LanguageSwitcher } from './LanguageSwitcher.vue'
+export { default as FilePreview } from './FilePreview.vue'
 
 // 业务组件
 export * from '../Business'
