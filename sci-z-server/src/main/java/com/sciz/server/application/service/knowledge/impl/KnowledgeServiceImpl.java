@@ -33,6 +33,8 @@ import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.interfaces.converter.KnowledgeConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -40,8 +42,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.concurrent.Executor;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 知识库应用服务实现类
@@ -64,6 +71,10 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private final SysAttachmentRepo attachmentRepo;
     private final SysKnowledgeFileRelationRepo fileRelationRepo;
     private final FileService fileService;
+
+    @Autowired
+    @Qualifier("globalTaskExecutor")
+    private Executor globalTaskExecutor;
 
     @Value("${dify.default-resource-id:default}")
     private String defaultResourceId;
@@ -237,7 +248,6 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 result.getTotal(), result.getCurrent(), result.getSize()));
         return result;
     }
-
     /**
      * 上传文件到知识库
      *
@@ -247,11 +257,28 @@ public class KnowledgeServiceImpl implements KnowledgeService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void uploadFile(String knowledgeId, MultipartFile file, Long folderId) {
+    public void uploadFile(int knowledgeId, MultipartFile file, Long folderId) {
+        // 单个文件上传，转换为多文件上传处理
+        uploadFiles(knowledgeId, Arrays.asList(file), folderId);
+    }
+
+    /**
+     * 上传多个文件到知识库（异步上传）
+     *
+     * @param knowledgeId 知识库ID（Dify知识库ID，String类型）
+     * @param files 上传的文件列表
+     * @param folderId 文件夹ID（可选，0为根目录）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void uploadFiles(int knowledgeId, List<MultipartFile> files, Long folderId) {
+        if (files == null || files.isEmpty()) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "文件列表不能为空");
+        }
+
         // 1. 获取当前登录用户ID
         Long userId = StpUtil.getLoginIdAsLong();
-        log.info(String.format("上传文件到知识库: userId=%s, knowledgeId=%s, fileName=%s, folderId=%s",
-                userId, knowledgeId, file.getOriginalFilename(), folderId));
+        log.info(String.format("上传多个文件到知识库: userId=%s, knowledgeId=%s, fileCount=%s, folderId=%s",
+                userId, knowledgeId, files.size(), folderId));
 
         // 2. 根据Dify知识库ID查询知识库信息
         SysKnowledgeBase knowledgeBase = knowledgeBaseRepo.findByDifyKnowdataId(knowledgeId);
@@ -260,7 +287,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         }
 
         // 3. 使用传入的 knowledgeId 作为 Dify 数据集ID
-        String datasetId = knowledgeId;
+        String datasetId = knowledgeBase.getDifyKbId();
 
         // 4. 查询用户信息
         SysUser user = userRepo.findById(userId);
@@ -268,24 +295,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             throw new BusinessException(ResultCode.USER_NOT_FOUND);
         }
 
-        // 5. 先上传文件到 MinIO，获取 attachment_id
-        FileUploadReq fileUploadReq = new FileUploadReq();
-        fileUploadReq.setFile(file);
-        fileUploadReq.setRelationType(AttachmentRelationStatus.KNOWLEDGE.getCode());
-        fileUploadReq.setRelationId(knowledgeBase.getId());
-        fileUploadReq.setRelationName(knowledgeBase.getName());
-        fileUploadReq.setAttachmentType(AttachmentCategoryStatus.DOCUMENT.getCode());
-        fileUploadReq.setIsPublic(0);
-
-        log.info(String.format("上传文件到 MinIO: fileName=%s", file.getOriginalFilename()));
-        FileInfoResp fileInfoResp = fileService.upload(fileUploadReq);
-        Long attachmentId = fileInfoResp.id();
-        if (attachmentId == null) {
-            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED, "上传文件到 MinIO 失败");
-        }
-        log.info(String.format("文件已上传到 MinIO: attachmentId=%s", attachmentId));
-
-        // 6. 获取用户的 Dify API Key
+        // 5. 获取用户的 Dify API Key
         DifyApiKey difyApiKey = null;
         QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId)
@@ -294,24 +304,162 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 .last("LIMIT 1");
         difyApiKey = difyApiKeyService.getOne(queryWrapper);
 
-        // 7. 确定 resourceId
+        // 6. 确定 resourceId
         String resourceId = Optional.ofNullable(difyApiKey)
                 .map(DifyApiKey::getResourceId)
                 .orElse(defaultResourceId);
 
-        // 8. 调用 Dify API 上传文档（使用原始文件）
-        ResponseEntity<String> response = difyApiService.uploadDocumentWithFileStorage(
-                datasetId, file, userId, resourceId, "dataset");
+        // 7. 先异步批量上传文件到 MinIO
+        log.info(String.format("开始异步上传 %d 个文件到 MinIO", files.size()));
+        List<CompletableFuture<FileInfoResp>> minioFutures = new ArrayList<>();
+        for (MultipartFile file : files) {
+            CompletableFuture<FileInfoResp> minioFuture = CompletableFuture.supplyAsync(() -> {
+                try {
+                    FileUploadReq fileUploadReq = new FileUploadReq();
+                    fileUploadReq.setFile(file);
+                    fileUploadReq.setRelationType(AttachmentRelationStatus.KNOWLEDGE.getCode());
+                    fileUploadReq.setRelationId(knowledgeBase.getId());
+                    fileUploadReq.setRelationName(knowledgeBase.getName());
+                    fileUploadReq.setAttachmentType(AttachmentCategoryStatus.DOCUMENT.getCode());
+                    fileUploadReq.setIsPublic(0);
+                    
+                    log.info(String.format("异步上传文件到 MinIO: fileName=%s", file.getOriginalFilename()));
+                    return fileService.upload(fileUploadReq, userId, user.getRealName());
+                } catch (BusinessException e) {
+                    // 如果是业务异常（如文件大小超出限制），直接抛出，保留原始错误信息
+                    log.error(String.format("MinIO上传文件失败（业务异常）: fileName=%s, error=%s", 
+                            file.getOriginalFilename(), e.getMessage()), e);
+                    throw e;
+                } catch (Exception e) {
+                    // 其他异常包装成业务异常
+                    log.error(String.format("MinIO上传文件失败: fileName=%s, error=%s", 
+                            file.getOriginalFilename(), e.getMessage()), e);
+                    throw new BusinessException(ResultCode.SERVER_ERROR, 
+                            String.format("MinIO上传文件失败: %s - %s", file.getOriginalFilename(), e.getMessage()));
+                }
+            }, globalTaskExecutor);
+            minioFutures.add(minioFuture);
+        }
 
-        // 9. 检查响应状态
+        // 8. 等待所有 MinIO 上传完成
+        CompletableFuture.allOf(minioFutures.toArray(new CompletableFuture[0])).join();
+        
+        // 9. 收集 MinIO 上传结果
+        List<FileInfoResp> minioResults = new ArrayList<>();
+        for (int i = 0; i < minioFutures.size(); i++) {
+            CompletableFuture<FileInfoResp> future = minioFutures.get(i);
+            MultipartFile file = files.get(i);
+            try {
+                FileInfoResp result = future.get();
+                if (result != null && result.id() != null) {
+                    minioResults.add(result);
+                    log.info(String.format("MinIO上传成功: attachmentId=%s", result.id()));
+                } else {
+                    throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED, 
+                            String.format("MinIO上传失败: %s - 返回结果为空", file.getOriginalFilename()));
+                }
+            } catch (java.util.concurrent.ExecutionException e) {
+                // 获取异步执行时的异常
+                Throwable cause = e.getCause();
+                if (cause instanceof BusinessException) {
+                    // 如果是业务异常，直接抛出，保留原始错误信息
+                    log.error(String.format("获取MinIO上传结果失败（业务异常）: fileName=%s, error=%s", 
+                            file.getOriginalFilename(), cause.getMessage()), cause);
+                    throw (BusinessException) cause;
+                } else {
+                    // 其他异常包装成业务异常
+                    log.error(String.format("获取MinIO上传结果失败: fileName=%s, error=%s", 
+                            file.getOriginalFilename(), cause != null ? cause.getMessage() : e.getMessage()), e);
+                    throw new BusinessException(ResultCode.SERVER_ERROR, 
+                            String.format("MinIO上传失败: %s - %s", 
+                                    file.getOriginalFilename(), 
+                                    cause != null ? cause.getMessage() : e.getMessage()));
+                }
+            } catch (Exception e) {
+                log.error(String.format("获取MinIO上传结果失败: fileName=%s, error=%s", 
+                        file.getOriginalFilename(), e.getMessage()), e);
+                throw new BusinessException(ResultCode.SERVER_ERROR, 
+                        String.format("MinIO上传失败: %s - %s", file.getOriginalFilename(), e.getMessage()));
+            }
+        }
+
+        if (minioResults.size() != files.size()) {
+            log.error(String.format("MinIO上传结果数量不匹配: expected=%d, actual=%d", 
+                    files.size(), minioResults.size()));
+            throw new BusinessException(ResultCode.SERVER_ERROR, "MinIO上传失败: 结果数量不匹配");
+        }
+
+        // 10. 异步上传文件到 Dify API
+        log.info(String.format("开始异步上传 %d 个文件到 Dify API", files.size()));
+        CompletableFuture<List<ResponseEntity<String>>> difyUploadFuture = difyApiService.uploadDocumentsAsync(
+                datasetId, files, userId, resourceId, "dataset");
+
+        // 11. 等待 Dify 上传完成并处理结果
+        List<ResponseEntity<String>> difyResponses;
+        try {
+            difyResponses = difyUploadFuture.get();
+        } catch (Exception e) {
+            log.error(String.format("异步上传文件到Dify失败: knowledgeId=%s, error=%s", knowledgeId, e.getMessage()), e);
+            throw new BusinessException(ResultCode.SERVER_ERROR, "上传文件到Dify失败: " + e.getMessage());
+        }
+
+        if (difyResponses == null || difyResponses.size() != files.size()) {
+            log.error(String.format("Dify上传结果数量不匹配: expected=%d, actual=%d", 
+                    files.size(), difyResponses != null ? difyResponses.size() : 0));
+            throw new BusinessException(ResultCode.SERVER_ERROR, "Dify上传失败: 结果数量不匹配");
+        }
+
+        // 12. 处理每个文件的上传结果
+        List<String> successFiles = new ArrayList<>();
+        List<String> failedFiles = new ArrayList<>();
+
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
+            FileInfoResp minioResult = minioResults.get(i);
+            ResponseEntity<String> difyResponse = difyResponses.get(i);
+
+            try {
+                processSingleFileUpload(knowledgeId, file, folderId, difyResponse, userId, knowledgeBase, minioResult);
+                successFiles.add(file.getOriginalFilename());
+                log.info(String.format("文件上传成功: fileName=%s", file.getOriginalFilename()));
+            } catch (Exception e) {
+                failedFiles.add(file.getOriginalFilename());
+                log.error(String.format("处理文件上传结果失败: fileName=%s, error=%s", 
+                        file.getOriginalFilename(), e.getMessage()), e);
+            }
+        }
+
+        log.info(String.format("批量上传完成: knowledgeId=%s, total=%d, success=%d, failed=%d",
+                knowledgeId, files.size(), successFiles.size(), failedFiles.size()));
+
+        // 10. 如果有文件上传失败，抛出异常
+        if (!failedFiles.isEmpty()) {
+            throw new BusinessException(ResultCode.SERVER_ERROR, 
+                    String.format("部分文件上传失败: %s", String.join(", ", failedFiles)));
+        }
+    }
+
+    /**
+     * 处理单个文件的上传结果
+     */
+    private void processSingleFileUpload(int knowledgeId, MultipartFile file, Long folderId,
+            ResponseEntity<String> response, Long userId, SysKnowledgeBase knowledgeBase, FileInfoResp minioResult) {
+        // 1. 检查 Dify 响应状态
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-            log.error(String.format("Dify API上传文档失败: status=%s, body=%s",
-                    response.getStatusCode(), response.getBody()));
+            log.error(String.format("Dify API上传文档失败: fileName=%s, status=%s, body=%s",
+                    file.getOriginalFilename(), response.getStatusCode(), response.getBody()));
             throw new BusinessException(ResultCode.SERVER_ERROR,
                     String.format("上传文件失败: Dify API调用失败, status=%s", response.getStatusCode()));
         }
 
-        // 10. 解析返回的JSON
+        // 2. 使用 MinIO 上传结果（已异步上传完成）
+        Long attachmentId = minioResult.id();
+        if (attachmentId == null) {
+            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED, "MinIO上传失败: attachmentId为空");
+        }
+        log.info(String.format("使用MinIO上传结果: attachmentId=%s", attachmentId));
+
+        // 3. 解析返回的JSON
         JsonNode responseJson;
         try {
             responseJson = objectMapper.readTree(response.getBody());
@@ -320,7 +468,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             throw new BusinessException(ResultCode.SERVER_ERROR, "解析Dify API响应失败");
         }
 
-        // 11. 提取文档信息
+        // 4. 提取文档信息
         JsonNode documentNode = responseJson.get("document");
         if (documentNode == null) {
             log.error(String.format("Dify API返回数据缺少document字段: body=%s", response.getBody()));
@@ -336,7 +484,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             throw new BusinessException(ResultCode.SERVER_ERROR, "上传文件失败: Dify API返回数据异常");
         }
 
-        // 12. 更新附件记录，保存 Dify 文档ID
+        // 5. 更新附件记录，保存 Dify 文档ID
         SysAttachment attachment = attachmentRepo.findById(attachmentId);
         if (attachment == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND, "附件记录不存在");
@@ -350,7 +498,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             log.info(String.format("更新附件记录成功: attachmentId=%s, difyDocId=%s", attachmentId, difyDocId));
         }
 
-        // 13. 创建知识库文件关联记录
+        // 6. 创建知识库文件关联记录
         SysKnowledgeFileRelation fileRelation = new SysKnowledgeFileRelation();
         fileRelation.setKnowledgeId(knowledgeBase.getId()); // 使用数据库主键ID
         fileRelation.setFolderId(folderId != null ? folderId : 0L);

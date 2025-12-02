@@ -153,7 +153,7 @@ export const uploadKnowledgeFile = (data) => {
 }
 
 /**
- * 上传文件到知识库（新接口，使用 difyKbId）
+ * 上传文件到知识库（单文件接口，保留兼容）
  * @param {string|number} difyKbId - 知识库的 Dify KB ID
  * @param {File} file - 要上传的文件
  * @param {number} [folderId=0] - 文件夹ID，默认为0（根目录）
@@ -168,6 +168,36 @@ export const uploadFileToKnowledge = (difyKbId, file, folderId = 0) => {
   
   return request({
     url: KNOWLEDGE_API.UPLOAD(difyKbId),
+    method: HTTP_METHODS.POST,
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+/**
+ * 批量上传文件到知识库（多文件接口，异步分批上传）
+ * @param {string|number} knowledgeId - 知识库ID（数据库主键ID）
+ * @param {File[]} files - 要上传的文件列表
+ * @param {number} [folderId=0] - 文件夹ID，默认为0（根目录）
+ * @returns {Promise} 上传文件响应
+ */
+export const uploadFilesToKnowledge = (knowledgeId, files, folderId = 0) => {
+  const formData = new FormData()
+  
+  // 添加多个文件（使用 files 字段名，后端接收 List<MultipartFile>）
+  Array.from(files).forEach(file => {
+    formData.append('files', file)
+  })
+  
+  // 添加文件夹ID
+  if (folderId && folderId !== 0) {
+    formData.append('folderId', folderId)
+  }
+  
+  return request({
+    url: KNOWLEDGE_API.UPLOAD_BATCH(knowledgeId),
     method: HTTP_METHODS.POST,
     data: formData,
     headers: {

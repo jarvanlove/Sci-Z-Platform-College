@@ -357,7 +357,7 @@ public enum ResultCode {
     /**
      * 文件大小超出限制
      */
-    FILE_SIZE_EXCEEDED(8005, "文件大小超出限制"),
+    FILE_SIZE_EXCEEDED(80000, "文件大小超出限制"),
 
     /**
      * 文件上传成功

@@ -12,7 +12,7 @@
  Target Server Version : 160010 (160010)
  File Encoding         : 65001
 
- Date: 25/11/2025 17:03:08
+ Date: 28/11/2025 16:38:10
 */
 
 
@@ -61,16 +61,15 @@ COMMENT ON TABLE "public"."dify_api_keys" IS 'Dify API 密钥管理表';
 -- Records of dify_api_keys
 -- ----------------------------
 INSERT INTO "public"."dify_api_keys" VALUES (1, 1, 'dataset', 'knowledge_base_001', 'dataset-MwOxGbIDhZmg6bUdHEid0rhX', '默认知识库密钥', '管理员默认知识库API密钥', 'f', '2025-11-03 07:17:26.157061', '2025-11-03 07:17:26.157061', 'system', NULL, 0);
-INSERT INTO "public"."dify_api_keys" VALUES (2, 1, 'workflow', 'workflow_001', 'app-TsSdGbD50r8fDt1shM3RBSMi', '默认工作流密钥', '管理员默认工作流API密钥', 'f', '2025-11-03 07:17:26.157061', '2025-11-03 07:19:31.727833', 'system', NULL, 0);
 INSERT INTO "public"."dify_api_keys" VALUES (6, 1, 'chatbot', '35766afb-ab07-438d-84ed-40054f72b17f', 'app-fL2Abrb566WzXiif06MK2BGB', 'chatbot_595a3f97-c903-40c2-9cfb-d8ef662e141e', 'testte', 'f', NULL, NULL, 'admin', 'admin', 0);
 INSERT INTO "public"."dify_api_keys" VALUES (7, 1, 'file', 'work_file', 'app-PZbKcvauvZpUO4NR6xgpjhlB', NULL, NULL, 'f', '2025-11-18 06:58:25.650167', '2025-11-18 06:58:25.650167', NULL, NULL, 0);
-INSERT INTO "public"."dify_api_keys" VALUES (8, 1, 'workflow', '报告1', '', '科技报告 ', '详细记录项目的技术实现、技术难点、解决方案等', 'f', '2025-11-03 07:17:26.157061', '2025-11-03 07:19:31.727833', 'system', NULL, 0);
-INSERT INTO "public"."dify_api_keys" VALUES (9, 1, 'workflow', '报告2', '', '自评报告 ', '自评报告 项目自评报告，包含项目完成情况、成果总结等', 'f', '2025-11-03 07:17:26.157061', '2025-11-03 07:19:31.727833', 'system', NULL, 0);
+INSERT INTO "public"."dify_api_keys" VALUES (2, 1, 'workflow', 'workflow_001', 'app-PZbKcvauvZpUO4NR6xgpjhlB', '默认工作流密钥', '管理员默认工作流API密钥', 'f', '2025-11-03 07:17:26.157061', '2025-11-03 07:19:31.727833', 'system', NULL, 0);
+INSERT INTO "public"."dify_api_keys" VALUES (9, 1, 'workflow', 'workflow', 'app-TsSdGbD50r8fDt1shM3RBSMi', '测试科技报告生成工作流', '测试科技报告生成', 'f', NULL, NULL, NULL, NULL, 0);
 
 -- ----------------------------
 -- Auto increment value for dify_api_keys
 -- ----------------------------
-SELECT setval('"public"."dify_api_keys_id_seq"', 8, true);
+SELECT setval('"public"."dify_api_keys_id_seq"', 9, true);
 
 -- ----------------------------
 -- Indexes structure for table dify_api_keys

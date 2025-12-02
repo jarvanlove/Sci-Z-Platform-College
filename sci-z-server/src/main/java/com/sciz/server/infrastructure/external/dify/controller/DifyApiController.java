@@ -9,6 +9,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Dify API 简化控制器
  * 使用 DifyApiClient 工具类
@@ -93,13 +97,13 @@ public class DifyApiController {
      */
     @PostMapping("/datasets/{datasetId}/document/upload")
     @Operation(summary = "上传文档到数据集（先存储文件，再调用Dify API）")
-    public ResponseEntity<String> uploadDocument(
+    public CompletableFuture<List<ResponseEntity<String>>> uploadDocument(
             @PathVariable String datasetId,
-            @RequestParam("file") MultipartFile file,
+            @RequestParam("file") List<MultipartFile> file,
             @RequestParam("userId") Long userId,
             @RequestParam("resourceId") String resourceId,
             @RequestParam("keyType") String keyType) {
-        return difyApiService.uploadDocumentWithFileStorage(datasetId, file, userId, resourceId, keyType);
+        return difyApiService.uploadDocumentsAsync(datasetId, file, userId, resourceId, keyType);
     }
     /**
      * 上传文件

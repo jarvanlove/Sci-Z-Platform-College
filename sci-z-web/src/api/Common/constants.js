@@ -166,7 +166,8 @@ export const KNOWLEDGE_API = {
   UPDATE_FOLDER: (id) => buildApiUrl(`/knowledge/folders/${id}`),
   DELETE_FOLDER: (id) => buildApiUrl(`/knowledge/folders/${id}`),
   UPLOAD_FILE: buildApiUrl('/knowledge/files/upload'),
-  UPLOAD: (id) => buildApiUrl(`/knowledge/${id}/upload`), // POST /api/knowledge/{difyKbId}/upload
+  UPLOAD: (id) => buildApiUrl(`/knowledge/${id}/upload`), // POST /api/knowledge/{difyKbId}/upload (单文件)
+  UPLOAD_BATCH: (id) => buildApiUrl(`/knowledge/${id}/upload/batch`), // POST /api/knowledge/{id}/upload/batch (多文件)
   FILES: (id) => buildApiUrl(`/knowledge/files/${id}`),
   DELETE_FILE: (id) => buildApiUrl(`/knowledge/files/${id}`),
   RENAME_FILE: (id) => buildApiUrl(`/knowledge/files/rename/${id}`),

@@ -10,15 +10,22 @@ import com.sciz.server.infrastructure.external.dify.service.impl.DifyApiKeyServi
 import com.sciz.server.infrastructure.external.dify.util.DifyApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 /**
  * Dify API 服务类
@@ -38,6 +45,15 @@ public class DifyApiService {
     private final DifyDocumentConfig difyDocumentConfig;
     private final ObjectMapper objectMapper;
     private final DifyApiKeyServiceImpl difyApiKeyService;
+    
+    @Autowired
+    @Qualifier("globalTaskExecutor")
+    private Executor globalTaskExecutor;
+    
+    /**
+     * 每批上传的文件数量
+     */
+    private static final int BATCH_SIZE = 5;
 
     /**
      * 创建 Chatbot 应用
@@ -289,14 +305,12 @@ public class DifyApiService {
      */
     private String buildDefaultConfigJson() {
         Map<String, Object> config = new HashMap<>();
-
         // 基础配置
         config.put("indexing_technique", difyDocumentConfig.getIndexingTechnique());
         config.put("doc_form", difyDocumentConfig.getDocForm());
         config.put("doc_language", difyDocumentConfig.getDocLanguage());
         config.put("embedding_model", difyDocumentConfig.getEmbeddingModel());
         config.put("embedding_model_provider", difyDocumentConfig.getEmbeddingModelProvider());
-
         // 检索模型配置
         Map<String, Object> retrievalModel = new HashMap<>();
         retrievalModel.put("search_method", difyDocumentConfig.getRetrievalModel().getSearchMethod());
@@ -306,12 +320,10 @@ public class DifyApiService {
                 difyDocumentConfig.getRetrievalModel().getScoreThresholdEnabled());
         retrievalModel.put("score_threshold", difyDocumentConfig.getRetrievalModel().getScoreThreshold());
         config.put("retrieval_model", retrievalModel);
-
         // 处理规则配置
         Map<String, Object> processRule = new HashMap<>();
         processRule.put("mode", difyDocumentConfig.getProcessRule().getMode());
         config.put("process_rule", processRule);
-
         try {
             return new ObjectMapper().writeValueAsString(config);
         } catch (Exception e) {
@@ -319,29 +331,169 @@ public class DifyApiService {
         }
     }
 
+
     /**
-     * 上传文档到数据集（直接使用传入的文件，不存储到本地）
+     * 异步上传文档到数据集（支持单个或多个文件，分批上传）
+     * 
+     * @param datasetId 数据集ID
+     * @param files 文件列表（支持单个或多个文件，可以传入单个文件或文件数组）
+     * @param userId 用户ID
+     * @param resourceId 资源ID
+     * @param keyType 密钥类型
+     * @return CompletableFuture，包含所有上传结果的列表
      */
-    public ResponseEntity<String> uploadDocumentWithFileStorage(String datasetId, MultipartFile file, Long userId,
-            String resourceId, String keyType) {
+    public CompletableFuture<List<ResponseEntity<String>>> uploadDocumentsAsync(String datasetId, 
+            List<MultipartFile> files, Long userId, String resourceId, String keyType) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // 1. 验证并过滤文件
+                List<MultipartFile> validFiles = validateAndFilterFiles(files);
+                
+                if (validFiles.isEmpty()) {
+                    log.warn("没有有效的文件需要上传");
+                    return new ArrayList<>();
+                }
+
+                int totalFiles = validFiles.size();
+                log.info("开始异步上传文档到 Dify API: datasetId={}, totalFiles={}, userId={}", 
+                        datasetId, totalFiles, userId);
+                // 2. 分批上传文件
+                List<ResponseEntity<String>> results = new ArrayList<>();
+                List<List<MultipartFile>> batches = partitionFiles(validFiles, BATCH_SIZE);
+                
+                log.info("文件将分为 {} 批上传，每批最多 {} 个文件", batches.size(), BATCH_SIZE);
+
+                for (int batchIndex = 0; batchIndex < batches.size(); batchIndex++) {
+                    List<MultipartFile> batch = batches.get(batchIndex);
+                    log.info("开始上传第 {}/{} 批文件，本批文件数: {}", 
+                            batchIndex + 1, batches.size(), batch.size());
+
+                    // 3. 批量上传当前批次
+                    List<CompletableFuture<ResponseEntity<String>>> batchFutures = new ArrayList<>();
+                    for (MultipartFile file : batch) {
+                        CompletableFuture<ResponseEntity<String>> future = CompletableFuture.supplyAsync(() -> {
+                            try {
+                                return uploadSingleDocument(datasetId, file, userId, resourceId, keyType);
+                            } catch (Exception e) {
+                                log.error("上传文件失败: fileName={}, error={}", 
+                                        file.getOriginalFilename(), e.getMessage(), e);
+                                return ResponseEntity.status(500)
+                                        .body("{\"error\": \"上传文件失败: " + e.getMessage() + "\"}");
+                            }
+                        }, globalTaskExecutor);
+                        batchFutures.add(future);
+                    }
+                    // 4. 等待当前批次所有文件上传完成
+                    CompletableFuture.allOf(batchFutures.toArray(new CompletableFuture[0])).join();
+                    
+                    // 5. 收集当前批次的结果
+                    for (CompletableFuture<ResponseEntity<String>> future : batchFutures) {
+                        try {
+                            results.add(future.get());
+                        } catch (Exception e) {
+                            log.error("获取上传结果失败: error={}", e.getMessage(), e);
+                            results.add(ResponseEntity.status(500)
+                                    .body("{\"error\": \"获取上传结果失败: " + e.getMessage() + "\"}"));
+                        }
+                    }
+
+                    log.info("第 {}/{} 批文件上传完成", batchIndex + 1, batches.size());
+                }
+
+                log.info("所有文件上传完成: datasetId={}, totalFiles={}, successCount={}", 
+                        datasetId, totalFiles, results.stream()
+                                .filter(r -> r.getStatusCode().is2xxSuccessful())
+                                .count());
+
+                return results;
+            } catch (Exception e) {
+                log.error("异步上传文档失败: datasetId={}, error={}", datasetId, e.getMessage(), e);
+                throw new RuntimeException("异步上传文档失败: " + e.getMessage(), e);
+            }
+        }, globalTaskExecutor);
+    }
+
+    /**
+     * 异步上传文档到数据集（支持单个文件，便捷方法）
+     * 
+     * @param datasetId 数据集ID
+     * @param file 单个文件
+     * @param userId 用户ID
+     * @param resourceId 资源ID
+     * @param keyType 密钥类型
+     * @return CompletableFuture，包含上传结果
+     */
+    public CompletableFuture<ResponseEntity<String>> uploadDocumentAsync(String datasetId, 
+            MultipartFile file, Long userId, String resourceId, String keyType) {
+        List<MultipartFile> files = Arrays.asList(file);
+        return uploadDocumentsAsync(datasetId, files, userId, resourceId, keyType)
+                .thenApply(results -> results.isEmpty() ? 
+                        ResponseEntity.status(400).body("{\"error\": \"上传失败\"}") : 
+                        results.get(0));
+    }
+
+    /**
+     * 上传单个文档（内部方法）
+     */
+    private ResponseEntity<String> uploadSingleDocument(String datasetId, MultipartFile file, 
+            Long userId, String resourceId, String keyType) {
         try {
-            // 1. 验证文件
+            // 验证文件
             validateFile(file);
 
-            // 2. 直接使用传入的 MultipartFile 调用 Dify API
+            // 构建表单数据
             Map<String, Object> data = new HashMap<>();
             data.put("data", buildDefaultConfigJson());
-            log.info("直接上传文件到 Dify API: fileName={}, size={}", file.getOriginalFilename(), file.getSize());
+            
+            log.info("上传单个文件到 Dify API: fileName={}, size={}", 
+                    file.getOriginalFilename(), file.getSize());
+            
             return difyApiClient.uploadFile("POST", "/datasets/" + datasetId + "/document/create-by-file",
                     file, data, userId, resourceId, keyType);
         } catch (HttpClientErrorException e) {
-            log.error("Dify API调用失败: {}", e.getMessage());
-            // 直接返回Dify的错误响应给前端
+            log.error("Dify API调用失败: fileName={}, error={}", 
+                    file.getOriginalFilename(), e.getMessage());
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.error("上传文件到 Dify API 失败: {}", e.getMessage(), e);
-            throw new RuntimeException("上传文件到 Dify API 失败: " + e.getMessage(), e);
+            log.error("上传文件到 Dify API 失败: fileName={}, error={}", 
+                    file.getOriginalFilename(), e.getMessage(), e);
+            return ResponseEntity.status(500)
+                    .body("{\"error\": \"上传文件失败: " + e.getMessage() + "\"}");
         }
+    }
+
+    /**
+     * 验证并过滤文件列表
+     */
+    private List<MultipartFile> validateAndFilterFiles(List<MultipartFile> files) {
+        if (files == null || files.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        List<MultipartFile> validFiles = new ArrayList<>();
+        for (MultipartFile file : files) {
+            try {
+                validateFile(file);
+                validFiles.add(file);
+            } catch (Exception e) {
+                log.warn("文件验证失败，跳过: fileName={}, error={}", 
+                        file != null ? file.getOriginalFilename() : "null", e.getMessage());
+            }
+        }
+        
+        return validFiles;
+    }
+
+    /**
+     * 将文件列表分批
+     */
+    private List<List<MultipartFile>> partitionFiles(List<MultipartFile> files, int batchSize) {
+        List<List<MultipartFile>> batches = new ArrayList<>();
+        for (int i = 0; i < files.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, files.size());
+            batches.add(new ArrayList<>(files.subList(i, end)));
+        }
+        return batches;
     }
 
     /**
@@ -525,5 +677,72 @@ public class DifyApiService {
             return ResponseEntity.status(500).body("{\"error\": \"文件上传异常: " + e.getMessage() + "\"}");
         }
 
+    }
+
+    /**
+     * 使用动态密钥上传多个文件（支持指定 keyType）
+     * 注意：由于 Dify API 只支持单个文件上传，此方法会循环调用单个文件上传接口
+     *
+     * @param user       用户标识
+     * @param files      上传的文件列表（支持单个或多个文件）
+     * @param userId     用户ID
+     * @param resourceId 资源ID
+     * @param keyType    密钥类型（dataset/file）
+     * @return 最后一个文件的上传结果（建议使用异步方法批量上传）
+     */
+    public ResponseEntity<String> uploadFilesWithDynamicKey(Long user, List<MultipartFile> files, Long userId,
+            String resourceId, String keyType) {
+        try {
+            int fileCount = (files != null) ? files.size() : 0;
+            log.info("开始上传多个文件到 Dify（动态密钥），用户: {}, 文件数量: {}, 资源ID: {}, keyType: {}",
+                    user, fileCount, resourceId, keyType);
+            
+            if (files == null || files.isEmpty()) {
+                log.warn("文件列表为空，无法上传");
+                return ResponseEntity.status(400).body("{\"error\": \"文件列表不能为空\"}");
+            }
+
+            // 循环上传每个文件（Dify API 只支持单个文件上传）
+            ResponseEntity<String> lastResponse = null;
+            for (int i = 0; i < files.size(); i++) {
+                MultipartFile file = files.get(i);
+                if (file == null || file.isEmpty()) {
+                    log.warn("跳过空文件: index={}", i);
+                    continue;
+                }
+                
+                log.info("上传第 {}/{} 个文件: fileName={}", i + 1, fileCount, file.getOriginalFilename());
+                lastResponse = uploadFileWithDynamicKey(user, file, userId, resourceId, keyType);
+                
+                if (!lastResponse.getStatusCode().is2xxSuccessful()) {
+                    log.error("文件上传失败: fileName={}, status={}", 
+                            file.getOriginalFilename(), lastResponse.getStatusCode());
+                }
+            }
+            
+            if (lastResponse == null) {
+                return ResponseEntity.status(400).body("{\"error\": \"没有成功上传的文件\"}");
+            }
+            
+            log.info("多个文件上传完成（动态密钥），文件数量: {}", fileCount);
+            return lastResponse;
+        } catch (Exception e) {
+            log.error("多个文件上传异常（动态密钥）: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body("{\"error\": \"多个文件上传异常: " + e.getMessage() + "\"}");
+        }
+    }
+
+    /**
+     * 使用动态密钥上传多个文件（默认使用 dataset keyType）
+     *
+     * @param user       用户标识
+     * @param files      上传的文件列表（支持单个或多个文件）
+     * @param userId     用户ID
+     * @param resourceId 资源ID
+     * @return 文件上传结果
+     */
+    public ResponseEntity<String> uploadFilesWithDynamicKey(Long user, List<MultipartFile> files, Long userId,
+            String resourceId) {
+        return uploadFilesWithDynamicKey(user, files, userId, resourceId, DifyApiKey.KeyType.DATASET.getCode());
     }
 }
