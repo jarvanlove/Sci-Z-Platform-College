@@ -50,9 +50,9 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
     }
 
     @Override
-    public SysKnowledgeBase findByDifyKnowdataId(String difyKnowdataId) {
+    public SysKnowledgeBase findByDifyKnowdataId(int difyKnowdataId) {
         return new LambdaQueryChainWrapper<>(mapper)
-                .eq(SysKnowledgeBase::getDifyKnowdataId, difyKnowdataId)
+                .eq(SysKnowledgeBase::getId, difyKnowdataId)
                 .eq(SysKnowledgeBase::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
                 .one();
     }

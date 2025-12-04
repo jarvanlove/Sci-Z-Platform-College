@@ -10,6 +10,7 @@ import jakarta.validation.constraints.NotNull;
  * @param projectCode        String 项目编号
  * @param projectKnowledgeId String 项目知识库ID
  * @param reportType         String 报告类型(tech/self)
+ * @param difyApiKeysId      String Dify API Keys 表 ID
  * @param summary            String 报告摘要
  * @param status             String 状态
  * @author JiaWen.Wu
@@ -22,6 +23,7 @@ public record ReportManagementUpdateReq(
         String projectCode,
         String projectKnowledgeId,
         String reportType,
+        String difyApiKeysId,
         String summary,
         String status) {
 }

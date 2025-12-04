@@ -52,6 +52,11 @@ public class ReportManagementDetailResp {
     private String reportType;
 
     /**
+     * Dify API Keys 表 ID
+     */
+    private String difyApiKeysId;
+
+    /**
      * 创建人ID
      */
     private Long creatorId;
@@ -85,5 +90,10 @@ public class ReportManagementDetailResp {
      * 更新时间
      */
     private LocalDateTime updatedTime;
+
+    /**
+     * MinIO 附件 ID
+     */
+    private Long attachmentId;
 }
 

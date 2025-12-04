@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.List;
+
 /**
  * 知识库控制器
  *
@@ -62,20 +64,38 @@ public class KnowledgeController {
         return Result.success();
     }
     /**
-     * 上传文件到知识库
+     * 上传文件到知识库（支持单个文件）
      *
      * @param id 知识库ID
      * @param file 上传的文件
      * @param folderId 文件夹ID（可选，0为根目录）
      * @return 操作结果
      */
-    @Operation(summary = "上传文件", description = "向知识库上传文件，调用Dify API上传文档并保存关联关系")
+    @Operation(summary = "上传文件", description = "向知识库上传单个文件，调用Dify API上传文档并保存关联关系")
     @PostMapping("/{id}/upload")
     public Result<Void> uploadFile(
-            @PathVariable String id,
+            @PathVariable int id,
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "folderId", required = false, defaultValue = "0") Long folderId) {
         knowledgeService.uploadFile(id, file, folderId);
+        return Result.success();
+    }
+
+    /**
+     * 上传多个文件到知识库（支持多文件上传）
+     *
+     * @param id 知识库ID
+     * @param files 上传的文件列表
+     * @param folderId 文件夹ID（可选，0为根目录）
+     * @return 操作结果
+     */
+    @Operation(summary = "批量上传文件", description = "向知识库批量上传文件，支持异步分批上传，调用Dify API上传文档并保存关联关系")
+    @PostMapping("/{id}/upload/batch")
+    public Result<Void> uploadFiles(
+            @PathVariable int id,
+            @RequestParam("files") List<MultipartFile> files,
+            @RequestParam(value = "folderId", required = false, defaultValue = "0") Long folderId) {
+        knowledgeService.uploadFiles(id, files, folderId);
         return Result.success();
     }
     /**

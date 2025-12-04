@@ -66,6 +66,12 @@ public class ReportManagement extends BaseEntity {
     private String reportType;
 
     /**
+     * Dify API Keys 表 ID
+     */
+    @TableField("dify_api_keys_id")
+    private String difyApiKeysId;
+
+    /**
      * 创建人ID
      */
     @TableField("creator_id")
@@ -94,4 +100,10 @@ public class ReportManagement extends BaseEntity {
      */
     @TableField("generate_time")
     private LocalDateTime generateTime;
+
+    /**
+     * MinIO 附件 ID（从 sys_attachment 表的 id 获取）
+     */
+    @TableField("attachment_id")
+    private Long attachmentId;
 }

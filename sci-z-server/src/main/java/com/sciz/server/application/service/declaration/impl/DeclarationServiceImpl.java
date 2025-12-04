@@ -479,7 +479,7 @@ public class DeclarationServiceImpl implements DeclarationService {
             // 4. 同步上传文件到 Dify
             log.info(String.format("开始同步文件到 Dify: fileName=%s, resourceId=%s, keyType=%s",
                     fileName, resourceId, keyType));
-            var syncResp = fileService.syncToDify(syncReq);
+            var syncResp = difyWorkflowService.syncFileToDify(syncReq);
             String difyFileId = syncResp.difyFileId();
 
             log.info(String.format("文件已上传到 Dify: difyFileId=%s", difyFileId));

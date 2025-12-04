@@ -447,6 +447,7 @@ public class FileConvertServiceImpl implements FileConvertService {
     /**
      * 加载系统字体（支持中文）
      * 使用 Java GraphicsEnvironment 动态获取系统可用字体
+     * 遍历所有可用的中文字体，逐个尝试加载，直到成功或全部失败
      */
     private PDFont loadSystemFont(PDDocument document) {
         var ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
@@ -464,28 +465,45 @@ public class FileConvertServiceImpl implements FileConvertService {
                 "PingFang SC", "苹方" // macOS 苹方
         };
 
-        // 查找可用的中文字体
-        var fontName = Arrays.stream(preferredFontNames)
+        // 查找所有可用的中文字体（去重）
+        var availableChineseFonts = Arrays.stream(preferredFontNames)
                 .filter(name -> Arrays.asList(availableFonts).contains(name))
-                .findFirst()
-                .orElse(null);
+                .distinct()
+                .toList();
 
-        if (fontName != null) {
+        if (availableChineseFonts.isEmpty()) {
+            log.error("系统中未找到任何可用的中文字体");
+            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED,
+                    "系统缺少中文字体支持，无法转换包含中文的文档。请安装中文字体（如：SimSun、SimHei、Microsoft YaHei 等）");
+        }
+
+        // 遍历所有可用的中文字体，逐个尝试加载
+        var lastException = new Exception[1];
+        for (var fontName : availableChineseFonts) {
             var fontFile = getFontFile(fontName);
-            if (fontFile != null) {
-                try (var fontStream = Files.newInputStream(fontFile)) {
-                    var font = PDType0Font.load(document, fontStream);
-                    log.info(String.format("成功加载字体: %s (%s)", fontName, fontFile));
-                    return font;
-                } catch (Exception e) {
-                    log.debug(String.format("加载字体文件失败: %s", fontFile), e);
-                }
+            if (fontFile == null) {
+                log.debug(String.format("字体文件不存在: %s", fontName));
+                continue;
+            }
+
+            try (var fontStream = Files.newInputStream(fontFile)) {
+                var font = PDType0Font.load(document, fontStream);
+                log.info(String.format("成功加载字体: %s (%s)", fontName, fontFile));
+                return font;
+            } catch (Exception e) {
+                lastException[0] = e;
+                log.warn(String.format("加载字体文件失败: %s (%s), err=%s", fontName, fontFile, e.getMessage()));
+                // 继续尝试下一个字体
             }
         }
 
-        // 如果都失败，使用备用字体
-        log.warn("无法加载系统字体，使用备用字体（不支持中文）");
-        return PDType1Font.HELVETICA;
+        // 所有字体都加载失败，抛出明确的业务异常
+        var errorMsg = lastException[0] != null
+                ? String.format("所有中文字体加载失败，最后一个错误: %s", lastException[0].getMessage())
+                : "所有中文字体加载失败";
+        log.error(errorMsg);
+        throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED,
+                "无法加载中文字体，可能是字体文件损坏或格式不正确。请检查系统字体文件（如：C:/Windows/Fonts/simsun.ttc）");
     }
 
     /**

@@ -452,17 +452,18 @@ public class DeclarationEventHandler {
                 log.warn(String.format("事件中缺少操作人ID，使用申报人ID作为后备: applicantId=%s", operatorId));
             }
 
-            // 构建更新请求
+            // 构建更新请求（只更新 difyKnowledgeId）
             var updateReq = new ProjectUpdateReq(
                     projectId,
-                    null, // name 不更新
-                    null, // description 不更新
-                    null, // declarationId 不更新
+                    null, // manager 不更新
+                    null, // startTime 不更新
+                    null, // endTime 不更新
                     null, // budget 不更新
-                    null, // progress 不更新
+                    null, // description 不更新
                     null, // status 不更新
                     difyKnowledgeId, // 只更新 difyKnowledgeId
-                    operatorId // 设置用户ID，避免从上下文获取
+                    null, // members 不更新
+                    null // milestones 不更新
             );
 
             // 更新项目

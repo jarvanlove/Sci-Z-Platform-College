@@ -1,4 +1,4 @@
-<!--
+<!-- <!--
 /**
  * @description 仪表板统计卡片组件
  * 基于原型图设计的仪表板统计卡片，专门用于仪表板页面
@@ -218,4 +218,4 @@ const formattedValue = computed(() => {
     border-left: 4px solid var(--color-danger);
   }
 }
-</style>
+</style> -->

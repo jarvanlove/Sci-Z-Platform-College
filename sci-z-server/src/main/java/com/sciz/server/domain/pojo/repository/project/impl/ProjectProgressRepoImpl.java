@@ -1,6 +1,7 @@
 package com.sciz.server.domain.pojo.repository.project.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
 import com.sciz.server.domain.pojo.entity.project.ProjectProgress;
 import com.sciz.server.domain.pojo.mapper.project.ProjectProgressMapper;
 import com.sciz.server.domain.pojo.repository.project.ProjectProgressRepo;
@@ -71,5 +72,43 @@ public class ProjectProgressRepoImpl implements ProjectProgressRepo {
                 .entrySet().stream()
                 .filter(entry -> entry.getValue() != null)
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    @Override
+    public List<ProjectProgress> findMilestonesByProjectId(Long projectId) {
+        if (projectId == null) {
+            return List.of();
+        }
+        return mapper.selectList(new LambdaQueryWrapper<ProjectProgress>()
+                .eq(ProjectProgress::getProjectId, projectId)
+                .eq(ProjectProgress::getIsMilestone, 1)
+                .eq(ProjectProgress::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .orderByAsc(ProjectProgress::getMilestoneStartTime));
+    }
+
+    @Override
+    public ProjectProgress findById(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return mapper.selectOne(new LambdaQueryWrapper<ProjectProgress>()
+                .eq(ProjectProgress::getId, id)
+                .eq(ProjectProgress::getIsDeleted, DeleteStatus.NOT_DELETED.getCode()));
+    }
+
+    @Override
+    public boolean updateById(ProjectProgress entity) {
+        return mapper.updateById(entity) > 0;
+    }
+
+    @Override
+    public boolean deleteBatchByIds(List<Long> ids) {
+        if (CollectionUtils.isEmpty(ids)) {
+            return true;
+        }
+        return new LambdaUpdateChainWrapper<>(mapper)
+                .in(ProjectProgress::getId, ids)
+                .set(ProjectProgress::getIsDeleted, DeleteStatus.DELETED.getCode())
+                .update();
     }
 }

@@ -40,10 +40,10 @@ public interface SysKnowledgeBaseRepo {
     /**
      * 根据Dify知识库ID查询知识库
      *
-     * @param difyKnowdataId Dify知识库ID
+     * @param difyKnowdataId Dify知识库ID（字符串类型）
      * @return 知识库实体
      */
-    SysKnowledgeBase findByDifyKnowdataId(String difyKnowdataId);
+    SysKnowledgeBase findByDifyKnowdataId(int difyKnowdataId);
 
     /**
      * 分页查询知识库列表

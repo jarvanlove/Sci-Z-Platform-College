@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.domain.pojo.entity.declaration.Declaration;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 申报仓储（领域层抽象）
@@ -68,5 +69,13 @@ public interface DeclarationRepo {
      * @param declarationIds List<Long> 申报ID列表
      * @return Map<Long, Declaration> 申报ID -> 申报实体
      */
-    java.util.Map<Long, Declaration> findByIds(List<Long> declarationIds);
+    Map<Long, Declaration> findByIds(List<Long> declarationIds);
+
+    /**
+     * 根据ID更新申报
+     *
+     * @param entity Declaration 实体
+     * @return boolean 是否更新成功
+     */
+    boolean updateById(Declaration entity);
 }

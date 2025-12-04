@@ -603,6 +603,7 @@ import {
   createKnowledgeFolder,
   uploadKnowledgeFile,
   uploadFileToKnowledge,
+  uploadFilesToKnowledge,
   renameKnowledgeFile,
   deleteKnowledgeFile,
   deleteKnowledgeFolder,
@@ -1024,67 +1025,30 @@ const handleKbUpload = async (e) => {
   const files = e.target.files || []
   if (!files.length || !selectedKnowledgeBase.value) return
 
-  // 检查是否有 Dify KB ID（优先使用 difyKnowdataId，兼容 difyKbId）
-  const difyKbId = selectedKnowledgeBase.value.difyKnowdataId || selectedKnowledgeBase.value.difyKbId
-  if (!difyKbId) {
-    logger.warn('知识库缺少 Dify KB ID', {
-      knowledgeBase: selectedKnowledgeBase.value,
-      availableFields: Object.keys(selectedKnowledgeBase.value)
-    })
-    ElMessage.warning('知识库缺少 Dify KB ID，无法上传文件。请检查知识库是否已正确创建。')
-    e.target.value = ''
-    return
-  }
-
   // 获取当前文件夹ID（如果有），确保是数字类型
   const folderId = currentFolder.value ? Number(currentFolder.value.id) : 0
-  const knowledgeId = Number(selectedKnowledgeBase.value.id)
+  const knowledgeId = String(selectedKnowledgeBase.value.id) // 后端接口使用 String 类型的知识库ID
 
   try {
-    logger.info('开始上传文件', { 
+    logger.info('开始批量上传文件', { 
       fileCount: files.length, 
-      difyKbId, 
-      folderId,
-      knowledgeId
+      knowledgeId,
+      folderId
     })
 
-    // 逐个上传文件
-    const uploadPromises = Array.from(files).map(file => 
-      uploadFileToKnowledge(difyKbId, file, folderId)
-    )
-
-    const uploadResults = await Promise.all(uploadPromises)
+    // 使用批量上传接口（后端已处理文件关联的创建）
+    const response = await uploadFilesToKnowledge(knowledgeId, files, folderId)
     
-    // 上传成功后，需要创建文件关联记录
-    // 注意：这里假设上传接口返回的数据中包含 attachmentId 和 callback 信息
-    // 如果后端上传接口返回的数据结构不同，需要根据实际情况调整
-    try {
-      for (let i = 0; i < uploadResults.length; i++) {
-        const result = uploadResults[i]
-        if (result.code === 200 && result.data) {
-          // 创建文件关联记录，确保所有 ID 都是数字类型
-          await createKnowledgeFileRelation({
-            knowledgeId: knowledgeId,
-            folderId: folderId,
-            attachmentId: Number(result.data.attachmentId || result.data.id), // 根据实际返回结构调整
-            fileName: files[i].name,
-            sortOrder: 0,
-            callback: result.data.callback ? JSON.stringify(result.data.callback) : null
-          })
-        }
-      }
-    } catch (relationError) {
-      logger.warn('创建文件关联失败', relationError)
-      // 即使关联创建失败，也提示上传成功（文件已上传到Dify）
+    if (response.code === 200) {
+      ElMessage.success(`成功上传 ${files.length} 个文件`)
+      logger.info('文件批量上传成功', { fileCount: files.length })
+      // 上传成功后刷新文件列表
+      await loadKnowledgeFiles(Number(selectedKnowledgeBase.value.id), folderId || null)
+    } else {
+      throw new Error(response.message || '上传文件失败')
     }
-    
-    ElMessage.success(`成功上传 ${files.length} 个文件`)
-    logger.info('文件上传成功', { fileCount: files.length })
-
-    // 上传成功后刷新文件列表
-    await loadKnowledgeFiles(knowledgeId, folderId || null)
   } catch (error) {
-    logger.error('上传文件失败', error)
+    logger.error('批量上传文件失败', error)
     ElMessage.error(error.message || '上传文件失败，请稍后重试')
   } finally {
     e.target.value = ''

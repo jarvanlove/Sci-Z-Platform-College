@@ -62,7 +62,7 @@
 
       <!-- 报告类型选择 -->
       <div class="report-type-selector form-item-full">
-        <el-form-item :label="$t('report.type')" prop="reportType" class="form-item-full">
+        <el-form-item :label="$t('report.type')" prop="difyApiKeysId" class="form-item-full">
           <div v-if="reportTypesLoading" class="loading-container">
             <el-icon class="is-loading"><Loading /></el-icon>
             <span>{{ $t('common.loading') }}</span>
@@ -75,13 +75,13 @@
               v-for="reportType in reportTypes"
               :key="reportType.id"
               class="type-card"
-              :class="{ selected: formData.reportType === reportType.resourceId }"
-              @click="formData.reportType = reportType.resourceId"
+              :class="{ selected: formData.difyApiKeysId === String(reportType.id) }"
+              @click="handleReportTypeChange(reportType)"
             >
               <el-icon class="type-icon"><Document /></el-icon>
               <h3 class="type-title">{{ reportType.keyName }}</h3>
               <p class="type-description">{{ reportType.description || $t('report.generatePage.typeDefaultDesc') }}</p>
-              <span v-if="formData.reportType === reportType.resourceId" class="type-badge">
+              <span v-if="formData.difyApiKeysId === String(reportType.id)" class="type-badge">
                 <el-icon><Check /></el-icon>
               </span>
             </div>
@@ -128,7 +128,8 @@ const formData = reactive({
   projectName: '',
   projectCode: '',
   projectKnowledgeId: '',
-  reportType: '',
+  reportType: '', // 报告类型（保留用于显示和筛选）
+  difyApiKeysId: '', // Dify API Keys 表 ID（从报告类型选择中获取的 id）
   summary: ''
 })
 
@@ -137,7 +138,7 @@ const formRules = {
   projectId: [
     { required: true, message: '请选择项目', trigger: 'change' }
   ],
-  reportType: [
+  difyApiKeysId: [
     { required: true, message: '请选择报告类型', trigger: 'change' }
   ]
 }
@@ -193,6 +194,21 @@ const handleProjectChange = (projectId) => {
   }
 }
 
+// 报告类型选择变化
+const handleReportTypeChange = (reportType) => {
+  formData.difyApiKeysId = String(reportType.id)
+  // 根据 keyName 判断报告类型（如果包含"科技"则为 tech，包含"自评"则为 self）
+  if (reportType.keyName && reportType.keyName.includes('科技')) {
+    formData.reportType = 'tech'
+  } else if (reportType.keyName && reportType.keyName.includes('自评')) {
+    formData.reportType = 'self'
+  } else {
+    // 默认使用 keyName 作为 reportType
+    formData.reportType = reportType.keyName || ''
+  }
+  logger.info(`选择报告类型: ${reportType.keyName} (Dify API Keys ID: ${reportType.id})`)
+}
+
 // 重置表单
 const resetForm = () => {
   formData.projectId = null
@@ -200,6 +216,7 @@ const resetForm = () => {
   formData.projectCode = ''
   formData.projectKnowledgeId = ''
   formData.reportType = ''
+  formData.difyApiKeysId = ''
   formData.summary = ''
   formRef.value?.clearValidate()
 }
@@ -224,6 +241,7 @@ const getFormData = () => {
     projectCode: formData.projectCode || undefined,
     projectKnowledgeId: formData.projectKnowledgeId || undefined,
     reportType: formData.reportType,
+    difyApiKeysId: formData.difyApiKeysId,
     summary: formData.summary || undefined
   }
 }

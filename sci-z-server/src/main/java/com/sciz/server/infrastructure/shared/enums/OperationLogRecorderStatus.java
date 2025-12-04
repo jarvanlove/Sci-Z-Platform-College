@@ -128,6 +128,16 @@ public enum OperationLogRecorderStatus {
      */
     PROJECT_APPROVE("审核项目", "已审核项目"),
 
+    /**
+     * 上传里程碑文档
+     */
+    PROJECT_MILESTONE_DOCUMENT_UPLOAD("上传里程碑文档", "已上传里程碑文档"),
+
+    /**
+     * 删除里程碑文档
+     */
+    PROJECT_MILESTONE_DOCUMENT_DELETE("删除里程碑文档", "已删除里程碑文档"),
+
     // ==================== 申报管理模块 ====================
 
     /**
