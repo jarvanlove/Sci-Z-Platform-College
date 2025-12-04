@@ -56,4 +56,12 @@ public interface ProjectRepo {
      * @return boolean 是否删除成功
      */
     boolean deleteById(Long id);
+
+    /**
+     * 统计项目数量（根据状态）
+     *
+     * @param status String 项目状态（null表示统计所有未删除的项目）
+     * @return Long 项目数量
+     */
+    Long countByStatus(String status);
 }

@@ -47,10 +47,15 @@ public interface ProjectConverter {
 
     /**
      * entity → detailResp
+     * 
+     * 注意：此方法已废弃，项目详情响应现在在 Service 中直接构建
+     * （因为需要从多个表查询数据：项目、申报、成员、里程碑、附件）
      *
      * @param entity 实体
      * @return 详情响应
+     * @deprecated 项目详情响应现在在 Service 中直接构建，不再使用此方法
      */
+    @Deprecated
     ProjectDetailResp toDetailResp(Project entity);
 
     /**
@@ -61,20 +66,4 @@ public interface ProjectConverter {
      */
     List<ProjectListResp> toListRespList(List<Project> entities);
 
-    /**
-     * updateReq → entity（更新实体）
-     *
-     * @param req    更新请求
-     * @param entity 实体（会被更新）
-     */
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "number", ignore = true)
-    @Mapping(target = "createdBy", ignore = true)
-    @Mapping(target = "updatedBy", ignore = true)
-    @Mapping(target = "createdTime", ignore = true)
-    @Mapping(target = "updatedTime", ignore = true)
-    @Mapping(target = "isDeleted", ignore = true)
-    void updateEntity(@MappingTarget Project entity, ProjectUpdateReq req);
 }
-
-

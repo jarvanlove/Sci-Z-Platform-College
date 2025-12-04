@@ -9,7 +9,10 @@ import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -89,5 +92,33 @@ public class SysAttachmentRelationRepoImpl implements SysAttachmentRelationRepo 
                 .set(SysAttachmentRelation::getRelationId, relationId)
                 .set(SysAttachmentRelation::getUpdatedBy, userId)
                 .set(SysAttachmentRelation::getUpdatedTime, now)) > 0;
+    }
+
+    @Override
+    public Map<Long, List<Long>> findAttachmentIdsByRelationIds(String relationType, List<Long> relationIds) {
+        if (!StringUtils.hasText(relationType) || CollectionUtils.isEmpty(relationIds)) {
+            return Map.of();
+        }
+        var records = mapper.selectList(new LambdaQueryWrapper<SysAttachmentRelation>()
+                .eq(SysAttachmentRelation::getRelationType, relationType)
+                .in(SysAttachmentRelation::getRelationId, relationIds)
+                .eq(SysAttachmentRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode()));
+        return records.stream()
+                .collect(Collectors.groupingBy(
+                        SysAttachmentRelation::getRelationId,
+                        Collectors.mapping(SysAttachmentRelation::getAttachmentId, Collectors.toList())));
+    }
+
+    @Override
+    public SysAttachmentRelation findByAttachmentId(Long attachmentId, String relationType) {
+        if (attachmentId == null) {
+            return null;
+        }
+        var queryWrapper = new LambdaQueryWrapper<SysAttachmentRelation>()
+                .eq(SysAttachmentRelation::getAttachmentId, attachmentId)
+                .eq(StringUtils.hasText(relationType), SysAttachmentRelation::getRelationType, relationType)
+                .eq(SysAttachmentRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .last("LIMIT 1");
+        return mapper.selectOne(queryWrapper);
     }
 }

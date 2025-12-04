@@ -478,7 +478,7 @@ CREATE TABLE IF NOT EXISTS project_member (
     project_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
     user_name VARCHAR(50) NOT NULL,
-    role VARCHAR(20) NOT NULL,
+    role VARCHAR(100) NOT NULL,
     join_time TIMESTAMP NOT NULL,
     is_deleted SMALLINT DEFAULT 0,
     created_by BIGINT,

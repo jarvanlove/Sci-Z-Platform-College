@@ -147,6 +147,7 @@
         :limit="uploadLimit"
         :max-size="uploadMaxSize"
         :allowed-types="uploadAllowedTypes"
+        :custom-upload="customUpload"
         @success="handleUploadSuccess"
         @error="handleUploadError"
       />
@@ -241,6 +242,11 @@ const props = defineProps({
   uploadAllowedTypes: {
     type: Array,
     default: () => []
+  },
+  // 自定义上传函数
+  customUpload: {
+    type: Function,
+    default: null
   },
   // 自定义类名
   customClass: {

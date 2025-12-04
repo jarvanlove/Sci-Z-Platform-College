@@ -4,12 +4,10 @@ import com.sciz.server.application.service.file.FileService;
 import com.sciz.server.domain.pojo.dto.request.file.FileBatchUploadReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileCheckDuplicateReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileListQueryReq;
-import com.sciz.server.domain.pojo.dto.request.file.FileSyncDifyReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.file.FileDuplicateCheckResp;
 import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
 import com.sciz.server.domain.pojo.dto.response.file.FileDownloadContext;
-import com.sciz.server.domain.pojo.dto.response.file.FileSyncDifyResp;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.Result;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -151,12 +149,5 @@ public class FileController {
     public Result<FileDuplicateCheckResp> checkDuplicate(@Valid @RequestBody FileCheckDuplicateReq req) {
         FileDuplicateCheckResp resp = fileService.checkDuplicate(req);
         return Result.success(resp);
-    }
-
-    @Operation(summary = "同步到Dify", description = "文件同步到Dify知识库")
-    @PostMapping("/sync-dify")
-    public Result<FileSyncDifyResp> syncDify(@Valid @ModelAttribute FileSyncDifyReq req) {
-        FileSyncDifyResp resp = fileService.syncToDify(req);
-        return Result.success(resp, ResultCode.FILE_UPLOAD_SUCCESS.getMessage());
     }
 }

@@ -1,13 +1,21 @@
 package com.sciz.server.interfaces.controller;
 
 import com.sciz.server.application.service.project.ProjectService;
+import com.sciz.server.domain.pojo.dto.request.file.FileBatchUploadReq;
+import com.sciz.server.domain.pojo.dto.request.project.MilestoneDocumentDeleteReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectCreateReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.project.MilestoneDocumentUploadResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectDetailResp;
+
+import java.util.List;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectListResp;
+import com.sciz.server.domain.pojo.dto.response.project.ProjectStatisticsResp;
+import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.Result;
+import com.sciz.server.infrastructure.shared.result.ResultCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -63,7 +71,7 @@ public class ProjectController {
      * @return 项目详情
      */
     @Operation(summary = "获取项目详情", description = "根据ID获取项目详细信息")
-    @GetMapping("/{id}")
+    @GetMapping("/detail/{id}")
     public Result<ProjectDetailResp> getProjectDetail(@PathVariable Long id) {
         ProjectDetailResp resp = projectService.findDetail(id);
         return Result.success(resp);
@@ -72,13 +80,17 @@ public class ProjectController {
     /**
      * 更新项目
      *
+     * @param id  项目ID
      * @param req 更新请求
-     * @return 成功标识
+     * @return 操作结果
      */
-    @Operation(summary = "更新项目", description = "更新项目信息")
-    @PutMapping
+    @Operation(summary = "更新项目", description = "更新项目信息（包括基本信息、成员、里程碑）")
+    @PutMapping("/update/{id}")
     // @SaCheckPermission("api:project:update")
-    public Result<Void> updateProject(@Valid @RequestBody ProjectUpdateReq req) {
+    public Result<Void> updateProject(@PathVariable Long id, @Valid @RequestBody ProjectUpdateReq req) {
+        if (!id.equals(req.id())) {
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "路径参数中的项目ID与请求体中的ID不一致");
+        }
         projectService.update(req);
         return Result.success();
     }
@@ -94,6 +106,47 @@ public class ProjectController {
     // @SaCheckPermission("api:project:delete")
     public Result<Void> deleteProject(@PathVariable Long id) {
         projectService.deleteById(id);
+        return Result.success();
+    }
+
+    /**
+     * 获取项目统计信息
+     *
+     * @return 项目统计信息（总项目数、进行中、已延期、已完成）
+     */
+    @Operation(summary = "获取项目统计信息", description = "获取项目统计数据：总项目数、进行中的项目数、已延期项目数、已完成项目数")
+    @GetMapping("/statistics")
+    public Result<ProjectStatisticsResp> getProjectStatistics() {
+        var statistics = projectService.getStatistics();
+        return Result.success(statistics);
+    }
+
+    /**
+     * 批量上传里程碑文档
+     *
+     * @param req 批量文件上传请求
+     * @return 文档上传响应列表
+     */
+    @Operation(summary = "批量上传里程碑文档", description = "批量上传里程碑文档，返回文件信息列表。relationId为项目ID，relationName由前端传递")
+    @PostMapping("/milestone/document")
+    // @SaCheckPermission("api:project:milestone:document:upload")
+    public Result<List<MilestoneDocumentUploadResp>> uploadMilestoneDocument(
+            @Valid @ModelAttribute FileBatchUploadReq req) {
+        var respList = projectService.uploadMilestoneDocument(req);
+        return Result.success(respList);
+    }
+
+    /**
+     * 删除里程碑文档
+     *
+     * @param req 删除请求（包含附件ID、项目ID、Dify文档ID）
+     * @return 操作结果
+     */
+    @Operation(summary = "删除里程碑文档", description = "删除里程碑文档，同步删除关联表，异步并行删除 MinIO 文件和 Dify 知识库文档")
+    @DeleteMapping("/milestone/document")
+    // @SaCheckPermission("api:project:milestone:document:delete")
+    public Result<Void> deleteMilestoneDocument(@Valid @RequestBody MilestoneDocumentDeleteReq req) {
+        projectService.deleteMilestoneDocument(req);
         return Result.success();
     }
 

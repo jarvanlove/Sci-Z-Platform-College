@@ -3,8 +3,11 @@
  * 基于原型图设计的仪表板相关组件
  */
 
+// 仪表板主组件
+export { default as Dashboard } from './Dashboard.vue'
+
 // 仪表板统计卡片
-export { default as DashboardStatCard } from './DashboardStatCard.vue'
+//export { default as DashboardStatCard } from './DashboardStatCard.vue'
 
 // 仪表板图表组件
 //export { default as DashboardChart } from './DashboardChart.vue'

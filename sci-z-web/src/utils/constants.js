@@ -73,20 +73,20 @@ export const LOGIN_STATUS_TAG_CONFIG = {
   warning: { type: 'warning' }
 }
 
-// 项目状态常量
+// 项目状态常量（与后端枚举保持一致）
 export const PROJECT_STATUS = {
-  PLANNED: 'planned',
-  PROGRESS: 'progress', 
-  COMPLETED: 'completed',
-  DELAYED: 'delayed'
+  PROGRESS: 'progress',   // 进行中 (code: 1)
+  COMPLETED: 'completed', // 已完成 (code: 2)
+  DELAYED: 'delayed',     // 已延期 (code: 3)
+  CANCELLED: 'cancelled'  // 已取消 (code: 4)
 }
 
 // 项目状态配置
 export const PROJECT_STATUS_CONFIG = {
-  [PROJECT_STATUS.PLANNED]: { text: '未开始', type: 'info', color: '#2563eb' },
   [PROJECT_STATUS.PROGRESS]: { text: '进行中', type: 'warning', color: '#f59e0b' },
   [PROJECT_STATUS.COMPLETED]: { text: '已完成', type: 'success', color: '#16a34a' },
-  [PROJECT_STATUS.DELAYED]: { text: '已延期', type: 'danger', color: '#dc2626' }
+  [PROJECT_STATUS.DELAYED]: { text: '已延期', type: 'danger', color: '#dc2626' },
+  [PROJECT_STATUS.CANCELLED]: { text: '已取消', type: 'info', color: '#6b7280' }
 }
 
 // 里程碑状态常量
@@ -107,11 +107,11 @@ export const MILESTONE_STATUS_CONFIG = {
 
 // 里程碑选项常量
 export const MILESTONE_OPTIONS = [
-  '项目启动：建设方案通过审核并备案',
-  '任务分解与资源准备：项目任务书下达，资源配置完成，进入实施阶段',
-  '项目实施与过程管理：中期检查',
-  '成果整合与结题准备：结题验收',
-  '后续管理与成果转化：项目归档完成，成果转化'
+  '1.项目启动：建设方案通过审核并备案',
+  '2.任务分解与资源准备：项目任务书下达，资源配置完成，进入实施阶段',
+  '3.项目实施与过程管理：中期检查',
+  '4.成果整合与结题准备：结题验收',
+  '5.后续管理与成果转化：项目归档完成，成果转化'
 ]
 
 

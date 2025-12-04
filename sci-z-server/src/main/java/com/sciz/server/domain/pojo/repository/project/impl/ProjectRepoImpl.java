@@ -107,4 +107,17 @@ public class ProjectRepoImpl implements ProjectRepo {
                 .set(Project::getIsDeleted, DeleteStatus.DELETED.getCode())
                 .update();
     }
+
+    @Override
+    public Long countByStatus(String status) {
+        var queryWrapper = new LambdaQueryWrapper<Project>();
+        queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 如果指定了状态，则按状态筛选
+        if (StringUtils.hasText(status)) {
+            queryWrapper.eq(Project::getStatus, status);
+        }
+
+        return mapper.selectCount(queryWrapper);
+    }
 }

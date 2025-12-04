@@ -74,28 +74,13 @@ export const PROJECT_API = {
   ADD_MEMBER: buildApiUrl('/project/members/add'),
   REMOVE_MEMBER: buildApiUrl('/project/members/remove'),
   PROGRESS: (id) => buildApiUrl(`/project/progress/${id}`),
-  ADD_PROGRESS: buildApiUrl('/project/progress/add')
+  ADD_PROGRESS: buildApiUrl('/project/progress/add'),
+  STATISTICS: buildApiUrl('/project/statistics'), // 获取项目统计信息
+  MILESTONE_DOCUMENT: buildApiUrl('/project/milestone/document') // 里程碑文档上传
 }
 
 // ================================
-// 5. 验收模块 API 路径
-// ================================
-
-export const ACCEPTANCE_API = {
-  BASE_PATH: buildApiUrl('/acceptance'),
-  APPLY: buildApiUrl('/acceptance/apply'),
-  LIST: buildApiUrl('/acceptance/list'),
-  DETAIL: (id) => buildApiUrl(`/acceptance/detail/${id}`),
-  REPORT_GENERATE: buildApiUrl('/acceptance/report/generate'),
-  REPORT_LIST: (id) => buildApiUrl(`/acceptance/report/list/${id}`),
-  REPORT_PREVIEW: (id) => buildApiUrl(`/acceptance/report/preview/${id}`),
-  REPORT_DOWNLOAD: (id) => buildApiUrl(`/acceptance/report/download/${id}`),
-  SUBMIT: (id) => buildApiUrl(`/acceptance/submit/${id}`),
-  REVIEW: (id) => buildApiUrl(`/acceptance/review/${id}`)
-}
-
-// ================================
-// 6. 报告模块 API 路径
+// 5. 报告模块 API 路径
 // ================================
 
 export const REPORT_API = {
@@ -312,7 +297,6 @@ export default {
   AUTH_API,
   DECLARATION_API,
   PROJECT_API,
-  ACCEPTANCE_API,
   REPORT_API,
   AI_API,
   KNOWLEDGE_API,

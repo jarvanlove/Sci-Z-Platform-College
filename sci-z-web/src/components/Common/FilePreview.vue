@@ -21,18 +21,6 @@
     class="file-preview-dialog"
   >
     <div class="file-preview-container">
-      <div class="file-preview-header">
-        <div class="file-preview-title">{{ fileInfo?.name || '文件预览' }}</div>
-        <div class="file-preview-actions">
-          <el-button
-            type="primary"
-            :loading="loading"
-            @click="handleDownload"
-          >
-            {{ $t('common.download')}}
-          </el-button>
-        </div>
-      </div>
       <div class="file-preview-content">
         <!-- 加载状态 -->
         <div v-if="loading" class="preview-loading">
@@ -71,9 +59,34 @@
           />
         </div>
         
-        <!-- Word/Office 文档预览 - 使用 docx-preview 在浏览器中直接渲染 -->
+        <!-- Word 文档预览 - 使用 docx-preview 在浏览器中直接渲染 -->
         <div v-else-if="previewType === 'office' && previewUrl" class="preview-office-container">
           <div ref="docxPreviewContainer" class="docx-preview-wrapper"></div>
+        </div>
+
+        <!-- PPT/PPTX 预览 - 使用 Office Online Viewer -->
+        <div v-else-if="previewType === 'ppt' && previewUrl" class="preview-iframe-container">
+          <iframe
+            :src="previewUrl"
+            class="preview-iframe"
+            frameborder="0"
+            @load="handleIframeLoad"
+            @error="handleIframeError"
+          ></iframe>
+          <!-- Office Online Viewer 错误提示覆盖层 -->
+          <div v-if="pptViewerError" class="ppt-viewer-error-overlay">
+            <el-icon><Warning /></el-icon>
+            <p class="error-title">{{ pptViewerErrorTitle }}</p>
+            <p class="error-message">{{ pptViewerErrorMessage }}</p>
+            <div class="error-actions">
+              <el-button type="primary" @click="handleDownloadFile">
+                {{ $t('filePreview.downloadFile') || '下载文件' }}
+              </el-button>
+              <el-button @click="loadPreview">
+                {{ $t('common.retry') || '重试' }}
+              </el-button>
+            </div>
+          </div>
         </div>
         
         <!-- 文本文件预览 -->
@@ -124,6 +137,9 @@ const previewType = ref('')
 const iframeLoaded = ref(false)
 const textContent = ref('')
 const docxPreviewContainer = ref(null) // docx-preview 渲染容器
+const pptViewerError = ref(false) // PPT 预览器错误状态
+const pptViewerErrorTitle = ref('') // PPT 预览器错误标题
+const pptViewerErrorMessage = ref('') // PPT 预览器错误消息
 
 // 根据文件名或 URL 判断文件类型
 const detectFileType = (fileName, fileUrl = '') => {
@@ -142,10 +158,16 @@ const detectFileType = (fileName, fileUrl = '') => {
       return 'image'
     }
     
-    // Word/Office 文档
-    const officeExts = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']
-    if (officeExts.some(ext => name.endsWith(ext))) {
+    // Word 文档（使用 docx-preview 渲染）
+    const wordExts = ['.doc', '.docx']
+    if (wordExts.some(ext => name.endsWith(ext))) {
       return 'office'
+    }
+
+    // PPT 文档（使用 Office Online 预览）
+    const pptExts = ['.ppt', '.pptx']
+    if (pptExts.some(ext => name.endsWith(ext))) {
+      return 'ppt'
     }
     
     // 文本文件
@@ -166,7 +188,8 @@ const detectFileType = (fileName, fileUrl = '') => {
       
       if (ext === 'pdf') return 'pdf'
       if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)) return 'image'
-      if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) return 'office'
+      if (['doc', 'docx'].includes(ext)) return 'office'
+      if (['ppt', 'pptx'].includes(ext)) return 'ppt'
       if (['txt', 'md', 'json', 'xml', 'csv'].includes(ext)) return 'text'
     }
     
@@ -174,7 +197,7 @@ const detectFileType = (fileName, fileUrl = '') => {
     if (url.includes('.pdf') || url.includes('application/pdf')) return 'pdf'
     if (url.includes('.doc') || url.includes('.docx') || url.includes('word') || url.includes('application/vnd.openxmlformats-officedocument.wordprocessingml')) return 'office'
     if (url.includes('.xls') || url.includes('.xlsx') || url.includes('excel') || url.includes('application/vnd.openxmlformats-officedocument.spreadsheetml')) return 'office'
-    if (url.includes('.ppt') || url.includes('.pptx') || url.includes('powerpoint') || url.includes('application/vnd.openxmlformats-officedocument.presentationml')) return 'office'
+    if (url.includes('.ppt') || url.includes('.pptx') || url.includes('powerpoint') || url.includes('application/vnd.openxmlformats-officedocument.presentationml')) return 'ppt'
     if (url.includes('image/')) return 'image'
   }
   
@@ -224,7 +247,7 @@ const loadPreview = async () => {
       type: previewType.value 
     })
     
-    // 如果是 Word/Office 文档，使用 docx-preview 在浏览器中直接渲染
+    // 如果是 Word 文档，使用 docx-preview 在浏览器中直接渲染
     if (previewType.value === 'office') {
       try {
         // 先关闭 loading，让容器显示在 DOM 中
@@ -281,6 +304,54 @@ const loadPreview = async () => {
       }
       return
     }
+
+    // PPT/PPTX 使用 Office Online Viewer 进行预览
+    if (previewType.value === 'ppt') {
+      try {
+        const originalUrl = previewUrl.value
+        
+        // 重置错误状态
+        pptViewerError.value = false
+        pptViewerErrorTitle.value = ''
+        pptViewerErrorMessage.value = ''
+        
+        // 检查 URL 是否为 localhost 或内网地址
+        // Office Online Viewer 无法访问本地服务器，需要公网可访问的 URL
+        const isLocalhost = /^(https?:\/\/)?(localhost|127\.0\.0\.1|0\.0\.0\.0|::1)/i.test(originalUrl)
+        const isPrivateIP = /^(https?:\/\/)?(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/i.test(originalUrl)
+        
+        if (isLocalhost || isPrivateIP) {
+          // 本地或内网地址，无法使用在线预览服务
+          logger.warn('PPT file URL is localhost or private IP, cannot use Office Online Viewer', {
+            originalUrl,
+            isLocalhost,
+            isPrivateIP
+          })
+          pptViewerError.value = true
+          pptViewerErrorTitle.value = t('filePreview.pptLocalhostTitle')
+          pptViewerErrorMessage.value = t('filePreview.pptLocalhostNotSupported')
+          loading.value = false
+          return
+        }
+        
+        // 将文件 URL 编码后，使用 Office Online Viewer 服务进行预览
+        // Office Online Viewer 可以预览 PPT/PPTX 文件，避免浏览器直接下载
+        const encodedUrl = encodeURIComponent(originalUrl)
+        previewUrl.value = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`
+        logger.info('PPT preview URL generated with Office Online Viewer', {
+          originalUrl,
+          viewerUrl: previewUrl.value
+        })
+        loading.value = false
+      } catch (err) {
+        logger.error('Failed to generate PPT preview URL', err)
+        pptViewerError.value = true
+        pptViewerErrorTitle.value = t('filePreview.pptViewerErrorTitle') || 'PPT 预览服务不可用'
+        pptViewerErrorMessage.value = t('filePreview.pptPreviewFailed') || 'PPT 预览失败，请尝试下载后查看'
+        loading.value = false
+      }
+      return
+    }
     
     // 如果无法识别文件类型，但 URL 存在，默认尝试作为 Office 文档处理
     if (previewType.value === 'unsupported' && previewUrl.value) {
@@ -320,12 +391,58 @@ const loadPreview = async () => {
 const handleIframeLoad = () => {
   iframeLoaded.value = true
   logger.info('Iframe loaded successfully')
+  
+  // 对于 PPT 预览，延迟检查 iframe 内容是否真正加载成功
+  // Office Online Viewer 可能会显示错误页面（如限额提示）
+  if (previewType.value === 'ppt') {
+    // 延迟检查，等待 iframe 内容完全加载
+    setTimeout(() => {
+      // 由于跨域限制，无法直接访问 iframe 内容
+      // 但可以通过检查 iframe 的 URL 变化或等待一段时间后判断
+      // 如果 Office Online Viewer 显示错误，通常会在 URL 中包含错误信息
+      const iframe = document.querySelector('.preview-iframe')
+      if (iframe) {
+        const currentSrc = iframe.src
+        // 检查 URL 中是否包含错误相关的参数
+        if (currentSrc.includes('error') || currentSrc.includes('failed')) {
+          pptViewerError.value = true
+          pptViewerErrorTitle.value = t('filePreview.pptViewerErrorTitle') || 'PPT 预览服务不可用'
+          pptViewerErrorMessage.value = t('filePreview.pptViewerErrorMessage') || 'Office Online Viewer 服务可能已达到使用限额。如需升级 Pro+ 版本以获得更好的预览体验，请联系系统管理员。'
+        }
+      }
+    }, 3000) // 等待 3 秒，给 Office Online Viewer 足够时间加载或显示错误
+  }
 }
 
 // iframe 加载失败
 const handleIframeError = () => {
   logger.error('Iframe load failed')
-  error.value = t('filePreview.iframeLoadFailed') || '预览加载失败'
+  
+  // 如果是 PPT 预览失败，提供更详细的错误信息
+  if (previewType.value === 'ppt') {
+    pptViewerError.value = true
+    pptViewerErrorTitle.value = t('filePreview.pptViewerErrorTitle') || 'PPT 预览服务不可用'
+    pptViewerErrorMessage.value = t('filePreview.pptViewerErrorMessage') || 'Office Online Viewer 服务可能已达到使用限额。如需升级 Pro+ 版本以获得更好的预览体验，请联系系统管理员。'
+  } else {
+    error.value = t('filePreview.iframeLoadFailed') || '预览加载失败'
+  }
+}
+
+// 下载文件
+const handleDownloadFile = () => {
+  if (previewUrl.value) {
+    // 如果是 Office Online Viewer 的 URL，需要获取原始文件 URL
+    const originalUrl = previewUrl.value.includes('view.officeapps.live.com') 
+      ? previewUrl.value.match(/src=([^&]+)/)?.[1] 
+      : previewUrl.value
+    if (originalUrl) {
+      window.open(decodeURIComponent(originalUrl), '_blank')
+    } else {
+      window.open(previewUrl.value, '_blank')
+    }
+  } else {
+    ElMessage.warning(t('filePreview.downloadUrlNotReady') || '下载链接未就绪')
+  }
 }
 
 // 图片加载成功
@@ -339,14 +456,6 @@ const handleImageError = () => {
   logger.error('Image load failed')
 }
 
-// 下载文件
-const handleDownload = () => {
-  if (previewUrl.value) {
-    window.open(previewUrl.value, '_blank')
-  } else {
-    ElMessage.warning(t('filePreview.downloadUrlNotReady') || '下载链接未就绪')
-  }
-}
 
 // 关闭预览
 const handleClose = () => {
@@ -359,6 +468,9 @@ const handleClose = () => {
     error.value = ''
     iframeLoaded.value = false
     textContent.value = ''
+    pptViewerError.value = false
+    pptViewerErrorTitle.value = ''
+    pptViewerErrorMessage.value = ''
     // 清空 docx-preview 容器
     if (docxPreviewContainer.value) {
       docxPreviewContainer.value.innerHTML = ''
@@ -403,33 +515,6 @@ watch(() => props.fileInfo, (newVal) => {
   background: var(--bg);
   border-radius: var(--radius-md);
   overflow: hidden;
-}
-
-.file-preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  flex-shrink: 0;
-}
-
-.file-preview-title {
-  font-size: var(--font-size-lg);
-  font-weight: 600;
-  color: var(--text);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-right: 16px;
-}
-
-.file-preview-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
 }
 
 .file-preview-content {
@@ -480,6 +565,52 @@ watch(() => props.fileInfo, (newVal) => {
   height: 100%;
   border: none;
   background: var(--bg);
+}
+
+// PPT 预览器错误覆盖层
+.ppt-viewer-error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 10;
+  padding: 40px;
+  gap: 16px;
+  
+  .el-icon {
+    font-size: 48px;
+    color: var(--color-warning);
+    margin-bottom: 8px;
+  }
+  
+  .error-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+    text-align: center;
+  }
+  
+  .error-message {
+    font-size: var(--font-size-base);
+    color: var(--text-2);
+    margin: 0;
+    text-align: center;
+    line-height: 1.6;
+    max-width: 600px;
+  }
+  
+  .error-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+  }
 }
 
 

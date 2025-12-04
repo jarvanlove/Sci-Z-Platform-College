@@ -87,4 +87,12 @@ public interface SysAttachmentRepo {
             String keyword,
             String sortBy,
             boolean asc);
+
+    /**
+     * 根据附件ID列表批量查询附件
+     *
+     * @param attachmentIds List<Long> 附件ID列表
+     * @return List<SysAttachment> 附件列表
+     */
+    List<SysAttachment> findByIds(List<Long> attachmentIds);
 }

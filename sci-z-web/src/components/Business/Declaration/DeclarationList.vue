@@ -127,7 +127,8 @@
             </el-dropdown>
             <!-- 处理状态未完成时，显示不可点击的状态标签 -->
             <BaseTooltip
-              :content="$t('declaration.workflowNotCompletedHint') || '处理状态未完成，无法修改申报状态'"
+              v-else
+              :content="$t('declaration.workflowNotCompletedHint')"
               placement="top"
             >
               <span
@@ -505,7 +506,7 @@ const handleView = (id) => {
 }
 
 
-// 下载处理
+// 下载处理 - 直接调用下载接口，让浏览器自动处理
 const handleDownload = async (command) => {
   const { id, attachmentId, format } = command
   const formatNames = {
@@ -525,30 +526,27 @@ const handleDownload = async (command) => {
     }
   
     const fileFormat = format === 'word' ? 'docx' : format // 将 word 转换为 docx
+    
+    // 直接调用下载接口
     const response = await downloadFile(attachmentId, fileFormat)
     
-    // 处理下载响应
+    // 创建 blob URL 并触发下载
+    // 后端应该正确设置 Content-Disposition 头，浏览器会自动处理文件名
     const blob = new Blob([response.data], { 
       type: response.headers['content-type'] || 'application/octet-stream' 
     })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    
-    // 从响应头获取文件名，或使用默认文件名
-    const contentDisposition = response.headers['content-disposition']
-    const fileName = contentDisposition 
-      ? decodeURIComponent(contentDisposition.split('filename=')[1]?.replace(/"/g, ''))
-      : `申报文档_${id}.${fileFormat || 'pdf'}`
-    
-    link.download = fileName
+    // 使用简单的默认文件名，如果后端正确设置了 Content-Disposition 头，浏览器会使用后端提供的文件名
+    link.download = `申报文档_${id}.${fileFormat || 'pdf'}`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     
     ElMessage.success(t('declaration.downloadComplete', { format: formatNames[format] || '文件' }) || '文档下载完成')
-    logger.info('Download completed successfully', { id, attachmentId, format: fileFormat })
+    logger.info('Download completed', { id, attachmentId, format: fileFormat })
   } catch (error) {
     logger.error('Download failed', error)
     ElMessage.error(t('declaration.downloadFailed'))

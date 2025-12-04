@@ -134,4 +134,15 @@ public class SysAttachmentRepoImpl implements SysAttachmentRepo {
 
         return mapper.selectPage(page, wrapper);
     }
+
+    @Override
+    public List<SysAttachment> findByIds(List<Long> attachmentIds) {
+        if (attachmentIds == null || attachmentIds.isEmpty()) {
+            return List.of();
+        }
+        return mapper.selectList(new LambdaQueryWrapper<SysAttachment>()
+                .in(SysAttachment::getId, attachmentIds)
+                .eq(SysAttachment::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .orderByDesc(SysAttachment::getUploadTime));
+    }
 }
