@@ -1,4 +1,4 @@
-package com.sciz.server.domain.pojo.dto.response.file;
+package com.sciz.server.infrastructure.external.dify.dto.response;
 
 /**
  * 文件同步到 Dify 响应

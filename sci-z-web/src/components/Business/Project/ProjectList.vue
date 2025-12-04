@@ -180,7 +180,8 @@ const statusOptions = computed(() => [
   { label: t('common.all'), value: '' },
   { label: PROJECT_STATUS_CONFIG[PROJECT_STATUS.PROGRESS].text, value: PROJECT_STATUS.PROGRESS },
   { label: PROJECT_STATUS_CONFIG[PROJECT_STATUS.COMPLETED].text, value: PROJECT_STATUS.COMPLETED },
-  { label: PROJECT_STATUS_CONFIG[PROJECT_STATUS.DELAYED].text, value: PROJECT_STATUS.DELAYED }
+  { label: PROJECT_STATUS_CONFIG[PROJECT_STATUS.DELAYED].text, value: PROJECT_STATUS.DELAYED },
+  { label: PROJECT_STATUS_CONFIG[PROJECT_STATUS.CANCELLED].text, value: PROJECT_STATUS.CANCELLED }
 ])
 
 // 表格列配置 - 使用自适应策略
@@ -246,15 +247,15 @@ const getProgressColor = (progress) => {
   return '#16a34a'
 }
 
-// 状态映射：将后端状态值映射到前端状态值
-// 后端返回的状态可能是字符串数字（如 "1"）或状态描述（如 "进行中"）
+// 状态映射：将后端状态值映射到前端状态值（与后端枚举保持一致）
+// 后端枚举：1-进行中, 2-已完成, 3-已延期, 4-已取消
 const mapStatus = (status) => {
   // 如果状态是字符串数字，映射到前端状态值
   const statusNumberMap = {
-    '1': PROJECT_STATUS.PROGRESS, // 进行中
+    '1': PROJECT_STATUS.PROGRESS,  // 进行中
     '2': PROJECT_STATUS.COMPLETED, // 已完成
-    '3': PROJECT_STATUS.DELAYED, // 已延期
-    '0': PROJECT_STATUS.PLANNED // 未开始
+    '3': PROJECT_STATUS.DELAYED,   // 已延期
+    '4': PROJECT_STATUS.CANCELLED  // 已取消
   }
   
   // 如果状态是字符串描述，映射到前端状态值
@@ -266,22 +267,22 @@ const mapStatus = (status) => {
     '已完成': PROJECT_STATUS.COMPLETED,
     'delayed': PROJECT_STATUS.DELAYED,
     '已延期': PROJECT_STATUS.DELAYED,
-    'planned': PROJECT_STATUS.PLANNED,
-    '未开始': PROJECT_STATUS.PLANNED
+    'cancelled': PROJECT_STATUS.CANCELLED,
+    '已取消': PROJECT_STATUS.CANCELLED
   }
   
   // 优先匹配数字状态，再匹配文本状态
-  return statusNumberMap[status] || statusTextMap[status] || status
+  return statusNumberMap[String(status)] || statusTextMap[status] || status
 }
 
 // 状态反向映射：将前端状态值转换为后端 API 期望的值
-// 根据 API 文档，后端期望的状态值是字符串数字（如 "1"）
+// 后端枚举：1-进行中, 2-已完成, 3-已延期, 4-已取消
 const mapStatusToBackend = (status) => {
   const frontendToBackendMap = {
-    [PROJECT_STATUS.PROGRESS]: '1', // 进行中
+    [PROJECT_STATUS.PROGRESS]: '1',  // 进行中
     [PROJECT_STATUS.COMPLETED]: '2', // 已完成
-    [PROJECT_STATUS.DELAYED]: '3', // 已延期
-    [PROJECT_STATUS.PLANNED]: '0' // 未开始
+    [PROJECT_STATUS.DELAYED]: '3',   // 已延期
+    [PROJECT_STATUS.CANCELLED]: '4'  // 已取消
   }
   return frontendToBackendMap[status] || status
 }

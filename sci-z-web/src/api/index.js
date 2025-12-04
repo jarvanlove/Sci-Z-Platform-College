@@ -9,6 +9,9 @@ export * from './Auth'
 // 用户模块
 export * from './User'
 
+// 仪表板模块
+export * from './Dashboard'
+
 // 申报模块
 export * from './Declaration'
 

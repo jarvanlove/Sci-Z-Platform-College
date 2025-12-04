@@ -17,10 +17,11 @@
       :accept="accept"
       :limit="limit"
       :file-list="fileList"
-      :auto-upload="autoUpload"
+      :auto-upload="actualAutoUpload"
       :show-file-list="showFileList"
       :drag="drag"
       :disabled="disabled"
+      :http-request="props.customUpload ? customUpload : undefined"
       :before-upload="handleBeforeUpload"
       :on-success="handleUploadSuccess"
       :on-error="handleUploadError"
@@ -28,6 +29,7 @@
       :on-remove="handleRemove"
       :on-exceed="handleExceed"
       :on-preview="handlePreview"
+      :on-change="handleChange"
       class="file-upload"
       :class="{ 'is-drag': drag, 'is-disabled': disabled }"
     >
@@ -50,7 +52,7 @@
       </template>
     </el-upload>
     
-    <!-- 文件列表 -->
+    <!-- 文件列表（立即上传模式 & 批量模式公用展示） -->
     <div v-if="showFileList && fileList.length > 0" class="file-list">
       <div
         v-for="(file, index) in fileList"
@@ -73,7 +75,7 @@
           </div>
         </div>
         
-        <!-- 上传进度 -->
+        <!-- 上传进度（仅立即上传模式使用） -->
         <div v-if="file.status === 'uploading'" class="upload-progress">
           <el-progress
             :percentage="file.percentage || 0"
@@ -94,13 +96,36 @@
           </el-button>
           <el-button
             v-if="!disabled"
-            type="text"
+            type="danger"
+            text
             size="small"
             @click="handleRemove(file)"
           >
             <el-icon><Delete /></el-icon>
           </el-button>
         </div>
+      </div>
+    </div>
+    
+    <!-- 批量模式：待上传说明与按钮 -->
+    <div
+      v-if="isBatchMode && batchRawFiles.length > 0 && showBatchUploadButton"
+      class="batch-upload-panel"
+    >
+      <div class="batch-header">
+        <span>待上传文件（{{ batchRawFiles.length }}/{{ maxBatchCount }}）</span>
+      </div>
+      <div class="batch-hint">
+        单次最多上传 {{ maxBatchCount }} 个文件，点击下方按钮开始上传。
+      </div>
+      <div class="batch-actions">
+        <button
+          class="action-btn btn-primary"
+          :disabled="batchRawFiles.length === 0"
+          @click="handleBatchUploadClick"
+        >
+          开始上传
+        </button>
       </div>
     </div>
     
@@ -229,29 +254,81 @@ const props = defineProps({
   allowedTypes: {
     type: Array,
     default: () => []
+  },
+  // 上传模式：immediate=选中立刻上传（默认）、batch=仅收集文件，外部统一触发上传
+  mode: {
+    type: String,
+    default: 'immediate' // 'immediate' | 'batch'
+  },
+  // 批量模式下，单次最大文件数
+  maxBatchCount: {
+    type: Number,
+    default: 10
+  },
+  // 批量模式下，是否显示「开始上传」按钮
+  showBatchUploadButton: {
+    type: Boolean,
+    default: true
+  },
+  // 自定义上传函数
+  customUpload: {
+    type: Function,
+    default: null
   }
 })
 
 // Emits
-const emit = defineEmits(['update:modelValue', 'success', 'error', 'remove', 'preview'])
+const emit = defineEmits([
+  'update:modelValue',
+  'success',
+  'error',
+  'remove',
+  'preview',
+  // 批量模式相关事件
+  'batch-change',
+  'batch-upload'
+])
 
 // Refs
 const uploadRef = ref()
 
 // 计算属性
 const fileList = computed({
-  get: () => props.modelValue,
+  get: () => Array.isArray(props.modelValue) ? props.modelValue : [],
   set: (value) => emit('update:modelValue', value)
 })
 
 const uploadAction = computed(() => props.action)
 const uploadHeaders = computed(() => props.headers)
 const uploadData = computed(() => props.data)
+const isBatchMode = computed(() => props.mode === 'batch')
+// 批量模式下强制关闭自动上传
+const actualAutoUpload = computed(() => (isBatchMode.value ? false : props.autoUpload))
+
 const resolvedAllowedTypes = computed(() => {
   return props.allowedTypes.length > 0
     ? props.allowedTypes.map((item) => String(item).toLowerCase())
     : SUPPORTED_FILE_EXTENSIONS
 })
+
+// 批量模式：原始 File 列表
+const batchRawFiles = computed(() => {
+  if (!isBatchMode.value) return []
+  // el-upload 的 file 对象上通常有 raw 字段指向原始 File
+  return fileList.value
+    .map((f) => f.raw || f)
+    .filter((f) => !!f)
+})
+
+// 监听批量文件变化，通知外部
+watch(
+  () => batchRawFiles.value,
+  (val) => {
+    if (isBatchMode.value) {
+      emit('batch-change', val)
+    }
+  }
+)
 
 // 获取文件图标
 const getFileIcon = (file) => {
@@ -296,8 +373,25 @@ const getStatusText = (status) => {
   return statusMap[status] || status
 }
 
+// 自定义上传函数（如果提供）
+const customUpload = (options) => {
+  if (props.customUpload && typeof props.customUpload === 'function') {
+    return props.customUpload(options)
+  }
+  // 如果没有提供自定义上传函数，el-upload 会使用默认的 action、headers、data 等配置
+  // 这里返回 undefined，让 el-upload 使用默认上传
+  return undefined
+}
+
 // 上传前检查
 const handleBeforeUpload = (file) => {
+  // 批量模式下，先检查数量限制
+  const currentCount = Array.isArray(fileList.value) ? fileList.value.length : 0
+  if (isBatchMode.value && currentCount >= props.maxBatchCount) {
+    ElMessage.warning(`单次最多只能选择 ${props.maxBatchCount} 个文件`)
+    return false
+  }
+
   // 检查文件大小
   const sizeValidation = validateFileSize(file, props.maxSize)
   if (!sizeValidation.passed) {
@@ -313,6 +407,16 @@ const handleBeforeUpload = (file) => {
   }
   
   return true
+}
+
+// 批量模式：点击「开始上传」按钮时，通知外部
+const handleBatchUploadClick = () => {
+  if (!isBatchMode.value) return
+  if (batchRawFiles.value.length === 0) {
+    ElMessage.warning('暂无可上传的文件')
+    return
+  }
+  emit('batch-upload', batchRawFiles.value)
 }
 
 // 上传成功
@@ -332,9 +436,21 @@ const handleUploadProgress = (event, file, fileList) => {
   // 进度更新
 }
 
+// 文件列表变化（批量模式下需要同步到 v-model）
+const handleChange = (file, currentFileList) => {
+  // 批量模式下，同步 fileList 到 v-model
+  if (isBatchMode.value) {
+    emit('update:modelValue', currentFileList)
+  }
+}
+
 // 移除文件
-const handleRemove = (file, fileList) => {
-  emit('remove', { file, fileList })
+const handleRemove = (file, currentFileList) => {
+  // 批量模式下，同步更新 fileList
+  if (isBatchMode.value) {
+    emit('update:modelValue', currentFileList)
+  }
+  emit('remove', { file, fileList: currentFileList })
 }
 
 // 超出限制
@@ -496,6 +612,66 @@ defineExpose({
   
   .upload-tips {
     margin-top: var(--gap-lg);
+  }
+  
+  // 批量上传面板样式
+  .batch-upload-panel {
+    margin-top: var(--gap-md);
+    padding: var(--gap-md);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-tertiary);
+    
+    .batch-header {
+      font-size: var(--font-size-base);
+      font-weight: 600;
+      color: var(--color-primary); // 与主题主色保持一致
+      margin-bottom: var(--gap-xs);
+    }
+    
+    .batch-hint {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--gap-sm);
+    }
+    
+    .batch-actions {
+      display: flex;
+      justify-content: flex-end;
+
+      // 统一“开始上传”等动作按钮的细边框主题样式（与申报列表、用户管理一致）
+      .action-btn {
+        padding: 5px 12px;
+        border: 1px solid var(--color-primary);
+        border-radius: 4px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: none;
+        white-space: nowrap;
+        color: var(--color-primary);
+
+        &:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+
+          &:hover {
+            background: none;
+            color: inherit;
+          }
+        }
+
+        &.btn-primary {
+          color: var(--color-primary);
+          border-color: var(--color-primary);
+
+          &:hover:not(:disabled) {
+            background: var(--color-primary);
+            color: var(--surface);
+          }
+        }
+      }
+    }
   }
 }
 

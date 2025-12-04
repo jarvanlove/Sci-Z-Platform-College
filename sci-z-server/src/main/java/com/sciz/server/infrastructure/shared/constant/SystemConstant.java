@@ -75,9 +75,9 @@ public class SystemConstant {
         public static final Integer DEFAULT_PREVIEW_EXPIRE_SECONDS = 86400;
 
         /**
-         * 文件上传最大大小（字节）
+         * 文件上传最大大小（字节）- 300MB
          */
-        public static final Long MAX_FILE_SIZE = 10485760L; // 10MB
+        public static final Long MAX_FILE_SIZE = 314572800L; // 300 * 1024 * 1024 = 300MB
 
         /**
          * 支持的文件类型

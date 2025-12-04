@@ -8,7 +8,7 @@
   <div class="error-404-page">
     <h1>404 - 页面不存在</h1>
     <p>抱歉，您访问的页面不存在</p>
-    <BaseButton type="primary" @click="goHome">返回首页</BaseButton>
+    <BaseButton type="primary" @click="goHome" class="home-button">返回首页</BaseButton>
   </div>
 </template>
 
@@ -43,6 +43,28 @@ const goHome = () => {
     font-size: var(--font-size-lg);
     color: var(--text-2);
     margin-bottom: var(--gap-xl);
+  }
+  
+  .home-button {
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    
+    :deep(.el-button) {
+      background-color: var(--color-primary);
+      border-color: var(--color-primary);
+      color: var(--surface);
+      
+      &:hover {
+        background-color: var(--color-primary-hover);
+        border-color: var(--color-primary-hover);
+      }
+      
+      &:active {
+        background-color: var(--color-primary-active);
+        border-color: var(--color-primary-active);
+      }
+    }
   }
 }
 </style>

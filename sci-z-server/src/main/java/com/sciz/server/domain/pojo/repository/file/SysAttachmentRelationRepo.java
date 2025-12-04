@@ -2,6 +2,7 @@ package com.sciz.server.domain.pojo.repository.file;
 
 import com.sciz.server.domain.pojo.entity.file.SysAttachmentRelation;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 附件关联仓储（领域层抽象）
@@ -56,4 +57,22 @@ public interface SysAttachmentRelationRepo {
      * @return boolean 是否更新成功
      */
     boolean updateRelationIds(List<Long> relationIds, Long relationId, Long userId);
+
+    /**
+     * 根据关联类型和关联ID列表批量查询附件ID集合
+     *
+     * @param relationType String 关联类型
+     * @param relationIds  List<Long> 关联对象ID列表
+     * @return Map<Long, List<Long>> 关联对象ID -> 附件ID列表
+     */
+    Map<Long, List<Long>> findAttachmentIdsByRelationIds(String relationType, List<Long> relationIds);
+
+    /**
+     * 根据附件ID查询关联信息
+     *
+     * @param attachmentId Long 附件ID
+     * @param relationType String 关联类型（可选，如果为null则查询所有类型）
+     * @return SysAttachmentRelation 关联信息（如果不存在则返回null）
+     */
+    SysAttachmentRelation findByAttachmentId(Long attachmentId, String relationType);
 }

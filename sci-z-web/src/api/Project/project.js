@@ -144,3 +144,38 @@ export const addProjectProgress = (data) => {
     data
   })
 }
+
+/**
+ * 获取项目统计信息
+ * @returns {Promise} 项目统计信息响应
+ * 响应格式：{ code: 200, data: { totalProjects: 10, inProgressCount: 5, delayedCount: 2, completedCount: 3 } }
+ */
+export const getProjectStatistics = () => {
+  return request({
+    url: PROJECT_API.STATISTICS,
+    method: HTTP_METHODS.GET
+  })
+}
+
+/**
+ * 批量上传项目里程碑文档
+ * @param {FormData} formData - 文件表单数据
+ * @param {File[]} formData.files - 文件对象数组（批量上传）
+ * @param {string} formData.relationType - 关联类型（固定值：'project'）
+ * @param {string} formData.attachmentType - 附件类型（固定值：'document'）
+ * @param {number} formData.relationId - 关联ID（项目ID，必填）
+ * @param {string} formData.relationName - 关联名称（项目名称/里程碑名称）
+ * @param {number} formData.isPublic - 是否公开（0:私有, 1:公开，默认0）
+ * @returns {Promise} 文件上传响应，data 为文件信息数组
+ * 响应格式：{ code: 200, data: [{ id, fileName, originalName, fileType, fileSize, uploaderName, uploadTime, fileUrl, previewUrl }, ...] }
+ */
+export const uploadMilestoneDocument = (formData) => {
+  return request({
+    url: PROJECT_API.MILESTONE_DOCUMENT,
+    method: HTTP_METHODS.POST,
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}

@@ -169,4 +169,9 @@ public class DeclarationRepoImpl implements DeclarationRepo {
         return mapper.selectList(queryWrapper).stream()
                 .collect(Collectors.toMap(Declaration::getId, declaration -> declaration));
     }
+
+    @Override
+    public boolean updateById(Declaration entity) {
+        return mapper.updateById(entity) > 0;
+    }
 }
