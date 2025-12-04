@@ -48,16 +48,23 @@ logging: # 日志总配置
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{50} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{50} - %msg%n"
 
-# OpenAPI/Swagger UI 配置
-springdoc: # SpringDoc(OpenAPI) 配置
+# OpenAPI/Swagger UI 配置（knife4j）
+# knife4j 默认访问路径：/doc.html（无需额外配置）
+# 访问地址：
+#   - 根路径：http://localhost:8808/  → 自动跳转到 /doc.html（通过 static/index.html 实现）
+#   - API 文档界面：http://localhost:8808/doc.html
+#   - OpenAPI JSON：http://localhost:8808/v3/api-docs
+springdoc:
   api-docs:
-    enabled: true # 是否启用 API 文档生成
-    path: /v3/api-docs # OpenAPI 文档 JSON 路径
-  swagger-ui:
-    path: /swagger-ui.html # Swagger UI 访问路径
-    tags-sorter: alpha # 标签按字母排序
-    operations-sorter: alpha # 接口按方法名排序
-  packages-to-scan: com.sciz.server.interfaces.controller # 仅扫描该包下的 Controller
+    enabled: true
+    path: /v3/api-docs
+  packages-to-scan: com.sciz.server.interfaces.controller
+
+# knife4j 配置
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
 
 # MyBatis-Plus 通用配置（所有环境共享），如需环境覆盖请在对应 profile 中追加
 mybatis-plus: # MyBatis-Plus 配置
