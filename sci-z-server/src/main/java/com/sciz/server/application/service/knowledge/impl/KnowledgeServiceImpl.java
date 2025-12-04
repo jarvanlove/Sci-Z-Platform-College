@@ -107,7 +107,6 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (user == null) {
             throw new BusinessException(ResultCode.USER_NOT_FOUND);
         }
-
         // 4. 构建 Dify API 请求
         DifyDatasetRequest difyRequest = new DifyDatasetRequest();
         difyRequest.setName(req.getName());
