@@ -1,10 +1,16 @@
 package com.sciz.server.application.service.project;
 
+import com.sciz.server.domain.pojo.dto.request.file.FileBatchUploadReq;
+import com.sciz.server.domain.pojo.dto.request.project.MilestoneDocumentDeleteReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectCreateReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectUpdateReq;
+import com.sciz.server.domain.pojo.dto.response.project.MilestoneDocumentUploadResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectDetailResp;
+
+import java.util.List;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectListResp;
+import com.sciz.server.domain.pojo.dto.response.project.ProjectStatisticsResp;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 
 /**
@@ -62,4 +68,26 @@ public interface ProjectService {
      * @param id 项目ID
      */
     void deleteById(Long id);
+
+    /**
+     * 获取项目统计信息
+     *
+     * @return 项目统计信息（总项目数、进行中、已延期、已完成）
+     */
+    ProjectStatisticsResp getStatistics();
+
+    /**
+     * 批量上传里程碑文档
+     *
+     * @param req 批量文件上传请求
+     * @return 文档上传响应列表
+     */
+    List<MilestoneDocumentUploadResp> uploadMilestoneDocument(FileBatchUploadReq req);
+
+    /**
+     * 删除里程碑文档
+     *
+     * @param req 删除请求（包含附件ID、项目ID、Dify文档ID）
+     */
+    void deleteMilestoneDocument(MilestoneDocumentDeleteReq req);
 }

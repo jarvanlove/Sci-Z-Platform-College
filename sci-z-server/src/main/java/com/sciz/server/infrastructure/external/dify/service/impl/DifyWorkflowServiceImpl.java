@@ -4,13 +4,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sciz.server.domain.pojo.dto.request.file.FileSyncDifyReq;
 import com.sciz.server.domain.pojo.dto.response.declaration.RedHeaderFileParseResp;
-import com.sciz.server.domain.pojo.dto.response.file.FileSyncDifyResp;
+import com.sciz.server.infrastructure.external.dify.dto.response.FileSyncDifyResp;
 import com.sciz.server.infrastructure.external.dify.dto.DifyFileUploadResponse;
 import com.sciz.server.infrastructure.external.dify.dto.DifyWorkflowRequest;
 import com.sciz.server.infrastructure.external.dify.dto.DifyWorkflowResponse;
 import com.sciz.server.infrastructure.external.dify.dto.request.DeclarationWorkflowReq;
 import com.sciz.server.infrastructure.external.dify.dto.request.DifyWorkflowReqBuilder;
 import com.sciz.server.infrastructure.external.dify.dto.response.DeclarationWorkflowResp;
+import com.sciz.server.infrastructure.external.dify.dto.response.DifyDocumentBatchUploadResp;
 import com.sciz.server.infrastructure.external.dify.dto.response.DifyWorkflowRespBuilder;
 import com.sciz.server.infrastructure.external.dify.dto.response.RedHeaderFileWorkflowResp;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiService;
@@ -22,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 import java.util.Optional;
@@ -191,5 +193,82 @@ public class DifyWorkflowServiceImpl implements DifyWorkflowService {
 
                 log.info(String.format("申报工作流执行完成: resourceId=%s, fileUrl=%s", resourceId, fileUrl));
                 return workflowOutputs;
+        }
+
+        /**
+         * 批量创建知识库文档（即知识库文件批量上传）
+         * 支持一次上传多个文件（最多10个，Dify API限制最多20个）
+         *
+         * @param datasetId  String 数据集ID（知识库ID）
+         * @param files      MultipartFile[] 文件列表
+         * @param userId     Long 用户ID（必须传入，因为可能在异步上下文中调用）
+         * @param resourceId String 资源ID（用于查找 API Key）
+         * @param keyType    String 密钥类型（dataset/file）
+         * @return DifyDocumentBatchUploadResp 批量文档上传响应（类型安全，包含文档信息和批次ID）
+         */
+        @Override
+        public DifyDocumentBatchUploadResp createDocumentsBatch(String datasetId, MultipartFile[] files, Long userId,
+                        String resourceId, String keyType) {
+                var fileCount = files != null ? files.length : 0;
+                log.info(String.format("开始批量创建知识库文档: datasetId=%s, fileCount=%s, userId=%s, resourceId=%s, keyType=%s",
+                                datasetId, fileCount, userId, resourceId, keyType));
+
+                // 1. 验证文件数量（系统限制最多10个，Dify API限制最多20个）
+                if (files == null || files.length == 0) {
+                        throw BusinessException.of(ResultCode.BAD_REQUEST, "文件列表不能为空");
+                }
+                if (files.length > 10) {
+                        throw BusinessException.of(ResultCode.BAD_REQUEST, "文件数量超过限制，最多支持10个文件");
+                }
+
+                // 2. 调用 Dify API 批量上传文档
+                log.info(String.format("调用 Dify API 批量上传文档: datasetId=%s, fileCount=%s", datasetId, fileCount));
+                ResponseEntity<String> difyResponse = difyApiService.uploadDocumentsBatchWithFileStorage(
+                                datasetId, files, userId, resourceId, keyType);
+
+                // 3. 验证 HTTP 响应状态
+                String responseBody = DifyWorkflowRespBuilder.validateHttpResponse(
+                                difyResponse, "Dify 批量文档上传");
+
+                // 4. 解析响应为类型安全的响应对象
+                DifyDocumentBatchUploadResp batchUploadResp = DifyDocumentBatchUploadResp.from(responseBody,
+                                objectMapper);
+
+                log.info(String.format("批量创建知识库文档成功: datasetId=%s, fileCount=%s, batch=%s, documentCount=%s",
+                                datasetId, fileCount, batchUploadResp.batch(),
+                                batchUploadResp.documents() != null ? batchUploadResp.documents().size() : 1));
+
+                return batchUploadResp;
+        }
+
+        /**
+         * 删除知识库文档
+         *
+         * @param datasetId  String 数据集ID（知识库ID）
+         * @param documentId String 文档ID
+         * @param userId     Long 用户ID（必须传入，因为可能在异步上下文中调用）
+         * @param resourceId String 资源ID（用于查找 API Key）
+         * @param keyType    String 密钥类型（dataset/file/workflow）
+         * @return String Dify API 响应体（JSON字符串）
+         */
+        @Override
+        public String deleteDocument(String datasetId, String documentId, Long userId, String resourceId,
+                        String keyType) {
+                log.info(String.format("开始删除知识库文档: datasetId=%s, documentId=%s, userId=%s, resourceId=%s, keyType=%s",
+                                datasetId, documentId, userId, resourceId, keyType));
+
+                // 1. 调用 Dify API 删除文档
+                log.info(String.format("调用 Dify API 删除文档: datasetId=%s, documentId=%s", datasetId, documentId));
+                ResponseEntity<String> difyResponse = difyApiService.deleteDocument(
+                                datasetId, documentId, userId, resourceId, keyType);
+
+                // 2. 验证 HTTP 响应状态
+                String responseBody = DifyWorkflowRespBuilder.validateHttpResponse(
+                                difyResponse, "Dify 文档删除");
+
+                log.info(String.format("删除知识库文档成功: datasetId=%s, documentId=%s, responseLength=%d",
+                                datasetId, documentId, responseBody != null ? responseBody.length() : 0));
+
+                return responseBody;
         }
 }
