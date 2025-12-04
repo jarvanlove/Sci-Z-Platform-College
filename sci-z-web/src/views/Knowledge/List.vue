@@ -775,8 +775,26 @@ const selectKnowledgeBase = (kb) => {
     id: kb.id,
     name: kb.name,
     difyKnowdataId: kb.difyKnowdataId,
-    difyKbId: kb.difyKbId
+    difyKbId: kb.difyKbId,
+    allFields: Object.keys(kb) // 记录所有字段，便于调试
   })
+  
+  // 检查 Dify KB ID 是否存在
+  const difyKbId = kb.difyKnowdataId || kb.difyKbId
+  if (!difyKbId) {
+    logger.warn('选中的知识库缺少 Dify KB ID', {
+      kbId: kb.id,
+      kbName: kb.name,
+      allFields: Object.keys(kb),
+      fieldValues: {
+        difyKnowdataId: kb.difyKnowdataId,
+        difyKbId: kb.difyKbId,
+        dify_knowdata_id: kb.dify_knowdata_id,
+        dify_kb_id: kb.dify_kb_id
+      }
+    })
+    ElMessage.warning('该知识库缺少 Dify KB ID，无法使用问答功能。请重新创建知识库或联系管理员。')
+  }
   
   // 加载知识库文件列表，确保 ID 是数字类型
   loadKnowledgeFiles(kbId)
@@ -879,8 +897,17 @@ const createKnowledgeBase = async () => {
         coverUrl: newKbForm.value.coverUrl,
         docCount: 0,
         updatedAt: new Date(),
-        shortName: response.data.name
+        shortName: response.data.name,
+        // 确保设置 Dify KB ID 字段
+        difyKnowdataId: response.data.difyKnowdataId,
+        difyKbId: response.data.difyKbId
       }
+      logger.info('创建知识库成功', {
+        id: newKb.id,
+        name: newKb.name,
+        difyKnowdataId: newKb.difyKnowdataId,
+        difyKbId: newKb.difyKbId
+      })
       knowledgeBases.value.unshift(newKb)
       kbContents.value[newKb.id] = []
       selectedKnowledgeBase.value = newKb
@@ -1376,12 +1403,27 @@ const sendKbMessage = async () => {
     return
   }
 
-  // 检查是否有 Dify KB ID（优先使用 difyKnowdataId，兼容 difyKbId）
-  const difyKbId = selectedKnowledgeBase.value.difyKnowdataId || selectedKnowledgeBase.value.difyKbId
+  // 检查是否有 Dify KB ID（优先使用 difyKnowdataId，兼容 difyKbId，也兼容下划线命名）
+  const kb = selectedKnowledgeBase.value
+  const difyKbId = kb.difyKnowdataId || kb.difyKbId || kb.dify_knowdata_id || kb.dify_kb_id
   if (!difyKbId) {
-    console.warn('[sendKbMessage] 知识库缺少 Dify KB ID', selectedKnowledgeBase.value)
-    logger.warn('知识库缺少 Dify KB ID', selectedKnowledgeBase.value)
-    ElMessage.warning('知识库缺少 Dify KB ID，无法使用问答功能')
+    console.warn('[sendKbMessage] 知识库缺少 Dify KB ID', {
+      kbId: kb.id,
+      kbName: kb.name,
+      allFields: Object.keys(kb),
+      fieldValues: {
+        difyKnowdataId: kb.difyKnowdataId,
+        difyKbId: kb.difyKbId,
+        dify_knowdata_id: kb.dify_knowdata_id,
+        dify_kb_id: kb.dify_kb_id
+      }
+    })
+    logger.warn('知识库缺少 Dify KB ID', {
+      kbId: kb.id,
+      kbName: kb.name,
+      allFields: Object.keys(kb)
+    })
+    ElMessage.warning('知识库缺少 Dify KB ID，无法使用问答功能。请重新创建知识库或联系管理员。')
     isExecuting = false
     return
   }
