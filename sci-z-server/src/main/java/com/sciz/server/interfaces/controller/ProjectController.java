@@ -8,6 +8,7 @@ import com.sciz.server.domain.pojo.dto.request.project.ProjectListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.project.MilestoneDocumentUploadResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectDetailResp;
+import com.sciz.server.domain.pojo.dto.response.project.ProjectProgressResp;
 
 import java.util.List;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectListResp;
@@ -96,16 +97,16 @@ public class ProjectController {
     }
 
     /**
-     * 删除项目
+     * 取消项目
      *
      * @param id 项目ID
      * @return 成功标识
      */
-    @Operation(summary = "删除项目", description = "根据ID删除项目（软删除）")
-    @DeleteMapping("/{id}")
-    // @SaCheckPermission("api:project:delete")
-    public Result<Void> deleteProject(@PathVariable Long id) {
-        projectService.deleteById(id);
+    @Operation(summary = "取消项目", description = "根据ID取消项目，将项目状态更新为已取消")
+    @PutMapping("/{id}/cancel")
+    // @SaCheckPermission("api:project:cancel")
+    public Result<Void> cancelProject(@PathVariable Long id) {
+        projectService.cancelById(id);
         return Result.success();
     }
 
@@ -127,7 +128,7 @@ public class ProjectController {
      * @param req 批量文件上传请求
      * @return 文档上传响应列表
      */
-    @Operation(summary = "批量上传里程碑文档", description = "批量上传里程碑文档，返回文件信息列表。relationId为项目ID，relationName由前端传递")
+    @Operation(summary = "批量上传里程碑文档", description = "批量上传里程碑文档，返回文件信息列表。前端传递的relationId为项目ID（此时还没有进度数据）")
     @PostMapping("/milestone/document")
     // @SaCheckPermission("api:project:milestone:document:upload")
     public Result<List<MilestoneDocumentUploadResp>> uploadMilestoneDocument(
@@ -150,4 +151,44 @@ public class ProjectController {
         return Result.success();
     }
 
+    /**
+     * 获取项目进度
+     *
+     * @param id 项目ID
+     * @return 项目进度响应（包含项目基本信息、进度统计、整体进度、里程碑列表）
+     */
+    @Operation(summary = "获取项目进度", description = "获取项目进度信息，包括项目基本信息、进度统计（已完成、进行中、未开始、已延期）、整体进度（百分比、开始时间、预计完成时间）和里程碑列表（时间轴视图）")
+    @GetMapping("/progress/{id}")
+    public Result<ProjectProgressResp> getProjectProgress(@PathVariable Long id) {
+        var resp = projectService.findProgress(id);
+        return Result.success(resp);
+    }
+
+    /**
+     * 完成里程碑
+     *
+     * @param milestoneId 里程碑ID
+     * @return 操作结果
+     */
+    @Operation(summary = "完成里程碑", description = "手动完成里程碑，将里程碑进度设置为100%，支持提前完成")
+    @PutMapping("/milestone/{milestoneId}/complete")
+    // @SaCheckPermission("api:project:milestone:complete")
+    public Result<Void> completeMilestone(@PathVariable Long milestoneId) {
+        projectService.completeMilestone(milestoneId);
+        return Result.success();
+    }
+
+    /**
+     * 取消完成里程碑
+     *
+     * @param milestoneId 里程碑ID
+     * @return 操作结果
+     */
+    @Operation(summary = "取消完成里程碑", description = "取消里程碑的完成状态，重新按时间自动计算进度")
+    @PutMapping("/milestone/{milestoneId}/cancel-complete")
+    // @SaCheckPermission("api:project:milestone:cancel-complete")
+    public Result<Void> cancelCompleteMilestone(@PathVariable Long milestoneId) {
+        projectService.cancelCompleteMilestone(milestoneId);
+        return Result.success();
+    }
 }

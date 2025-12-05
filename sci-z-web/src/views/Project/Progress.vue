@@ -1,23 +1,13 @@
 <!--
 /**
- * @description 项目进度页面
- * 查看和管理项目进度
+ * @description 项目进度页面视图层
+ * 极薄包装层，仅负责引入业务组件
  */
 -->
 <template>
-  <div class="project-progress-page">
-    <h1>项目进度页面</h1>
-    <p>待根据原型图开发</p>
-  </div>
+  <ProjectProgress />
 </template>
 
 <script setup>
-// 待根据原型图开发
+import ProjectProgress from '@/components/Business/Project/ProjectProgress.vue'
 </script>
-
-<style lang="scss" scoped>
-.project-progress-page {
-  padding: var(--gap-lg);
-  text-align: center;
-}
-</style>

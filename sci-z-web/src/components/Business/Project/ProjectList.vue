@@ -92,14 +92,12 @@
 
         <!-- 进度列自定义 -->
         <template #progress="{ row }">
-          <div class="progress-container">
-            <el-progress
-              :percentage="row.progress || 0"
-              :color="getProgressColor(row.progress || 0)"
-              :stroke-width="6"
-              :show-text="false"
+          <div class="progress-cell-wrapper">
+            <ProjectProgressBar
+              :progress="row.progress || 0"
+              :height="6"
+              :show-text="true"
             />
-            <span class="progress-text">{{ row.progress || 0 }}%</span>
           </div>
         </template>
 
@@ -128,11 +126,11 @@
                 {{ $t('common.edit') }}
               </button>
               <button
-                v-if="row.canDelete"
+                v-if="row.canDelete && row.status !== PROJECT_STATUS.CANCELLED"
                 class="action-btn btn-danger"
-                @click.stop="handleDelete(row)"
+                @click.stop="handleCancel(row)"
               >
-                {{ $t('common.delete') }}
+                {{ $t('project.list.cancel') }}
               </button>
             </div>
           </div>
@@ -148,9 +146,9 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh } from '@element-plus/icons-vue'
-import { BaseCard, BaseTable, BaseDatePicker } from '@/components/Common'
+import { BaseCard, BaseTable, BaseDatePicker, ProjectProgressBar } from '@/components/Common'
 import { PROJECT_STATUS, PROJECT_STATUS_CONFIG } from '@/utils/constants'
-import { getProjectList } from '@/api/Project'
+import { getProjectList, cancelProject } from '@/api/Project'
 import { createLogger } from '@/utils/simpleLogger'
 
 const router = useRouter()
@@ -240,12 +238,7 @@ const getStatusTagType = (status) => {
   return PROJECT_STATUS_CONFIG[status]?.type || 'info'
 }
 
-// 获取进度条颜色
-const getProgressColor = (progress) => {
-  if (progress <= 30) return '#dc2626'
-  if (progress <= 70) return '#f59e0b'
-  return '#16a34a'
-}
+// 注意：进度条颜色逻辑已移至 ProjectProgressBar 组件中
 
 // 状态映射：将后端状态值映射到前端状态值（与后端枚举保持一致）
 // 后端枚举：1-进行中, 2-已完成, 3-已延期, 4-已取消
@@ -403,11 +396,11 @@ const handleProgress = (project) => {
   router.push(`/project/progress/${project.id}`)
 }
 
-const handleDelete = async (project) => {
+const handleCancel = async (project) => {
   try {
     await ElMessageBox.confirm(
-      t('project.list.deleteConfirm', { name: project.name }),
-      t('project.list.deleteTitle'),
+      t('project.list.cancelConfirm', { name: project.name }),
+      t('project.list.cancelTitle'),
       {
         confirmButtonText: t('common.confirm'),
         cancelButtonText: t('common.cancel'),
@@ -415,15 +408,20 @@ const handleDelete = async (project) => {
       }
     )
     
-    // TODO: 替换为实际后端删除接口
-    // await deleteProject(project.id)
-    await new Promise(resolve => setTimeout(resolve, 500))
+    logger.info('Canceling project', { projectId: project.id, projectName: project.name })
+    const response = await cancelProject(project.id)
     
-    ElMessage.success(t('project.list.deleteSuccess'))
-    loadProjects()
+    if (response.code === 200) {
+      ElMessage.success(t('project.list.cancelSuccess', { name: project.name }))
+      logger.info('Project canceled successfully', { projectId: project.id })
+      loadProjects()
+    } else {
+      throw new Error(response.message || '取消项目失败')
+    }
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error(t('project.list.deleteError'))
+      logger.error('Failed to cancel project', error)
+      ElMessage.error(error.message || t('project.list.cancelError'))
     }
   }
 }
@@ -494,20 +492,28 @@ onMounted(() => {
   }
 }
 
-.progress-container {
+// 进度列样式 - 限制进度条宽度，避免百分比文本被遮挡
+.progress-cell-wrapper {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--gap-xs);
   width: 100%;
-}
-
-.progress-text {
-  font-size: 12px;
-  color: var(--text-secondary);
-  min-width: 35px;
-  text-align: center;
-  flex-shrink: 0;
+  max-width: 100%;
+  
+  :deep(.project-progress-bar) {
+    width: 100%;
+    max-width: 100%;
+    
+    .progress-bar-wrapper {
+      flex: 1;
+      min-width: 0;
+      max-width: calc(100% - 50px); // 为百分比文本预留空间（32px文本 + 10px间距）
+    }
+    
+    .progress-text {
+      flex-shrink: 0;
+      min-width: 32px;
+    }
+  }
 }
 
 // 表格样式 - 参考 DeclarationList 和 UserManagement

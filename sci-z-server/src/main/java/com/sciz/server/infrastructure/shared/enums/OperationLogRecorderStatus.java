@@ -114,9 +114,9 @@ public enum OperationLogRecorderStatus {
     PROJECT_UPDATE("更新项目", "已更新项目"),
 
     /**
-     * 删除项目
+     * 取消项目
      */
-    PROJECT_DELETE("删除项目", "已删除项目"),
+    PROJECT_CANCEL("取消项目", "已取消项目"),
 
     /**
      * 提交项目
@@ -137,6 +137,16 @@ public enum OperationLogRecorderStatus {
      * 删除里程碑文档
      */
     PROJECT_MILESTONE_DOCUMENT_DELETE("删除里程碑文档", "已删除里程碑文档"),
+
+    /**
+     * 完成里程碑
+     */
+    PROJECT_MILESTONE_COMPLETE("完成里程碑", "已完成里程碑"),
+
+    /**
+     * 取消完成里程碑
+     */
+    PROJECT_MILESTONE_CANCEL_COMPLETE("取消完成里程碑", "已取消完成里程碑"),
 
     // ==================== 申报管理模块 ====================
 
@@ -203,6 +213,11 @@ public enum OperationLogRecorderStatus {
      * 删除知识库
      */
     KNOWLEDGE_DELETE("删除知识库", "已删除知识库"),
+
+    /**
+     * 上传文件到 Dify 知识库
+     */
+    KNOWLEDGE_UPLOAD_DIFY("上传文件到 Dify 知识库", "已上传文件到 Dify 知识库"),
 
     // ==================== 系统配置模块 ====================
 

@@ -61,9 +61,9 @@ public record DifyDocumentBatchUploadResp(
     /**
      * 从 JSON 字符串解析批量文档上传响应（类型安全）
      * <p>
-     * 支持两种响应格式：
-     * 1. 包含单个 document 对象和 batch 字段（初始响应）
-     * 2. 包含 documents 数组（完整批量结果，通过批次状态查询获得）
+     * 支持多种响应格式：
+     * 1. 批量上传初始响应：{"document": {...}, "batch": "...", "documents": [...]}
+     * 2. 批次状态查询响应：{"data": [...]} 或 {"batch": "...", "documents": [...]}
      *
      * @param jsonString   String JSON 字符串
      * @param objectMapper ObjectMapper Jackson 对象映射器
@@ -80,16 +80,18 @@ public record DifyDocumentBatchUploadResp(
             // 解析 batch 字段
             String batch = extractString(rootNode, "batch");
 
-            // 解析 documents 数组（如果存在，包含所有文件的详细信息）
+            // 解析 documents 数组（优先使用 documents 字段）
             List<DifyDocumentInfo> documentsList = null;
             JsonNode documentsArray = rootNode.get("documents");
             if (documentsArray != null && documentsArray.isArray() && documentsArray.size() > 0) {
-                documentsList = new ArrayList<>();
-                for (JsonNode docNode : documentsArray) {
-                    DifyDocumentInfo docInfo = parseDocumentInfo(docNode);
-                    if (docInfo != null) {
-                        documentsList.add(docInfo);
-                    }
+                documentsList = parseDocumentArray(documentsArray);
+            }
+
+            // 如果 documents 数组不存在，尝试解析 data 数组（批次状态查询接口返回格式）
+            if (documentsList == null || documentsList.isEmpty()) {
+                JsonNode dataArray = rootNode.get("data");
+                if (dataArray != null && dataArray.isArray() && dataArray.size() > 0) {
+                    documentsList = parseDocumentArray(dataArray);
                 }
             }
 
@@ -110,6 +112,27 @@ public record DifyDocumentBatchUploadResp(
         } catch (JsonProcessingException e) {
             throw BusinessException.of(ResultCode.SERVER_ERROR, "解析 Dify 批量文档上传响应失败: %s", e.getMessage());
         }
+    }
+
+    /**
+     * 解析文档数组
+     *
+     * @param arrayNode JsonNode 数组节点
+     * @return List<DifyDocumentInfo> 文档列表
+     */
+    private static List<DifyDocumentInfo> parseDocumentArray(JsonNode arrayNode) {
+        if (arrayNode == null || !arrayNode.isArray()) {
+            return null;
+        }
+
+        List<DifyDocumentInfo> documentsList = new ArrayList<>();
+        for (JsonNode docNode : arrayNode) {
+            DifyDocumentInfo docInfo = parseDocumentInfo(docNode);
+            if (docInfo != null) {
+                documentsList.add(docInfo);
+            }
+        }
+        return documentsList.isEmpty() ? null : documentsList;
     }
 
     /**

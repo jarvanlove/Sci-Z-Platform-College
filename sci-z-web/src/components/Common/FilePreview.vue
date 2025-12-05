@@ -659,9 +659,11 @@ watch(() => props.fileInfo, (newVal) => {
 
 .docx-preview-wrapper {
   width: 100%;
+  max-width: 1200px;
   min-height: 100%;
+  margin: 0 auto;
   background: var(--surface);
-  padding: 40px;
+  padding: 40px 60px;
   box-shadow: var(--shadow-sm);
   border-radius: var(--radius-md);
   

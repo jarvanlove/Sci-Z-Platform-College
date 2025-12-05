@@ -887,7 +887,8 @@ public class FileServiceImpl implements FileService {
         var singleReq = new FileUploadReq();
         singleReq.setFile(multipartFile);
         singleReq.setRelationType(req.relationType());
-        singleReq.setRelationId(req.relationId());
+        // 优先使用 relationId，如果为空则使用 0（待关联）
+        singleReq.setRelationId(req.relationId() != null ? req.relationId() : 0L);
         singleReq.setRelationName(req.relationName());
         singleReq.setAttachmentType(req.attachmentType());
         singleReq.setIsPublic(req.isPublic());

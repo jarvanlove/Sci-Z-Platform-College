@@ -66,17 +66,20 @@ export const DECLARATION_API = {
 
 export const PROJECT_API = {
   BASE_PATH: buildApiUrl('/project'),
-  LIST: buildApiUrl('/project/list'),
-  DETAIL: (id) => buildApiUrl(`/project/detail/${id}`),
+  LIST: buildApiUrl('/project/list'), // 获取项目列表
+  DETAIL: (id) => buildApiUrl(`/project/detail/${id}`), // 获取项目详情
   CREATE: buildApiUrl('/project/create'),
-  UPDATE: (id) => buildApiUrl(`/project/update/${id}`),
-  MEMBERS: (id) => buildApiUrl(`/project/members/${id}`),
-  ADD_MEMBER: buildApiUrl('/project/members/add'),
-  REMOVE_MEMBER: buildApiUrl('/project/members/remove'),
-  PROGRESS: (id) => buildApiUrl(`/project/progress/${id}`),
-  ADD_PROGRESS: buildApiUrl('/project/progress/add'),
+  UPDATE: (id) => buildApiUrl(`/project/update/${id}`), // 更新项目
+  MEMBERS: (id) => buildApiUrl(`/project/members/${id}`), // 获取项目成员
+  ADD_MEMBER: buildApiUrl('/project/members/add'), // 添加项目成员
+  REMOVE_MEMBER: buildApiUrl('/project/members/remove'), // 删除项目成员
+  PROGRESS: (id) => buildApiUrl(`/project/progress/${id}`), // 获取项目进度
+  ADD_PROGRESS: buildApiUrl('/project/progress/add'), // 添加项目进度
   STATISTICS: buildApiUrl('/project/statistics'), // 获取项目统计信息
-  MILESTONE_DOCUMENT: buildApiUrl('/project/milestone/document') // 里程碑文档上传
+  MILESTONE_DOCUMENT: buildApiUrl('/project/milestone/document'), // 里程碑文档上传
+  MILESTONE_COMPLETE: (milestoneId) => buildApiUrl(`/project/milestone/${milestoneId}/complete`), // 完成里程碑
+  MILESTONE_CANCEL_COMPLETE: (milestoneId) => buildApiUrl(`/project/milestone/${milestoneId}/cancel-complete`), // 取消完成里程碑
+  CANCEL: (id) => buildApiUrl(`/project/${id}/cancel`) // 取消项目
 }
 
 // ================================

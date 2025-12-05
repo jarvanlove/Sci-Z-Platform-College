@@ -48,10 +48,19 @@ public interface SysKnowledgeFileRelationRepo {
     /**
      * 根据知识库ID分页查询文件关联列表
      *
-     * @param page 分页对象
+     * @param page        分页对象
      * @param knowledgeId 知识库ID
-     * @param folderId 文件夹ID（可选，如果为null则查询所有文件夹）
+     * @param folderId    文件夹ID（可选，如果为null则查询所有文件夹）
      * @return 分页结果
      */
-    IPage<SysKnowledgeFileRelation> pageByKnowledgeId(Page<SysKnowledgeFileRelation> page, Long knowledgeId, Long folderId);
+    IPage<SysKnowledgeFileRelation> pageByKnowledgeId(Page<SysKnowledgeFileRelation> page, Long knowledgeId,
+            Long folderId);
+
+    /**
+     * 根据附件ID删除知识库文件关联（软删除）
+     *
+     * @param attachmentId 附件ID
+     * @return 是否删除成功
+     */
+    boolean deleteByAttachmentId(Long attachmentId);
 }

@@ -460,6 +460,32 @@ public class DifyApiService {
     }
 
     /**
+     * 查询批次索引状态（用于批量上传后获取所有文件的详细信息）
+     *
+     * @param datasetId  数据集ID
+     * @param batch      批次ID
+     * @param userId     用户ID
+     * @param resourceId 资源ID
+     * @param keyType    密钥类型
+     * @return 响应结果（包含所有文件的详细信息）
+     */
+    public ResponseEntity<String> getBatchIndexingStatus(String datasetId, String batch, Long userId,
+            String resourceId, String keyType) {
+        try {
+            return difyApiClient.getBatchIndexingStatus(datasetId, batch, userId, resourceId, keyType);
+        } catch (HttpClientErrorException e) {
+            log.error("Dify API调用失败: datasetId={}, batch={}, status={}, error={}",
+                    datasetId, batch, e.getStatusCode(), e.getMessage());
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        } catch (Exception e) {
+            log.error("查询批次索引状态失败: datasetId={}, batch={}, error={}",
+                    datasetId, batch, e.getMessage(), e);
+            return ResponseEntity.status(500)
+                    .body("{\"error\": \"查询批次索引状态失败: " + e.getMessage() + "\"}");
+        }
+    }
+
+    /**
      * 批量上传文档到数据集（直接使用 MultipartFile）
      * 支持一次上传多个文件（最多20个，系统限制为10个）
      * <p>

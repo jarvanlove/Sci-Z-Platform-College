@@ -292,7 +292,25 @@ export default {
     removeMember: 'Remove Member',
     projectCreated: 'Project created successfully',
     projectUpdated: 'Project updated successfully',
-    projectDeleted: 'Project deleted successfully'
+    projectDeleted: 'Project deleted successfully',
+    // Progress page
+    progress: {
+      title: 'Project Progress',
+      overview: 'Project Overview',
+      projectInfo: 'Project Information',
+      name: 'Project Name',
+      number: 'Project Number',
+      manager: 'Project Manager',
+      status: 'Project Status',
+      overallProgress: 'Overall Progress',
+      startTime: 'Start Time',
+      endTime: 'Expected Completion',
+      timeline: 'Timeline View',
+      noTimeline: 'No timeline data',
+      timelineHint: 'Project milestones will be displayed here',
+      loadError: 'Failed to load project progress, please try again',
+      noProjectId: 'Project ID not found'
+    }
   },
 
   // Report

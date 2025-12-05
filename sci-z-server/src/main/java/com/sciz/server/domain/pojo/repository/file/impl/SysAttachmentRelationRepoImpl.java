@@ -54,11 +54,13 @@ public class SysAttachmentRelationRepoImpl implements SysAttachmentRelationRepo 
         if (attachmentId == null) {
             return false;
         }
+        // PostgreSQL 不支持在 UPDATE 语句中使用 LIMIT，移除 LIMIT 1
+        // 一个附件ID可能有多条关联记录（例如关联到多个里程碑），应该全部删除
         return mapper.update(null, new LambdaUpdateWrapper<SysAttachmentRelation>()
                 .eq(SysAttachmentRelation::getAttachmentId, attachmentId)
+                .eq(SysAttachmentRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
                 .set(SysAttachmentRelation::getIsDeleted, DeleteStatus.DELETED.getCode())
-                .set(SysAttachmentRelation::getUpdatedTime, LocalDateTime.now())
-                .last("LIMIT 1")) > 0;
+                .set(SysAttachmentRelation::getUpdatedTime, LocalDateTime.now())) > 0;
     }
 
     @Override

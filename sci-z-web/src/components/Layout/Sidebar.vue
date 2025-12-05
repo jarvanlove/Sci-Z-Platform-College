@@ -6,6 +6,7 @@
       :collapse="sidebarCollapsed"
       :unique-opened="true"
       router
+      :default-openeds="defaultOpeneds"
     >
       <!-- 动态渲染菜单 -->
       <template v-for="menu in filteredMenus" :key="menu.path">
@@ -50,9 +51,126 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 
+// 递归查找菜单项（包括子菜单）
+// 优先返回第一个匹配的菜单项（即使置灰），确保菜单始终激活同一个菜单项
+const findMenuByPermission = (menus, permission) => {
+  for (const menu of menus) {
+    // 如果当前菜单项的 permission 匹配，立即返回其 path（不检查权限，因为可能是置灰的菜单）
+    if (menu.permission === permission) {
+      return menu.path
+    }
+    // 如果有子菜单，递归查找
+    if (menu.children && menu.children.length > 0) {
+      const found = findMenuByPermission(menu.children, permission)
+      if (found) {
+        return found
+      }
+    }
+  }
+  return null
+}
+
+// 递归查找菜单项（包括子菜单）通过路径匹配
+const findMenuByPath = (menus, path) => {
+  for (const menu of menus) {
+    // 精确匹配当前菜单路径
+    if (menu.path === path) {
+      return menu.path
+    }
+    // 如果有子菜单，递归查找
+    if (menu.children && menu.children.length > 0) {
+      const found = findMenuByPath(menu.children, path)
+      if (found) {
+        return found
+      }
+    }
+  }
+  return null
+}
+
+// 递归查找父菜单路径
+const findParentMenuPath = (menus, childPath) => {
+  for (const menu of menus) {
+    if (menu.children && menu.children.length > 0) {
+      // 检查子菜单中是否有匹配的
+      const childMatch = menu.children.find(child => child.path === childPath)
+      if (childMatch) {
+        return menu.path
+      }
+      // 递归查找
+      const found = findParentMenuPath(menu.children, childPath)
+      if (found) {
+        return menu.path
+      }
+    }
+  }
+  return null
+}
+
+// 递归查找菜单项并获取其 permission
+const getMenuPermission = (menus, path) => {
+  for (const menu of menus) {
+    if (menu.path === path) {
+      return menu.permission
+    }
+    if (menu.children && menu.children.length > 0) {
+      const found = getMenuPermission(menu.children, path)
+      if (found !== null) {
+        return found
+      }
+    }
+  }
+  return null
+}
+
 // 当前激活的菜单
+// 优先通过路径匹配，但如果匹配到的菜单项 permission 与路由 permission 不一致，
+// 说明是详情页/创建页，应该使用 permission 匹配来激活对应的列表页菜单
 const activeMenu = computed(() => {
-  return route.path
+  const currentPath = route.path
+  const routeMeta = route.meta
+  
+  // 首先尝试通过路径直接匹配菜单
+  const pathMatched = findMenuByPath(authStore.menus, currentPath)
+  if (pathMatched) {
+    // 如果路径匹配成功，检查匹配到的菜单项的 permission 是否与路由的 permission 一致
+    const menuPermission = getMenuPermission(authStore.menus, pathMatched)
+    // 如果菜单项的 permission 与路由的 permission 不一致，说明是详情页/创建页，
+    // 应该使用 permission 匹配来找到对应的列表页菜单
+    if (routeMeta?.permission && menuPermission !== routeMeta.permission) {
+      const permissionMatched = findMenuByPermission(authStore.menus, routeMeta.permission)
+      if (permissionMatched) {
+        return permissionMatched
+      }
+    }
+    // 如果 permission 一致，或者没有 permission 配置，直接返回路径匹配的结果
+    return pathMatched
+  }
+  
+  // 如果路径匹配不到，尝试通过 permission 匹配
+  if (routeMeta?.permission) {
+    const permissionMatched = findMenuByPermission(authStore.menus, routeMeta.permission)
+    if (permissionMatched) {
+      return permissionMatched
+    }
+  }
+  
+  // 如果都匹配不到，返回当前路径（Element Plus 菜单会自动处理）
+  return currentPath
+})
+
+// 默认展开的父菜单（当子菜单激活时，自动展开父菜单）
+const defaultOpeneds = computed(() => {
+  const currentPath = route.path
+  const openedMenus = []
+  
+  // 查找当前路径对应的父菜单
+  const parentPath = findParentMenuPath(authStore.menus, currentPath)
+  if (parentPath) {
+    openedMenus.push(parentPath)
+  }
+  
+  return openedMenus
 })
 
 // 侧边栏折叠状态
