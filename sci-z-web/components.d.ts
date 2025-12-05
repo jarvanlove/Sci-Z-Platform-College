@@ -79,7 +79,6 @@ declare module 'vue' {
     RecentActivity: typeof import('./src/components/Business/Legacy/RecentActivity.vue')['default']
     RegisterForm: typeof import('./src/components/Business/Auth/RegisterForm.vue')['default']
     ReportGenerate: typeof import('./src/components/Business/Report/ReportGenerate.vue')['default']
-    ReportGenerateForm: typeof import('./src/components/Business/Report/ReportGenerateForm.vue')['default']
     ReportList: typeof import('./src/components/Business/Report/ReportList.vue')['default']
     ResetPasswordForm: typeof import('./src/components/Business/Auth/ResetPasswordForm.vue')['default']
     RoleManagement: typeof import('./src/components/Business/System/RoleManagement.vue')['default']
