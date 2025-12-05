@@ -123,7 +123,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long create(ReportManagementCreateReq req) {
-        log.info(String.format("开始创建报告管理: projectId=%s, reportType=%s, difyApiKeysId=%s", 
+        log.info(String.format("开始创建报告管理: Id=%s, reportType=%s, difyApiKeysId=%s",
                 req.projectId(), req.reportType(), req.difyApiKeysId()));
         try {
             // 1. 获取当前登录用户
@@ -148,7 +148,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             // 注意：在异步线程中无法获取 Web 上下文，所以需要在调用前获取用户信息
             CompletableFuture.runAsync(() -> {
                 try {
-                    triggerDifyWorkflowAsync(entity.getId(), userId, realName);
+                    triggerDifyWorkflowAsync(reportId, userId, realName);
                 } catch (Exception e) {
                     log.error(String.format("异步执行 Dify 工作流失败: reportId=%s, err=%s", 
                             entity.getId(), e.getMessage()), e);

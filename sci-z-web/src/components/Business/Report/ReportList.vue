@@ -147,31 +147,35 @@
           </div>
 
           <div class="card-actions" @click.stop>
-            <BaseButton class="action-btn primary" @click="handlePreview(report)">
-              {{ $t('report.listPage.preview') }}
-            </BaseButton>
-            <el-dropdown
-              @command="(format) => handleDownload(report, format)"
-              trigger="click"
-            >
-              <BaseButton class="action-btn primary">
-                {{ $t('report.listPage.download') }}
-                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            <div class="action-group-primary">
+              <BaseButton class="action-btn primary" @click="handlePreview(report)">
+                {{ $t('report.listPage.preview') }}
               </BaseButton>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="pdf">PDF</el-dropdown-item>
-                  <el-dropdown-item command="word">Word</el-dropdown-item>
-                  <el-dropdown-item command="markdown">Markdown</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-            <BaseButton class="action-btn primary" @click="handleRegenerate(report)">
-              {{ $t('report.listPage.regenerate') }}
-            </BaseButton>
-            <BaseButton class="action-btn danger" @click="handleDelete(report)">
-              {{ $t('common.delete') }}
-            </BaseButton>
+              <el-dropdown
+                @command="(format) => handleDownload(report, format)"
+                trigger="click"
+              >
+                <BaseButton class="action-btn primary">
+                  {{ $t('report.listPage.download') }}
+                  <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </BaseButton>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="pdf">PDF</el-dropdown-item>
+                    <el-dropdown-item command="word">Word</el-dropdown-item>
+                    <el-dropdown-item command="markdown">Markdown</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              <BaseButton class="action-btn primary" @click="handleRegenerate(report)">
+                {{ $t('report.listPage.regenerate') }}
+              </BaseButton>
+            </div>
+            <div class="action-group-danger">
+              <BaseButton class="action-btn danger" @click="handleDelete(report)">
+                {{ $t('common.delete') }}
+              </BaseButton>
+            </div>
           </div>
         </div>
       </div>
@@ -198,25 +202,6 @@
       </div>
     </BaseCard>
 
-    <!-- 报告生成弹窗 -->
-    <BaseDialog
-      v-model="generateDialogVisible"
-      :title="$t('report.generatePage.title')"
-      width="900px"
-      type="form"
-      @close="handleDialogClose"
-    >
-      <ReportGenerateForm ref="generateFormRef" />
-      <template #footer>
-        <BaseButton @click="handleDialogClose">
-          {{ $t('common.cancel') }}
-        </BaseButton>
-        <BaseButton type="primary" :loading="generating" @click="handleGenerate">
-          <el-icon v-if="!generating"><MagicStick /></el-icon>
-          {{ $t('report.generateReport') }}
-        </BaseButton>
-      </template>
-    </BaseDialog>
   </div>
 </template>
 
@@ -225,11 +210,10 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Refresh, ArrowDown, Loading, MagicStick } from '@element-plus/icons-vue'
-import { BaseCard, BaseButton, BaseDatePicker, BasePagination, BaseDialog } from '@/components/Common'
-import { getReportManagementList, deleteReportManagement, createReportManagement } from '@/api/Report'
+import { Plus, Search, Refresh, ArrowDown, Loading } from '@element-plus/icons-vue'
+import { BaseCard, BaseButton, BaseDatePicker, BasePagination } from '@/components/Common'
+import { getReportManagementList, deleteReportManagement } from '@/api/Report'
 import { previewFile, downloadFile } from '@/api/File/file'
-import ReportGenerateForm from './ReportGenerateForm.vue'
 import { createLogger } from '@/utils/simpleLogger'
 import { formatDate } from '@/utils/date'
 
@@ -240,11 +224,6 @@ const logger = createLogger('ReportList')
 // 响应式数据
 const loading = ref(false)
 const reportList = ref([])
-
-// 生成弹窗相关
-const generateDialogVisible = ref(false)
-const generateFormRef = ref(null)
-const generating = ref(false)
 
 // 搜索表单
 const searchForm = reactive({
@@ -403,58 +382,10 @@ const handleReset = () => {
   ElMessage.info(t('common.resetSuccess'))
 }
 
-// 生成新报告（打开弹窗）
+// 生成新报告（跳转到生成页面）
 const handleGenerateReport = () => {
   logger.info('User clicked generate new report')
-  generateDialogVisible.value = true
-}
-
-// 弹窗关闭处理
-const handleDialogClose = () => {
-  generateDialogVisible.value = false
-  // 重置表单
-  if (generateFormRef.value) {
-    generateFormRef.value.resetForm()
-  }
-}
-
-// 生成报告
-const handleGenerate = async () => {
-  if (!generateFormRef.value) return
-
-  // 表单验证
-  const isValid = await generateFormRef.value.validate()
-  if (!isValid) {
-    return
-  }
-
-  generating.value = true
-
-  try {
-    const requestData = generateFormRef.value.getFormData()
-    logger.info('开始创建报告', requestData)
-
-    const response = await createReportManagement(requestData)
-
-    if (response.code === 200) {
-      ElMessage.success(t('report.generatePage.generateSuccess'))
-      logger.info(`报告创建成功: ID=${response.data}`)
-
-      // 关闭弹窗
-      handleDialogClose()
-
-      // 刷新列表
-      await loadReportList()
-    } else {
-      throw new Error(response.message || t('report.generatePage.generateError'))
-    }
-  } catch (error) {
-    logger.error(`创建报告失败: ${error.message}`, error)
-    const errorMessage = error.response?.data?.message || error.message || t('report.generatePage.generateError')
-    ElMessage.error(errorMessage)
-  } finally {
-    generating.value = false
-  }
+  router.push('/report/generate')
 }
 
 // 预览报告
@@ -788,6 +719,24 @@ onMounted(() => {
     .card-actions {
       display: flex;
       gap: var(--gap-sm);
+      padding-top: var(--gap-md);
+      border-top: 1px solid var(--border-color, #f3f4f6);
+      box-sizing: border-box;
+
+      .action-group-primary {
+        display: flex;
+        gap: var(--gap-sm);
+        flex: 1;
+        min-width: 0;
+      }
+
+      .action-group-danger {
+        display: flex;
+        gap: var(--gap-sm);
+        padding-left: var(--gap-sm);
+        border-left: 1px solid var(--border-color, #e5e7eb);
+        flex-shrink: 0;
+      }
 
       .action-btn {
         flex: 1;
@@ -804,6 +753,8 @@ onMounted(() => {
         align-items: center;
         justify-content: center;
         gap: 4px;
+        min-width: 0;
+        box-sizing: border-box;
 
         &:hover {
           background: var(--background-hover, #f9fafb);
@@ -825,6 +776,10 @@ onMounted(() => {
           background: #dc2626;
           color: var(--surface, #ffffff);
           border-color: #dc2626;
+          font-weight: 600;
+          flex: 0 0 auto;
+          min-width: 70px;
+          max-width: 80px;
 
           &:hover {
             background: #b91c1c;

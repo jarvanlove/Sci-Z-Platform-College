@@ -630,7 +630,7 @@ const loadMessages = async (chatId) => {
               id: msg.id,
               type: msg.role === 'user' ? 'user' : 'ai',
               content: msg.content || '',
-              timestamp: new Date(msg.sendTime || msg.createdTime || msg.createdAt || msg.timestamp),
+              timestamp: new Date(msg.created_time || msg.createdTime || msg.createdAt || msg.timestamp),
               documents: documents,
               conversationId: msg.conversationId
             }
@@ -652,7 +652,7 @@ const loadMessages = async (chatId) => {
               id: msg.id,
               type: msg.role === 'user' ? 'user' : 'ai',
               content: msg.content || '',
-              timestamp: new Date(msg.createdAt || msg.timestamp),
+              timestamp: new Date(msg.created_time || msg.createdAt || msg.timestamp),
               documents: msg.documents || []
             }))
             messages.value = apiMessages
@@ -711,18 +711,73 @@ const formatKbContent = (content) => {
 }
 
 const formatTime = (date) => {
+  if (!date) return ''
+  
   const d = typeof date === 'string' || typeof date === 'number'
     ? new Date(date)
     : date
+  
+  // 检查日期是否有效
+  if (isNaN(d.getTime())) return ''
+  
   const now = new Date()
   const diff = now - d
   const minutes = Math.floor(diff / (1000 * 60))
   const hours = Math.floor(diff / (1000 * 60 * 60))
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  
+  // 格式化时间：HH:mm
+  const formatHourMinute = (date) => {
+    const hours = date.getHours().toString().padStart(2, '0')
+    const minutes = date.getMinutes().toString().padStart(2, '0')
+    return `${hours}:${minutes}`
+  }
+  
+  // 格式化日期：YYYY-MM-DD
+  const formatDate = (date) => {
+    const year = date.getFullYear()
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  
+  // 判断是否是同一天
+  const isSameDay = (date1, date2) => {
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate()
+  }
+  
+  // 判断是否是昨天
+  const isYesterday = (date) => {
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    return isSameDay(date, yesterday)
+  }
+  
+  // 1分钟内：刚刚
   if (minutes < 1) return '刚刚'
+  
+  // 1小时内：X分钟前
   if (minutes < 60) return `${minutes}分钟前`
-  if (hours < 24) return `${hours}小时前`
-  return `${days}天前`
+  
+  // 今天：显示具体时间（如 14:30）
+  if (isSameDay(d, now)) {
+    return formatHourMinute(d)
+  }
+  
+  // 昨天：昨天 HH:mm
+  if (isYesterday(d)) {
+    return `昨天 ${formatHourMinute(d)}`
+  }
+  
+  // 7天内：X天前
+  if (days < 7) {
+    return `${days}天前`
+  }
+  
+  // 更早：显示完整日期和时间（如 2025-01-15 14:30）
+  return `${formatDate(d)} ${formatHourMinute(d)}`
 }
 
 const scrollKbToBottom = () => {
@@ -938,13 +993,12 @@ const sendKbMessage = async () => {
       const messageResp = await createAiMessage({
         conversationId: String(conversationId),
         role: 'user',
-        content: text, // 保存原始文本，不包含@知识库标记
-        sendTime: new Date().toISOString()
+        content: text // 保存原始文本，不包含@知识库标记
       })
       if (messageResp.code === 200 && messageResp.data) {
         // 更新消息ID为后端返回的ID
         userMessage.id = messageResp.data.id
-        userMessage.timestamp = new Date(messageResp.data.sendTime || messageResp.data.createdTime)
+        userMessage.timestamp = new Date(messageResp.data.created_time || messageResp.data.createdTime)
         logger.info('保存用户消息成功', { messageId: messageResp.data.id })
       }
     } catch (error) {
@@ -1152,14 +1206,13 @@ const sendKbMessage = async () => {
               content: message.content,
               difyMessageId: data.messageId || null,
               sources: sourcesJson,
-              confidence: null,
-              sendTime: new Date().toISOString()
+              confidence: null
             })
             
             if (messageResp.code === 200 && messageResp.data) {
               // 更新消息ID为后端返回的ID
               message.id = messageResp.data.id
-              message.timestamp = new Date(messageResp.data.sendTime || messageResp.data.createdTime)
+              message.timestamp = new Date(messageResp.data.created_time || messageResp.data.createdTime)
               logger.info('保存AI消息成功', { messageId: messageResp.data.id })
             }
           } catch (error) {

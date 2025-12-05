@@ -18,7 +18,7 @@ import java.util.*;
 public class DifyChatbotModelConfigRequest {
 
     @JsonProperty("pre_prompt")
-    private String prePrompt = "";
+    private String prePrompt = "你的名字是小查，根据知识库内容回答，不要做太多延申。";
 
     @JsonProperty("prompt_type")
     private String promptType = "simple";
@@ -161,7 +161,6 @@ public class DifyChatbotModelConfigRequest {
                     Image.defaultConfig()
             );
         }
-
         @Data
         @JsonIgnoreProperties(ignoreUnknown = true)
         public static class Image {
@@ -178,14 +177,12 @@ public class DifyChatbotModelConfigRequest {
 
             public Image() {
             }
-
             private Image(Boolean enabled, String detail, Integer numberLimits, List<String> transferMethods) {
                 this.enabled = enabled;
                 this.detail = detail;
                 this.numberLimits = numberLimits;
                 this.transferMethods = transferMethods;
             }
-
             public static Image defaultConfig() {
                 return new Image(
                         false,
@@ -374,7 +371,7 @@ public class DifyChatbotModelConfigRequest {
                     }
 
                     public static Dataset defaultConfig() {
-                        return new Dataset(true, "f3ddc6e8-7688-4fb3-b1e0-02ac38e3b651");
+                        return new Dataset(true, "");
                     }
                 }
             }
