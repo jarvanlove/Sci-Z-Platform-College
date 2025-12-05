@@ -195,11 +195,15 @@ defineExpose({
 // 工作流选择容器
 .workflow-select-container {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .workflow-select-wrapper {
   position: relative;
   width: 100%;
+  flex-shrink: 0;
   
   .workflow-clear-btn {
     position: absolute;
@@ -300,6 +304,7 @@ defineExpose({
 }
 
 // 选中工作流信息卡片
+// 确保信息卡片在新的一行显示，不占用下拉菜单的位置
 .workflow-info {
   width: 100%;
   margin-top: 12px;
@@ -308,6 +313,12 @@ defineExpose({
   border-radius: 8px;
   border: 1px solid #e2e8f0;
   box-sizing: border-box;
+  // 确保在新行显示，不占用下拉菜单空间
+  display: block;
+  flex-shrink: 0;
+  // 确保信息卡片不会影响下拉菜单的位置计算
+  position: relative;
+  z-index: 0;
 
   .workflow-info-title {
     font-size: 16px;

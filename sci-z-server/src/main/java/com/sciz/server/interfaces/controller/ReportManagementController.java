@@ -105,8 +105,8 @@ public class ReportManagementController {
      *
      * @return 报告类型列表
      */
-    @Operation(summary = "获取报告类型列表", description = "查询工作流类型且名称包含'报告'的密钥列表，用于动态获取报告类型选项")
-    @GetMapping("/types")
+    @Operation(summary = "查询报告工作流", description = "查询工作流类型且名称包含'报告'的密钥列表，用于动态获取报告类型选项")
+    @GetMapping("/workflow")
     public Result<List<ReportTypeResp>> getReportTypes() {
         List<DifyApiKey> apiKeys = difyApiKeyService.getReportTypes();
         List<ReportTypeResp> reportTypes = apiKeys.stream()

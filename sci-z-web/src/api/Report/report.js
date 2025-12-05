@@ -105,6 +105,18 @@ export const getReportTypes = () => {
   })
 }
 
+/**
+ * 获取报告工作流列表
+ * 获取可用于报告生成的工作流列表
+ * @returns {Promise} 工作流列表响应
+ */
+export const getReportWorkflows = () => {
+  return request({
+    url: '/report-management/workflow',
+    method: HTTP_METHODS.GET
+  })
+}
+
 // ==================== 原有报告接口（保留兼容） ====================
 
 /**

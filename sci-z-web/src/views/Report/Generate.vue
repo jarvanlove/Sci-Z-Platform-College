@@ -9,5 +9,5 @@
 </template>
 
 <script setup>
-import { ReportGenerate } from '@/components/Business/Report'
+import ReportGenerate from '@/components/Business/Report/ReportGenerate.vue'
 </script>

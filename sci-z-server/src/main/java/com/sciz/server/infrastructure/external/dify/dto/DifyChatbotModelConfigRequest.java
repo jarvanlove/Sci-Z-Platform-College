@@ -18,7 +18,7 @@ import java.util.*;
 public class DifyChatbotModelConfigRequest {
 
     @JsonProperty("pre_prompt")
-    private String prePrompt = "";
+    private String prePrompt = "你的名字是小查，根据知识库内容回答，不要做太多延申。";
 
     @JsonProperty("prompt_type")
     private String promptType = "simple";
@@ -374,7 +374,7 @@ public class DifyChatbotModelConfigRequest {
                     }
 
                     public static Dataset defaultConfig() {
-                        return new Dataset(true, "f3ddc6e8-7688-4fb3-b1e0-02ac38e3b651");
+                        return new Dataset(true, "");
                     }
                 }
             }
