@@ -147,31 +147,35 @@
           </div>
 
           <div class="card-actions" @click.stop>
-            <BaseButton class="action-btn primary" @click="handlePreview(report)">
-              {{ $t('report.listPage.preview') }}
-            </BaseButton>
-            <el-dropdown
-              @command="(format) => handleDownload(report, format)"
-              trigger="click"
-            >
-              <BaseButton class="action-btn primary">
-                {{ $t('report.listPage.download') }}
-                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            <div class="action-group-primary">
+              <BaseButton class="action-btn primary" @click="handlePreview(report)">
+                {{ $t('report.listPage.preview') }}
               </BaseButton>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="pdf">PDF</el-dropdown-item>
-                  <el-dropdown-item command="word">Word</el-dropdown-item>
-                  <el-dropdown-item command="markdown">Markdown</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-            <BaseButton class="action-btn primary" @click="handleRegenerate(report)">
-              {{ $t('report.listPage.regenerate') }}
-            </BaseButton>
-            <BaseButton class="action-btn danger" @click="handleDelete(report)">
-              {{ $t('common.delete') }}
-            </BaseButton>
+              <el-dropdown
+                @command="(format) => handleDownload(report, format)"
+                trigger="click"
+              >
+                <BaseButton class="action-btn primary">
+                  {{ $t('report.listPage.download') }}
+                  <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </BaseButton>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="pdf">PDF</el-dropdown-item>
+                    <el-dropdown-item command="word">Word</el-dropdown-item>
+                    <el-dropdown-item command="markdown">Markdown</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              <BaseButton class="action-btn primary" @click="handleRegenerate(report)">
+                {{ $t('report.listPage.regenerate') }}
+              </BaseButton>
+            </div>
+            <div class="action-group-danger">
+              <BaseButton class="action-btn danger" @click="handleDelete(report)">
+                {{ $t('common.delete') }}
+              </BaseButton>
+            </div>
           </div>
         </div>
       </div>
@@ -715,6 +719,24 @@ onMounted(() => {
     .card-actions {
       display: flex;
       gap: var(--gap-sm);
+      padding-top: var(--gap-md);
+      border-top: 1px solid var(--border-color, #f3f4f6);
+      box-sizing: border-box;
+
+      .action-group-primary {
+        display: flex;
+        gap: var(--gap-sm);
+        flex: 1;
+        min-width: 0;
+      }
+
+      .action-group-danger {
+        display: flex;
+        gap: var(--gap-sm);
+        padding-left: var(--gap-sm);
+        border-left: 1px solid var(--border-color, #e5e7eb);
+        flex-shrink: 0;
+      }
 
       .action-btn {
         flex: 1;
@@ -731,6 +753,8 @@ onMounted(() => {
         align-items: center;
         justify-content: center;
         gap: 4px;
+        min-width: 0;
+        box-sizing: border-box;
 
         &:hover {
           background: var(--background-hover, #f9fafb);
@@ -752,6 +776,10 @@ onMounted(() => {
           background: #dc2626;
           color: var(--surface, #ffffff);
           border-color: #dc2626;
+          font-weight: 600;
+          flex: 0 0 auto;
+          min-width: 70px;
+          max-width: 80px;
 
           &:hover {
             background: #b91c1c;

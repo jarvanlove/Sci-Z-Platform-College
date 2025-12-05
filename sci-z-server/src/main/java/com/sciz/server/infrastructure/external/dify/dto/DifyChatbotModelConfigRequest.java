@@ -161,7 +161,6 @@ public class DifyChatbotModelConfigRequest {
                     Image.defaultConfig()
             );
         }
-
         @Data
         @JsonIgnoreProperties(ignoreUnknown = true)
         public static class Image {
@@ -178,14 +177,12 @@ public class DifyChatbotModelConfigRequest {
 
             public Image() {
             }
-
             private Image(Boolean enabled, String detail, Integer numberLimits, List<String> transferMethods) {
                 this.enabled = enabled;
                 this.detail = detail;
                 this.numberLimits = numberLimits;
                 this.transferMethods = transferMethods;
             }
-
             public static Image defaultConfig() {
                 return new Image(
                         false,
