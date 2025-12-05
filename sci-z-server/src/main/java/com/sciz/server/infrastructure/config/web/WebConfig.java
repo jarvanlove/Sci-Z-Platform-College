@@ -35,7 +35,7 @@ public class WebConfig implements WebMvcConfigurer {
     }
 
     /**
-     * 配置静态资源与 Swagger 资源映射
+     * 配置静态资源映射
      *
      * @param registry ResourceHandlerRegistry 资源注册器
      * @return void
@@ -45,9 +45,5 @@ public class WebConfig implements WebMvcConfigurer {
         // 静态资源 - 只处理 /static/** 路径
         registry.addResourceHandler("/static/**")
                 .addResourceLocations("classpath:/static/");
-
-        // Swagger UI (Springdoc)
-        registry.addResourceHandler("/swagger-ui/**")
-                .addResourceLocations("classpath:/META-INF/resources/webjars/springdoc-ui/");
     }
 }
