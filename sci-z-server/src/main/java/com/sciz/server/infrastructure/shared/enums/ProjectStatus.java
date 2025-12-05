@@ -13,6 +13,11 @@ import lombok.Getter;
 public enum ProjectStatus {
 
     /**
+     * 未开始
+     */
+    NOT_STARTED(0, "未开始"),
+
+    /**
      * 进行中
      */
     IN_PROGRESS(1, "进行中"),
@@ -89,5 +94,14 @@ public enum ProjectStatus {
      */
     public boolean isCancelled() {
         return this == CANCELLED;
+    }
+
+    /**
+     * 判断是否为未开始状态
+     *
+     * @return 是否为未开始状态
+     */
+    public boolean isNotStarted() {
+        return this == NOT_STARTED;
     }
 }

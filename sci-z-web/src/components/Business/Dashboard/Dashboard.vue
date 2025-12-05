@@ -6,6 +6,11 @@
 -->
 <template>
   <div class="dashboard-container">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <h1 class="page-title">{{ $t('menu.dashboard') }}</h1>
+    </div>
+
     <!-- 统计卡片区域 -->
     <div class="stats-cards">
       <div
@@ -13,7 +18,6 @@
         :key="stat.key"
         class="stat-card"
         :class="`stat-${stat.key}`"
-        @click="handleStatClick(stat)"
       >
         <div class="stat-icon">{{ stat.icon }}</div>
         <div class="stat-value" :class="stat.valueClass">{{ formatNumber(stat.value) }}</div>
@@ -48,7 +52,6 @@
             :empty-text="$t('common.noData')"
             stripe
             class="declaration-table"
-            @row-click="handleDeclarationClick"
           >
             <el-table-column
               prop="number"
@@ -125,16 +128,16 @@
             </div>
           </template>
           <div class="quick-actions">
-            <el-button
+            <button
               v-for="action in quickActions"
               :key="action.key"
-              :type="action.type"
-              :icon="action.icon"
               class="action-button"
+              :class="action.buttonClass"
               @click="handleQuickAction(action.key)"
             >
+              <el-icon class="action-icon"><component :is="action.icon" /></el-icon>
               {{ action.label }}
-            </el-button>
+            </button>
           </div>
         </BaseCard>
       </div>
@@ -172,10 +175,9 @@
                 </div>
               </div>
               <div class="progress-bar-container">
-                <el-progress
-                  :percentage="project.progress"
-                  :color="getProgressColor(project.progress)"
-                  :stroke-width="8"
+                <ProjectProgressBar
+                  :progress="project.progress"
+                  :height="8"
                   :show-text="false"
                 />
               </div>
@@ -194,7 +196,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Document, Folder, Check, Search } from '@element-plus/icons-vue'
-import { BaseCard } from '@/components/Common'
+import { BaseCard, ProjectProgressBar } from '@/components/Common'
 import { formatDate } from '@/utils/date'
 import { DECLARATION_STATUS_CONFIG } from '@/utils/constants'
 import { createLogger } from '@/utils/simpleLogger'
@@ -218,10 +220,10 @@ const recentDeclarations = ref([])
 const projectProgress = ref([])
 
 const quickActions = ref([
-  { key: 'newDeclaration', icon: Document, type: 'default', label: t('dashboard.newDeclaration') },
-  { key: 'createProject', icon: Folder, type: 'default', label: t('dashboard.createProject') },
-  { key: 'applyAcceptance', icon: Check, type: 'default', label: t('dashboard.applyAcceptance') },
-  { key: 'knowledgeSearch', icon: Search, type: 'default', label: t('dashboard.knowledgeSearch') }
+  { key: 'newDeclaration', icon: Document, buttonClass: 'primary', label: t('dashboard.newDeclaration') },
+  { key: 'projectList', icon: Folder, buttonClass: 'secondary', label: t('dashboard.projectList') },
+  { key: 'applyAcceptance', icon: Check, buttonClass: 'secondary', label: t('dashboard.applyAcceptance') },
+  { key: 'knowledgeSearch', icon: Search, buttonClass: 'text', label: t('dashboard.knowledgeSearch') }
 ])
 
 
@@ -241,12 +243,7 @@ const getStatusTagType = (statusType) => {
   return typeMap[statusType] || 'info'
 }
 
-// 获取进度条颜色
-const getProgressColor = (progress) => {
-  if (progress <= 30) return '#dc2626'
-  if (progress <= 70) return '#f59e0b'
-  return '#16a34a'
-}
+// 注意：进度条颜色逻辑已移至 ProjectProgressBar 组件中
 
 // 状态数字到字符串的映射
 const STATUS_MAP = {
@@ -346,20 +343,6 @@ const loadDashboardData = async () => {
 }
 
 // 事件处理
-const handleStatClick = (stat) => {
-  logger.info('User clicked stat card', { stat: stat.key, label: stat.label })
-  // 根据统计类型跳转到对应列表页
-  const routeMap = {
-    total: '/project/list',
-    progress: '/project/list?status=progress',
-    pending: '/acceptance/list?status=pending',
-    completed: '/project/list?status=completed'
-  }
-  if (routeMap[stat.key]) {
-    router.push(routeMap[stat.key])
-  }
-}
-
 const handleDeclarationClick = (item) => {
   logger.info('User clicked declaration item', { id: item.id, number: item.number })
   router.push(`/declaration/detail/${item.id}`)
@@ -385,8 +368,8 @@ const handleQuickAction = (action) => {
   
   const pathMap = {
     newDeclaration: '/declaration/create',
-    createProject: '/project/list', // 项目创建功能暂未实现，跳转到项目列表
-    applyAcceptance: '/project/list', // 验收功能暂未实现，跳转到项目列表
+    projectList: '/project/list',
+    applyAcceptance: '/report/list',
     knowledgeSearch: '/knowledge/list'
   }
   
@@ -412,6 +395,20 @@ onMounted(() => {
   max-width: 100%;
 }
 
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--gap-lg);
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin: 0;
+}
+
 .stats-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -433,7 +430,6 @@ onMounted(() => {
   text-align: center;
   position: relative;
   transition: all 0.3s ease;
-  cursor: pointer;
   overflow: hidden;
 
   &::before {
@@ -443,11 +439,27 @@ onMounted(() => {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #60a5fa 100%);
     border-radius: var(--radius-lg);
     opacity: 0;
     transition: opacity 0.3s ease;
     z-index: -1;
+  }
+
+  // 根据不同类型设置不同的渐变色
+  &.stat-total::before {
+    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #60a5fa 100%);
+  }
+
+  &.stat-progress::before {
+    background: linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%);
+  }
+
+  &.stat-pending::before {
+    background: linear-gradient(135deg, #991b1b 0%, #dc2626 50%, #ef4444 100%);
+  }
+
+  &.stat-completed::before {
+    background: linear-gradient(135deg, #15803d 0%, #16a34a 50%, #22c55e 100%);
   }
 
   &:hover {
@@ -488,7 +500,7 @@ onMounted(() => {
 
 .stat-label {
   font-size: 14px;
-  color: var(--text-2);
+  color: #6b7280;
   transition: color 0.3s ease;
 }
 
@@ -528,6 +540,8 @@ onMounted(() => {
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .card-title {
@@ -535,6 +549,7 @@ onMounted(() => {
   font-weight: 600;
   color: var(--color-primary);
   margin: 0;
+  flex-shrink: 0;
 }
 
 .card-action {
@@ -542,6 +557,9 @@ onMounted(() => {
   font-size: 14px;
   text-decoration: none;
   cursor: pointer;
+  white-space: nowrap;
+  margin-left: auto;
+  flex-shrink: 0;
 
   &:hover {
     text-decoration: underline;
@@ -753,26 +771,61 @@ onMounted(() => {
 }
 
 .action-button {
-  width: 100%;
-  height: 40px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  padding: 0 16px;
-  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #374151;
   font-size: 14px;
   font-weight: 500;
   transition: all 0.2s;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-1);
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  box-sizing: border-box;
 
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(30, 58, 138, 0.1);
-    border-color: var(--color-primary);
+  .action-icon {
+    margin-right: 8px;
+    font-size: 16px;
+  }
+
+  &.primary {
+    background-color: var(--surface);
+    border: 1px solid var(--color-primary);
     color: var(--color-primary);
-    background: #f0f9ff;
+  }
+
+  &.primary:hover {
+    background-color: #e0f2fe;
+    border-color: #1e40af;
+    color: #1e40af;
+  }
+
+  &.secondary {
+    background-color: var(--surface);
+    border: 1px solid var(--color-primary);
+    color: var(--color-primary);
+  }
+
+  &.secondary:hover {
+    background-color: #e0f2fe;
+    border-color: #1e40af;
+    color: #1e40af;
+  }
+
+  &.text {
+    background-color: var(--surface);
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+  }
+
+  &.text:hover {
+    background-color: #e0f2fe;
+    border-color: #1e40af;
+    color: #1e40af;
   }
 }
 

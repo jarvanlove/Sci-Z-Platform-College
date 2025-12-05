@@ -608,7 +608,6 @@ export default {
     removeMember: '移除成员',
     projectCreated: '项目创建成功',
     projectUpdated: '项目更新成功',
-    projectDeleted: '项目删除成功',
     milestoneTimeError: '里程碑 {index} 的结束时间必须晚于开始时间',
     // 列表页面
     list: {
@@ -622,10 +621,11 @@ export default {
       endDate: '结束日期',
       progress: '进度',
       noData: '暂无项目记录',
-      deleteConfirm: '确定要删除此项目吗？删除后将无法恢复。',
-      deleteTitle: '确认删除',
-      deleteSuccess: '项目删除成功',
-      deleteError: '项目删除失败',
+      cancel: '取消',
+      cancelConfirm: '确定要取消此项目吗？取消后项目状态将变为"已取消"。',
+      cancelTitle: '确认取消',
+      cancelSuccess: '项目"{name}"已取消',
+      cancelError: '项目取消失败',
       loadError: '项目列表加载失败',
       columns: {
         number: '项目编号',
@@ -639,10 +639,7 @@ export default {
     },
     listPage: {
       searchPlaceholder: '请输入项目名称/负责人',
-      deleteConfirm: '确定删除该项目吗？',
-      loadError: '项目列表加载失败',
-      deleteSuccess: '项目删除成功',
-      deleteError: '项目删除失败'
+      loadError: '项目列表加载失败'
     },
     // 详情编辑页面
     detail: {
@@ -706,6 +703,7 @@ export default {
       documentsAddedSuccess: '里程碑 {milestoneIndex} 已添加 {count} 个文档',
       uploadError: '文件上传失败',
       fileAlreadyExists: '文件 {name} 已存在',
+      imageNotSupported: '文件 {name} 是图片类型，里程碑文档不支持上传图片文件',
       documentDeletedSuccess: '文档 {name} 已删除',
       deleteDocumentConfirm: '确定要删除文档"{name}"吗？删除后将无法恢复。',
       deleteDocumentTitle: '确认删除',
@@ -720,6 +718,16 @@ export default {
       milestoneDeletedSuccess: '里程碑删除成功',
       deleteMilestoneConfirm: '确定要删除此里程碑吗？',
       deleteMilestoneTitle: '确认删除',
+      complete: '完成',
+      cancelComplete: '取消完成',
+      milestoneIdRequired: '里程碑ID不存在，无法完成操作',
+      earlyCompleteConfirm: '里程碑"{name}"的预计结束时间为 {endTime}，当前时间早于预计结束时间。确定要提前完成此里程碑吗？',
+      earlyCompleteTitle: '确认提前完成',
+      milestoneCompletedSuccess: '里程碑"{name}"已完成',
+      cancelCompleteConfirm: '确定要取消完成里程碑"{name}"吗？取消后将重新按时间自动计算进度。',
+      cancelCompleteTitle: '确认取消完成',
+      milestoneCancelCompleteSuccess: '里程碑"{name}"已取消完成',
+      milestoneToggleError: '操作失败',
       save: '保存',
       update: '更新项目',
       saveSuccess: '保存成功',
@@ -751,6 +759,23 @@ export default {
       removeMemberSuccess: '成员移除成功'
     },
     // 进度页面
+    progress: {
+      title: '项目进度',
+      overview: '项目概览',
+      projectInfo: '项目信息',
+      name: '项目名称',
+      number: '项目编号',
+      manager: '项目负责人',
+      status: '项目状态',
+      overallProgress: '整体进度',
+      startTime: '开始时间',
+      endTime: '预计完成',
+      timeline: '时间轴视图',
+      noTimeline: '暂无时间轴数据',
+      timelineHint: '项目里程碑将在此显示',
+      loadError: '项目进度加载失败，请重试',
+      noProjectId: '未找到项目ID'
+    },
     progressPage: {
       stats: '进度统计',
       completed: '已完成',
@@ -849,7 +874,7 @@ export default {
     delayedProjects: '已延期项目',
     completed: '已完成项目',
     newDeclaration: '新建申报',
-    createProject: '创建项目',
+    projectList: '项目列表',
     applyAcceptance: '申请验收',
     knowledgeSearch: '知识库搜索',
     declarationNumber: '申报编号',
@@ -863,21 +888,8 @@ export default {
     viewProjectDetails: '查看项目详情：项目ID {projectId}',
     executingAction: '执行操作：{action}',
     actionNewDeclaration: '新建申报',
-    actionCreateProject: '创建项目',
     actionApplyAcceptance: '申请验收',
-    actionKnowledgeSearch: '知识库搜索',
-    // 模拟数据（后端开发完成后删除）
-    mockDeclaration1: '人工智能在教育领域的应用研究',
-    mockDeclaration2: '区块链技术在供应链管理中的应用',
-    mockDeclaration3: '量子计算算法优化研究',
-    mockDeclaration4: '生物信息学数据分析方法研究',
-    mockDeclaration5: '物联网安全防护技术研究',
-    mockProject1: '智能教学系统开发',
-    mockProject2: '区块链供应链平台',
-    mockProject3: '量子算法优化研究',
-    mockProject4: '生物信息学分析工具',
-    mockProject5: '物联网安全框架',
-    mockProject6: '大数据分析平台'
+    actionKnowledgeSearch: '知识库搜索'
   },
 
   // 知识库相关

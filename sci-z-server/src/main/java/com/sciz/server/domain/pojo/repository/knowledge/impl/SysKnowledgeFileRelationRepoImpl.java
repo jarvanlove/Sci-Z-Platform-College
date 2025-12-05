@@ -1,10 +1,12 @@
 package com.sciz.server.domain.pojo.repository.knowledge.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import java.time.LocalDateTime;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeFileRelation;
 import com.sciz.server.domain.pojo.mapper.knowledge.SysKnowledgeFileRelationMapper;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeFileRelationRepo;
@@ -55,20 +57,35 @@ public class SysKnowledgeFileRelationRepoImpl implements SysKnowledgeFileRelatio
     }
 
     @Override
-    public IPage<SysKnowledgeFileRelation> pageByKnowledgeId(Page<SysKnowledgeFileRelation> page, Long knowledgeId, Long folderId) {
+    public IPage<SysKnowledgeFileRelation> pageByKnowledgeId(Page<SysKnowledgeFileRelation> page, Long knowledgeId,
+            Long folderId) {
         LambdaQueryWrapper<SysKnowledgeFileRelation> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(SysKnowledgeFileRelation::getKnowledgeId, knowledgeId)
                 .eq(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
-        
+
         // 如果指定了文件夹ID，则只查询该文件夹下的文件
         if (folderId != null) {
             queryWrapper.eq(SysKnowledgeFileRelation::getFolderId, folderId);
         }
-        
+
         // 按排序号升序，创建时间倒序排列
         queryWrapper.orderByAsc(SysKnowledgeFileRelation::getSortOrder)
                 .orderByDesc(SysKnowledgeFileRelation::getCreatedTime);
-        
+
         return mapper.selectPage(page, queryWrapper);
+    }
+
+    @Override
+    public boolean deleteByAttachmentId(Long attachmentId) {
+        if (attachmentId == null) {
+            return false;
+        }
+        // PostgreSQL 不支持在 UPDATE 语句中使用 LIMIT，移除 LIMIT
+        // 一个附件ID可能有多条知识库文件关联记录，应该全部删除
+        return mapper.update(null, new LambdaUpdateWrapper<SysKnowledgeFileRelation>()
+                .eq(SysKnowledgeFileRelation::getAttachmentId, attachmentId)
+                .eq(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .set(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.DELETED.getCode())
+                .set(SysKnowledgeFileRelation::getUpdatedTime, LocalDateTime.now())) > 0;
     }
 }

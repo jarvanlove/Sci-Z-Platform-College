@@ -523,7 +523,7 @@ COMMENT ON COLUMN project_progress.project_id IS '项目ID';
 COMMENT ON COLUMN project_progress.title IS '进度标题';
 COMMENT ON COLUMN project_progress.content IS '进度内容';
 COMMENT ON COLUMN project_progress.progress IS '进度百分比';
-COMMENT ON COLUMN project_progress.is_milestone IS '是否里程碑';
+COMMENT ON COLUMN project_progress.is_milestone IS '是否里程碑（0：普通进度记录  1：里程碑记录）';
 COMMENT ON COLUMN project_progress.milestone_start_time IS '里程碑开始时间';
 COMMENT ON COLUMN project_progress.milestone_end_time IS '里程碑结束时间';
 COMMENT ON COLUMN project_progress.recorder_id IS '记录人ID';

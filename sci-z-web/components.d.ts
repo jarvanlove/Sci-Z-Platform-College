@@ -75,6 +75,8 @@ declare module 'vue' {
     ProgressBar: typeof import('./src/components/Business/Detail/ProgressBar.vue')['default']
     ProjectDetail: typeof import('./src/components/Business/Project/ProjectDetail.vue')['default']
     ProjectList: typeof import('./src/components/Business/Project/ProjectList.vue')['default']
+    ProjectProgress: typeof import('./src/components/Business/Project/ProjectProgress.vue')['default']
+    ProjectProgressBar: typeof import('./src/components/Common/ProjectProgressBar.vue')['default']
     QuickActions: typeof import('./src/components/Business/Legacy/QuickActions.vue')['default']
     RecentActivity: typeof import('./src/components/Business/Legacy/RecentActivity.vue')['default']
     RegisterForm: typeof import('./src/components/Business/Auth/RegisterForm.vue')['default']

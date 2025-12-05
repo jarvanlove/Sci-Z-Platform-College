@@ -13,4 +13,4 @@ export { default as ProjectList } from './ProjectList.vue'
 export { default as ProjectDetail } from './ProjectDetail.vue'
 
 // 项目进度组件
-// export { default as ProjectProgress } from './ProjectProgress.vue'
+export { default as ProjectProgress } from './ProjectProgress.vue'

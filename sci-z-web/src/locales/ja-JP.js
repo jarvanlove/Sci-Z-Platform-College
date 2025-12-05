@@ -292,7 +292,25 @@ export default {
     removeMember: 'メンバー削除',
     projectCreated: 'プロジェクトが正常に作成されました',
     projectUpdated: 'プロジェクトが正常に更新されました',
-    projectDeleted: 'プロジェクトが正常に削除されました'
+    projectDeleted: 'プロジェクトが正常に削除されました',
+    // 進捗ページ
+    progress: {
+      title: 'プロジェクト進捗',
+      overview: 'プロジェクト概要',
+      projectInfo: 'プロジェクト情報',
+      name: 'プロジェクト名',
+      number: 'プロジェクト番号',
+      manager: 'プロジェクトマネージャー',
+      status: 'プロジェクトステータス',
+      overallProgress: '全体進捗',
+      startTime: '開始時間',
+      endTime: '予定完了',
+      timeline: 'タイムライン表示',
+      noTimeline: 'タイムラインデータなし',
+      timelineHint: 'プロジェクトマイルストーンがここに表示されます',
+      loadError: 'プロジェクト進捗の読み込みに失敗しました。もう一度お試しください',
+      noProjectId: 'プロジェクトIDが見つかりません'
+    }
   },
 
   // レポート

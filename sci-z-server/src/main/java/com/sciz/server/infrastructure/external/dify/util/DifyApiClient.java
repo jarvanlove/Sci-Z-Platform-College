@@ -15,6 +15,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import java.time.Duration;
 import java.util.Map;
+
 /**
  * Dify API 客户端工具类
  * 封装 HTTP 请求和 Authorization 认证
@@ -31,6 +32,7 @@ public class DifyApiClient {
     private final DifyApiKeyService difyApiKeyService;
     private final ObjectMapper objectMapper;
     private final WebClient webClient;
+
     /**
      * 统一请求方法（使用动态密钥）
      * 
@@ -267,6 +269,7 @@ public class DifyApiClient {
     /**
      * 创建带动态密钥的批量文件上传 HTTP 实体
      * 支持多个文件上传（每个文件使用相同的 field name "file"）
+     * 根据 Dify 官方文档，批量上传时每个文件都使用 "file" 作为字段名
      */
     private HttpEntity<?> createBatchFileUploadEntityWithDynamicKey(MultipartFile[] files, Map<String, Object> data,
             long userId, String resourceId, String keyType) {
@@ -281,21 +284,28 @@ public class DifyApiClient {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
 
         // 添加多个文件（每个文件都使用 "file" 作为 field name，符合 Dify API 规范）
+        // 这是批量上传的关键：多个文件使用相同的字段名 "file"
         if (files != null && files.length > 0) {
+            int fileCount = 0;
             for (MultipartFile file : files) {
                 if (file != null && !file.isEmpty()) {
                     body.add("file", file.getResource());
+                    fileCount++;
+                    log.debug("添加文件到批量上传请求: fileName={}, fileCount={}/{}",
+                            file.getOriginalFilename(), fileCount, files.length);
                 }
             }
+            log.info("批量上传请求构建完成: totalFileCount={}, actualFileCount={}", files.length, fileCount);
         }
 
-        // 添加其他数据
+        // 添加其他数据（所有文件共享同一个 data 配置）
         if (data != null) {
             data.forEach((key, value) -> {
                 if (value != null) {
                     body.add(key, value.toString());
                 }
             });
+            log.debug("添加表单数据到批量上传请求: dataKeys={}", data.keySet());
         }
 
         return new HttpEntity<>(body, headers);
@@ -316,10 +326,10 @@ public class DifyApiClient {
             Long userId, String resourceId, String keyType) {
         String url = buildUrl(path, null, 0);
         HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType, 0);
-        
-        log.debug(String.format("Dify %s 流式请求: %s, userId=%s, resourceId=%s, keyType=%s, hasBody=%s", 
+
+        log.debug(String.format("Dify %s 流式请求: %s, userId=%s, resourceId=%s, keyType=%s, hasBody=%s",
                 method, url, userId, resourceId, keyType, body != null));
-        
+
         try {
             // 构建请求体
             String jsonBody;
@@ -362,16 +372,42 @@ public class DifyApiClient {
             HttpHeaders responseHeaders = new HttpHeaders();
             responseHeaders.setContentType(MediaType.TEXT_EVENT_STREAM);
             ResponseEntity<String> response = new ResponseEntity<>(
-                    responseBody, 
-                    responseHeaders, 
+                    responseBody,
+                    responseHeaders,
                     HttpStatus.OK);
-            
+
             validateResponse(url, response);
             return response;
-            
+
         } catch (Exception e) {
             log.error(String.format("Dify 流式请求异常: url=%s, err=%s", url, e.getMessage()), e);
             throw new RuntimeException("Dify 流式请求异常: " + url, e);
+        }
+    }
+
+    /**
+     * 查询批次索引状态（用于批量上传后获取所有文件的详细信息）
+     * 根据 Dify 官方文档：GET /datasets/{dataset_id}/documents/{batch}/indexing-status
+     * 
+     * @param datasetId  数据集ID
+     * @param batch      批次ID
+     * @param userId     用户ID
+     * @param resourceId 资源ID
+     * @param keyType    密钥类型
+     * @return 响应结果（包含所有文件的详细信息）
+     */
+    public ResponseEntity<String> getBatchIndexingStatus(String datasetId, String batch, Long userId,
+            String resourceId, String keyType) {
+        try {
+            // 修正路径：应该是 /documents/{batch}/indexing-status 而不是
+            // /batch/{batch}/indexing-status
+            String path = "/datasets/" + datasetId + "/documents/" + batch + "/indexing-status";
+            log.debug("查询批次索引状态: datasetId={}, batch={}, userId={}, resourceId={}, keyType={}",
+                    datasetId, batch, userId, resourceId, keyType);
+            return request("GET", path, userId, resourceId, keyType);
+        } catch (Exception e) {
+            log.error("查询批次索引状态失败: datasetId={}, batch={}, error={}", datasetId, batch, e.getMessage(), e);
+            throw new RuntimeException("查询批次索引状态失败: " + e.getMessage(), e);
         }
     }
 

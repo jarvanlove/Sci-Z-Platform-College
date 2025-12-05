@@ -25,8 +25,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.IntStream;
 
 /**
  * Dify 工作流服务实现类
@@ -221,22 +221,111 @@ public class DifyWorkflowServiceImpl implements DifyWorkflowService {
                         throw BusinessException.of(ResultCode.BAD_REQUEST, "文件数量超过限制，最多支持10个文件");
                 }
 
-                // 2. 调用 Dify API 批量上传文档
-                log.info(String.format("调用 Dify API 批量上传文档: datasetId=%s, fileCount=%s", datasetId, fileCount));
-                ResponseEntity<String> difyResponse = difyApiService.uploadDocumentsBatchWithFileStorage(
-                                datasetId, files, userId, resourceId, keyType);
+                // 2. 将 MultipartFile[] 转换为 List<MultipartFile>
+                var fileList = Arrays.asList(files);
 
-                // 3. 验证 HTTP 响应状态
-                String responseBody = DifyWorkflowRespBuilder.validateHttpResponse(
-                                difyResponse, "Dify 批量文档上传");
+                // 3. 调用 Dify API 异步批量上传文档
+                log.info(String.format("调用 Dify API 异步批量上传文档: datasetId=%s, fileCount=%s", datasetId, fileCount));
+                var future = difyApiService.uploadDocumentsAsync(datasetId, fileList, userId, resourceId, keyType);
 
-                // 4. 解析响应为类型安全的响应对象
-                DifyDocumentBatchUploadResp batchUploadResp = DifyDocumentBatchUploadResp.from(responseBody,
-                                objectMapper);
+                // 4. 等待异步上传完成
+                List<ResponseEntity<String>> uploadResults;
+                try {
+                        uploadResults = future.get();
+                        log.info(String.format("异步批量上传完成: datasetId=%s, fileCount=%s, resultCount=%s",
+                                        datasetId, fileCount, uploadResults != null ? uploadResults.size() : 0));
+                } catch (Exception e) {
+                        log.error(String.format("异步批量上传失败: datasetId=%s, fileCount=%s, err=%s",
+                                        datasetId, fileCount, e.getMessage()), e);
+                        throw BusinessException.of(ResultCode.FILE_UPLOAD_FAILED, "异步批量上传失败: %s", e.getMessage());
+                }
 
-                log.info(String.format("批量创建知识库文档成功: datasetId=%s, fileCount=%s, batch=%s, documentCount=%s",
-                                datasetId, fileCount, batchUploadResp.batch(),
-                                batchUploadResp.documents() != null ? batchUploadResp.documents().size() : 1));
+                // 5. 解析所有上传响应，合并成 DifyDocumentBatchUploadResp 对象
+                if (uploadResults == null || uploadResults.isEmpty()) {
+                        throw BusinessException.of(ResultCode.FILE_UPLOAD_FAILED, "上传结果为空");
+                }
+
+                // 6. 解析每个响应，提取文档信息
+                var documentsList = IntStream.range(0, uploadResults.size())
+                                .mapToObj(i -> {
+                                        var response = uploadResults.get(i);
+                                        if (response == null || !response.getStatusCode().is2xxSuccessful()) {
+                                                log.warn(String.format(
+                                                                "文件上传失败: datasetId=%s, fileIndex=%s, statusCode=%s",
+                                                                datasetId, i,
+                                                                response != null ? response.getStatusCode() : "null"));
+                                                return null;
+                                        }
+
+                                        try {
+                                                // 验证 HTTP 响应状态
+                                                int fileIndex = i + 1;
+                                                String responseBody = DifyWorkflowRespBuilder.validateHttpResponse(
+                                                                response,
+                                                                String.format("Dify 文档上传（文件 %d/%d）", fileIndex,
+                                                                                fileCount));
+
+                                                // 解析单个文档上传响应
+                                                var singleUploadResp = DifyDocumentBatchUploadResp.from(responseBody,
+                                                                objectMapper);
+
+                                                // 提取文档信息（优先使用 documents 数组，否则使用 document 对象）
+                                                DifyDocumentBatchUploadResp.DifyDocumentInfo docInfo = null;
+                                                if (singleUploadResp.documents() != null
+                                                                && !singleUploadResp.documents().isEmpty()) {
+                                                        docInfo = singleUploadResp.documents().get(0);
+                                                } else if (singleUploadResp.document() != null) {
+                                                        docInfo = singleUploadResp.document();
+                                                }
+
+                                                if (docInfo != null && docInfo.id() != null
+                                                                && !docInfo.id().trim().isEmpty()) {
+                                                        // 设置 position（文件在批次中的位置）
+                                                        var docInfoWithPosition = new DifyDocumentBatchUploadResp.DifyDocumentInfo(
+                                                                        docInfo.id(),
+                                                                        docInfo.name(),
+                                                                        fileIndex, // position 从 1 开始
+                                                                        docInfo.indexingStatus(),
+                                                                        docInfo.createdAt(),
+                                                                        docInfo.tokens(),
+                                                                        docInfo.wordCount(),
+                                                                        docInfo.error());
+
+                                                        log.debug(String.format(
+                                                                        "解析文档信息成功: datasetId=%s, fileIndex=%s, docId=%s, fileName=%s",
+                                                                        datasetId, i, docInfo.id(), docInfo.name()));
+
+                                                        return docInfoWithPosition;
+                                                } else {
+                                                        log.warn(String.format(
+                                                                        "文档信息无效: datasetId=%s, fileIndex=%s, responseBody=%s",
+                                                                        datasetId, i, responseBody));
+                                                        return null;
+                                                }
+                                        } catch (Exception e) {
+                                                log.error(String.format(
+                                                                "解析文档上传响应失败: datasetId=%s, fileIndex=%s, err=%s",
+                                                                datasetId, i, e.getMessage()),
+                                                                e);
+                                                // 返回 null，后续会被过滤掉
+                                                return null;
+                                        }
+                                })
+                                .filter(docInfo -> docInfo != null)
+                                .toList();
+
+                // 获取第一个文档信息
+                DifyDocumentBatchUploadResp.DifyDocumentInfo firstDocument = documentsList.isEmpty() ? null
+                                : documentsList.get(0);
+
+                // 7. 构建批量上传响应对象
+                var batchUploadResp = new DifyDocumentBatchUploadResp(
+                                firstDocument, // 第一个文档信息
+                                null, // 异步上传方式不返回 batch 字段
+                                documentsList.isEmpty() ? null : documentsList); // 所有文档信息列表
+
+                log.info(String.format("批量创建知识库文档成功: datasetId=%s, fileCount=%s, documentCount=%s",
+                                datasetId, fileCount, documentsList.size()));
 
                 return batchUploadResp;
         }

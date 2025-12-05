@@ -163,8 +163,8 @@ export const getProjectStatistics = () => {
  * @param {File[]} formData.files - 文件对象数组（批量上传）
  * @param {string} formData.relationType - 关联类型（固定值：'project'）
  * @param {string} formData.attachmentType - 附件类型（固定值：'document'）
- * @param {number} formData.relationId - 关联ID（项目ID，必填）
- * @param {string} formData.relationName - 关联名称（项目名称/里程碑名称）
+ * @param {number} formData.relationId - 关联ID（传项目ID，后端会处理）
+ * @param {string} formData.relationName - 关联名称（项目编号/里程碑名称）
  * @param {number} formData.isPublic - 是否公开（0:私有, 1:公开，默认0）
  * @returns {Promise} 文件上传响应，data 为文件信息数组
  * 响应格式：{ code: 200, data: [{ id, fileName, originalName, fileType, fileSize, uploaderName, uploadTime, fileUrl, previewUrl }, ...] }
@@ -177,5 +177,44 @@ export const uploadMilestoneDocument = (formData) => {
     headers: {
       'Content-Type': 'multipart/form-data'
     }
+  })
+}
+
+/**
+ * 完成里程碑
+ * @param {number} milestoneId - 里程碑ID
+ * @returns {Promise} 完成里程碑响应
+ * 响应格式：{ code: 200, message: "操作成功", data: null }
+ */
+export const completeMilestone = (milestoneId) => {
+  return request({
+    url: PROJECT_API.MILESTONE_COMPLETE(milestoneId),
+    method: HTTP_METHODS.PUT
+  })
+}
+
+/**
+ * 取消完成里程碑
+ * @param {number} milestoneId - 里程碑ID
+ * @returns {Promise} 取消完成里程碑响应
+ * 响应格式：{ code: 200, message: "操作成功", data: null }
+ */
+export const cancelCompleteMilestone = (milestoneId) => {
+  return request({
+    url: PROJECT_API.MILESTONE_CANCEL_COMPLETE(milestoneId),
+    method: HTTP_METHODS.PUT
+  })
+}
+
+/**
+ * 取消项目
+ * @param {number} id - 项目ID
+ * @returns {Promise} 取消项目响应
+ * 响应格式：{ code: 200, message: "操作成功", data: null }
+ */
+export const cancelProject = (id) => {
+  return request({
+    url: PROJECT_API.CANCEL(id),
+    method: HTTP_METHODS.PUT
   })
 }

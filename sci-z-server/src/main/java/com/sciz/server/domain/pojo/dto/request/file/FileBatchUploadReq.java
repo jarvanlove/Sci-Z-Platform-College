@@ -10,7 +10,7 @@ import org.springframework.util.StringUtils;
  *
  * @param files          MultipartFile[] 上传文件集合
  * @param relationType   String 关联类型（可选）
- * @param relationId     Long 关联对象ID（可选）
+ * @param relationId     Long 关联对象ID（可选，优先使用，为空时使用 0）
  * @param relationName   String 关联对象名称（可选）
  * @param attachmentType String 附件业务类型（可选）
  * @param isPublic       Integer 是否公开（0:私有,1:公开）

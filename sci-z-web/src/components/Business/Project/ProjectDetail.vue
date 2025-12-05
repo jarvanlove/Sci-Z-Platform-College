@@ -267,13 +267,22 @@
             <div v-for="(milestone, index) in milestones" :key="index" class="milestone-item">
               <div class="milestone-header">
                 <span class="milestone-title">{{ $t('project.detail.milestone') }} {{ index + 1 }}</span>
-                <button
-                  v-if="isEditMode"
-                  class="action-btn btn-danger"
-                  @click="handleRemoveMilestone(index)"
-                >
-                  {{ $t('common.delete') }}
-                </button>
+                <div class="milestone-header-actions">
+                  <button
+                    v-if="isEditMode && milestone.id"
+                    :class="['action-btn', milestone.progress === 100 ? 'btn-warning' : 'btn-success']"
+                    @click="handleMilestoneCompleteToggle(milestone, index)"
+                  >
+                    {{ milestone.progress === 100 ? $t('project.detail.cancelComplete') : $t('project.detail.complete') }}
+                  </button>
+                  <button
+                    v-if="isEditMode"
+                    class="action-btn btn-danger"
+                    @click="handleRemoveMilestone(index)"
+                  >
+                    {{ $t('common.delete') }}
+                  </button>
+                </div>
               </div>
               
               <div class="milestone-form">
@@ -495,7 +504,7 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
   import { BaseCard, BaseDatePicker, BackButton, FilePreview } from '@/components/Common'
   import { FileUpload } from '@/components/Business/Form'
   import { PROJECT_STATUS, PROJECT_STATUS_CONFIG, MILESTONE_OPTIONS } from '@/utils/constants'
-  import { getProjectDetail, updateProject, uploadMilestoneDocument } from '@/api/Project'
+  import { getProjectDetail, updateProject, uploadMilestoneDocument, completeMilestone, cancelCompleteMilestone } from '@/api/Project'
   import { getUsers } from '@/api/System'
   import { deleteFile, downloadFile } from '@/api/File'
   import { ATTACHMENT_RELATION, ATTACHMENT_CATEGORY, IMAGE_FILE_EXTENSIONS, validateFileSize, validateFileType } from '@/constants/attachment'
@@ -585,8 +594,9 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
   // 使用 reactive 确保 Vue 能追踪动态属性的变化（例如 milestonePendingFiles[0] = []）
   const milestonePendingFiles = reactive({})
   
-  // 允许的文件扩展名（与批量上传接口白名单保持一致）
-  const allowedFileExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'rtf', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'zip', 'rar', '7z', 'tar', 'gz', 'mp4', 'avi', 'mov', 'wmv', 'flv', 'mp3', 'wav', 'flac', 'aac']
+  // 允许的文件扩展名（里程碑文档不支持图片类型）
+  // 排除图片类型：jpg, jpeg, png, gif, bmp, svg, webp
+  const allowedFileExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'rtf', 'zip', 'rar', '7z', 'tar', 'gz', 'mp4', 'avi', 'mov', 'wmv', 'flv', 'mp3', 'wav', 'flac', 'aac']
   
   // 判断文件类型（document/image/other）- 使用常量避免重复定义
   const getAttachmentType = (file) => {
@@ -691,8 +701,8 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       milestones.value[milestoneIndex].documents = []
     }
     
-    // 验证项目ID和名称
-    if (!project.value.id || !project.value.name) {
+    // 验证项目编号和名称
+    if (!project.value.number || !project.value.name) {
       ElMessage.error('项目信息不完整，无法上传文件')
       return
     }
@@ -709,6 +719,16 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
     const invalidFiles = []
     
     for (const file of files) {
+      // 检查是否为图片类型（里程碑文档不支持图片）
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() || ''
+      if (IMAGE_FILE_EXTENSIONS.includes(fileExtension)) {
+        invalidFiles.push({ 
+          file, 
+          reason: t('project.detail.imageNotSupported', { name: file.name }) 
+        })
+        continue
+      }
+      
       // 文件大小校验
       const sizeValidation = validateFileSize(file, maxSizeMB)
       if (!sizeValidation.passed) {
@@ -770,9 +790,8 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       // 添加其他参数
       formData.append('relationType', ATTACHMENT_RELATION.PROJECT)
       formData.append('attachmentType', ATTACHMENT_CATEGORY.DOCUMENT) // 固定值 "document"
-      formData.append('relationId', project.value.id)
-      // relationName：按照“项目ID/里程碑名称”传递，便于后端区分
-      formData.append('relationName', `${project.value.id}/${milestone.name}`)
+      formData.append('relationId', project.value.id) // 传项目ID，后端会处理
+      formData.append('relationName', `${project.value.number}/${milestone.name}`)
       formData.append('isPublic', '0') // 默认私有
       
       // 调用批量上传接口
@@ -915,10 +934,12 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
             .filter(Boolean)
 
           return {
+            id: milestone.id || milestone.milestoneId || null, // 里程碑ID
             name: milestone.milestoneName || milestone.name || milestone.title || '',
             description: milestone.description || milestone.content || '',
             startTime: milestone.startTime || milestone.milestoneStartTime || '',
             endTime: milestone.endTime || milestone.milestoneEndTime || '',
+            progress: milestone.progress || milestone.milestoneProgress || 0, // 里程碑进度，100表示完成
             // 统一后的文档列表
             documents
           }
@@ -1306,6 +1327,86 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
     }
   }
   
+  // 处理里程碑完成/取消完成
+  const handleMilestoneCompleteToggle = async (milestone, index) => {
+    if (!milestone.id) {
+      ElMessage.warning(t('project.detail.milestoneIdRequired'))
+      return
+    }
+    
+    const isCompleted = milestone.progress === 100
+    const today = new Date()
+    const endDate = milestone.endTime ? new Date(milestone.endTime) : null
+    const isEarlyComplete = endDate && today < endDate
+    
+    try {
+      if (!isCompleted) {
+        // 完成里程碑：检查是否提前完成
+        if (isEarlyComplete) {
+          await ElMessageBox.confirm(
+            t('project.detail.earlyCompleteConfirm', { 
+              name: milestone.name,
+              endTime: milestone.endTime 
+            }),
+            t('project.detail.earlyCompleteTitle'),
+            {
+              confirmButtonText: t('common.confirm'),
+              cancelButtonText: t('common.cancel'),
+              type: 'warning'
+            }
+          )
+        }
+        
+        // 调用完成接口
+        logger.info('Completing milestone', { milestoneId: milestone.id, milestoneName: milestone.name })
+        const response = await completeMilestone(milestone.id)
+        
+        if (response.code === 200) {
+          // 更新本地状态
+          milestones.value[index].progress = 100
+          ElMessage.success(t('project.detail.milestoneCompletedSuccess', { name: milestone.name }))
+          logger.info('Milestone completed successfully', { milestoneId: milestone.id })
+        } else {
+          throw new Error(response.message || '完成里程碑失败')
+        }
+      } else {
+        // 取消完成里程碑
+        await ElMessageBox.confirm(
+          t('project.detail.cancelCompleteConfirm', { name: milestone.name }),
+          t('project.detail.cancelCompleteTitle'),
+          {
+            confirmButtonText: t('common.confirm'),
+            cancelButtonText: t('common.cancel'),
+            type: 'warning'
+          }
+        )
+        
+        // 调用取消完成接口
+        logger.info('Canceling milestone completion', { milestoneId: milestone.id, milestoneName: milestone.name })
+        const response = await cancelCompleteMilestone(milestone.id)
+        
+        if (response.code === 200) {
+          // 更新本地状态（进度会由后端重新计算，这里先设为0，实际应该重新加载数据）
+          milestones.value[index].progress = 0
+          ElMessage.success(t('project.detail.milestoneCancelCompleteSuccess', { name: milestone.name }))
+          logger.info('Milestone completion canceled successfully', { milestoneId: milestone.id })
+          
+          // 重新加载项目详情以获取最新的进度
+          await loadProjectDetail()
+        } else {
+          throw new Error(response.message || '取消完成里程碑失败')
+        }
+      }
+    } catch (error) {
+      // 用户取消操作
+      if (error === 'cancel') {
+        return
+      }
+      logger.error('Failed to toggle milestone completion', error)
+      ElMessage.error(error.message || t('project.detail.milestoneToggleError'))
+    }
+  }
+  
   // 处理里程碑文档预览
   const handleMilestoneDocPreview = (doc) => {
     const attachmentId = doc.fileInfo?.id || doc.id
@@ -1670,6 +1771,12 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
     margin-bottom: var(--gap-sm);
   }
   
+  .milestone-header-actions {
+    display: flex;
+    gap: var(--gap-xs);
+    align-items: center;
+  }
+  
   .milestone-title {
     font-weight: 600;
     color: var(--color-primary); // 里程碑标题使用主题色
@@ -1798,6 +1905,16 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       
       &:hover:not(:disabled) {
         background: #dc2626;
+        color: var(--surface);
+      }
+    }
+    
+    &.btn-warning {
+      color: #f59e0b;
+      border-color: #f59e0b;
+      
+      &:hover:not(:disabled) {
+        background: #f59e0b;
         color: var(--surface);
       }
     }

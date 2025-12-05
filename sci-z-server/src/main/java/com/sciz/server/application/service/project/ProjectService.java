@@ -7,6 +7,7 @@ import com.sciz.server.domain.pojo.dto.request.project.ProjectListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.project.MilestoneDocumentUploadResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectDetailResp;
+import com.sciz.server.domain.pojo.dto.response.project.ProjectProgressResp;
 
 import java.util.List;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectListResp;
@@ -63,11 +64,11 @@ public interface ProjectService {
     void update(ProjectUpdateReq req);
 
     /**
-     * 删除项目
+     * 取消项目
      *
      * @param id 项目ID
      */
-    void deleteById(Long id);
+    void cancelById(Long id);
 
     /**
      * 获取项目统计信息
@@ -90,4 +91,26 @@ public interface ProjectService {
      * @param req 删除请求（包含附件ID、项目ID、Dify文档ID）
      */
     void deleteMilestoneDocument(MilestoneDocumentDeleteReq req);
+
+    /**
+     * 获取项目进度
+     *
+     * @param id 项目ID
+     * @return 项目进度响应
+     */
+    ProjectProgressResp findProgress(Long id);
+
+    /**
+     * 完成里程碑
+     *
+     * @param milestoneId 里程碑ID
+     */
+    void completeMilestone(Long milestoneId);
+
+    /**
+     * 取消完成里程碑
+     *
+     * @param milestoneId 里程碑ID
+     */
+    void cancelCompleteMilestone(Long milestoneId);
 }

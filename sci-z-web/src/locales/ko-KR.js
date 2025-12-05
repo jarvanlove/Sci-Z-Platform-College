@@ -292,7 +292,25 @@ export default {
     removeMember: '멤버 제거',
     projectCreated: '프로젝트가 성공적으로 생성되었습니다',
     projectUpdated: '프로젝트가 성공적으로 업데이트되었습니다',
-    projectDeleted: '프로젝트가 성공적으로 삭제되었습니다'
+    projectDeleted: '프로젝트가 성공적으로 삭제되었습니다',
+    // 진행률 페이지
+    progress: {
+      title: '프로젝트 진행률',
+      overview: '프로젝트 개요',
+      projectInfo: '프로젝트 정보',
+      name: '프로젝트명',
+      number: '프로젝트 번호',
+      manager: '프로젝트 관리자',
+      status: '프로젝트 상태',
+      overallProgress: '전체 진행률',
+      startTime: '시작 시간',
+      endTime: '예상 완료',
+      timeline: '타임라인 보기',
+      noTimeline: '타임라인 데이터 없음',
+      timelineHint: '프로젝트 마일스톤이 여기에 표시됩니다',
+      loadError: '프로젝트 진행률을 불러오는 데 실패했습니다. 다시 시도해 주세요',
+      noProjectId: '프로젝트 ID를 찾을 수 없습니다'
+    }
   },
 
   // 보고서
