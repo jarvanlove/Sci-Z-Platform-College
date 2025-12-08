@@ -43,10 +43,9 @@ public interface SysAttachmentRelationRepo {
      *
      * @param relationType String 关联类型
      * @param relationName String 关联名称
-     * @param userId       Long 用户ID（通过附件表关联查询）
      * @return List<SysAttachmentRelation> 待关联的记录列表
      */
-    List<SysAttachmentRelation> findPendingRelations(String relationType, String relationName, Long userId);
+    List<SysAttachmentRelation> findPendingRelations(String relationType, String relationName);
 
     /**
      * 批量更新关联记录的 relationId

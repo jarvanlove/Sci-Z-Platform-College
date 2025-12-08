@@ -1,5 +1,6 @@
 package com.sciz.server.infrastructure.shared.handler.file;
 
+import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
 import com.sciz.server.infrastructure.shared.event.file.FileDeletedEvent;
 import com.sciz.server.infrastructure.shared.event.file.FileUploadedEvent;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +28,18 @@ public class FileEventHandler {
     @EventListener
     @Async
     public void handleFileUploaded(FileUploadedEvent event) {
+        // 设置异步用户上下文，使 LoginUserUtil 在异步线程中也能正常工作
         try {
+            if (event.getUserId() != null && event.getUserName() != null) {
+                // 注意：事件中的 userId 和 userName 是 String 类型，需要转换为 Long
+                try {
+                    Long userId = Long.parseLong(event.getUserId());
+                    AsyncUserContext.set(userId, event.getUserName(), event.getUserName());
+                } catch (NumberFormatException e) {
+                    log.warn(String.format("文件上传事件中的 userId 格式不正确，无法设置异步用户上下文: userId=%s", event.getUserId()));
+                }
+            }
+
             log.info("处理文件上传事件: fileId={}, fileName={}, fileSize={}",
                     event.getFileId(), event.getFileName(), event.getFileSize());
 
@@ -50,6 +62,9 @@ public class FileEventHandler {
 
         } catch (Exception e) {
             log.error("处理文件上传事件失败: fileId={}", event.getFileId(), e);
+        } finally {
+            // 清理异步用户上下文（防止内存泄漏）
+            AsyncUserContext.clear();
         }
     }
 
@@ -61,7 +76,18 @@ public class FileEventHandler {
     @EventListener
     @Async
     public void handleFileDeleted(FileDeletedEvent event) {
+        // 设置异步用户上下文，使 LoginUserUtil 在异步线程中也能正常工作
         try {
+            if (event.getUserId() != null && event.getUserName() != null) {
+                // 注意：事件中的 userId 和 userName 是 String 类型，需要转换为 Long
+                try {
+                    Long userId = Long.parseLong(event.getUserId());
+                    AsyncUserContext.set(userId, event.getUserName(), event.getUserName());
+                } catch (NumberFormatException e) {
+                    log.warn(String.format("文件删除事件中的 userId 格式不正确，无法设置异步用户上下文: userId=%s", event.getUserId()));
+                }
+            }
+
             log.info("处理文件删除事件: fileId={}, fileName={}, deleteReason={}",
                     event.getFileId(), event.getFileName(), event.getDeleteReason());
 
@@ -84,6 +110,9 @@ public class FileEventHandler {
 
         } catch (Exception e) {
             log.error("处理文件删除事件失败: fileId={}", event.getFileId(), e);
+        } finally {
+            // 清理异步用户上下文（防止内存泄漏）
+            AsyncUserContext.clear();
         }
     }
 

@@ -39,6 +39,8 @@ import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeFileRelation
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeFileRelation;
 import com.sciz.server.infrastructure.external.dify.dto.response.DifyDocumentBatchUploadResp;
 import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -72,6 +74,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 
 /**
  * 项目应用服务实现类
@@ -100,8 +104,8 @@ public class ProjectServiceImpl implements ProjectService {
     private final SysKnowledgeFileRelationRepo knowledgeFileRelationRepo;
     private final EventPublisher eventPublisher;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.beans.factory.annotation.Qualifier("globalTaskExecutor")
+    @Autowired
+    @Qualifier("globalTaskExecutor")
     private Executor globalTaskExecutor;
 
     /**
@@ -312,7 +316,8 @@ public class ProjectServiceImpl implements ProjectService {
             // 5. 处理里程碑（新增、更新、删除），返回新增的里程碑列表
             var newMilestones = updateProjectMilestones(req.id(), req.milestones(), userId, realName);
 
-            // 6. 发布项目更新事件（如果存在新增的里程碑，用于异步更新待关联附件）
+            // 6. 发布项目更新事件（如果存在新增的里程碑，用于同步更新待关联附件）
+            // 注意：使用同步事件处理，确保在主事务中执行，避免事务提交时机问题
             if (!newMilestones.isEmpty()) {
                 var event = new ProjectUpdatedEvent(
                         req.id(),
@@ -320,7 +325,7 @@ public class ProjectServiceImpl implements ProjectService {
                         userId,
                         realName,
                         newMilestones);
-                eventPublisher.publishAsync(event);
+                eventPublisher.publish(event); // 使用同步发布，事件处理器会在同一事务中执行
                 log.info(String.format("发布项目更新事件: projectId=%s, newMilestoneCount=%s",
                         req.id(), newMilestones.size()));
             }
@@ -638,6 +643,77 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     /**
+     * 同步更新待关联的附件关联记录（将 relationId=0 的记录更新为实际的里程碑ID）
+     * <p>
+     * <strong>注意：</strong> 此方法用于测试，测试结束后应改为异步事件处理
+     *
+     * @param projectId     项目ID
+     * @param projectNumber 项目编号
+     * @param newMilestones 新增的里程碑列表
+     * @param userId        用户ID
+     */
+    private void updatePendingAttachmentRelationsSync(Long projectId, String projectNumber,
+            List<ProjectUpdatedEvent.MilestoneInfo> newMilestones, Long userId) {
+        if (projectNumber == null || projectNumber.trim().isEmpty() || newMilestones == null
+                || newMilestones.isEmpty()) {
+            return;
+        }
+
+        try {
+            // 处理每个新增的里程碑
+            newMilestones.forEach(milestoneInfo -> {
+                var milestoneName = milestoneInfo.getMilestoneName();
+                var milestoneId = milestoneInfo.getMilestoneId();
+
+                if (milestoneName == null || milestoneName.trim().isEmpty() || milestoneId == null) {
+                    log.warn(String.format("里程碑信息不完整，跳过附件关联更新: projectId=%s, milestoneId=%s, milestoneName=%s",
+                            projectId, milestoneId, milestoneName));
+                    return;
+                }
+
+                try {
+                    // 1. 构建 relationName：项目编号/里程碑名称（与附件关联表中存储的格式一致）
+                    var relationName = String.format("%s/%s", projectNumber, milestoneName);
+
+                    // 2. 查询该项目下待关联的附件关联记录（relationId=0，relationName 匹配 项目编号/里程碑名称）
+                    var pendingRelations = sysAttachmentRelationRepo.findPendingRelations(
+                            AttachmentRelationStatus.PROJECT.getCode(),
+                            relationName);
+
+                    if (pendingRelations.isEmpty()) {
+                        log.debug(String.format("未找到待关联的附件记录: projectId=%s, milestoneName=%s, relationName=%s",
+                                projectId, milestoneName, relationName));
+                        return;
+                    }
+
+                    // 3. 批量更新 relationId 为新的里程碑ID
+                    var relationIds = pendingRelations.stream()
+                            .map(relation -> relation.getId())
+                            .toList();
+
+                    var updated = sysAttachmentRelationRepo.updateRelationIds(relationIds, milestoneId, userId);
+                    if (updated) {
+                        log.info(String.format(
+                                "更新待关联附件成功: projectId=%s, milestoneId=%s, milestoneName=%s, count=%s, relationName=%s",
+                                projectId, milestoneId, milestoneName, relationIds.size(), relationName));
+                    } else {
+                        log.warn(String.format(
+                                "更新待关联附件失败: projectId=%s, milestoneId=%s, milestoneName=%s, relationName=%s",
+                                projectId, milestoneId, milestoneName, relationName));
+                    }
+                } catch (Exception e) {
+                    log.error(String.format("更新待关联附件异常: projectId=%s, milestoneId=%s, milestoneName=%s, err=%s",
+                            projectId, milestoneId, milestoneName, e.getMessage()), e);
+                    // 不抛出异常，继续处理下一个里程碑
+                }
+            });
+        } catch (Exception e) {
+            log.error(String.format("同步更新待关联附件失败: projectId=%s, err=%s", projectId, e.getMessage()), e);
+            // 不抛出异常，避免影响主流程
+        }
+    }
+
+    /**
      * 更新里程碑文档关联
      *
      * @param milestoneId  里程碑ID
@@ -696,11 +772,11 @@ public class ProjectServiceImpl implements ProjectService {
                 .limit(totalCount)
                 .toList();
 
-        // 5. 计算每个里程碑的当前进度，并统计完成数量
+        // 5. 计算每个里程碑的当前进度，并更新进度值
         var today = LocalDate.now();
 
-        // 使用 Stream API 处理每个里程碑，并统计完成数量
-        int completedCount = (int) sortedMilestones.stream()
+        // 使用 Stream API 处理每个里程碑，计算并更新进度，同时收集所有里程碑的进度值
+        var milestoneProgressList = sortedMilestones.stream()
                 .map(milestone -> {
                     // 计算里程碑的当前进度（自动计算或手动完成）
                     int milestoneProgress = calculateMilestoneProgressByTime(milestone, today);
@@ -722,11 +798,17 @@ public class ProjectServiceImpl implements ProjectService {
 
                     return milestoneProgress;
                 })
-                .filter(progress -> progress >= 100)
-                .count();
+                .toList();
 
-        // 6. 计算项目进度：已完成里程碑数 / 总里程碑数 * 100%
-        int projectProgress = (completedCount * 100) / totalCount;
+        // 6. 计算项目进度：所有里程碑进度的平均值
+        // 如果实际里程碑数少于总里程碑数，未创建的里程碑按0%计算
+        int actualMilestoneCount = milestoneProgressList.size();
+        int totalProgress = milestoneProgressList.stream().mapToInt(Integer::intValue).sum();
+
+        // 计算平均进度：(已创建里程碑的进度总和 + 未创建里程碑的0%进度) / 总里程碑数
+        // 例如：3个里程碑进度分别为 80%、50%、100%，总里程碑数为5
+        // 项目进度 = (80 + 50 + 100 + 0 + 0) / 5 = 46%
+        int projectProgress = totalCount > 0 ? totalProgress / totalCount : 0;
 
         // 7. 更新项目主表的进度百分比
         var project = projectRepo.findById(projectId);
@@ -735,8 +817,9 @@ public class ProjectServiceImpl implements ProjectService {
             projectRepo.updateById(project);
         }
 
-        log.info(String.format("项目进度重新计算: projectId=%s, completedCount=%s/%s, progress=%s%%",
-                projectId, completedCount, totalCount, projectProgress));
+        log.info(String.format(
+                "项目进度重新计算: projectId=%s, actualMilestoneCount=%s, totalCount=%s, totalProgress=%s, progress=%s%%",
+                projectId, actualMilestoneCount, totalCount, totalProgress, projectProgress));
     }
 
     /**
@@ -1116,18 +1199,52 @@ public class ProjectServiceImpl implements ProjectService {
             var userId = currentUser.userId();
             var username = currentUser.realName();
 
-            // 在异步执行前获取必要的上下文信息（避免在异步线程中访问 Web 上下文）
+            // 在异步执行前获取必要的上下文信息，并读取文件内容到内存（避免异步线程中无法访问 MultipartFile）
             var asyncProjectId = project.getId();
             var asyncProjectName = project.getName();
             var asyncDifyKnowledgeId = project.getDifyKnowledgeId();
-            var asyncFiles = req.files();
+
+            // 关键修复：在异步执行前读取文件内容到内存，避免异步线程中无法访问 MultipartFile
+            var fileDataList = new ArrayList<FileData>();
+            try {
+                for (var file : req.files()) {
+                    if (file != null && !file.isEmpty()) {
+                        var fileBytes = file.getBytes(); // 在主线程中读取文件内容
+                        var fileData = new FileData(
+                                file.getOriginalFilename(),
+                                fileBytes,
+                                file.getContentType());
+                        fileDataList.add(fileData);
+                    }
+                }
+                log.info(String.format("已读取文件内容到内存: projectId=%s, fileCount=%s", asyncProjectId, fileDataList.size()));
+            } catch (Exception e) {
+                log.error(String.format("读取文件内容失败: projectId=%s, err=%s", asyncProjectId, e.getMessage()), e);
+                // 不抛出异常，继续执行，但异步上传会跳过
+            }
 
             // 异步执行 Dify 上传（使用全局任务执行器）
+            final var finalFileDataList = fileDataList; // 用于 lambda 表达式
             CompletableFuture.runAsync(() -> {
                 try {
+                    if (finalFileDataList.isEmpty()) {
+                        log.warn(String.format("文件数据列表为空，跳过 Dify 上传: projectId=%s", asyncProjectId));
+                        return;
+                    }
+
                     log.info(String.format("开始异步上传文件到 Dify 知识库: projectId=%s, fileCount=%s", asyncProjectId,
-                            asyncFiles.length));
-                    uploadToDifyKnowledgeBaseAsync(asyncProjectId, asyncProjectName, asyncDifyKnowledgeId, asyncFiles,
+                            finalFileDataList.size()));
+
+                    // 将 FileData 转换为 MultipartFile
+                    var multipartFiles = finalFileDataList.stream()
+                            .map(fileData -> new ByteArrayMultipartFile(
+                                    fileData.fileName(),
+                                    fileData.content(),
+                                    fileData.contentType()))
+                            .toArray(MultipartFile[]::new);
+
+                    uploadToDifyKnowledgeBaseAsync(asyncProjectId, asyncProjectName, asyncDifyKnowledgeId,
+                            multipartFiles,
                             fileInfoRespList, userId, username);
                 } catch (Exception e) {
                     log.error(String.format("异步上传文件到 Dify 知识库失败: projectId=%s, err=%s", asyncProjectId, e.getMessage()),
@@ -1136,7 +1253,7 @@ public class ProjectServiceImpl implements ProjectService {
                 }
             }, globalTaskExecutor);
 
-            log.info(String.format("已提交异步 Dify 上传任务: projectId=%s, fileCount=%s", asyncProjectId, asyncFiles.length));
+            log.info(String.format("已提交异步 Dify 上传任务: projectId=%s, fileCount=%s", asyncProjectId, fileDataList.size()));
 
             // 8. 记录操作日志（成功）
             var endTime = DateUtil.now();
@@ -1817,6 +1934,83 @@ public class ProjectServiceImpl implements ProjectService {
                     errorMessage, executionTime);
             log.error(String.format("取消完成里程碑失败: milestoneId=%s, err=%s", milestoneId, e.getMessage()), e);
             throw BusinessException.of(ResultCode.SERVER_ERROR, "取消完成里程碑失败: %s", e.getMessage());
+        }
+    }
+
+    // ==================== 内部类 ====================
+
+    /**
+     * 文件数据记录（用于异步上传）
+     *
+     * @param fileName    String 文件名
+     * @param content     byte[] 文件内容
+     * @param contentType String 文件类型
+     */
+    private record FileData(String fileName, byte[] content, String contentType) {
+    }
+
+    /**
+     * 字节数组 MultipartFile 实现（用于异步上传）
+     */
+    private static class ByteArrayMultipartFile implements MultipartFile {
+        private final String fileName;
+        private final byte[] content;
+        private final String contentType;
+
+        public ByteArrayMultipartFile(String fileName, byte[] content, String contentType) {
+            this.fileName = fileName;
+            this.content = content;
+            this.contentType = contentType;
+        }
+
+        @Override
+        public String getName() {
+            return "file";
+        }
+
+        @Override
+        public String getOriginalFilename() {
+            return fileName;
+        }
+
+        @Override
+        public String getContentType() {
+            return contentType;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return content == null || content.length == 0;
+        }
+
+        @Override
+        public long getSize() {
+            return content != null ? content.length : 0;
+        }
+
+        @Override
+        public byte[] getBytes() {
+            return content;
+        }
+
+        @Override
+        public InputStream getInputStream() {
+            return new ByteArrayInputStream(content);
+        }
+
+        @Override
+        public org.springframework.core.io.Resource getResource() {
+            return new org.springframework.core.io.ByteArrayResource(content) {
+                @Override
+                public String getFilename() {
+                    return fileName;
+                }
+            };
+        }
+
+        @Override
+        public void transferTo(java.io.File dest) {
+            throw new UnsupportedOperationException("transferTo not supported");
         }
     }
 }

@@ -2,6 +2,7 @@ package com.sciz.server.infrastructure.shared.utils;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.sciz.server.domain.pojo.dto.response.user.LoginUserContext;
+import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
 import com.sciz.server.infrastructure.shared.constant.SystemConstant;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -60,11 +61,23 @@ public final class LoginUserUtil {
 
     /**
      * 获取当前登录用户信息
-     * 从 Sa-Token Session 中读取（如果配置了 Redis，会从 Redis 中读取）
+     * <p>
+     * 优先级：
+     * 1. 优先从 AsyncUserContext（ThreadLocal）获取（用于异步线程）
+     * 2. 如果 ThreadLocal 中没有，则从 Sa-Token Session 获取（用于 Web 请求线程）
+     * <p>
+     * 这样可以在异步上下文中也能正常获取用户信息，无需修改业务代码
      *
      * @return Optional<LoginUserContext> 登录用户上下文
      */
     public static Optional<LoginUserContext> getCurrentUser() {
+        // 1. 优先从 AsyncUserContext（ThreadLocal）获取（用于异步线程）
+        var asyncContext = AsyncUserContext.get();
+        if (asyncContext.isPresent()) {
+            return asyncContext;
+        }
+
+        // 2. 如果 ThreadLocal 中没有，则从 Sa-Token Session 获取（用于 Web 请求线程）
         if (!StpUtil.isLogin()) {
             return Optional.empty();
         }

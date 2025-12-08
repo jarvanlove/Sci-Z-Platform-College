@@ -1,14 +1,15 @@
 package com.sciz.server.infrastructure.shared.handler.project;
 
 import com.sciz.server.domain.pojo.entity.file.SysAttachmentRelation;
+import com.sciz.server.domain.pojo.entity.project.Project;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRelationRepo;
+import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.infrastructure.shared.enums.AttachmentRelationStatus;
 import com.sciz.server.infrastructure.shared.event.project.ProjectCreatedEvent;
 import com.sciz.server.infrastructure.shared.event.project.ProjectUpdatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProjectEventHandler {
 
     private final SysAttachmentRelationRepo sysAttachmentRelationRepo;
+    private final ProjectRepo projectRepo;
 
     /**
      * 处理项目创建事件
@@ -33,7 +35,6 @@ public class ProjectEventHandler {
      * @param event 项目创建事件
      */
     @EventListener
-    @Async
     public void handleProjectCreated(ProjectCreatedEvent event) {
         try {
             log.info("处理项目创建事件: projectId={}, projectName={}, creatorId={}",
@@ -122,14 +123,16 @@ public class ProjectEventHandler {
      * 处理项目更新事件
      * <p>
      * 当项目更新时，如果存在新增的里程碑，将待关联的附件（relationId=0）更新为实际的里程碑ID
+     * <p>
+     * <strong>注意：</strong> 使用同步处理，确保在主事务中执行，避免事务提交时机问题
      *
      * @param event 项目更新事件
      */
     @EventListener
-    @Async
     @Transactional(rollbackFor = Exception.class)
     public void handleProjectUpdated(ProjectUpdatedEvent event) {
         try {
+
             log.info(String.format("处理项目更新事件: projectId=%s, projectName=%s, newMilestoneCount=%s",
                     event.getProjectId(), event.getProjectName(),
                     event.getNewMilestones() != null ? event.getNewMilestones().size() : 0));
@@ -141,10 +144,19 @@ public class ProjectEventHandler {
                 return;
             }
 
+            // 查询项目信息，获取项目编号（用于构建 relationName）
+            Project project = projectRepo.findById(event.getProjectId());
+            if (project == null) {
+                log.warn(String.format("项目不存在，跳过附件关联更新: projectId=%s", event.getProjectId()));
+                return;
+            }
+            var projectNumber = project.getNumber();
+
             // 处理每个新增的里程碑
             event.getNewMilestones().forEach(milestoneInfo -> {
                 updatePendingAttachmentRelations(
                         event.getProjectId(),
+                        projectNumber,
                         milestoneInfo.getMilestoneName(),
                         milestoneInfo.getMilestoneId(),
                         event.getOperatorId());
@@ -165,21 +177,26 @@ public class ProjectEventHandler {
      * 更新待关联的附件关联记录（将 relationId=0 的记录更新为实际的里程碑ID）
      *
      * @param projectId     项目ID
-     * @param milestoneName 里程碑名称（用于匹配 relationName）
+     * @param projectNumber 项目编号
+     * @param milestoneName 里程碑名称
      * @param milestoneId   里程碑ID
      * @param userId        用户ID
      */
-    private void updatePendingAttachmentRelations(Long projectId, String milestoneName, Long milestoneId, Long userId) {
-        if (milestoneName == null || milestoneName.trim().isEmpty() || milestoneId == null) {
+    private void updatePendingAttachmentRelations(Long projectId, String projectNumber, String milestoneName,
+            Long milestoneId, Long userId) {
+        if (projectNumber == null || projectNumber.trim().isEmpty() || milestoneName == null
+                || milestoneName.trim().isEmpty() || milestoneId == null) {
             return;
         }
 
         try {
-            // 1. 查询该项目下待关联的附件关联记录（relationId=0，relationName 匹配里程碑名称）
+            // 1. 构建 relationName：项目编号/里程碑名称（与附件关联表中存储的格式一致）
+            var relationName = String.format("%s/%s", projectNumber, milestoneName);
+
+            // 2. 查询该项目下待关联的附件关联记录（relationId=0，relationName 匹配 项目编号/里程碑名称）
             var pendingRelations = sysAttachmentRelationRepo.findPendingRelations(
                     AttachmentRelationStatus.PROJECT.getCode(),
-                    milestoneName,
-                    userId);
+                    relationName);
 
             if (pendingRelations.isEmpty()) {
                 log.debug(String.format("未找到待关联的附件记录: projectId=%s, milestoneName=%s", projectId, milestoneName));

@@ -64,22 +64,19 @@ public class SysAttachmentRelationRepoImpl implements SysAttachmentRelationRepo 
     }
 
     @Override
-    public List<SysAttachmentRelation> findPendingRelations(String relationType, String relationName, Long userId) {
-        if (!StringUtils.hasText(relationType) || !StringUtils.hasText(relationName) || userId == null) {
+    public List<SysAttachmentRelation> findPendingRelations(String relationType, String relationName) {
+        if (!StringUtils.hasText(relationType) || !StringUtils.hasText(relationName)) {
             return Collections.emptyList();
         }
 
         // 查询待关联的记录（relationId = 0 表示待关联）
-        List<SysAttachmentRelation> relations = mapper.selectList(new LambdaQueryWrapper<SysAttachmentRelation>()
+        return mapper.selectList(new LambdaQueryWrapper<SysAttachmentRelation>()
                 .eq(SysAttachmentRelation::getRelationType, relationType)
                 .eq(SysAttachmentRelation::getRelationName, relationName)
                 .eq(SysAttachmentRelation::getRelationId, 0L) // 0 表示待关联
                 .eq(SysAttachmentRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
                 .orderByDesc(SysAttachmentRelation::getCreatedTime)
                 .last("LIMIT 10")); // 最多查询最近10条
-
-        // 需要通过附件表验证 uploaderId，这里先返回，由调用方通过附件表验证
-        return relations;
     }
 
     @Override

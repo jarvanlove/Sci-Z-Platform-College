@@ -11,6 +11,7 @@ import com.sciz.server.infrastructure.shared.event.declaration.DeclarationSucces
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationUpdatedEvent;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
+import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
 import com.sciz.server.infrastructure.shared.utils.DateUtil;
 import com.sciz.server.infrastructure.shared.utils.OperationLogRecorderUtil;
 import com.sciz.server.infrastructure.shared.enums.OperationLogRecorderStatus;
@@ -256,11 +257,15 @@ public class DeclarationEventHandler {
     @Async
     @Transactional(rollbackFor = Exception.class)
     public void handleDeclarationSuccess(DeclarationSuccessEvent event) {
-        var startTime = DateUtil.now();
-        var operationType = OperationLogRecorderStatus.DECLARATION_UPDATE;
-        var operation = operationType.getCode();
-
+        // 设置异步用户上下文，使 LoginUserUtil 在异步线程中也能正常工作
+        var operatorId = event.getOperatorId() != null ? event.getOperatorId() : event.getApplicantId();
         try {
+            AsyncUserContext.set(operatorId, event.getApplicantName(), event.getApplicantName());
+
+            var startTime = DateUtil.now();
+            var operationType = OperationLogRecorderStatus.DECLARATION_UPDATE;
+            var operation = operationType.getCode();
+
             log.info(String.format("处理申报成功事件: declarationId=%s, researchTopic=%s, applicantId=%s",
                     event.getDeclarationId(), event.getResearchTopic(), event.getApplicantId()));
 
@@ -272,10 +277,10 @@ public class DeclarationEventHandler {
                 throw BusinessException.of(ResultCode.BAD_REQUEST, "研究课题不能为空");
             }
 
-            // 2. 创建项目（内部会记录操作日志）
+            // 2. 创建项目（内部会记录操作日志，现在可以正常使用 LoginUserUtil）
             var projectId = createProject(event, researchTopic);
 
-            // 3. 创建知识库（内部会记录操作日志）
+            // 3. 创建知识库（内部会记录操作日志，现在可以正常使用 LoginUserUtil）
             createKnowledgeBase(event, researchTopic, projectId);
 
             // 4. 记录整体流程操作日志（成功）
@@ -283,10 +288,8 @@ public class DeclarationEventHandler {
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
             var detail = String.format("%s：申报编号 %s（ID: %s），已创建项目和知识库",
                     operationType.getDescription(), event.getDeclarationNumber(), event.getDeclarationId());
-            // 在异步上下文中，手动传入用户信息
-            var operatorId = event.getOperatorId() != null ? event.getOperatorId() : event.getApplicantId();
-            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime, operatorId,
-                    event.getApplicantName());
+            // 现在可以正常使用 LoginUserUtil，它会从 AsyncUserContext 获取用户信息
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
 
             log.info(String.format("申报成功事件处理完成: declarationId=%s, projectId=%s",
                     event.getDeclarationId(), projectId));
@@ -294,9 +297,15 @@ public class DeclarationEventHandler {
         } catch (Exception e) {
             log.error(String.format("处理申报成功事件失败: declarationId=%s, err=%s",
                     event.getDeclarationId(), e.getMessage()), e);
+            var startTime = DateUtil.now();
+            var operationType = OperationLogRecorderStatus.DECLARATION_UPDATE;
+            var operation = operationType.getCode();
             recordFailureLog(operation, event.getDeclarationId(), e.getMessage(), startTime, event);
             // 抛出异常，触发事务回滚
             throw e;
+        } finally {
+            // 清理异步用户上下文（防止内存泄漏）
+            AsyncUserContext.clear();
         }
     }
 
@@ -327,14 +336,15 @@ public class DeclarationEventHandler {
             );
 
             // 注意：项目编号会在 ProjectServiceImpl.initializeProjectEntity 中自动生成（PRJ+时间戳）
-            // 使用事件中的操作人ID创建项目，避免在异步线程中获取Web上下文
+            // 使用事件中的操作人ID创建项目，AsyncUserContext 已设置，可以直接使用 create 方法
             var operatorId = event.getOperatorId();
             if (operatorId == null) {
                 // 如果没有操作人ID，使用申报人ID作为后备方案
                 operatorId = event.getApplicantId();
                 log.warn(String.format("事件中缺少操作人ID，使用申报人ID作为后备: applicantId=%s", operatorId));
             }
-            var projectId = projectService.createWithUserId(projectCreateReq, operatorId);
+            // 现在可以正常使用 create 方法，LoginUserUtil 会从 AsyncUserContext 获取用户信息
+            var projectId = projectService.create(projectCreateReq);
             log.info(String.format("项目创建成功: projectId=%s, name=%s, operatorId=%s", projectId, researchTopic,
                     operatorId));
 
@@ -342,9 +352,8 @@ public class DeclarationEventHandler {
             var endTime = DateUtil.now();
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
             var detail = String.format("%s：%s（ID: %s）", operationType.getDescription(), researchTopic, projectId);
-            // 在异步上下文中，手动传入用户信息
-            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime, operatorId,
-                    event.getApplicantName());
+            // 现在可以正常使用 LoginUserUtil，它会从 AsyncUserContext 获取用户信息
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
 
             return projectId;
 
@@ -355,11 +364,10 @@ public class DeclarationEventHandler {
             var endTime = DateUtil.now();
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
             var errorMessage = e instanceof BusinessException ? e.getMessage() : e.getClass().getSimpleName();
-            // 在异步上下文中，手动传入用户信息
-            var operatorId = event.getOperatorId() != null ? event.getOperatorId() : event.getApplicantId();
+            // 现在可以正常使用 LoginUserUtil，它会从 AsyncUserContext 获取用户信息
             operationLogRecorderUtil.recordFailure(operation,
                     String.format("%s失败：研究课题 %s", operation, researchTopic),
-                    errorMessage, executionTime, operatorId, event.getApplicantName());
+                    errorMessage, executionTime);
             throw BusinessException.of(ResultCode.SERVER_ERROR, "创建项目失败: %s", e.getMessage());
         }
     }
@@ -381,17 +389,11 @@ public class DeclarationEventHandler {
                     researchTopic, researchTopic, projectId));
 
             var knowledgeCreateReq = new KnowledgeCreateReq();
+            knowledgeCreateReq.setUserId(event.getOperatorId()); // 用户ID
             knowledgeCreateReq.setName(researchTopic); // 知识库名称 = 研究课题
             knowledgeCreateReq.setDescription(researchTopic); // 知识库描述 = 研究课题
             knowledgeCreateReq.setProjectId(projectId); // 关联项目ID
-            // 设置操作人ID（用于创建知识库，避免在异步线程中获取Web上下文）
-            var operatorId = event.getOperatorId();
-            if (operatorId == null) {
-                // 如果没有操作人ID，使用申报人ID作为后备方案
-                operatorId = event.getApplicantId();
-                log.warn(String.format("事件中缺少操作人ID，使用申报人ID作为后备: applicantId=%s", operatorId));
-            }
-            knowledgeCreateReq.setUserId(operatorId); // 设置用户ID，避免从上下文获取
+            // AsyncUserContext 已设置，可以直接使用 create 方法，无需设置 userId
 
             var knowledgeResp = knowledgeService.create(knowledgeCreateReq);
             log.info(String.format("知识库创建成功: knowledgeId=%s, name=%s, difyKnowdataId=%s",
@@ -405,9 +407,8 @@ public class DeclarationEventHandler {
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
             var detail = String.format("%s：%s（ID: %s）", operationType.getDescription(), researchTopic,
                     knowledgeResp.getId());
-            // 在异步上下文中，手动传入用户信息
-            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime, operatorId,
-                    event.getApplicantName());
+            // 现在可以正常使用 LoginUserUtil，它会从 AsyncUserContext 获取用户信息
+            operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
 
         } catch (Exception e) {
             log.error(String.format("创建知识库失败: declarationId=%s, projectId=%s, err=%s",
@@ -416,11 +417,10 @@ public class DeclarationEventHandler {
             var endTime = DateUtil.now();
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
             var errorMessage = e instanceof BusinessException ? e.getMessage() : e.getClass().getSimpleName();
-            // 在异步上下文中，手动传入用户信息
-            var operatorId = event.getOperatorId() != null ? event.getOperatorId() : event.getApplicantId();
+            // 现在可以正常使用 LoginUserUtil，它会从 AsyncUserContext 获取用户信息
             operationLogRecorderUtil.recordFailure(operation,
                     String.format("%s失败：研究课题 %s，项目ID %s", operation, researchTopic, projectId),
-                    errorMessage, executionTime, operatorId, event.getApplicantName());
+                    errorMessage, executionTime);
             throw BusinessException.of(ResultCode.SERVER_ERROR, "创建知识库失败: %s", e.getMessage());
         }
     }
@@ -433,7 +433,18 @@ public class DeclarationEventHandler {
      * @param difyKnowledgeId Dify知识库ID（本地知识库ID）
      */
     private void updateProjectDifyKnowledgeId(DeclarationSuccessEvent event, Long projectId, String difyKnowledgeId) {
+        // 获取操作人ID（用于更新项目，避免在异步线程中获取Web上下文）
+        var operatorId = event.getOperatorId();
+        if (operatorId == null) {
+            // 如果没有操作人ID，使用申报人ID作为后备方案
+            operatorId = event.getApplicantId();
+            log.warn(String.format("事件中缺少操作人ID，使用申报人ID作为后备: applicantId=%s", operatorId));
+        }
+
+        // 设置异步用户上下文，使 LoginUserUtil 在异步线程中也能正常工作
         try {
+            AsyncUserContext.set(operatorId, event.getApplicantName(), event.getApplicantName());
+
             log.info(String.format("开始更新项目的Dify知识库ID: projectId=%s, difyKnowledgeId=%s",
                     projectId, difyKnowledgeId));
 
@@ -442,14 +453,6 @@ public class DeclarationEventHandler {
             if (project == null) {
                 log.error(String.format("项目不存在，无法更新Dify知识库ID: projectId=%s", projectId));
                 return;
-            }
-
-            // 获取操作人ID（用于更新项目，避免在异步线程中获取Web上下文）
-            var operatorId = event.getOperatorId();
-            if (operatorId == null) {
-                // 如果没有操作人ID，使用申报人ID作为后备方案
-                operatorId = event.getApplicantId();
-                log.warn(String.format("事件中缺少操作人ID，使用申报人ID作为后备: applicantId=%s", operatorId));
             }
 
             // 构建更新请求（只更新 difyKnowledgeId）
@@ -466,7 +469,7 @@ public class DeclarationEventHandler {
                     null // milestones 不更新
             );
 
-            // 更新项目
+            // 更新项目（现在可以正常使用 LoginUserUtil，它会从 AsyncUserContext 获取用户信息）
             projectService.update(updateReq);
 
             log.info(String.format("项目Dify知识库ID更新成功: projectId=%s, difyKnowledgeId=%s",
@@ -476,6 +479,9 @@ public class DeclarationEventHandler {
             log.error(String.format("更新项目Dify知识库ID失败: projectId=%s, difyKnowledgeId=%s, err=%s",
                     projectId, difyKnowledgeId, e.getMessage()), e);
             // 注意：不抛出异常，避免影响主流程
+        } finally {
+            // 清理异步用户上下文（防止内存泄漏）
+            AsyncUserContext.clear();
         }
     }
 
@@ -493,14 +499,10 @@ public class DeclarationEventHandler {
         try {
             var endTime = DateUtil.now();
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
-            // 在异步上下文中，手动传入用户信息
-            var operatorId = event != null && event.getOperatorId() != null
-                    ? event.getOperatorId()
-                    : (event != null ? event.getApplicantId() : null);
-            var username = event != null ? event.getApplicantName() : null;
+            // 现在可以正常使用 LoginUserUtil，它会从 AsyncUserContext 获取用户信息
             operationLogRecorderUtil.recordFailure(operation,
                     String.format("%s失败：申报ID %s（创建项目和知识库）", operation, declarationId),
-                    errorMessage, executionTime, operatorId, username);
+                    errorMessage, executionTime);
         } catch (Exception e) {
             log.error(String.format("记录失败日志异常: declarationId=%s, err=%s", declarationId, e.getMessage()), e);
         }

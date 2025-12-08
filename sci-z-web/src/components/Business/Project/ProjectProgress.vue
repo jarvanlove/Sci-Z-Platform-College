@@ -83,7 +83,7 @@
         <div v-if="milestones.length > 0" class="timeline-container">
           <div class="timeline-line"></div>
           <div v-for="milestone in milestones" :key="milestone.id" class="timeline-item">
-            <div :class="`timeline-dot ${milestone.status}`"></div>
+            <div :class="`timeline-dot ${getProgressColorType(milestone.progress)}`"></div>
             <div class="timeline-content">
               <div class="timeline-title">{{ milestone.name }}</div>
               <div class="timeline-time">
@@ -182,6 +182,16 @@ const getStatusText = (status) => {
 const getStatusTagType = (status) => {
   const mappedStatus = mapStatus(status)
   return PROJECT_STATUS_CONFIG[mappedStatus]?.type || 'info'
+}
+
+// 根据进度值获取颜色类型（与 ProjectProgressBar 组件逻辑一致）
+const getProgressColorType = (progress) => {
+  const value = Number(progress) || 0
+  if (value === 0) return 'empty'
+  if (value === 100) return 'success'
+  if (value >= 60) return 'success'
+  if (value >= 30) return 'warning'
+  return 'danger'
 }
 
 // 加载项目进度数据
@@ -422,28 +432,57 @@ onMounted(() => {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 3px solid var(--surface, #ffffff);
-  box-shadow: 0 0 0 2px var(--border, #e5e7eb);
+  border: 2px solid var(--surface, #ffffff);
+  box-shadow: 0 0 0 1px var(--border, #e5e7eb);
+  z-index: 1;
 }
 
-.timeline-dot.completed {
-  background: var(--milestone-completed-color, #16a34a);
-  box-shadow: 0 0 0 2px var(--milestone-completed-color, #16a34a);
+// 根据进度值设置颜色（与进度条颜色保持一致）
+.timeline-dot.empty {
+  background: var(--border, #e5e7eb);
+  box-shadow: 0 0 0 1px var(--border, #e5e7eb);
 }
 
-.timeline-dot.progress {
-  background: var(--milestone-progress-color, #f59e0b);
-  box-shadow: 0 0 0 2px var(--milestone-progress-color, #f59e0b);
+.timeline-dot.success {
+  background: #16a34a; // 绿色，与进度条 success 颜色一致
+  box-shadow: 0 0 0 1px #16a34a;
 }
 
-.timeline-dot.planned {
-  background: var(--milestone-planned-color, #2563eb);
-  box-shadow: 0 0 0 2px var(--milestone-planned-color, #2563eb);
+.timeline-dot.warning {
+  background: #f59e0b; // 橙色，与进度条 warning 颜色一致
+  box-shadow: 0 0 0 1px #f59e0b;
 }
 
-.timeline-dot.delayed {
-  background: var(--milestone-delayed-color, #dc2626);
-  box-shadow: 0 0 0 2px var(--milestone-delayed-color, #dc2626);
+.timeline-dot.danger {
+  background: #dc2626; // 红色，与进度条 danger 颜色一致
+  box-shadow: 0 0 0 1px #dc2626;
+}
+
+// 暗色主题适配
+:global(.dark) {
+  .timeline-dot {
+    border-color: var(--surface, #1f2937);
+    
+    &.empty {
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+    }
+    
+    &.success {
+      background: #22c55e; // 暗色主题下的绿色
+      box-shadow: 0 0 0 1px #22c55e;
+    }
+    
+    &.warning {
+      background: #fbbf24; // 暗色主题下的橙色
+      box-shadow: 0 0 0 1px #fbbf24;
+    }
+    
+    &.danger {
+      background: #ef4444; // 暗色主题下的红色
+      box-shadow: 0 0 0 1px #ef4444;
+    }
+  }
 }
 
 .timeline-content {

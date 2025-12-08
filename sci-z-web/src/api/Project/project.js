@@ -207,6 +207,23 @@ export const cancelCompleteMilestone = (milestoneId) => {
 }
 
 /**
+ * 删除里程碑文档
+ * @param {Object} data - 删除数据
+ * @param {number} data.attachmentId - 附件ID（必填）
+ * @param {number} data.projectId - 项目ID（必填）
+ * @param {string} [data.difyDocId] - Dify文档ID（可选，如果为空则跳过Dify删除）
+ * @returns {Promise} 删除文档响应
+ * 响应格式：{ code: 200, message: "删除成功", data: null }
+ */
+export const deleteMilestoneDocument = (data) => {
+  return request({
+    url: PROJECT_API.MILESTONE_DOCUMENT_DELETE,
+    method: HTTP_METHODS.DELETE,
+    data
+  })
+}
+
+/**
  * 取消项目
  * @param {number} id - 项目ID
  * @returns {Promise} 取消项目响应
