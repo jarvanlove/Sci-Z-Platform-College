@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -23,6 +24,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * @className OperationLogRecorderUtil
  * @date 2025-11-17 11:40
  */
+@Slf4j
 @Component
 public class OperationLogRecorderUtil {
 
@@ -166,8 +168,8 @@ public class OperationLogRecorderUtil {
                     userId, username);
             eventPublisher.publishAsync(event);
         } catch (Exception e) {
-            System.err.println(String.format("[OperationLogRecorder] 记录操作日志失败: operation=%s, err=%s",
-                    operation, e.getMessage()));
+            log.error(String.format("[OperationLogRecorder] 记录操作日志失败: operation=%s, err=%s",
+                    operation, e.getMessage()), e);
         }
     }
 
@@ -212,6 +214,12 @@ public class OperationLogRecorderUtil {
             event.setLocation(ClientInfoUtil.getLocation(ClientInfoUtil.getClientIp(request)));
             event.setBrowser(ClientInfoUtil.getBrowser(request));
             event.setOs(ClientInfoUtil.getOs(request));
+        } else {
+            // 异步上下文中无法获取请求信息，设置默认值（避免 NOT NULL 约束错误）
+            event.setMethod("ASYNC");
+            event.setRequestUrl("/async/event");
+            event.setIpAddress("0.0.0.0");
+            // location、browser、os 可以为 null，不需要设置默认值
         }
 
         // 设置操作信息

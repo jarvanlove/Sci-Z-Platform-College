@@ -3,6 +3,7 @@ package com.sciz.server.application.service.file.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.application.service.file.FileConvertService;
+import com.sciz.server.application.service.file.FileConvertService.ConvertResult;
 import com.sciz.server.application.service.file.FileService;
 import com.sciz.server.domain.pojo.dto.request.file.FileBatchUploadReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileCheckDuplicateReq;
@@ -405,20 +406,32 @@ public class FileServiceImpl implements FileService {
         }
 
         // 3.5 执行格式转换
+        ConvertResult convertResult;
         try (var sourceInputStream = sourceFile) {
-            var convertResult = fileConvertService.convert(
+            convertResult = fileConvertService.convert(
                     sourceInputStream,
                     sourceFormat,
                     targetFormat,
                     attachment.getOriginalName());
+        } catch (Exception e) {
+            log.error(String.format("文件格式转换失败: attachmentId=%s, err=%s", attachmentId, e.getMessage()), e);
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "文件格式转换失败: %s", e.getMessage());
+        }
 
-            // 3.6 更新下载统计
+        // 3.6 更新下载统计
+        try {
             sysAttachmentRepo.increaseDownloadCount(attachmentId,
                     LoginUserUtil.getCurrentUserId().orElse(null));
+        } catch (Exception e) {
+            log.warn(String.format("更新下载统计失败: attachmentId=%s, err=%s", attachmentId, e.getMessage()));
+            // 不影响主流程，继续执行
+        }
 
-            // 3.7 封装为 FileDownloadContext
-            // 注意：需要将 InputStream 转换为可重复读取的格式（ByteArrayInputStream）
-            var convertedBytes = convertResult.inputStream().readAllBytes();
+        // 3.7 封装为 FileDownloadContext
+        // 注意：需要将 InputStream 转换为可重复读取的格式（ByteArrayInputStream）
+        // 在 try-with-resources 块外读取，确保 convertResult 的流在读取时还没有被关闭
+        try (var convertedInputStream = convertResult.inputStream()) {
+            var convertedBytes = convertedInputStream.readAllBytes();
             var byteArrayInputStream = new ByteArrayInputStream(convertedBytes);
 
             // 转换后的文件名已经通过 changeFileExtension 处理，直接使用即可
@@ -430,10 +443,9 @@ public class FileServiceImpl implements FileService {
                     convertResult.mimeType(),
                     convertResult.contentLength(),
                     byteArrayInputStream);
-
         } catch (Exception e) {
-            log.error(String.format("文件格式转换失败: attachmentId=%s, err=%s", attachmentId, e.getMessage()), e);
-            throw BusinessException.of(ResultCode.SERVER_ERROR, "文件格式转换失败: %s", e.getMessage());
+            log.error(String.format("读取转换结果失败: attachmentId=%s, err=%s", attachmentId, e.getMessage()), e);
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "读取转换结果失败: %s", e.getMessage());
         }
     }
 

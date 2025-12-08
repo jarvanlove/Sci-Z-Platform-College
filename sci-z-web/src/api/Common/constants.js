@@ -77,6 +77,7 @@ export const PROJECT_API = {
   ADD_PROGRESS: buildApiUrl('/project/progress/add'), // 添加项目进度
   STATISTICS: buildApiUrl('/project/statistics'), // 获取项目统计信息
   MILESTONE_DOCUMENT: buildApiUrl('/project/milestone/document'), // 里程碑文档上传
+  MILESTONE_DOCUMENT_DELETE: buildApiUrl('/project/milestone/document/delete'), // 删除里程碑文档
   MILESTONE_COMPLETE: (milestoneId) => buildApiUrl(`/project/milestone/${milestoneId}/complete`), // 完成里程碑
   MILESTONE_CANCEL_COMPLETE: (milestoneId) => buildApiUrl(`/project/milestone/${milestoneId}/cancel-complete`), // 取消完成里程碑
   CANCEL: (id) => buildApiUrl(`/project/${id}/cancel`) // 取消项目

@@ -343,8 +343,10 @@ export default {
       status: 'ステータス',
       statusPending: '生成待ち',
       statusGenerating: '生成中',
-      statusCompleted: '完了',
+      statusGenerated: '生成済み',
+      statusCompleted: '完了', // 旧データとの互換性
       statusFailed: '失敗',
+      statusUnknown: '不明',
       generateNewReport: '新しいレポートを生成',
       totalReports: '{total}件のレポートが見つかりました',
       generateTime: '生成時間',

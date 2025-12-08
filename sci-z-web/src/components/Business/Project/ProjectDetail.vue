@@ -504,9 +504,9 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
   import { BaseCard, BaseDatePicker, BackButton, FilePreview } from '@/components/Common'
   import { FileUpload } from '@/components/Business/Form'
   import { PROJECT_STATUS, PROJECT_STATUS_CONFIG, MILESTONE_OPTIONS } from '@/utils/constants'
-  import { getProjectDetail, updateProject, uploadMilestoneDocument, completeMilestone, cancelCompleteMilestone } from '@/api/Project'
+  import { getProjectDetail, updateProject, uploadMilestoneDocument, completeMilestone, cancelCompleteMilestone, deleteMilestoneDocument } from '@/api/Project'
   import { getUsers } from '@/api/System'
-  import { deleteFile, downloadFile } from '@/api/File'
+  import { downloadFile } from '@/api/File'
   import { ATTACHMENT_RELATION, ATTACHMENT_CATEGORY, IMAGE_FILE_EXTENSIONS, validateFileSize, validateFileType } from '@/constants/attachment'
   import { createLogger } from '@/utils/simpleLogger'
   import { formatFileSize } from '@/utils/file'
@@ -675,8 +675,11 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
         fileUrl: fileInfo.fileUrl,
         previewUrl: fileInfo.previewUrl,
         uploaderName: fileInfo.uploaderName,
-        uploadTime: fileInfo.uploadTime
-      }
+        uploadTime: fileInfo.uploadTime,
+        difyDocId: fileInfo.difyDocId || '' // 保存 Dify 文档ID，用于删除时传递
+      },
+      // 同时在外层也保存一份，方便直接访问
+      difyDocId: fileInfo.difyDocId || ''
     }
   }
 
@@ -1475,6 +1478,12 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       return
     }
     
+    // 验证项目ID
+    if (!project.value.id) {
+      ElMessage.warning('项目ID不存在，无法删除')
+      return
+    }
+    
     try {
       // 确认删除
       await ElMessageBox.confirm(
@@ -1487,10 +1496,22 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
         }
       )
       
-      logger.info('Deleting milestone document', { attachmentId, fileName: docName })
+      // 构建删除请求参数
+      const deleteData = {
+        attachmentId: attachmentId,
+        projectId: project.value.id,
+        difyDocId: doc.fileInfo?.difyDocId || doc.difyDocId || '' // 可选字段，如果存在则传递
+      }
       
-      // 调用后端删除接口
-      const response = await deleteFile(attachmentId)
+      logger.info('Deleting milestone document', { 
+        attachmentId, 
+        projectId: project.value.id, 
+        difyDocId: deleteData.difyDocId,
+        fileName: docName 
+      })
+      
+      // 调用项目里程碑文档删除接口
+      const response = await deleteMilestoneDocument(deleteData)
       
       if (response.code === 200) {
         // 删除成功，从列表中移除

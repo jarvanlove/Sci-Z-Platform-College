@@ -52,22 +52,75 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: linear-gradient(
-          135deg,
-          #1e3a8a 0%,
-          #3b82f6 50%,
-          #60a5fa 100%
-        );
         border-radius: 8px;
         opacity: 0;
         transition: opacity 0.3s ease;
         z-index: -1;
       }
 
+      /* 总项目数 - 蓝色渐变 */
+      .stat-total::before {
+        background: linear-gradient(
+          135deg,
+          #1e3a8a 0%,
+          #3b82f6 50%,
+          #60a5fa 100%
+        );
+      }
+
+      /* 进行中的项目 - 橙色/黄色渐变 */
+      .stat-progress::before {
+        background: linear-gradient(
+          135deg,
+          #d97706 0%,
+          #f59e0b 50%,
+          #fbbf24 100%
+        );
+      }
+
+      /* 待验收项目 - 蓝色/紫色渐变 */
+      .stat-pending::before {
+        background: linear-gradient(
+          135deg,
+          #2563eb 0%,
+          #6366f1 50%,
+          #8b5cf6 100%
+        );
+      }
+
+      /* 已完成项目 - 绿色渐变 */
+      .stat-completed::before {
+        background: linear-gradient(
+          135deg,
+          #15803d 0%,
+          #16a34a 50%,
+          #22c55e 100%
+        );
+      }
+
       .stat-card:hover {
         transform: translateY(-4px);
-        box-shadow: 0 8px 25px rgba(30, 58, 138, 0.15);
         border: 1px solid transparent;
+      }
+
+      /* 总项目数 - 悬停阴影 */
+      .stat-total:hover {
+        box-shadow: 0 8px 25px rgba(30, 58, 138, 0.15);
+      }
+
+      /* 进行中的项目 - 悬停阴影 */
+      .stat-progress:hover {
+        box-shadow: 0 8px 25px rgba(217, 119, 6, 0.15);
+      }
+
+      /* 待验收项目 - 悬停阴影 */
+      .stat-pending:hover {
+        box-shadow: 0 8px 25px rgba(37, 99, 235, 0.15);
+      }
+
+      /* 已完成项目 - 悬停阴影 */
+      .stat-completed:hover {
+        box-shadow: 0 8px 25px rgba(21, 128, 61, 0.15);
       }
 
       .stat-card:hover::before {
@@ -84,8 +137,24 @@
         transition: color 0.3s ease;
       }
 
-      .stat-card:hover .stat-label {
+      /* 不同状态卡片的悬停文字颜色 */
+      .stat-total:hover .stat-label {
         color: #e0e7ff;
+        transition: color 0.3s ease;
+      }
+
+      .stat-progress:hover .stat-label {
+        color: #fef3c7;
+        transition: color 0.3s ease;
+      }
+
+      .stat-pending:hover .stat-label {
+        color: #e0e7ff;
+        transition: color 0.3s ease;
+      }
+
+      .stat-completed:hover .stat-label {
+        color: #dcfce7;
         transition: color 0.3s ease;
       }
 

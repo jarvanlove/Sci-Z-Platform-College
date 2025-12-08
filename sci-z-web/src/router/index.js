@@ -145,7 +145,8 @@ const routes = [
         meta: { 
           title: '报告生成', 
           requiresAuth: true,
-          permission: 'menu:report:generate',
+          // 🔥 报告生成页不是独立菜单，继承列表页权限
+          permission: 'menu:report:list',
           layout: 'main'
         }
       }

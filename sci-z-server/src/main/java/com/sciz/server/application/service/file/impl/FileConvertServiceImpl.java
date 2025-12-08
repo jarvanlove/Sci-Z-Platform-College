@@ -16,7 +16,6 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
@@ -400,6 +399,7 @@ public class FileConvertServiceImpl implements FileConvertService {
     /**
      * 文本换行处理（支持中英文混合）
      * 确保文本不会超出右边距
+     * 当字体不支持某个字符时，使用替换字符（?）确保转换继续进行
      */
     private List<String> wrapText(String text, PDFont font, float fontSize, float maxWidth) throws IOException {
         // 文本换行状态
@@ -426,6 +426,12 @@ public class FileConvertServiceImpl implements FileConvertService {
                                     newCurrentLine.append(ch);
                                     return new WrapState(state.lines(), newCurrentLine);
                                 }
+                            } catch (IllegalArgumentException e) {
+                                // 字体不支持该字符（如：U+2021 †），使用替换字符
+                                log.warn(String.format("字体不支持字符 U+%04X (%c)，使用替换字符 '?'", (int) ch, ch));
+                                var newCurrentLine = new StringBuilder(state.currentLine());
+                                newCurrentLine.append('?'); // 使用 '?' 替换不支持的字符
+                                return new WrapState(state.lines(), newCurrentLine);
                             } catch (IOException e) {
                                 throw new UncheckedIOException(e);
                             }

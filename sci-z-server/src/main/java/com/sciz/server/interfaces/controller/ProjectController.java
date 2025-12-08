@@ -144,7 +144,7 @@ public class ProjectController {
      * @return 操作结果
      */
     @Operation(summary = "删除里程碑文档", description = "删除里程碑文档，同步删除关联表，异步并行删除 MinIO 文件和 Dify 知识库文档")
-    @DeleteMapping("/milestone/document")
+    @DeleteMapping("/milestone/document/delete")
     // @SaCheckPermission("api:project:milestone:document:delete")
     public Result<Void> deleteMilestoneDocument(@Valid @RequestBody MilestoneDocumentDeleteReq req) {
         projectService.deleteMilestoneDocument(req);

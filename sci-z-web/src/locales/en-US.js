@@ -343,8 +343,10 @@ export default {
       status: 'Status',
       statusPending: 'Pending',
       statusGenerating: 'Generating',
-      statusCompleted: 'Completed',
+      statusGenerated: 'Generated',
+      statusCompleted: 'Completed', // For backward compatibility
       statusFailed: 'Failed',
+      statusUnknown: 'Unknown',
       generateNewReport: 'Generate New Report',
       totalReports: 'Found {total} reports',
       generateTime: 'Generate Time',
