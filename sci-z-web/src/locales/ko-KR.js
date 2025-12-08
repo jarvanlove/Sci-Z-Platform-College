@@ -343,8 +343,10 @@ export default {
       status: '상태',
       statusPending: '생성 대기',
       statusGenerating: '생성 중',
-      statusCompleted: '완료됨',
+      statusGenerated: '생성 완료',
+      statusCompleted: '완료됨', // 이전 데이터와의 호환성
       statusFailed: '실패',
+      statusUnknown: '알 수 없음',
       generateNewReport: '새 보고서 생성',
       totalReports: '총 {total}개의 보고서를 찾았습니다',
       generateTime: '생성 시간',

@@ -206,7 +206,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -224,6 +224,10 @@ const logger = createLogger('ReportList')
 // 响应式数据
 const loading = ref(false)
 const reportList = ref([])
+
+// 定时刷新相关
+const refreshTimer = ref(null)
+const REFRESH_INTERVAL = 5000 // 5秒刷新一次
 
 // 搜索表单
 const searchForm = reactive({
@@ -252,7 +256,7 @@ const statusOptions = computed(() => [
   { label: t('common.all'), value: '' },
   { label: t('report.listPage.statusPending'), value: 'pending' },
   { label: t('report.listPage.statusGenerating'), value: 'generating' },
-  { label: t('report.listPage.statusCompleted'), value: 'completed' },
+  { label: t('report.listPage.statusGenerated'), value: 'generated' },
   { label: t('report.listPage.statusFailed'), value: 'failed' }
 ])
 
@@ -261,26 +265,39 @@ const getReportTypeText = (type) => {
   return type === 'tech' ? t('report.typeTech') : t('report.typeSelf')
 }
 
-// 获取状态文本
+// 获取状态文本（确保所有状态都显示为中文）
 const getStatusText = (status) => {
+  if (!status) {
+    return '-'
+  }
+  // 统一转换为小写，确保匹配
+  const statusLower = String(status).toLowerCase()
   const statusMap = {
     pending: t('report.listPage.statusPending'),
     generating: t('report.listPage.statusGenerating'),
-    completed: t('report.listPage.statusCompleted'),
+    generated: t('report.listPage.statusGenerated'),
+    completed: t('report.listPage.statusCompleted'), // 兼容旧数据
     failed: t('report.listPage.statusFailed')
   }
-  return statusMap[status] || status || '-'
+  // 如果状态在映射中，返回中文；否则返回默认值
+  return statusMap[statusLower] || t('report.listPage.statusUnknown') || '未知状态'
 }
 
-// 获取状态标签类型
+// 获取状态标签类型（确保所有状态都有对应的标签类型）
 const getStatusTagType = (status) => {
+  if (!status) {
+    return 'info'
+  }
+  // 统一转换为小写，确保匹配
+  const statusLower = String(status).toLowerCase()
   const typeMap = {
     pending: 'info',
     generating: 'warning',
-    completed: 'success',
+    generated: 'success',
+    completed: 'success', // 兼容旧数据
     failed: 'danger'
   }
-  return typeMap[status] || 'info'
+  return typeMap[statusLower] || 'info'
 }
 
 // 加载报告列表
@@ -336,6 +353,9 @@ const loadReportList = async () => {
       count: reportList.value.length,
       total: pagination.total
     })
+
+    // 检查是否需要启动定时刷新
+    checkAndStartAutoRefresh()
   } catch (error) {
     logger.error('Failed to load report list', error)
     const errorMessage = error.response?.data?.message || error.message || t('report.listPage.loadError')
@@ -545,10 +565,69 @@ const handlePageSizeChange = (size) => {
   loadReportList()
 }
 
+// 检查是否有待刷新状态的报告（pending 或 generating）
+const hasPendingOrGeneratingReports = () => {
+  if (!reportList.value || reportList.value.length === 0) {
+    return false
+  }
+  return reportList.value.some(report => {
+    const status = String(report.status || '').toLowerCase()
+    return status === 'pending' || status === 'generating'
+  })
+}
+
+// 启动定时刷新
+const startAutoRefresh = () => {
+  // 如果已经有定时器在运行，先清除
+  stopAutoRefresh()
+
+  logger.info('Starting auto refresh timer', { interval: REFRESH_INTERVAL })
+  refreshTimer.value = setInterval(() => {
+    // 只有在没有正在加载时才刷新
+    if (!loading.value) {
+      logger.debug('Auto refreshing report list')
+      loadReportList()
+    }
+  }, REFRESH_INTERVAL)
+}
+
+// 停止定时刷新
+const stopAutoRefresh = () => {
+  if (refreshTimer.value) {
+    logger.info('Stopping auto refresh timer')
+    clearInterval(refreshTimer.value)
+    refreshTimer.value = null
+  }
+}
+
+// 检查并启动/停止定时刷新
+const checkAndStartAutoRefresh = () => {
+  if (hasPendingOrGeneratingReports()) {
+    startAutoRefresh()
+  } else {
+    stopAutoRefresh()
+  }
+}
+
+// 监听报告列表变化，自动调整定时器
+watch(
+  () => reportList.value,
+  () => {
+    checkAndStartAutoRefresh()
+  },
+  { deep: true }
+)
+
 // 组件挂载
 onMounted(() => {
   logger.info('Report list page mounted')
   loadReportList()
+})
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  logger.info('Report list page unmounted, cleaning up timer')
+  stopAutoRefresh()
 })
 </script>
 

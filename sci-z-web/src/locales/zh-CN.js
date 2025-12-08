@@ -816,8 +816,10 @@ export default {
       status: '状态',
       statusPending: '待生成',
       statusGenerating: '生成中',
-      statusCompleted: '已完成',
+      statusGenerated: '已生成',
+      statusCompleted: '已完成', // 兼容旧数据
       statusFailed: '失败',
+      statusUnknown: '未知状态',
       generateNewReport: '生成新报告',
       totalReports: '共找到 {total} 份报告',
       generateTime: '生成时间',
