@@ -12,6 +12,7 @@ import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
+import java.util.List;
 
 /**
  * 项目仓储实现
@@ -44,7 +45,8 @@ public class ProjectRepoImpl implements ProjectRepo {
     }
 
     @Override
-    public IPage<Project> page(Page<Project> page, String keyword, String status, String sortBy, boolean asc) {
+    public IPage<Project> page(Page<Project> page, String keyword, String status, String sortBy, boolean asc,
+            List<Long> declarationIds) {
         var queryWrapper = new LambdaQueryWrapper<Project>();
         queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
@@ -59,6 +61,13 @@ public class ProjectRepoImpl implements ProjectRepo {
         // 项目状态筛选
         if (StringUtils.hasText(status)) {
             queryWrapper.eq(Project::getStatus, status);
+        }
+
+        // 时间范围筛选（通过申报ID列表）
+        // 如果提供了申报ID列表，则只查询这些申报关联的项目
+        // 这样可以避免连表查询，利用索引提高性能
+        if (declarationIds != null && !declarationIds.isEmpty()) {
+            queryWrapper.in(Project::getDeclarationId, declarationIds);
         }
 
         // 排序

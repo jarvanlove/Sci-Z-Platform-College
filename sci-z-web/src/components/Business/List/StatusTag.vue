@@ -151,6 +151,8 @@ const displayText = computed(() => {
   height: 24px !important;
   box-sizing: border-box !important;
   flex-shrink: 0 !important;
+  // 🔥 圆角处理：确保所有状态标签都有 12px 圆角
+  border-radius: 12px !important;
   
   .status-icon {
     font-size: 12px;

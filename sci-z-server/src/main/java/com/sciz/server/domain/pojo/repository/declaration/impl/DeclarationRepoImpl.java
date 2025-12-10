@@ -18,6 +18,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -168,6 +169,27 @@ public class DeclarationRepoImpl implements DeclarationRepo {
 
         return mapper.selectList(queryWrapper).stream()
                 .collect(Collectors.toMap(Declaration::getId, declaration -> declaration));
+    }
+
+    @Override
+    public List<Long> findIdsByTimeRange(LocalDate startTime, LocalDate endTime) {
+        var queryWrapper = new LambdaQueryWrapper<Declaration>();
+        queryWrapper.eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 项目开始时间筛选：project_start_time >= startTime
+        if (startTime != null) {
+            queryWrapper.ge(Declaration::getProjectStartTime, startTime);
+        }
+
+        // 项目结束时间筛选：project_end_time <= endTime
+        if (endTime != null) {
+            queryWrapper.le(Declaration::getProjectEndTime, endTime);
+        }
+
+        // 只查询ID，提高性能
+        return mapper.selectList(queryWrapper).stream()
+                .map(Declaration::getId)
+                .toList();
     }
 
     @Override

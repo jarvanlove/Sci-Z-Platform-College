@@ -59,7 +59,7 @@
           <el-icon><Search /></el-icon>
           {{ t('common.search') }}
         </el-button>
-        <el-button @click="handleReset">
+        <el-button type="primary" @click="handleReset">
           <el-icon><Refresh /></el-icon>
           {{ t('common.reset') }}
         </el-button>
@@ -75,7 +75,7 @@
         :columns="tableColumns"
         :loading="loading"
         :pagination="pagination"
-        :action-width="280"
+        :action-width="200"
         action-fixed="right"
         :empty-text="t('common.noData')"
         stripe
@@ -83,9 +83,9 @@
         @current-change="handlePageChange"
         @size-change="handlePageSizeChange"
       >
-        <!-- 角色列自定义 -->
+        <!-- 角色列自定义 - 1*n排版，支持换行 -->
         <template #role="{ row }">
-          <div v-if="getRoleNames(row).length > 0" class="role-tags-container">
+          <div v-if="getRoleNames(row).length > 0" class="role-tags-container base-table__cell-wrap">
             <span
               v-for="(roleName, index) in getRoleNames(row)"
               :key="index"
@@ -105,53 +105,73 @@
           </span>
         </template>
 
-        <!-- 创建时间列自定义 -->
+        <!-- 创建时间列自定义 - 只显示年月日时分 -->
         <template #createTime="{ row }">
           {{ formatDisplayTime(row.createTime) }}
         </template>
 
-        <!-- 操作列 -->
+        <!-- 操作列 - 使用图标按钮 -->
         <template #actions="{ row }">
           <div class="action-buttons">
-            <div class="action-row">
+            <!-- 编辑按钮 -->
+            <BaseTooltip :content="t('common.edit')" placement="top">
               <button
                 class="action-btn btn-primary"
-                @click="handleEdit(row)"
+                @click.stop="handleEdit(row)"
               >
-                {{ t('common.edit') }}
+                <el-icon><Edit /></el-icon>
               </button>
+            </BaseTooltip>
+            <!-- 重置密码按钮 -->
+            <BaseTooltip :content="t('system.user.resetPassword')" placement="top">
               <button
                 class="action-btn btn-warning"
-                @click="handleResetPassword(row)"
+                @click.stop="handleResetPassword(row)"
               >
-                {{ t('system.user.resetPassword') }}
+                <el-icon><Lock /></el-icon>
               </button>
-            </div>
-            <div class="action-row">
+            </BaseTooltip>
+            <!-- 绑定角色按钮 -->
+            <BaseTooltip :content="t('system.user.bindRoles')" placement="top">
               <button
                 class="action-btn btn-warning"
-                @click="handleBindRoles(row)"
+                @click.stop="handleBindRoles(row)"
               >
-                {{ t('system.user.bindRoles') }}
+                <el-icon><User /></el-icon>
               </button>
+            </BaseTooltip>
+            <!-- 启用/禁用按钮 -->
+            <BaseTooltip 
+              :content="(row.status === 1 || row.status === 'active') ? t('common.disable') : t('common.enable')" 
+              placement="top"
+            >
               <button
                 class="action-btn"
                 :class="(row.status === 1 || row.status === 'active') ? 'btn-info' : 'btn-success'"
-                @click="handleToggleStatus(row)"
+                @click.stop="handleToggleStatus(row)"
               >
-                {{ (row.status === 1 || row.status === 'active') ? t('common.disable') : t('common.enable') }}
+                <!-- 🔥 根据状态显示不同图标：启用状态显示禁用图标（CircleClose），禁用状态显示启用图标（CircleCheck） -->
+                <el-icon v-if="row.status === 1 || row.status === 'active'">
+                  <CircleClose />
+                </el-icon>
+                <el-icon v-else>
+                  <CircleCheck />
+                </el-icon>
               </button>
-            </div>
-            <div class="action-row">
+            </BaseTooltip>
+            <!-- 删除按钮 -->
+            <BaseTooltip 
+              :content="isAdminUser(row) ? t('system.user.cannotDeleteAdmin') : t('common.delete')" 
+              placement="top"
+            >
               <button
                 class="action-btn btn-danger"
                 :disabled="isAdminUser(row)"
-                :title="isAdminUser(row) ? t('system.user.cannotDeleteAdmin') : ''"
-                @click="handleDelete(row)"
+                @click.stop="handleDelete(row)"
               >
-                {{ t('common.delete') }}
+                <el-icon><Delete /></el-icon>
               </button>
-            </div>
+            </BaseTooltip>
           </div>
         </template>
       </BaseTable>
@@ -169,6 +189,7 @@
         :model="formData"
         :rules="formRules"
         label-width="100px"
+        class="user-form"
       >
         <el-form-item :label="t('system.user.username')" prop="username">
           <el-input
@@ -271,8 +292,10 @@
         ref="resetPasswordFormRef"
         :model="resetPasswordForm"
         :rules="resetPasswordRules"
+        label-width="0"
+        class="reset-password-form"
       >
-        <el-form-item prop="newPassword">
+        <el-form-item :label="t('system.user.newPassword')" prop="newPassword">
           <el-input
             v-model="resetPasswordForm.newPassword"
             type="password"
@@ -297,6 +320,7 @@
       v-model="showBindRolesDialog"
       :title="t('system.user.bindRoles')"
       width="1000px"
+      class="bind-roles-dialog"
       @close="handleBindRolesDialogClose"
     >
       <div class="bind-roles-container">
@@ -371,8 +395,8 @@
 import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { Plus, Search, Refresh } from '@element-plus/icons-vue'
-import { BaseButton, BaseCard, BaseTable, BaseDialog, BaseSwitch } from '@/components/Common'
+import { Plus, Search, Refresh, Edit, Delete, Lock, User, CircleClose, CircleCheck } from '@element-plus/icons-vue'
+import { BaseButton, BaseCard, BaseTable, BaseDialog, BaseSwitch, BaseTooltip } from '@/components/Common'
 import { getUsers, createUser, updateUser, deleteUser, updateUserStatus, resetUserPassword, getRoles, getUserRoles, updateUserRoles } from '@/api/System/system'
 import { validateEmail, validatePhone, validateUsername, validateChineseName } from '@/utils/validate'
 import { formatDate } from '@/utils/date'
@@ -473,22 +497,17 @@ const availableRoleTableColumns = computed(() => [
   { prop: 'status', label: t('common.status'), minWidth: 100, align: 'center' }
 ])
 
-// 表格列配置
+// 表格列配置 - 移除工号列，重新分配列宽
 const tableColumns = computed(() => [
   {
     prop: 'username',
     label: t('system.user.username'),
-    minWidth: 100
+    minWidth: 120
   },
   {
     prop: 'realName',
     label: t('system.user.realName'),
-    minWidth: 110
-  },
-  {
-    prop: 'employeeId',
-    label: industryStore.employeeIdLabel || t('system.user.employeeId'),
-    minWidth: 230
+    minWidth: 120
   },
   {
     prop: 'email',
@@ -498,13 +517,14 @@ const tableColumns = computed(() => [
   {
     prop: 'departmentName',
     label: t(industryStore.departmentLabelKey || 'system.user.department'),
-    minWidth: 140
+    minWidth: 150
   },
   {
     prop: 'role',
     label: industryStore.roleLabel || t('system.user.role'),
-    minWidth: 200,
-    align: 'center'
+    minWidth: 150,
+    align: 'center',
+    wrap: true
   },
   {
     prop: 'status',
@@ -515,7 +535,7 @@ const tableColumns = computed(() => [
   {
     prop: 'createTime',
     label: t('common.createTime'),
-    minWidth: 180
+    minWidth: 160
   }
 ])
 
@@ -688,7 +708,7 @@ const getStatusText = (status) => {
 }
 
 const formatDisplayTime = (time) => {
-  return formatDate(time, 'YYYY-MM-DD HH:mm:ss')
+  return formatDate(time, 'YYYY-MM-DD HH:mm') // 🔥 只显示年月日时分，不显示秒
 }
 
 // 判断是否为管理员用户（不允许删除）
@@ -814,7 +834,34 @@ const handleSearch = () => {
   loadUsers()
 }
 
+// 🔥 使用 watch 监听筛选条件变化，自动触发查询（带防抖）
+let searchTimer = null
+watch(
+  () => [searchForm.keyword, searchForm.status],
+  () => {
+    // 清除之前的定时器
+    if (searchTimer) {
+      clearTimeout(searchTimer)
+    }
+    // 设置新的定时器，300ms 后执行查询（输入框防抖）
+    searchTimer = setTimeout(() => {
+      logger.info('Filter conditions changed, auto search', { 
+        keyword: searchForm.keyword, 
+        status: searchForm.status 
+      })
+      pagination.current = 1
+      loadUsers()
+    }, 300)
+  },
+  { deep: true }
+)
+
 const handleReset = () => {
+  // 🔥 清除防抖定时器
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+    searchTimer = null
+  }
   searchForm.keyword = ''
   searchForm.status = ''
   pagination.current = 1
@@ -1399,13 +1446,20 @@ onMounted(async () => {
     width: 100%;
     display: flex;
     flex-direction: column;
+    overflow: visible;
   }
   
   :deep(.base-table__table) {
     width: 100% !important;
-    min-width: 100%;
+    min-width: fit-content;
     flex: 1;
-    overflow: auto;
+    overflow: visible;
+  }
+  
+  // 🔥 确保表格内部可以正确显示滚动条
+  :deep(.el-table) {
+    width: 100%;
+    min-width: fit-content;
   }
   
   // Element Plus 表格会自动处理表头和表体的对齐，不需要额外样式
@@ -1487,20 +1541,17 @@ onMounted(async () => {
 
 .action-buttons {
   display: flex;
-  flex-direction: column;
+  flex-direction: row; // 🔥 改为横向排列，图标按钮一行显示
   gap: 8px;
   justify-content: center;
   align-items: center;
-  
-  .action-row {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-  }
+  flex-wrap: nowrap; // 🔥 确保不换行
 }
 
 .action-btn {
-  padding: 5px 12px;
+  padding: 4px; // 🔥 图标按钮使用更小的内边距
+  min-width: 32px; // 🔥 确保图标按钮有最小宽度
+  height: 28px; // 🔥 统一高度
   border: 1px solid transparent;
   border-radius: 4px;
   font-size: 13px;
@@ -1508,6 +1559,18 @@ onMounted(async () => {
   transition: all 0.2s;
   background: none;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center; // 🔥 图标居中显示
+  gap: 0; // 🔥 只有图标，不需要 gap
+  
+  // 🔥 图标样式
+  .el-icon {
+    font-size: 16px; // 🔥 图标大小
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   
   &:disabled {
     opacity: 0.5;
@@ -1570,17 +1633,18 @@ onMounted(async () => {
   }
 }
 
-// 角色和状态标签样式 - 参考原型图
+// 角色和状态标签样式 - 参考原型图，1*n排版
 .role-tags-container {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column; // 🔥 改为垂直排列，实现1*n排版（每行一个标签）
   gap: 6px;
   justify-content: center;
   align-items: center;
   width: 100%;
-  min-width: 150px;
+  min-width: 100px;
   max-width: 100%;
 }
+
 
 .role-tag {
   display: inline-flex;
@@ -1715,6 +1779,114 @@ onMounted(async () => {
 @media (max-width: 1200px) {
   .user-management-container {
     padding: 24px 32px;
+  }
+}
+
+// 🔥 编辑用户表单样式 - 按照 @页面修改.md
+.user-form {
+  :deep(.el-form-item__label) {
+    font-size: 14px !important;
+    color: var(--text-2) !important;
+    font-weight: 600 !important;
+  }
+  
+  :deep(.el-input__inner),
+  :deep(.el-textarea__inner),
+  :deep(.el-select .el-input__inner),
+  :deep(.el-date-editor .el-input__inner) {
+    font-size: 14px !important;
+    color: var(--text-3) !important;
+    font-weight: 400 !important;
+  }
+  
+  :deep(.el-tag),
+  :deep(.status-tag) {
+    border-radius: 12px !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+  }
+}
+
+// 🔥 重置密码表单样式 - 按照 @页面修改.md
+.reset-password-form {
+  :deep(.el-form-item__label) {
+    font-size: 14px !important;
+    color: var(--text-2) !important;
+    font-weight: 600 !important;
+  }
+  
+  :deep(.el-input__inner) {
+    font-size: 14px !important;
+    color: var(--text-3) !important;
+    font-weight: 400 !important;
+  }
+}
+
+// 🔥 统一弹窗取消按钮样式 - 参考 BaseDialog 和 ElMessageBox 的取消按钮样式
+:deep(.base-dialog__footer .base-button:not(.el-button--primary)),
+:deep(.el-dialog__footer .base-button:not(.el-button--primary)),
+:deep(.bind-roles-dialog .el-dialog__footer .base-button:not(.el-button--primary)) {
+  color: var(--text-2) !important;
+  border-color: var(--border) !important;
+  background-color: var(--surface) !important;
+  
+  &:hover {
+    color: var(--text-2) !important;
+    border-color: var(--border-hover) !important;
+    background-color: var(--hover) !important;
+  }
+  
+  &:active {
+    color: var(--text-2) !important;
+    border-color: var(--border) !important;
+    background-color: var(--surface) !important;
+  }
+}
+
+// 🔥 绑定角色弹窗的取消按钮样式（el-dialog 直接使用 el-button）
+:deep(.bind-roles-dialog .el-dialog__footer .el-button--default) {
+  color: var(--text-2) !important;
+  border-color: var(--border) !important;
+  background-color: var(--surface) !important;
+  
+  &:hover {
+    color: var(--text-2) !important;
+    border-color: var(--border-hover) !important;
+    background-color: var(--hover) !important;
+  }
+  
+  &:active {
+    color: var(--text-2) !important;
+    border-color: var(--border) !important;
+    background-color: var(--surface) !important;
+  }
+}
+
+// 🔥 确保绑定角色弹窗的确认按钮（primary）与重置密码弹窗的确认按钮样式一致
+:deep(.bind-roles-dialog .el-dialog__footer .base-button.el-button--primary),
+:deep(.bind-roles-dialog .el-dialog__footer .el-button--primary) {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: var(--surface) !important;
+  
+  &:hover {
+    background-color: var(--color-primary-dark) !important;
+    border-color: var(--color-primary-dark) !important;
+  }
+  
+  /* 暗色主题下确认按钮悬浮样式 */
+  [data-theme='dark'] &,
+  .dark & {
+    &:hover {
+      background-color: var(--color-primary-light) !important;
+      border-color: var(--color-primary-light) !important;
+    }
+  }
+  
+  &:active {
+    background-color: var(--color-primary-dark) !important;
+    border-color: var(--color-primary-dark) !important;
   }
 }
 

@@ -11,10 +11,12 @@ import { PROJECT_API, HTTP_METHODS } from '../Common/constants'
  * @param {Object} params - 查询参数
  * @param {number} params.pageNo - 页码（从1开始）
  * @param {number} params.pageSize - 每页数量
- * @param {string} params.keyword - 关键词搜索（可选）
- * @param {string} params.status - 状态筛选（可选，如 "1"）
- * @param {string} params.sortBy - 排序字段（可选，如 "createdTime"）
- * @param {string} params.sortOrder - 排序方向（可选，如 "DESC"）
+ * @param {string} [params.keyword] - 关键词搜索（可选）
+ * @param {string} [params.status] - 状态筛选（可选，如 "1"）
+ * @param {string} [params.startTime] - 项目开始时间（可选，LocalDate 格式：YYYY-MM-DD，查询开始时间 >= startTime 的项目）
+ * @param {string} [params.endTime] - 项目结束时间（可选，LocalDate 格式：YYYY-MM-DD，查询结束时间 <= endTime 的项目）
+ * @param {string} [params.sortBy] - 排序字段（可选，如 "createdTime"）
+ * @param {string} [params.sortOrder] - 排序方向（可选，如 "DESC"）
  * @returns {Promise} 项目列表响应
  */
 export const getProjectList = (params) => {

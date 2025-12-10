@@ -282,6 +282,14 @@ onMounted(() => {
   padding: var(--gap-lg);
   background: var(--bg-secondary, #f7f9fc);
   min-height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px);
+}
+
+.project-progress-content {
+  flex: 1;
+  overflow: auto;
 }
 
 .page-header {
@@ -339,9 +347,9 @@ onMounted(() => {
 }
 
 .section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-2, #374151);
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--text-2) !important;
   margin-bottom: var(--gap-md);
 }
 
@@ -358,14 +366,15 @@ onMounted(() => {
 }
 
 .info-label {
-  color: var(--text-3, #6b7280);
-  font-size: 14px;
+  font-size: 13px;
+  color: var(--text-2) !important;
+  font-weight: 600;
 }
 
 .info-value {
-  color: var(--text-1, #111827);
-  font-weight: 500;
-  font-size: 14px;
+  font-size: 13px;
+  color: var(--text-3) !important;
+  font-weight: 400;
 }
 
 
@@ -375,9 +384,9 @@ onMounted(() => {
 }
 
 .progress-percentage {
-  font-size: 36px;
-  font-weight: 700;
-  color: var(--color-primary, #1e3a8a);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-3) !important;
   margin-bottom: var(--gap-sm);
 }
 
@@ -400,8 +409,15 @@ onMounted(() => {
 .progress-time {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-3, #6b7280);
+  font-size: 14px;
+  color: var(--text-3) !important;
+  font-weight: 400;
+  
+  div {
+    font-size: 14px;
+    color: var(--text-3) !important;
+    font-weight: 400;
+  }
 }
 
 // 时间轴样式
@@ -493,27 +509,36 @@ onMounted(() => {
 }
 
 .timeline-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-1, #111827);
+  color: var(--text-2) !important;
   margin-bottom: 4px;
 }
 
 .timeline-time {
   font-size: 12px;
-  color: var(--text-3, #6b7280);
+  color: var(--text-3) !important;
+  font-weight: 400;
   margin-bottom: var(--gap-sm);
 }
 
 .timeline-description {
   font-size: 14px;
-  color: var(--text-2, #374151);
+  color: var(--text-3) !important;
+  font-weight: 400;
   line-height: 1.5;
   margin-bottom: var(--gap-sm);
 }
 
 .timeline-progress {
   margin-top: var(--gap-sm);
+  
+  // 🔥 时间轴进度百分比按照表单内容处理
+  :deep(.progress-text) {
+    font-size: 14px !important;
+    color: var(--text-3) !important;
+    font-weight: 400 !important;
+  }
 }
 
 // 空状态样式

@@ -773,36 +773,72 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
-.info-label {
-  font-size: 14px;
-  color: var(--text-2, #6b7280);
-  font-weight: 500;
+// 🔥 研究信息模块标签样式：按照页面修改.md规范
+.research-info-content .info-label {
+  font-size: 14px !important;
+  color: var(--text-2) !important; // #4b5563
+  font-weight: 600 !important; // 加粗
 }
 
+// 🔥 研究方向和研究课题内容样式：按照页面修改.md规范
 .research-direction {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--gap-md);
-  font-size: var(--font-size-base);
+  // 移除背景、边框、padding等装饰样式，只保留文本样式
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  font-size: 14px !important; // 与 el-input placeholder 一致
   line-height: var(--line-height-normal);
-  color: var(--text);
-  white-space: nowrap; // 确保在一行显示
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--text-3) !important; // #6b7280（比 placeholder 稍深，与表格内容颜色一致）
+  font-weight: 400 !important; // normal
+  white-space: normal; // 允许换行
+  word-break: break-word;
+  overflow: visible;
+  text-overflow: unset;
 }
 
 .field-tags {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: row; // 🔥 横向排列，一行显示
+  flex-wrap: wrap; // 允许换行
+  gap: 6px;
   align-items: center;
+  line-height: 1.4;
 }
 
+// 🔥 研究领域标签样式：与列表页保持一致
 .field-tag {
-  background: var(--color-primary-light, #e0e7ff);
-  color: var(--color-primary, #1e3a8a);
-  border: none;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 4px 12px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  background: var(--hover-light) !important; // 🔥 使用浅灰色背景，更协调
+  color: var(--text-3) !important; // 🔥 与表格字体颜色保持一致
+  border: 1px solid var(--border) !important; // 🔥 添加边框，更精致
+  transition: all 0.2s ease !important;
+  
+  &:hover {
+    background: var(--hover) !important;
+    border-color: var(--border-hover) !important;
+    color: var(--text-2) !important; // 🔥 hover时稍微加深
+  }
+}
+
+// 🔥 暗色主题下的研究领域标签样式
+[data-theme='dark'] .field-tag,
+.dark .field-tag {
+  background: rgba(148, 163, 184, 0.1) !important; // 🔥 暗色主题下使用半透明背景
+  color: var(--text-3) !important; // 🔥 与表格字体颜色保持一致
+  border-color: var(--border) !important;
+  
+  &:hover {
+    background: rgba(148, 163, 184, 0.2) !important;
+    border-color: var(--border-hover) !important;
+    color: var(--text-2) !important;
+  }
 }
 
 .no-field {
@@ -880,14 +916,66 @@ onBeforeUnmount(() => {
   margin-bottom: 4px;
 }
 
+// 🔥 工作流描述：与表单内容样式保持一致（图1红色圈1）
 .workflow-description {
-  font-size: 14px;
-  color: var(--text-2, #6b7280);
+  font-size: 14px !important; // 与表单内容一致
+  color: var(--text-3) !important; // #6b7280，与表单内容一致
+  font-weight: 400 !important; // normal，与表单内容一致
   margin-bottom: 8px;
 }
 
 .workflow-progress {
   margin-top: 8px;
+  
+  // 🔥 进度条百分比：与表单内容样式保持一致（图1红色圈2）
+  :deep(.progress-percentage) {
+    font-size: 14px !important; // 与表单内容一致
+    color: var(--text-3) !important; // #6b7280，与表单内容一致
+    font-weight: 400 !important; // normal，与表单内容一致
+  }
+  
+  // 🔥 进度条中的状态标签：需要圆角处理（图1红色圈1）
+  :deep(.status-tag),
+  :deep(.el-tag),
+  :deep(.progress-header .status-tag),
+  :deep(.progress-header .el-tag) {
+    padding: 4px 8px !important; // 🔥 与列表页一致
+    border-radius: 12px !important; // 🔥 圆角处理，与列表页一致
+    font-size: 12px !important; // 🔥 与列表页一致
+    font-weight: 500 !important; // 🔥 与列表页一致
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    transition: all 0.2s ease !important;
+    
+    // 🔥 成功状态样式：与列表页保持一致
+    &.el-tag--success {
+      background-color: #d1fae5 !important; // 🔥 与列表页一致
+      color: #059669 !important; // 🔥 与列表页一致
+      border-color: #d1fae5 !important;
+    }
+    
+    // 🔥 警告状态样式：与列表页保持一致
+    &.el-tag--warning {
+      background-color: #fef3c7 !important;
+      color: #f59e0b !important;
+      border-color: #fef3c7 !important;
+    }
+    
+    // 🔥 危险状态样式：与列表页保持一致
+    &.el-tag--danger {
+      background-color: #fee2e2 !important;
+      color: #dc2626 !important;
+      border-color: #fee2e2 !important;
+    }
+    
+    // 🔥 信息状态样式：与列表页保持一致
+    &.el-tag--info {
+      background-color: #e0e7ff !important;
+      color: #2563eb !important;
+      border-color: #e0e7ff !important;
+    }
+  }
 }
 
 .workflow-timeline {
@@ -913,72 +1001,69 @@ onBeforeUnmount(() => {
           flex-shrink: 0; // 防止压缩
           min-width: 240px; // 固定总宽度，确保对齐
           
+          // 🔥 时间戳：与表单内容样式保持一致（图1红色圈3）
           .item-time {
             width: 160px; // 固定时间宽度，确保对齐
             text-align: right; // 右对齐
-            font-size: var(--font-size-sm);
-            color: var(--text-3);
+            font-size: 14px !important; // 与表单内容一致
+            color: var(--text-3) !important; // #6b7280，与表单内容一致
+            font-weight: 400 !important; // normal，与表单内容一致
             white-space: nowrap;
             flex-shrink: 0;
           }
           
-          // 状态标签样式 - 圆角、对齐，确保失败和完成按钮一样大
-          // 使用更具体的选择器确保样式生效，强制固定宽度覆盖自适应行为
+          // 🔥 状态标签样式 - 圆角、对齐，与列表页保持一致（图2红色圈）
+          // 使用更具体的选择器确保覆盖 StatusTag 组件内部样式
           :deep(.status-tag),
           :deep(.el-tag),
           :deep(.timeline-item .content-meta .status-tag),
           :deep(.timeline-item .content-meta .el-tag),
           :deep(.workflow-timeline .status-tag),
-          :deep(.workflow-timeline .el-tag) {
-            border-radius: var(--radius-md) !important; // 圆角，使用!important确保生效
-            padding: 4px 8px !important; // 减小padding，确保文字能完整显示
-            font-size: var(--font-size-sm) !important;
-            white-space: nowrap !important;
-            // 强制固定宽度和高度，覆盖 Element Plus 的自适应行为
-            min-width: 60px !important;
-            max-width: 60px !important;
-            width: 60px !important;
-            height: 24px !important;
-            text-align: center !important;
+          :deep(.workflow-timeline .el-tag),
+          :deep(.content-meta .status-tag),
+          :deep(.content-meta .el-tag),
+          :deep(.content-meta .status-tag.el-tag),
+          :deep(.content-meta .el-tag.status-tag) {
+            padding: 4px 8px !important; // 🔥 与列表页一致
+            border-radius: 12px !important; // 🔥 圆角处理，与列表页一致（必须生效）
+            font-size: 12px !important; // 🔥 与列表页一致
+            font-weight: 500 !important; // 🔥 与列表页一致
             display: inline-flex !important;
             align-items: center !important;
-            justify-content: center !important;
-            flex-shrink: 0 !important;
-            box-sizing: border-box !important; // 确保padding不影响宽度
-            line-height: 1 !important; // 确保文字垂直居中
-            overflow: hidden !important; // 防止内容溢出
+            gap: 4px !important;
+            transition: all 0.2s ease !important;
+            position: relative !important;
             
-            // 确保所有状态标签（成功、失败、处理中等）都有相同的尺寸
-            .status-text {
-              display: inline-block;
-              width: 100%;
-              text-align: center;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
+            // 🔥 成功状态样式：与列表页保持一致
+            &.el-tag--success {
+              background-color: #d1fae5 !important; // 🔥 与列表页一致
+              color: #059669 !important; // 🔥 与列表页一致
+              border-color: #d1fae5 !important;
+              border-radius: 12px !important; // 🔥 再次强调圆角
             }
             
-            // 覆盖 Element Plus 的默认样式和所有变体
-            &.el-tag--success,
-            &.el-tag--danger,
-            &.el-tag--warning,
-            &.el-tag--info,
-            &.el-tag--primary {
-              min-width: 60px !important;
-              max-width: 60px !important;
-              width: 60px !important;
-              height: 24px !important;
-              padding: 4px 8px !important;
+            // 🔥 警告状态样式：与列表页保持一致
+            &.el-tag--warning {
+              background-color: #fef3c7 !important;
+              color: #f59e0b !important;
+              border-color: #fef3c7 !important;
+              border-radius: 12px !important; // 🔥 再次强调圆角
             }
             
-            // 覆盖不同尺寸的默认样式
-            &.el-tag--small,
-            &.el-tag--default,
-            &.el-tag--large {
-              min-width: 60px !important;
-              max-width: 60px !important;
-              width: 60px !important;
-              height: 24px !important;
+            // 🔥 危险状态样式：与列表页保持一致
+            &.el-tag--danger {
+              background-color: #fee2e2 !important;
+              color: #dc2626 !important;
+              border-color: #fee2e2 !important;
+              border-radius: 12px !important; // 🔥 再次强调圆角
+            }
+            
+            // 🔥 信息状态样式：与列表页保持一致
+            &.el-tag--info {
+              background-color: #e0e7ff !important;
+              color: #2563eb !important;
+              border-color: #e0e7ff !important;
+              border-radius: 12px !important; // 🔥 再次强调圆角
             }
           }
         }
@@ -1006,16 +1091,19 @@ onBeforeUnmount(() => {
       .info-label {
         min-width: auto;
         margin-bottom: var(--gap-xs);
-        font-size: var(--font-size-sm);
-        color: var(--text-2);
-        font-weight: 500;
+        // 🔥 表单标签字体：比内容大，使用表头颜色
+        font-size: 14px; // 标签字体大小（比内容大）
+        color: var(--text-2) !important; // 表头颜色
+        font-weight: 600; // 表头粗细
         white-space: nowrap;
       }
       
       .info-value {
-        font-size: var(--font-size-base);
-        color: var(--text);
+        // 🔥 表单内容字体：比 placeholder 稍深一点
+        font-size: 14px; // 与 placeholder 一致（var(--font-size-base)）
+        color: var(--text-3) !important; // 比 placeholder 稍深（#6b7280，比 #9ca3af 深）
         word-break: break-word;
+        font-weight: 400; // 正常粗细
       }
     }
   }
@@ -1023,6 +1111,49 @@ onBeforeUnmount(() => {
   // InfoCard 标题样式
   :deep(.card-title) {
     color: var(--color-primary) !important;
+  }
+  
+  // 🔥 状态标签样式：与列表页保持一致
+  :deep(.info-value) {
+    .status-tag,
+    .el-tag {
+      padding: 4px 8px !important;
+      border-radius: 12px !important; // 🔥 圆角与列表页一致
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      transition: all 0.2s ease !important;
+      
+      // 成功状态样式
+      &.el-tag--success {
+        background-color: #d1fae5 !important; // 🔥 与列表页一致
+        color: #059669 !important; // 🔥 与列表页一致
+        border-color: #d1fae5 !important;
+      }
+      
+      // 警告状态样式
+      &.el-tag--warning {
+        background-color: #fef3c7 !important;
+        color: #f59e0b !important;
+        border-color: #fef3c7 !important;
+      }
+      
+      // 危险状态样式
+      &.el-tag--danger {
+        background-color: #fee2e2 !important;
+        color: #dc2626 !important;
+        border-color: #fee2e2 !important;
+      }
+      
+      // 信息状态样式
+      &.el-tag--info {
+        background-color: #e0e7ff !important;
+        color: #2563eb !important;
+        border-color: #e0e7ff !important;
+      }
+    }
   }
 }
 

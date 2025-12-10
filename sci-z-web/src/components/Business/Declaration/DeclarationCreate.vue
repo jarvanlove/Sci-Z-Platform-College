@@ -425,8 +425,14 @@
     fileInputRef.value?.click()
   }
   
-  // 红头文件允许的文件类型（扩展名）
-  const RED_HEADER_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png']
+  // 红头文件允许的文件类型（扩展名）- 仅支持 PDF 和 WORD 格式
+  const RED_HEADER_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx']
+  // 红头文件允许的 MIME 类型
+  const RED_HEADER_ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ]
   // 红头文件大小限制（MB）
   const RED_HEADER_MAX_SIZE_MB = 10
   // 文件选择器的 accept 属性值
@@ -439,17 +445,36 @@
     const file = event.target.files?.[0]
     if (!file) return
   
-    // 使用封装好的文件大小校验函数
+    // 🔥 先验证文件大小（在类型验证之前）
     const sizeValidation = validateFileSize(file, RED_HEADER_MAX_SIZE_MB)
     if (!sizeValidation.passed) {
       ElMessage.error(sizeValidation.reason || t('declaration.uploadError'))
+      // 清空文件选择，允许用户重新选择
+      if (fileInputRef.value) {
+        fileInputRef.value.value = ''
+      }
       return
     }
   
-    // 使用封装好的文件类型校验函数
-    const typeValidation = validateFileType(file, RED_HEADER_ALLOWED_EXTENSIONS)
-    if (!typeValidation.passed) {
-      ElMessage.error(typeValidation.reason || t('declaration.uploadError'))
+    // 🔥 验证文件类型 - 仅支持 PDF 和 WORD 格式
+    const extension = file.name.split('.').pop()?.toLowerCase()
+    if (!extension || !RED_HEADER_ALLOWED_EXTENSIONS.includes(extension)) {
+      ElMessage.error(t('declaration.fileFormatError') || '红头文件仅支持 PDF、WORD 格式，请重新选择文件')
+      // 清空文件选择，允许用户重新选择
+      if (fileInputRef.value) {
+        fileInputRef.value.value = ''
+      }
+      return
+    }
+  
+    // 🔥 验证 MIME 类型（额外验证，确保文件类型正确）
+    const mimeType = (file.type || '').toLowerCase()
+    if (mimeType && !RED_HEADER_ALLOWED_MIME_TYPES.includes(mimeType)) {
+      ElMessage.error(t('declaration.fileTypeError') || '文件格式不正确，请确保上传的是 PDF 或 WORD 格式文件')
+      // 清空文件选择，允许用户重新选择
+      if (fileInputRef.value) {
+        fileInputRef.value.value = ''
+      }
       return
     }
   
@@ -1052,15 +1077,37 @@
     margin-bottom: 24px !important;
   }
   
+  // 🔥 表单标签样式 - 按照页面修改.md规范
   :deep(.el-form-item__label) {
     padding-bottom: 8px !important;
-    font-weight: 500 !important;
-    color: var(--text) !important;
+    font-size: 14px !important; // 🔥 字体大小：14px
+    font-weight: 600 !important; // 🔥 字体粗细：600（加粗）
+    color: var(--text-2) !important; // 🔥 字体颜色：var(--text-2) 或 #4b5563
     white-space: nowrap !important;
   }
   
   :deep(.el-form-item__content) {
     line-height: 1.5 !important;
+  }
+  
+  // 🔥 表单内容样式 - 按照页面修改.md规范
+  // 输入框样式
+  :deep(.el-input__inner),
+  :deep(.el-textarea__inner),
+  :deep(.el-select .el-input__inner),
+  :deep(.el-date-editor .el-input__inner) {
+    font-size: 14px !important; // 🔥 字体大小：14px（与 placeholder 一致）
+    color: var(--text-3) !important; // 🔥 字体颜色：var(--text-3) 或 #6b7280（比 placeholder 稍深一点）
+    font-weight: 400 !important; // 🔥 字体粗细：400（normal）
+  }
+  
+  // 🔥 状态标签样式 - 按照页面修改.md规范（如果有状态标签的话）
+  :deep(.status-tag),
+  :deep(.el-tag) {
+    border-radius: 12px !important; // 🔥 圆角：12px
+    padding: 4px 8px !important; // 🔥 内边距：4px 8px
+    font-size: 12px !important; // 🔥 字体大小：12px
+    font-weight: 500 !important; // 🔥 字体粗细：500
   }
   
   // 响应式设计

@@ -132,31 +132,38 @@ body {
 }
 
 // ================================
-// 3. 滚动条统一样式
+// 3. 滚动条统一样式（与 BaseScrollbar 组件保持一致）
 // ================================
 
-/* 全局滚动条样式 */
+/* 全局滚动条样式 - 与 BaseScrollbar 组件样式统一 */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(107, 114, 128, 0.3);
-  border-radius: 3px;
-  transition: background 0.2s ease;
+  background: var(--border);
+  border-radius: 4px;
+  transition: opacity 0.3s ease, background 0.3s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(107, 114, 128, 0.5);
+  background: var(--border-hover);
 }
 
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Firefox 滚动条样式 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 
 // ================================
@@ -617,12 +624,36 @@ body {
   .el-select__placeholder {
     color: var(--disabled) !important;
     font-size: var(--font-size-base) !important;
+    font-weight: 400 !important;
   }
   
   .el-select__selected-item {
     color: var(--text) !important;
     font-size: var(--font-size-base) !important;
     font-weight: 500 !important;
+  }
+  
+  // 🔥 确保下拉框wrapper内的选中值颜色与输入框内容一致
+  .el-select__wrapper {
+    color: var(--text) !important; // 整个wrapper的文字颜色，确保选中值显示正确
+    
+    .el-select__selected-item {
+      color: var(--text) !important; // 选择值后的颜色，与输入框内容一致
+      font-size: var(--font-size-base) !important;
+      font-weight: 500 !important;
+    }
+    
+    .el-select__placeholder {
+      color: var(--disabled) !important; // placeholder颜色，与输入框placeholder一致
+      font-size: var(--font-size-base) !important;
+      font-weight: 400 !important;
+    }
+    
+    .el-select__input {
+      color: var(--text) !important; // 输入框文字颜色
+      font-size: var(--font-size-base) !important;
+      font-weight: 500 !important;
+    }
   }
   
   /* 下拉箭头颜色 */

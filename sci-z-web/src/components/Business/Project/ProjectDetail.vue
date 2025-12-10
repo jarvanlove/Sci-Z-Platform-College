@@ -170,13 +170,14 @@
                   {{ getRoleText(member) }} · {{ $t('project.detail.joinTime') }}: {{ formatDate(member.joinTime) }}
                 </div>
               </div>
-              <button
-                v-if="isEditMode"
-                class="action-btn btn-danger"
-                @click="handleRemoveMember(member.id)"
-              >
-                {{ $t('common.remove') }}
-              </button>
+              <BaseTooltip v-if="isEditMode" :content="$t('common.remove')" placement="top">
+                <button
+                  class="action-btn btn-danger"
+                  @click="handleRemoveMember(member.id)"
+                >
+                  <el-icon><Close /></el-icon>
+                </button>
+              </BaseTooltip>
             </div>
           </div>
   
@@ -208,7 +209,10 @@
             <el-icon class="is-loading"><Loading /></el-icon>
             <span>{{ $t('common.loading') }}</span>
           </div>
-          <div v-else-if="memberSearchResults.length > 0" class="search-results">
+          <BaseScrollbar 
+            v-else-if="memberSearchResults.length > 0" 
+            :custom-style="{ maxHeight: '200px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', marginTop: 'var(--gap-sm)' }"
+          >
             <div v-for="user in memberSearchResults" :key="user.id" class="search-result-item">
               <el-checkbox
                 :model-value="selectedUserIds.has(user.id)"
@@ -223,7 +227,7 @@
                 </div>
               </el-checkbox>
             </div>
-          </div>
+          </BaseScrollbar>
           <div v-else-if="!loadingUsers" class="empty-state">
             <div class="empty-state-text">
               {{ memberSearchKeyword.trim() ? '未找到匹配的用户' : $t('project.detail.searchHint') }}
@@ -268,20 +272,30 @@
               <div class="milestone-header">
                 <span class="milestone-title">{{ $t('project.detail.milestone') }} {{ index + 1 }}</span>
                 <div class="milestone-header-actions">
-                  <button
+                  <BaseTooltip
                     v-if="isEditMode && milestone.id"
-                    :class="['action-btn', milestone.progress === 100 ? 'btn-warning' : 'btn-success']"
-                    @click="handleMilestoneCompleteToggle(milestone, index)"
+                    :content="milestone.progress === 100 ? $t('project.detail.cancelComplete') : $t('project.detail.complete')"
+                    placement="top"
                   >
-                    {{ milestone.progress === 100 ? $t('project.detail.cancelComplete') : $t('project.detail.complete') }}
-                  </button>
-                  <button
+                    <button
+                      :class="['action-btn', milestone.progress === 100 ? 'btn-warning' : 'btn-success']"
+                      @click="handleMilestoneCompleteToggle(milestone, index)"
+                    >
+                      <el-icon><Check v-if="milestone.progress !== 100" /><CircleCheck v-else /></el-icon>
+                    </button>
+                  </BaseTooltip>
+                  <BaseTooltip
                     v-if="isEditMode"
-                    class="action-btn btn-danger"
-                    @click="handleRemoveMilestone(index)"
+                    :content="$t('common.delete')"
+                    placement="top"
                   >
-                    {{ $t('common.delete') }}
-                  </button>
+                    <button
+                      class="action-btn btn-danger"
+                      @click="handleRemoveMilestone(index)"
+                    >
+                      <el-icon><Delete /></el-icon>
+                    </button>
+                  </BaseTooltip>
                 </div>
               </div>
               
@@ -352,25 +366,34 @@
                       </div>
                     </div>
                     <div class="document-actions">
-                      <button
-                        class="action-btn btn-info"
-                        @click="handleMilestoneDocPreview(doc)"
-                      >
-                        {{ $t('common.preview') }}
-                      </button>
-                      <button
-                        class="action-btn btn-success"
-                        @click="handleMilestoneDocDownload(doc)"
-                      >
-                        {{ $t('common.download') }}
-                      </button>
-                      <button
+                      <BaseTooltip :content="$t('common.preview')" placement="top">
+                        <button
+                          class="action-btn btn-info"
+                          @click="handleMilestoneDocPreview(doc)"
+                        >
+                          <el-icon><View /></el-icon>
+                        </button>
+                      </BaseTooltip>
+                      <BaseTooltip :content="$t('common.download')" placement="top">
+                        <button
+                          class="action-btn btn-success"
+                          @click="handleMilestoneDocDownload(doc)"
+                        >
+                          <el-icon><Download /></el-icon>
+                        </button>
+                      </BaseTooltip>
+                      <BaseTooltip
                         v-if="isEditMode"
-                        class="action-btn btn-danger"
-                        @click="handleMilestoneDocDelete(index, doc.id)"
+                        :content="$t('common.delete')"
+                        placement="top"
                       >
-                        {{ $t('common.delete') }}
-                      </button>
+                        <button
+                          class="action-btn btn-danger"
+                          @click="handleMilestoneDocDelete(index, doc.id)"
+                        >
+                          <el-icon><Delete /></el-icon>
+                        </button>
+                      </BaseTooltip>
                     </div>
                   </div>
                 </div>
@@ -500,8 +523,8 @@ import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPlay, Folder } from '@element-plus/icons-vue'
-  import { BaseCard, BaseDatePicker, BackButton, FilePreview } from '@/components/Common'
+import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPlay, Folder, Close, Delete, Check, CircleCheck, View, Download } from '@element-plus/icons-vue'
+  import { BaseCard, BaseDatePicker, BackButton, FilePreview, BaseTooltip, BaseScrollbar } from '@/components/Common'
   import { FileUpload } from '@/components/Business/Form'
   import { PROJECT_STATUS, PROJECT_STATUS_CONFIG, MILESTONE_OPTIONS } from '@/utils/constants'
   import { getProjectDetail, updateProject, uploadMilestoneDocument, completeMilestone, cancelCompleteMilestone, deleteMilestoneDocument } from '@/api/Project'
@@ -1598,17 +1621,41 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
     display: flex;
     flex-direction: column;
     gap: 4px;
+    
+    // 🔥 编辑模式下输入框字体样式统一（与查看模式 .info-value 保持一致）
+    :deep(.el-input__inner),
+    :deep(.el-textarea__inner),
+    :deep(.el-input-number__input) {
+      font-size: 14px !important;
+      color: var(--text-3) !important;
+      font-weight: 400 !important;
+    }
+    
+    // BaseDatePicker 内部输入框样式
+    :deep(.el-date-editor .el-input__inner) {
+      font-size: 14px !important;
+      color: var(--text-3) !important;
+      font-weight: 400 !important;
+    }
+    
+    // el-input-number 内部输入框样式
+    :deep(.el-input-number .el-input__inner) {
+      font-size: 14px !important;
+      color: var(--text-3) !important;
+      font-weight: 400 !important;
+    }
   }
   
   .info-label {
     font-size: 14px;
-    color: var(--text-secondary);
-    font-weight: 500;
+    color: var(--text-2) !important;
+    font-weight: 600;
   }
   
   .info-value {
     font-size: 14px;
-    color: var(--text-primary);
+    color: var(--text-3) !important;
+    font-weight: 400;
   }
   
   .budget-input-wrapper {
@@ -1619,9 +1666,9 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
   }
   
   .budget-currency {
-    color: var(--text-primary);
-    font-size: 16px;
-    font-weight: 500;
+    color: var(--text-3) !important;
+    font-size: 14px;
+    font-weight: 400;
     flex-shrink: 0;
   }
   
@@ -1638,6 +1685,10 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
     justify-content: center;
     align-items: center;
     text-align: center;
+    border-radius: 12px !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
   }
   
   // 成员管理样式
@@ -1674,19 +1725,20 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
   
   .member-name {
     font-size: 14px;
-    font-weight: 500;
-    color: var(--text-primary);
+    font-weight: 600;
+    color: var(--text-2) !important;
     margin-bottom: 2px;
   }
   
   .member-role {
-    font-size: 12px;
-    color: var(--text-secondary);
+    font-size: 14px;
+    color: var(--text-3) !important;
+    font-weight: 400;
   }
   
-  .search-results {
+  // 🔥 搜索结果显示区域样式（直接应用在 BaseScrollbar 上）
+  :deep(.base-scrollbar) {
     max-height: 200px;
-    overflow-y: auto;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     background: var(--surface);
@@ -1807,6 +1859,38 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
     display: flex;
     flex-direction: column;
     gap: var(--gap-md);
+    
+    // 🔥 里程碑表单标签样式统一（按照 @页面修改.md 要求）
+    :deep(.el-form-item__label) {
+      font-size: 14px !important;
+      color: var(--text-2) !important;
+      font-weight: 600 !important;
+    }
+    
+    // 🔥 里程碑表单内容样式统一（按照 @页面修改.md 要求）
+    :deep(.el-input__inner),
+    :deep(.el-textarea__inner) {
+      font-size: 14px !important;
+      color: var(--text-3) !important;
+      font-weight: 400 !important;
+    }
+    
+    // 🔥 日期选择器输入框样式
+    :deep(.el-date-editor .el-input__inner) {
+      font-size: 14px !important;
+      color: var(--text-3) !important;
+      font-weight: 400 !important;
+    }
+    
+    // 🔥 禁用状态下的输入框样式（保持与启用状态一致）
+    :deep(.el-input.is-disabled .el-input__inner),
+    :deep(.el-textarea.is-disabled .el-textarea__inner),
+    :deep(.el-date-editor.is-disabled .el-input__inner) {
+      font-size: 14px !important;
+      color: var(--text-3) !important;
+      font-weight: 400 !important;
+      -webkit-text-fill-color: var(--text-3) !important;
+    }
   }
   
   .form-row {
@@ -1864,14 +1948,15 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
   
   .document-name {
     font-size: 14px;
-    font-weight: 500;
-    color: var(--text-primary);
+    font-weight: 600;
+    color: var(--text-2) !important;
     margin-bottom: 2px;
   }
   
   .document-meta {
-    font-size: 12px;
-    color: var(--text-secondary);
+    font-size: 14px;
+    color: var(--text-3) !important;
+    font-weight: 400;
   }
   
   .document-actions {
@@ -1881,7 +1966,9 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
 
   // 操作按钮样式，复用申报列表 / 用户管理的细边框主题按钮
   .action-btn {
-    padding: 5px 12px;
+    padding: 4px;
+    min-width: 32px;
+    height: 28px;
     border: 1px solid transparent;
     border-radius: 4px;
     font-size: 13px;
@@ -1889,6 +1976,14 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
     transition: all 0.2s;
     background: none;
     white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  
+    .el-icon {
+      font-size: 16px;
+    }
   
     &:disabled {
       opacity: 0.5;

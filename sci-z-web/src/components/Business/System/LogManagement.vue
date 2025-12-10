@@ -12,59 +12,52 @@
 
     <BaseCard>
       <div class="filter-section">
-        <div class="filter-item">
-          <span class="filter-label">{{ t('system.logs.logLevel') }}</span>
-          <el-select
-            v-model="searchForm.level"
-            :placeholder="t('common.all')"
-            clearable
-            style="width: 160px"
-            @change="handleSearch"
-          >
-            <el-option :label="t('common.all')" value="" />
-            <el-option
-              v-for="option in levelOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </div>
+        <!-- 🔥 用户名输入框移到最左边 -->
+        <el-input
+          v-model="searchForm.user"
+          placeholder="请输入用户名"
+          clearable
+          style="width: 200px"
+          @blur="handleUserInputBlur"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
 
-        <div class="filter-item">
-          <span class="filter-label">{{ t('system.logs.dateRange') }}</span>
-          <BaseDatePicker
-            v-model="searchForm.dateRange"
-            type="daterange"
-            :unlink-panels="true"
-            :start-placeholder="t('system.logs.startDate')"
-            :end-placeholder="t('system.logs.endDate')"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            style="width: 300px"
-            @change="handleSearch"
+        <el-select
+          v-model="searchForm.level"
+          :placeholder="t('common.all')"
+          clearable
+          style="width: 160px"
+          @change="handleSearch"
+        >
+          <el-option :label="t('common.all')" value="" />
+          <el-option
+            v-for="option in levelOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
           />
-        </div>
+        </el-select>
 
-        <div class="filter-item">
-          <span class="filter-label">{{ t('system.logs.user') }}</span>
-          <el-input
-            v-model="searchForm.user"
-            :placeholder="t('system.logs.userPlaceholder')"
-            clearable
-            style="width: 200px"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </div>
+        <BaseDatePicker
+          v-model="searchForm.dateRange"
+          type="daterange"
+          :unlink-panels="true"
+          :start-placeholder="t('system.logs.startDate')"
+          :end-placeholder="t('system.logs.endDate')"
+          format="YYYY-MM-DD"
+          value-format="YYYY-MM-DD"
+          style="width: 300px"
+          @change="handleSearch"
+        />
 
         <el-button type="primary" :loading="loading" @click="handleSearch">
           <el-icon><Search /></el-icon>
           {{ t('common.search') }}
         </el-button>
-        <el-button @click="handleReset">
+        <el-button type="primary" @click="handleReset">
           <el-icon><Refresh /></el-icon>
           {{ t('common.reset') }}
         </el-button>
@@ -75,7 +68,7 @@
         :columns="tableColumns"
         :loading="loading"
         :pagination="pagination"
-        :action-width="140"
+        :action-width="80"
         action-fixed="right"
         :empty-text="t('common.noData')"
         stripe
@@ -83,18 +76,23 @@
         @current-change="handlePageChange"
         @size-change="handlePageSizeChange"
       >
-        <!-- 日志级别列自定义 -->
+        <!-- 日志级别列自定义 - 圆角处理 -->
         <template #level="{ row }">
-          <el-tag :type="getLevelTagType(row.level)">
+          <el-tag :type="getLevelTagType(row.level)" class="level-tag">
             {{ row.level || '-' }}
           </el-tag>
         </template>
 
-        <!-- 操作列 -->
+        <!-- 操作列 - 使用图标按钮 -->
         <template #actions="{ row }">
-          <el-button size="small" @click="handleViewDetail(row)">
-            {{ t('system.logs.viewDetail') }}
-          </el-button>
+          <BaseTooltip :content="t('system.logs.viewDetail')" placement="top">
+            <button
+              class="action-btn btn-primary"
+              @click.stop="handleViewDetail(row)"
+            >
+              <el-icon><TopRight /></el-icon>
+            </button>
+          </BaseTooltip>
         </template>
       </BaseTable>
     </BaseCard>
@@ -112,7 +110,7 @@
         <div class="detail-row">
           <div class="detail-label">{{ t('system.logs.level') }}</div>
           <div class="detail-value">
-            <el-tag :type="getLevelTagType(currentLog.level)">
+            <el-tag :type="getLevelTagType(currentLog.level)" class="level-tag">
               {{ currentLog.level || '-' }}
             </el-tag>
           </div>
@@ -199,8 +197,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh } from '@element-plus/icons-vue'
-import { BaseCard, BaseTable, BaseDatePicker } from '@/components/Common'
+import { Search, Refresh, TopRight } from '@element-plus/icons-vue'
+import { BaseCard, BaseTable, BaseDatePicker, BaseTooltip } from '@/components/Common'
 import { getOperationLogs } from '@/api/System/system'
 import { LOG_LEVEL_OPTIONS, LOG_LEVEL_TAG_CONFIG, PAGINATION } from '@/utils/constants'
 import { formatDate } from '@/utils/date'
@@ -232,40 +230,38 @@ const normalizedLogs = computed(() => logs.value || [])
 
 const getLevelTagType = (level) => LOG_LEVEL_TAG_CONFIG[level]?.type || 'info'
 
-// 表格列配置
+// 表格列配置 - 所有列居中，优化列宽确保6个表头都能显示
 const tableColumns = computed(() => [
   {
     prop: 'timestamp',
     label: t('system.logs.time'),
-    minWidth: 180
+    minWidth: 160,
+    align: 'center'
   },
   {
     prop: 'level',
     label: t('system.logs.level'),
-    minWidth: 110,
+    minWidth: 100,
     align: 'center'
   },
   {
     prop: 'user',
     label: t('system.logs.user'),
-    minWidth: 120
+    minWidth: 100,
+    align: 'center'
   },
   {
     prop: 'operation',
     label: t('system.logs.operation'),
-    minWidth: 200,
-    wrap: true // 🔥 允许换行，充分利用空间
+    minWidth: 150,
+    wrap: true, // 🔥 允许换行，充分利用空间
+    align: 'center'
   },
   {
     prop: 'ip',
     label: t('system.logs.ipAddress'),
-    minWidth: 140
-  },
-  {
-    prop: 'detail',
-    label: t('system.logs.detail'),
-    minWidth: 200,
-    wrap: true // 🔥 允许换行，充分利用空间
+    minWidth: 140,
+    align: 'center'
   }
 ])
 
@@ -278,10 +274,12 @@ const buildQueryParams = () => {
     payload.level = searchForm.level
   }
   if (searchForm.user) {
-    payload.user = searchForm.user.trim()
+    // 🔥 后端参数名是 username，不是 user
+    payload.username = searchForm.user.trim()
   }
   if (searchForm.dateRange && searchForm.dateRange.length === 2) {
-    // 将日期格式化为时间格式：开始时间为 00:00:00，结束时间为 23:59:59
+    // 🔥 后端需要 LocalDateTime 格式，Spring Boot 默认接受 yyyy-MM-dd HH:mm:ss 格式（带空格）
+    // 开始时间为当天的 00:00:00，结束时间为当天的 23:59:59
     payload.startTime = `${searchForm.dateRange[0]} 00:00:00`
     payload.endTime = `${searchForm.dateRange[1]} 23:59:59`
   }
@@ -357,6 +355,15 @@ const handleSearch = () => {
   loadLogs()
 }
 
+// 🔥 用户名输入框失去焦点时，如果有值则自动查询
+const handleUserInputBlur = () => {
+  if (searchForm.user && searchForm.user.trim()) {
+    logger.info('User input blur with value, auto search', { user: searchForm.user })
+    pagination.current = 1
+    loadLogs()
+  }
+}
+
 const handleReset = () => {
   searchForm.level = ''
   searchForm.user = ''
@@ -402,7 +409,7 @@ onMounted(() => {
       margin: 0;
       font-size: 24px;
       font-weight: 600;
-      color: var(--text-1);
+      color: var(--color-primary); // 🔥 主题颜色
     }
   }
 
@@ -412,22 +419,90 @@ onMounted(() => {
     gap: 16px;
     margin-bottom: 16px;
     align-items: center;
-
-    .filter-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      white-space: nowrap;
-
-      .filter-label {
-        font-size: 14px;
-        color: var(--text-2);
-      }
-    }
   }
 
   .log-table {
     margin-top: 12px;
+    width: 100%;
+    border-radius: 8px;
+    overflow: visible;
+    border: 1px solid var(--border);
+    
+    // 🔥 确保表格内容居中显示
+    :deep(.el-table__cell) {
+      text-align: center !important;
+    }
+    
+    :deep(.el-table__header .el-table__cell) {
+      text-align: center !important;
+    }
+    
+    // 🔥 确保单元格内容居中
+    :deep(.el-table__body-wrapper .el-table__body .el-table__row .el-table__cell .cell) {
+      text-align: center !important;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    // 🔥 确保表头内容居中
+    :deep(.el-table__header-wrapper .el-table__header .el-table__row .el-table__cell .cell) {
+      text-align: center !important;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+  }
+  
+  // 🔥 级别标签圆角处理
+  .level-tag {
+    border-radius: 12px !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+  }
+  
+  // 🔥 操作按钮样式 - 图标按钮
+  .action-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .action-btn {
+    padding: 4px;
+    min-width: 32px;
+    height: 28px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: none;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    
+    .el-icon {
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    &.btn-primary {
+      color: var(--color-primary);
+      border-color: var(--color-primary);
+      
+      &:hover:not(:disabled) {
+        background: var(--color-primary);
+        color: var(--surface);
+      }
+    }
   }
 }
 
@@ -448,15 +523,20 @@ onMounted(() => {
     }
   }
 
+  // 🔥 按照 @页面修改.md 修改表单标签样式
   .detail-label {
     width: 120px;
-    font-weight: 600;
-    color: var(--text-2);
+    font-size: 14px !important; // 🔥 表单标签字体大小
+    color: var(--text-2) !important; // 🔥 表单标签字体颜色
+    font-weight: 600 !important; // 🔥 表单标签字体粗细
   }
 
+  // 🔥 按照 @页面修改.md 修改表单内容样式
   .detail-value {
     flex: 1;
-    color: var(--text-1);
+    font-size: 14px !important; // 🔥 表单内容字体大小
+    color: var(--text-3) !important; // 🔥 表单内容字体颜色
+    font-weight: 400 !important; // 🔥 表单内容字体粗细（normal）
     word-break: break-all;
   }
 

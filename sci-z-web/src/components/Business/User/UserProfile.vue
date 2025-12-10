@@ -675,6 +675,21 @@ try {
 }
 }
 
+// 🔥 处理裁剪缩放（放大/缩小）
+const handleCropZoom = (ratio) => {
+  if (!cropperInstance) {
+    logger.warn('Cropper instance not initialized')
+    return
+  }
+  try {
+    // Cropper.js 的 zoom 方法接受相对缩放值
+    // ratio > 0 表示放大，ratio < 0 表示缩小
+    cropperInstance.zoom(ratio)
+  } catch (error) {
+    logger.error('crop zoom failed', { error: error.message })
+  }
+}
+
 const handleCropConfirm = async () => {
 if (!cropperInstance || !pendingAvatarFile.value) return
 try {
@@ -915,11 +930,63 @@ border-radius: 12px;
 .card-title {
 font-size: 18px;
 font-weight: 600;
-color: var(--text-1);
+color: var(--color-primary); // 🔥 与"个人信息"页面标题颜色保持一致
+}
+
+// 🔥 头像设置卡片标题和文字颜色：与个人信息字体颜色一致
+.avatar-card {
+  .card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-primary); // 🔥 与"个人信息"页面标题颜色保持一致
+  }
+  
+  // 🔥 头像设置部分的文字颜色统一
+  .avatar-tip {
+    font-size: 12px;
+    color: var(--text-3) !important; // 与个人信息表单内容颜色一致
+  }
+  
+  // 🔥 头像裁剪提示文字颜色
+  .avatar-cropper__tips {
+    font-size: 12px;
+    color: var(--text-3) !important; // 与个人信息表单内容颜色一致
+  }
 }
 
 .profile-form {
 max-width: 640px;
+  
+  // 🔥 表单标签样式：按照页面修改.md规范
+  :deep(.el-form-item__label) {
+    font-size: 14px !important;
+    color: var(--text-2) !important; // #4b5563
+    font-weight: 600 !important; // 加粗
+  }
+  
+  // 🔥 表单内容样式：按照页面修改.md规范
+  :deep(.el-input__inner),
+  :deep(.el-textarea__inner),
+  :deep(.el-select__wrapper .el-select__selected-item),
+  :deep(.el-select__placeholder) {
+    font-size: 14px !important; // 与 placeholder 一致
+    color: var(--text-3) !important; // #6b7280，比 placeholder 稍深一点
+    font-weight: 400 !important; // normal
+  }
+  
+  // 🔥 只读输入框内容颜色
+  :deep(.readonly-input .el-input__inner) {
+    color: var(--text-3) !important;
+    font-weight: 400 !important;
+  }
+  
+  // 🔥 状态标签样式：按照页面修改.md规范
+  :deep(.el-tag) {
+    padding: 4px 8px !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+  }
 }
 
 .readonly-input {
@@ -1066,7 +1133,7 @@ span {
 .avatar-tip {
 margin: 0;
 font-size: 12px;
-color: var(--text-3);
+color: var(--text-3) !important; // 🔥 与个人信息表单内容颜色一致
 }
 
 .file-input {
@@ -1136,7 +1203,7 @@ gap: 12px;
 
 &__tips {
   font-size: 12px;
-  color: var(--text-3);
+  color: var(--text-3) !important; // 🔥 与个人信息表单内容颜色一致
   margin: 0;
 }
 

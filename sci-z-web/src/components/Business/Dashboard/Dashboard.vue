@@ -5,7 +5,10 @@
  */
 -->
 <template>
-  <div class="dashboard-container">
+  <BaseScrollbar 
+    class="dashboard-container"
+    :custom-style="{ height: '100%', overflow: 'auto' }"
+  >
     <!-- 页面头部 -->
     <div class="page-header">
       <h1 class="page-title">{{ $t('menu.dashboard') }}</h1>
@@ -60,7 +63,7 @@
               align="center"
             >
               <template #default="{ row }">
-                <span class="number-cell">{{ row.number }}</span>
+                <span class="number-cell" style="white-space: nowrap;">{{ row.number }}</span>
               </template>
             </el-table-column>
 
@@ -109,12 +112,14 @@
               fixed="right"
             >
               <template #default="{ row }">
-                <button
-                  class="action-btn btn-primary"
-                  @click.stop="handleDeclarationClick(row)"
-                >
-                  {{ $t('common.view') }}
-                </button>
+                <BaseTooltip :content="$t('common.view')" placement="top">
+                  <button
+                    class="action-btn btn-primary"
+                    @click.stop="handleDeclarationClick(row)"
+                  >
+                    <el-icon><TopRight /></el-icon>
+                  </button>
+                </BaseTooltip>
               </template>
             </el-table-column>
           </el-table>
@@ -187,7 +192,7 @@
         </BaseCard>
       </div>
     </div>
-  </div>
+  </BaseScrollbar>
 </template>
 
 <script setup>
@@ -195,8 +200,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Document, Folder, Check, Search } from '@element-plus/icons-vue'
-import { BaseCard, ProjectProgressBar } from '@/components/Common'
+import { Document, Folder, Check, Search, TopRight } from '@element-plus/icons-vue'
+import { BaseCard, ProjectProgressBar, BaseScrollbar, BaseTooltip } from '@/components/Common'
 import { formatDate } from '@/utils/date'
 import { DECLARATION_STATUS_CONFIG } from '@/utils/constants'
 import { createLogger } from '@/utils/simpleLogger'
@@ -393,6 +398,7 @@ onMounted(() => {
   min-height: calc(100vh - 56px);
   overflow-x: hidden;
   max-width: 100%;
+  // 🔥 滚动条样式由 BaseScrollbar 组件提供
 }
 
 .page-header {
@@ -592,23 +598,46 @@ onMounted(() => {
   overflow: visible;
   border: 1px solid var(--border);
 
+  // 🔥 使用最强的选择器优先级，确保覆盖所有全局样式
+  // 关键：使用 .declaration-table 类名 + 完整的选择器路径 + 多重选择器
   :deep(.el-table) {
-    // 表头样式
-    .el-table__header {
-      th {
-        padding: 14px 16px !important;
-        font-size: 14px;
-        font-weight: 600 !important;
-        color: var(--text-2);
-        background-color: var(--surface) !important;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        border-bottom: 1px solid var(--border) !important;
+    // 表头样式 - 使用最高优先级覆盖全局样式
+    .el-table__header-wrapper {
+      .el-table__header {
+        th {
+          padding: 14px 16px !important;
+          font-size: 14px !important;
+          font-weight: 600 !important; // 🔥 加粗
+          color: #000000 !important; // 🔥 变黑 - 覆盖所有全局样式
+          background-color: var(--surface) !important;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          border-bottom: 1px solid var(--border) !important;
+        }
+        
+        // 🔥 确保表头单元格内的文字也应用黑色和加粗（使用独立选择器提高优先级）
+        th .cell {
+          font-weight: 600 !important; // 🔥 加粗
+          color: #000000 !important; // 🔥 变黑 - 覆盖所有全局样式
+          font-size: 14px !important;
+          line-height: 1.5 !important;
+        }
       }
     }
-    
-    // 表体样式
+  }
+  
+  // 🔥 额外的样式规则，使用更直接的选择器确保覆盖
+  :deep(.el-table__header th),
+  :deep(.el-table__header th.cell),
+  :deep(.el-table__header th .cell) {
+    font-weight: 600 !important; // 🔥 加粗
+    color: #000000 !important; // 🔥 变黑
+    font-size: 14px !important;
+  }
+  
+  // 表体样式
+  :deep(.el-table) {
     .el-table__body {
       tr {
         cursor: pointer;
@@ -652,8 +681,12 @@ onMounted(() => {
   :deep(.el-table__body-wrapper) {
     .topic-cell {
       word-break: break-word;
-      white-space: normal;
+      white-space: normal !important; // 🔥 研究课题允许换行
       line-height: 1.5;
+    }
+    
+    .number-cell {
+      white-space: nowrap !important; // 🔥 申报编号不换行
     }
   }
 }
@@ -708,7 +741,9 @@ onMounted(() => {
 
 // 操作按钮样式 - 与 DeclarationList.vue 保持一致
 .action-btn {
-  padding: 5px 12px;
+  padding: 4px; // 🔥 图标按钮紧凑样式
+  min-width: 32px;
+  height: 28px;
   border: 1px solid transparent;
   border-radius: 4px;
   font-size: 13px;
@@ -718,8 +753,13 @@ onMounted(() => {
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 0; // 🔥 图标按钮不需要间距
   user-select: none;
+  
+  .el-icon {
+    font-size: 16px; // 🔥 图标大小
+  }
   
   &:disabled {
     opacity: 0.5;

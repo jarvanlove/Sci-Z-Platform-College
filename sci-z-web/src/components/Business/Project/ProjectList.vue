@@ -33,7 +33,6 @@
           :placeholder="$t('project.list.statusPlaceholder')"
           clearable
           style="width: 150px"
-          @change="handleStatusChange"
         >
           <el-option
             v-for="option in statusOptions"
@@ -52,14 +51,13 @@
           style="width: 200px"
           format="YYYY-MM-DD"
           value-format="YYYY-MM-DD"
-          @change="handleDateChange"
         />
         
         <el-button type="primary" :loading="loading" @click="handleSearch">
           <el-icon><Search /></el-icon>
           {{ $t('common.search') }}
         </el-button>
-        <el-button @click="handleReset">
+        <el-button type="primary" @click="handleReset">
           <el-icon><Refresh /></el-icon>
           {{ $t('common.reset') }}
         </el-button>
@@ -79,6 +77,11 @@
         @current-change="handleCurrentChange"
         @size-change="handleSizeChange"
       >
+        <!-- 项目名称列自定义 - 支持换行 -->
+        <template #name="{ row }">
+          <div class="name-cell base-table__cell-wrap">{{ row.name || '-' }}</div>
+        </template>
+
         <!-- 状态列自定义 -->
         <template #status="{ row }">
           <el-tag
@@ -104,35 +107,46 @@
         <!-- 操作列 -->
         <template #actions="{ row }">
           <div class="action-buttons">
-            <div class="action-row">
+            <!-- 进度按钮 -->
+            <BaseTooltip :content="$t('project.list.progress')" placement="top">
               <button
                 class="action-btn btn-success"
                 @click.stop="handleProgress(row)"
               >
-                {{ $t('project.list.progress') }}
+                <el-icon><DataLine /></el-icon>
               </button>
+            </BaseTooltip>
+            <!-- 查看按钮 -->
+            <BaseTooltip :content="$t('common.view')" placement="top">
               <button
                 class="action-btn btn-primary"
                 @click.stop="handleView(row)"
               >
-                {{ $t('common.view') }}
+                <el-icon><TopRight /></el-icon>
               </button>
-            </div>
-            <div class="action-row">
+            </BaseTooltip>
+            <!-- 编辑按钮 -->
+            <BaseTooltip :content="$t('common.edit')" placement="top">
               <button
                 class="action-btn btn-primary"
                 @click.stop="handleEdit(row)"
               >
-                {{ $t('common.edit') }}
+                <el-icon><Edit /></el-icon>
               </button>
+            </BaseTooltip>
+            <!-- 取消按钮 -->
+            <BaseTooltip
+              v-if="row.canDelete && row.status !== PROJECT_STATUS.CANCELLED"
+              :content="$t('project.list.cancel')"
+              placement="top"
+            >
               <button
-                v-if="row.canDelete && row.status !== PROJECT_STATUS.CANCELLED"
                 class="action-btn btn-danger"
                 @click.stop="handleCancel(row)"
               >
-                {{ $t('project.list.cancel') }}
+                <el-icon><Close /></el-icon>
               </button>
-            </div>
+            </BaseTooltip>
           </div>
         </template>
       </BaseTable>
@@ -141,12 +155,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh } from '@element-plus/icons-vue'
-import { BaseCard, BaseTable, BaseDatePicker, ProjectProgressBar } from '@/components/Common'
+import { Search, Refresh, DataLine, TopRight, Edit, Close } from '@element-plus/icons-vue'
+import { BaseCard, BaseTable, BaseDatePicker, ProjectProgressBar, BaseTooltip } from '@/components/Common'
 import { PROJECT_STATUS, PROJECT_STATUS_CONFIG } from '@/utils/constants'
 import { getProjectList, cancelProject } from '@/api/Project'
 import { createLogger } from '@/utils/simpleLogger'
@@ -187,43 +201,44 @@ const tableColumns = computed(() => [
   {
     prop: 'number',
     label: t('project.list.columns.number'),
-    minWidth: 180,
+    minWidth: 160,
     align: 'center'
   },
   {
     prop: 'name',
     label: t('project.list.columns.name'),
-    minWidth: 200,
-    showOverflowTooltip: true
+    minWidth: 150,
+    showOverflowTooltip: false, // 允许换行，不需要 tooltip
+    wrap: true // 明确指定允许换行
   },
   {
     prop: 'manager',
     label: t('project.list.columns.manager'),
     minWidth: 120,
-    align: 'center'
+    align: 'center' 
   },
   {
     prop: 'status',
     label: t('project.list.columns.status'),
-    minWidth: 100,
-    align: 'center'
+    minWidth: 90,
+    align: 'left' // 🔥 左对齐，值向左移动
   },
   {
     prop: 'progress',
     label: t('project.list.columns.progress'),
-    minWidth: 150,
+    minWidth: 120,
     align: 'center'
   },
   {
     prop: 'startTime',
     label: t('project.list.columns.startTime'),
-    minWidth: 140,
+    minWidth: 130,
     align: 'center'
   },
   {
     prop: 'endTime',
     label: t('project.list.columns.endTime'),
-    minWidth: 140,
+    minWidth: 130,
     align: 'center'
   }
 ])
@@ -308,6 +323,12 @@ const loadProjects = async () => {
       params.status = mapStatusToBackend(searchForm.status)
     }
     
+    // 🔥 时间范围筛选：将 dateRange 转换为 startTime 和 endTime（LocalDate 格式：YYYY-MM-DD）
+    if (searchForm.dateRange && searchForm.dateRange.length === 2) {
+      params.startTime = searchForm.dateRange[0] // 开始时间：YYYY-MM-DD
+      params.endTime = searchForm.dateRange[1]   // 结束时间：YYYY-MM-DD
+    }
+    
     // 排序参数（默认按创建时间倒序）
     params.sortBy = 'createdTime'
     params.sortOrder = 'DESC'
@@ -350,8 +371,36 @@ const handleSearch = () => {
   loadProjects()
 }
 
+// 🔥 使用 watch 监听筛选条件变化，自动触发查询（带防抖）
+let searchTimer = null
+watch(
+  () => [searchForm.keyword, searchForm.status, searchForm.dateRange],
+  () => {
+    // 清除之前的定时器
+    if (searchTimer) {
+      clearTimeout(searchTimer)
+    }
+    // 设置新的定时器，300ms 后执行查询（输入框防抖）
+    searchTimer = setTimeout(() => {
+      logger.info('Filter conditions changed, auto search', { 
+        keyword: searchForm.keyword, 
+        status: searchForm.status,
+        dateRange: searchForm.dateRange
+      })
+      pagination.current = 1
+      loadProjects()
+    }, 300)
+  },
+  { deep: true }
+)
+
 // 重置搜索
 const handleReset = () => {
+  // 🔥 清除防抖定时器
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+    searchTimer = null
+  }
   Object.assign(searchForm, {
     keyword: '',
     status: '',
@@ -359,16 +408,6 @@ const handleReset = () => {
   })
   pagination.current = 1
   loadProjects()
-}
-
-// 状态变化
-const handleStatusChange = () => {
-  handleSearch()
-}
-
-// 日期变化
-const handleDateChange = () => {
-  handleSearch()
 }
 
 // 分页处理
@@ -436,6 +475,9 @@ onMounted(() => {
   padding: var(--gap-lg);
   background: var(--bg-secondary);
   min-height: calc(100vh - 56px);
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden; // 🔥 不允许表格内容超出容器
 }
 
 .page-header {
@@ -516,27 +558,38 @@ onMounted(() => {
   }
 }
 
-// 表格样式 - 参考 DeclarationList 和 UserManagement
+
 .project-table {
   width: 100%;
   border-radius: 8px;
-  overflow: visible;
+  overflow: visible; // 🔥 允许表格内容超出容器，触发横向滚动
   border: 1px solid var(--border);
   
   :deep(.base-table) {
     width: 100%;
     display: flex;
     flex-direction: column;
+    // 🔥 确保表格容器可以横向滚动
+    overflow: visible;
   }
   
   :deep(.base-table__table) {
     width: 100% !important;
-    min-width: 100%;
+    // 🔥 允许表格内容超出容器宽度，触发横向滚动
+    min-width: fit-content;
     flex: 1;
-    overflow: auto;
+    overflow: visible;
+  }
+  
+  // 🔥 确保表格内部可以正确显示滚动条
+  :deep(.el-table) {
+    width: 100%;
+    // 🔥 表格内容可以超出，但滚动条在表体底部显示
+    min-width: fit-content;
   }
   
   :deep(.el-table) {
+    
     // 表头样式
     .el-table__header {
       th {
@@ -548,15 +601,66 @@ onMounted(() => {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        // 🔥 确保表头列宽固定，作为所有行的基准
+        box-sizing: border-box;
+      }
+      
+      // 🔥 项目名称表头左对齐
+      th[data-column-key="name"] {
+        text-align: left !important;
+      }
+      
+      // 🔥 项目负责人和项目状态表头左对齐
+      th[data-column-key="manager"],
+      th[data-column-key="status"] {
+        text-align: left !important;
       }
     }
     
     // 表体样式
     .el-table__body {
+      // 🔥 Element Plus 标准做法：表体的列宽由表头决定，所有行必须使用相同的列宽
+      // 不要设置 width、min-width、max-width，让 Element Plus 根据表头自动同步
       td {
         padding: 12px 16px !important;
         font-size: 14px;
         color: var(--text);
+        // 🔥 确保列宽与表头同步，防止不同行的列宽不一致
+        box-sizing: border-box;
+        // 🔥 移除所有可能干扰列宽同步的样式，让 Element Plus 自动处理
+      }
+      
+      // 🔥 项目名称列支持换行
+      td[data-column-key="name"] {
+        text-align: left !important;
+        
+        .cell {
+          white-space: normal !important;
+          word-break: break-word !important;
+          line-height: 1.6 !important;
+        }
+        
+        .name-cell {
+          white-space: normal !important;
+          word-break: break-word !important;
+          line-height: 1.6 !important;
+          max-width: 100%;
+          text-align: left;
+        }
+      }
+      
+      // 🔥 项目负责人和项目状态列左对齐，值向左移动
+      td[data-column-key="manager"],
+      td[data-column-key="status"] {
+        text-align: left !important;
+        padding-left: 16px !important; // 保持左边距
+        
+        .cell {
+          text-align: left !important;
+          display: flex;
+          justify-content: flex-start;
+          align-items: center;
+        }
       }
     }
     
@@ -584,20 +688,17 @@ onMounted(() => {
 
 .action-buttons {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
   justify-content: center;
   align-items: center;
-  
-  .action-row {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-  }
+  flex-wrap: nowrap;
 }
 
 .action-btn {
-  padding: 5px 12px;
+  padding: 4px;
+  min-width: 32px;
+  height: 28px;
   border: 1px solid transparent;
   border-radius: 4px;
   font-size: 13px;
@@ -607,8 +708,13 @@ onMounted(() => {
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 0;
   user-select: none;
+  
+  .el-icon {
+    font-size: 16px;
+  }
   
   &:disabled {
     opacity: 0.5;
@@ -674,8 +780,9 @@ onMounted(() => {
   }
   
   .action-buttons {
-    flex-direction: column;
+    flex-direction: row;
     gap: 4px;
+    flex-wrap: nowrap;
   }
 }
 </style>

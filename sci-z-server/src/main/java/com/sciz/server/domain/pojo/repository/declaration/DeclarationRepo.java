@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.domain.pojo.entity.declaration.Declaration;
 
 import java.util.List;
+import java.time.LocalDate;
 import java.util.Map;
 
 /**
@@ -70,6 +71,19 @@ public interface DeclarationRepo {
      * @return Map<Long, Declaration> 申报ID -> 申报实体
      */
     Map<Long, Declaration> findByIds(List<Long> declarationIds);
+
+    /**
+     * 根据时间范围查询申报ID列表（用于项目查询的时间筛选）
+     * <p>
+     * 查询条件：
+     * - startTime: 项目开始时间 >= startTime（如果提供）
+     * - endTime: 项目结束时间 <= endTime（如果提供）
+     *
+     * @param startTime LocalDate 项目开始时间（查询开始时间 >= startTime 的申报，null表示不限制）
+     * @param endTime   LocalDate 项目结束时间（查询结束时间 <= endTime 的申报，null表示不限制）
+     * @return List<Long> 符合条件的申报ID列表
+     */
+    List<Long> findIdsByTimeRange(LocalDate startTime, LocalDate endTime);
 
     /**
      * 根据ID更新申报

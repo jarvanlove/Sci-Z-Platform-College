@@ -113,6 +113,38 @@ public final class DateUtil {
     }
 
     /**
+     * 灵活解析日期时间字符串（支持多种格式）
+     * <p>
+     * 支持的格式：
+     * - "yyyy-MM-dd HH:mm:ss"（标准格式）
+     * - "yyyy-MM-dd"（日期格式，自动补充时间为 00:00:00）
+     *
+     * @param dateTimeStr 日期时间字符串（可能为 null 或空字符串）
+     * @return 日期时间，如果输入为 null 或空字符串则返回 null
+     */
+    public static LocalDateTime parseDateTimeFlexible(String dateTimeStr) {
+        if (dateTimeStr == null || dateTimeStr.trim().isEmpty()) {
+            return null;
+        }
+
+        var trimmed = dateTimeStr.trim();
+
+        // 尝试标准日期时间格式：yyyy-MM-dd HH:mm:ss
+        try {
+            return LocalDateTime.parse(trimmed, DEFAULT_DATETIME_FORMATTER);
+        } catch (Exception e) {
+            // 如果失败，尝试日期格式：yyyy-MM-dd
+            try {
+                var date = LocalDate.parse(trimmed, DEFAULT_DATE_FORMATTER);
+                return date.atStartOfDay();
+            } catch (Exception e2) {
+                throw new IllegalArgumentException(
+                        String.format("无法解析日期时间字符串: %s，支持的格式: yyyy-MM-dd HH:mm:ss 或 yyyy-MM-dd", trimmed));
+            }
+        }
+    }
+
+    /**
      * 解析日期字符串
      *
      * @param dateStr 日期字符串
@@ -120,6 +152,38 @@ public final class DateUtil {
      */
     public static LocalDate parseDate(String dateStr) {
         return LocalDate.parse(dateStr, DEFAULT_DATE_FORMATTER);
+    }
+
+    /**
+     * 灵活解析日期字符串（支持多种格式）
+     * <p>
+     * 支持的格式：
+     * - "yyyy-MM-dd"（标准格式）
+     * - "yyyy-MM-dd HH:mm:ss"（日期时间格式，自动提取日期部分）
+     *
+     * @param dateStr 日期字符串（可能为 null 或空字符串）
+     * @return 日期，如果输入为 null 或空字符串则返回 null
+     */
+    public static LocalDate parseDateFlexible(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return null;
+        }
+
+        var trimmed = dateStr.trim();
+
+        // 尝试标准日期格式：yyyy-MM-dd
+        try {
+            return LocalDate.parse(trimmed, DEFAULT_DATE_FORMATTER);
+        } catch (Exception e) {
+            // 如果失败，尝试日期时间格式：yyyy-MM-dd HH:mm:ss（提取日期部分）
+            try {
+                var dateTime = LocalDateTime.parse(trimmed, DEFAULT_DATETIME_FORMATTER);
+                return dateTime.toLocalDate();
+            } catch (Exception e2) {
+                throw new IllegalArgumentException(
+                        String.format("无法解析日期字符串: %s，支持的格式: yyyy-MM-dd 或 yyyy-MM-dd HH:mm:ss", trimmed));
+            }
+        }
     }
 
     /**

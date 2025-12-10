@@ -304,6 +304,18 @@ const syncScroll = () => {
   
   if (!headerWrapper || !bodyWrapper) return
   
+  // 🔥 初始同步：确保表头和表体初始状态对齐
+  const initialSync = () => {
+    requestAnimationFrame(() => {
+      if (bodyWrapper.scrollLeft !== headerWrapper.scrollLeft) {
+        headerWrapper.scrollLeft = bodyWrapper.scrollLeft
+      }
+    })
+  }
+  
+  // 立即执行一次初始同步
+  initialSync()
+  
   // 获取所有滚动容器（包括固定列）
   const getAllScrollContainers = () => {
     const containers = [headerWrapper, bodyWrapper]
@@ -354,11 +366,23 @@ const syncScroll = () => {
     return { container, handler: handleScroll }
   })
   
+  // 🔥 监听表体滚动，同步到表头（主要同步方向）
+  const bodyScrollHandler = () => {
+    if (isScrolling) return
+    isScrolling = true
+    requestAnimationFrame(() => {
+      headerWrapper.scrollLeft = bodyWrapper.scrollLeft
+      isScrolling = false
+    })
+  }
+  bodyWrapper.addEventListener('scroll', bodyScrollHandler, { passive: true })
+  
   // 返回清理函数
   return () => {
     scrollHandlers.forEach(({ container, handler }) => {
       container.removeEventListener('scroll', handler)
     })
+    bodyWrapper.removeEventListener('scroll', bodyScrollHandler)
   }
 }
 
@@ -411,7 +435,9 @@ defineExpose({
   &__table {
     background: var(--surface);
     border-radius: var(--radius-lg);
-    overflow: visible;
+    // 🔥 Element Plus 标准做法：表格容器使用 overflow: hidden，不允许内容超出
+    // 横向滚动由内部的 .el-table__body-wrapper 控制
+    overflow: hidden;
     width: 100% !important;
   }
 
@@ -449,39 +475,28 @@ defineExpose({
     background-color: var(--surface) !important;
   }
 
+  // 🔥 表头：隐藏滚动条但保持滚动功能（通过表体滚动同步）
+  // 关键：必须使用 overflow-x: scroll 才能设置 scrollLeft，不能用 hidden
   .el-table__header-wrapper {
-    overflow-x: auto !important;
+    overflow-x: scroll !important; // 保持滚动功能
     overflow-y: hidden;
-    // 使用自定义滚动条样式
-    scrollbar-width: thin; /* Firefox */
-    scrollbar-color: var(--border) transparent; /* Firefox */
-    -ms-overflow-style: -ms-autohiding-scrollbar; /* IE 10+ */
+    // 隐藏滚动条
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE 10+ */
     
     &::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-    
-    &::-webkit-scrollbar-track {
-      background: transparent;
-      border-radius: 4px;
-    }
-    
-    &::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 4px;
-      transition: all 0.3s ease;
-      
-      &:hover {
-        background: var(--border-hover);
-      }
+      display: none; /* Chrome, Safari, Edge */
+      width: 0;
+      height: 0;
     }
   }
 
+  // 🔥 表体：显示滚动条（用户可见）
+  // Element Plus 标准做法：当列数过多时，表体显示横向滚动条
   .el-table__body-wrapper {
     overflow-x: auto !important;
-    overflow-y: hidden;
-    // 使用自定义滚动条样式
+    overflow-y: auto !important; // 允许纵向滚动（当数据过多时）
+    // 自定义滚动条样式
     scrollbar-width: thin; /* Firefox */
     scrollbar-color: var(--border) transparent; /* Firefox */
     -ms-overflow-style: -ms-autohiding-scrollbar; /* IE 10+ */
@@ -505,20 +520,27 @@ defineExpose({
         background: var(--border-hover);
       }
     }
+    
+    &::-webkit-scrollbar-corner {
+      background: transparent;
+    }
   }
   
-  // Element Plus 表格会自动处理表头和表体的对齐和滚动
-  // 我们只需要确保滚动容器正确，不要干扰 Element Plus 的默认行为
-  .el-table__header-wrapper,
-  .el-table__body-wrapper {
-    overflow-x: auto !important;
-    overflow-y: hidden;
-  }
-  
-  // 确保表头和表体的列宽一致（Element Plus 内部会自动同步）
+  // 🔥 Element Plus 标准做法：确保表头和表体的列宽完全一致
+  // 关键：表头的列宽决定表体的列宽，所有行必须使用相同的列宽
   .el-table__header th,
   .el-table__body td {
     box-sizing: border-box;
+    // 🔥 移除可能干扰列宽同步的样式，让 Element Plus 自动计算
+    // 不要设置 width、min-width、max-width，让 Element Plus 根据表头自动同步
+  }
+  
+  // 🔥 确保表头和表体使用相同的表格布局算法
+  .el-table__header-wrapper table,
+  .el-table__body-wrapper table {
+    // Element Plus 默认使用 table-layout: fixed，列宽由表头决定
+    // 不要改为 auto，否则会导致列宽不一致
+    table-layout: fixed !important;
   }
   
   // 固定列样式 - 确保在滚动时不缩进去
@@ -705,15 +727,19 @@ defineExpose({
     td {
       border-bottom: 1px solid var(--border) !important;
       border-right: none !important; // 🔥 移除右侧边框，避免白色线条
-      color: var(--text) !important;
+      // 🔥 表格字体颜色：比 placeholder 稍深一点，使用 var(--text-3)
+      color: var(--text-3) !important;
       padding: 12px 16px !important;
       position: relative;
       // 🔥 默认不换行，保持向后兼容
       white-space: nowrap;
       // 确保表体列宽与表头一致
       box-sizing: border-box;
-      // 不设置 overflow，让父容器的滚动来控制隐藏
-      vertical-align: top; // 顶部对齐，换行时更美观
+      // 🔥 垂直居中对齐：当某些列换行时，其他列应该居中对齐（如图2红色标记）
+      vertical-align: middle !important;
+      // 🔥 Element Plus 标准做法：表体的列宽由表头决定，不允许根据内容自动调整
+      // 移除所有可能干扰列宽同步的样式，让 Element Plus 自动处理
+      // 不要设置 width、min-width、max-width，让 Element Plus 根据表头自动同步
       
       .cell {
         padding: 0 !important;
@@ -722,6 +748,8 @@ defineExpose({
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        // 🔥 确保单元格内容字体颜色比 placeholder 稍深一点
+        color: var(--text-3) !important;
       }
       
       // 🔥 支持换行的列：通过类名控制（两种方式：列级别和单元格级别）
