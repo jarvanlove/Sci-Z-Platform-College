@@ -1,7 +1,9 @@
 package com.sciz.server.domain.pojo.dto.request.log;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.sciz.server.domain.pojo.dto.request.BaseQueryReq;
 import com.sciz.server.infrastructure.shared.enums.LogLevelStatus;
+import com.sciz.server.infrastructure.shared.serializer.FlexibleDateTimeDeserializer;
 import jakarta.validation.constraints.Min;
 import java.time.LocalDateTime;
 import org.springframework.util.StringUtils;
@@ -15,7 +17,13 @@ import org.springframework.util.StringUtils;
  * @param sortOrder String 排序方式
  * @param username  String 用户名关键字（模糊查询）
  * @param startTime LocalDateTime 开始时间
+ *                  <p>
+ *                  前端可传入字符串格式：yyyy-MM-dd HH:mm:ss 或 yyyy-MM-dd，后端自动转换
+ *                  </p>
  * @param endTime   LocalDateTime 结束时间
+ *                  <p>
+ *                  前端可传入字符串格式：yyyy-MM-dd HH:mm:ss 或 yyyy-MM-dd，后端自动转换
+ *                  </p>
  * @param level     LogLevelStatus 日志级别
  * @author JiaWen.Wu
  * @className OperationLogQueryReq
@@ -27,8 +35,8 @@ public record OperationLogQueryReq(
         String sortBy,
         String sortOrder,
         String username,
-        LocalDateTime startTime,
-        LocalDateTime endTime,
+        @JsonDeserialize(using = FlexibleDateTimeDeserializer.class) LocalDateTime startTime,
+        @JsonDeserialize(using = FlexibleDateTimeDeserializer.class) LocalDateTime endTime,
         LogLevelStatus level) {
 
     private static final int MAX_PAGE_SIZE = 200;

@@ -106,7 +106,8 @@ const datePickerLocale = computed(() => {
 // 处理日期变化
 const handleChange = (value) => {
   emit('update:modelValue', value)
-  // change 事件由 el-date-picker 自动触发，这里不需要重复触发
+  // 🔥 触发 change 事件，让父组件可以监听日期变化
+  emit('change', value)
 }
 
 // 处理失焦事件

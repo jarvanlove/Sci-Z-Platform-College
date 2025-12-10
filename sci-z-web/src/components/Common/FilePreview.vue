@@ -17,6 +17,7 @@
     width="90%"
     :close-on-click-modal="false"
     :close-on-press-escape="true"
+    :draggable="true"
     @update:model-value="handleClose"
     class="file-preview-dialog"
   >
@@ -49,7 +50,10 @@
         </div>
         
         <!-- 图片预览 -->
-        <div v-else-if="previewType === 'image' && previewUrl" class="preview-image-container">
+        <BaseScrollbar
+          v-else-if="previewType === 'image' && previewUrl"
+          class="preview-image-container"
+        >
           <img
             :src="previewUrl"
             :alt="fileInfo?.name"
@@ -57,12 +61,15 @@
             @load="handleImageLoad"
             @error="handleImageError"
           />
-        </div>
+        </BaseScrollbar>
         
         <!-- Word 文档预览 - 使用 docx-preview 在浏览器中直接渲染 -->
-        <div v-else-if="previewType === 'office' && previewUrl" class="preview-office-container">
+        <BaseScrollbar
+          v-else-if="previewType === 'office' && previewUrl"
+          class="preview-office-container"
+        >
           <div ref="docxPreviewContainer" class="docx-preview-wrapper"></div>
-        </div>
+        </BaseScrollbar>
 
         <!-- PPT/PPTX 预览 - 使用 Office Online Viewer -->
         <div v-else-if="previewType === 'ppt' && previewUrl" class="preview-iframe-container">
@@ -90,9 +97,12 @@
         </div>
         
         <!-- 文本文件预览 -->
-        <div v-else-if="previewType === 'text' && previewUrl" class="preview-text-container">
+        <BaseScrollbar
+          v-else-if="previewType === 'text' && previewUrl"
+          class="preview-text-container"
+        >
           <pre class="preview-text" v-text="textContent"></pre>
-        </div>
+        </BaseScrollbar>
         
         <!-- 不支持的类型 -->
         <div v-else-if="previewType === 'unsupported'" class="preview-unsupported">
@@ -109,6 +119,7 @@ import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Loading, Warning, Document } from '@element-plus/icons-vue'
+import BaseScrollbar from './BaseScrollbar.vue'
 import { previewFile } from '@/api/File'
 import { createLogger } from '@/utils/simpleLogger'
 import { renderAsync } from 'docx-preview'
@@ -621,7 +632,6 @@ watch(() => props.fileInfo, (newVal) => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  overflow: auto;
 }
 
 .preview-image {
@@ -634,7 +644,6 @@ watch(() => props.fileInfo, (newVal) => {
 .preview-text-container {
   width: 100%;
   height: 100%;
-  overflow: auto;
   padding: 24px;
 }
 
@@ -652,7 +661,6 @@ watch(() => props.fileInfo, (newVal) => {
 .preview-office-container {
   width: 100%;
   height: 100%;
-  overflow: auto;
   padding: 24px;
   background: var(--bg);
 }

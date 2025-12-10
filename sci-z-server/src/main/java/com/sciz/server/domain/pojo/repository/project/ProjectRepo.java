@@ -3,6 +3,7 @@ package com.sciz.server.domain.pojo.repository.project;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.domain.pojo.entity.project.Project;
+import java.util.List;
 
 /**
  * 项目仓储（领域层抽象）
@@ -32,14 +33,16 @@ public interface ProjectRepo {
     /**
      * 分页查询项目列表
      *
-     * @param page    Page<Project> 分页对象
-     * @param keyword String 搜索关键字（项目编号/项目名称）
-     * @param status  String 项目状态（null表示全部）
-     * @param sortBy  String 排序字段
-     * @param asc     boolean 是否升序
+     * @param page           Page<Project> 分页对象
+     * @param keyword        String 搜索关键字（项目编号/项目名称）
+     * @param status         String 项目状态（null表示全部）
+     * @param sortBy         String 排序字段
+     * @param asc            boolean 是否升序
+     * @param declarationIds List<Long> 申报ID列表（用于时间范围筛选，null表示不限制）
      * @return IPage<Project> 分页结果
      */
-    IPage<Project> page(Page<Project> page, String keyword, String status, String sortBy, boolean asc);
+    IPage<Project> page(Page<Project> page, String keyword, String status, String sortBy, boolean asc,
+            List<Long> declarationIds);
 
     /**
      * 更新项目

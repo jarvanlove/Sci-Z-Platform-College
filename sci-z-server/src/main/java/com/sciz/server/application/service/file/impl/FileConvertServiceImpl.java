@@ -16,6 +16,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
@@ -26,6 +27,7 @@ import org.springframework.util.DigestUtils;
 
 import java.awt.*;
 import java.io.*;
+import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -36,7 +38,6 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 /**
  * 文件格式转换服务实现类
@@ -192,41 +193,111 @@ public class FileConvertServiceImpl implements FileConvertService {
 
     /**
      * DOCX 转 PDF
+     * 增强容错性：处理各种格式的 Word 文档，包括大模型生成的不规范文档
      */
     private ConvertResult convertDocxToPdf(Path docxFile, String originalFileName) {
-        try (var docxStream = Files.newInputStream(docxFile);
-                var document = new XWPFDocument(docxStream)) {
+        XWPFDocument document = null;
+        try (var docxStream = Files.newInputStream(docxFile)) {
+            // 1. 验证文档是否可读
+            try {
+                document = new XWPFDocument(docxStream);
+                validateDocument(document);
+            } catch (Exception e) {
+                log.warn(String.format("文档验证失败，尝试修复: err=%s", e.getMessage()));
+                // 如果第一次读取失败，尝试重新读取（可能是流位置问题）
+                try {
+                    docxStream.close();
+                    document = new XWPFDocument(Files.newInputStream(docxFile));
+                    validateDocument(document);
+                } catch (Exception e2) {
+                    log.error(String.format("文档验证和修复均失败: err=%s", e2.getMessage()), e2);
+                    throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED,
+                            "Word 文档格式异常，无法读取。请检查文档是否损坏: %s", e2.getMessage());
+                }
+            }
 
             var pdfFile = Files.createTempFile("pdf_", ".pdf");
             var pdfDoc = new PDDocument();
 
             try {
-                var font = loadSystemFont(pdfDoc);
-                var paragraphs = document.getParagraphs();
-
-                if (paragraphs.isEmpty()) {
-                    createEmptyPdf(pdfDoc, pdfFile);
-                } else {
-                    createPdfFromParagraphs(pdfDoc, pdfFile, font, paragraphs);
+                // 2. 加载字体（如果失败，使用降级方案）
+                PDFont font;
+                try {
+                    font = loadSystemFont(pdfDoc);
+                } catch (Exception e) {
+                    log.warn(String.format("字体加载失败，使用默认字体: err=%s", e.getMessage()));
+                    // 使用 PDFBox 内置字体作为降级方案（不支持中文，但至少能显示英文）
+                    font = PDType1Font.HELVETICA;
                 }
 
+                // 3. 提取段落（增强容错性）
+                var paragraphs = document.getParagraphs();
+                log.info(String.format("文档包含 %d 个段落", paragraphs.size()));
+
+                // 4. 创建 PDF
+                if (paragraphs.isEmpty()) {
+                    log.warn("文档没有段落，创建空 PDF");
+                    createEmptyPdf(pdfDoc, pdfFile);
+                } else {
+                    createPdfFromParagraphs(pdfDoc, pdfFile, font, paragraphs, document);
+                }
+
+                // 5. 验证生成的 PDF
                 var pdfSize = Files.size(pdfFile);
+                if (pdfSize == 0) {
+                    throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "生成的 PDF 文件为空");
+                }
+
+                // 6. 读取 PDF 文件内容到字节数组（避免流关闭问题）
+                byte[] pdfBytes;
+                try (var pdfInputStream = Files.newInputStream(pdfFile)) {
+                    pdfBytes = pdfInputStream.readAllBytes();
+                }
+
                 log.info(String.format("DOCX → PDF 转换成功: size=%d", pdfSize));
 
+                // 清理临时文件
+                cleanupTempFile(pdfFile);
+                cleanupTempFile(docxFile);
+
+                // 返回字节数组输入流（不会有关闭问题）
                 return new ConvertResult(
-                        createAutoCloseInputStream(pdfFile, docxFile),
+                        new ByteArrayInputStream(pdfBytes),
                         changeFileExtension(originalFileName, "pdf"),
                         "application/pdf",
                         pdfSize);
 
+            } catch (BusinessException e) {
+                pdfDoc.close();
+                cleanupTempFile(pdfFile);
+                cleanupTempFile(docxFile);
+                throw e;
             } catch (Exception e) {
                 pdfDoc.close();
                 cleanupTempFile(pdfFile);
-                throw e;
+                cleanupTempFile(docxFile);
+                log.error(String.format("DOCX → PDF 转换过程失败: err=%s", e.getMessage()), e);
+                throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED,
+                        "DOCX 转 PDF 失败: %s。文档可能包含不支持的格式或内容。", e.getMessage());
+            } finally {
+                if (document != null) {
+                    try {
+                        document.close();
+                    } catch (IOException e) {
+                        log.warn(String.format("关闭 Word 文档失败: err=%s", e.getMessage()));
+                    }
+                }
             }
+        } catch (BusinessException e) {
+            throw e;
         } catch (IOException e) {
-            log.error("DOCX → PDF 转换失败", e);
-            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "DOCX 转 PDF 失败: %s", e.getMessage());
+            log.error("DOCX → PDF 转换失败（IO异常）", e);
+            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED,
+                    "DOCX 转 PDF 失败: %s。请检查文件是否可读。", e.getMessage());
+        } catch (Exception e) {
+            log.error("DOCX → PDF 转换失败（未知异常）", e);
+            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED,
+                    "DOCX 转 PDF 失败: %s", e.getMessage());
         }
     }
 
@@ -251,10 +322,27 @@ public class FileConvertServiceImpl implements FileConvertService {
             }
 
             var docxSize = Files.size(docxFile);
+            if (docxSize == 0) {
+                cleanupTempFile(docxFile);
+                cleanupTempFile(pdfFile);
+                throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "生成的 DOCX 文件为空");
+            }
+
+            // 读取 DOCX 文件内容到字节数组（避免流关闭问题）
+            byte[] docxBytes;
+            try (var docxInputStream = Files.newInputStream(docxFile)) {
+                docxBytes = docxInputStream.readAllBytes();
+            }
+
             log.info(String.format("PDF → DOCX 转换成功: size=%d", docxSize));
 
+            // 清理临时文件
+            cleanupTempFile(docxFile);
+            cleanupTempFile(pdfFile);
+
+            // 返回字节数组输入流（不会有关闭问题）
             return new ConvertResult(
-                    createAutoCloseInputStream(docxFile, pdfFile),
+                    new ByteArrayInputStream(docxBytes),
                     changeFileExtension(originalFileName, "docx"),
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     docxSize);
@@ -267,38 +355,83 @@ public class FileConvertServiceImpl implements FileConvertService {
 
     /**
      * 从段落创建 PDF
+     * 增强容错性：即使部分段落处理失败，也继续处理其他段落
      */
-    private void createPdfFromParagraphs(PDDocument pdfDoc, Path pdfFile, PDFont font, List<XWPFParagraph> paragraphs)
-            throws IOException {
+    private void createPdfFromParagraphs(PDDocument pdfDoc, Path pdfFile, PDFont font,
+            List<XWPFParagraph> paragraphs, XWPFDocument document) throws IOException {
         var page = new PDPage(PDRectangle.A4);
         pdfDoc.addPage(page);
         var pageHeight = page.getMediaBox().getHeight();
         var maxWidth = page.getMediaBox().getWidth() - 2 * PDF_MARGIN;
 
         var context = new PdfContext(pdfDoc, page, font, pageHeight, maxWidth);
+        var processedCount = new int[] { 0 };
+        var failedCount = new int[] { 0 };
 
         try {
             context.startPage();
 
-            paragraphs.stream()
-                    .map(this::extractParagraphText)
-                    .filter(text -> text != null && !text.isBlank())
-                    .flatMap(text -> {
+            // 处理段落：增强容错性，单个段落失败不影响整体转换
+            for (var paragraph : paragraphs) {
+                try {
+                    var paragraphText = extractParagraphText(paragraph);
+                    if (paragraphText == null || paragraphText.isBlank()) {
+                        continue;
+                    }
+
+                    // 文本换行处理
+                    List<String> lines;
+                    try {
+                        lines = wrapText(paragraphText, font, PDF_FONT_SIZE, maxWidth);
+                    } catch (Exception e) {
+                        log.warn(String.format("段落文本换行失败，使用原始文本: err=%s", e.getMessage()));
+                        // 降级方案：如果换行失败，直接使用原始文本（可能会超出边界，但至少能显示）
+                        lines = List.of(paragraphText);
+                    }
+
+                    // 写入每一行
+                    for (var line : lines) {
                         try {
-                            return wrapText(text, font, PDF_FONT_SIZE, maxWidth).stream();
-                        } catch (IOException e) {
-                            log.error("文本换行失败", e);
-                            return Stream.empty();
+                            context.writeLine(line);
+                        } catch (Exception e) {
+                            log.warn(String.format("写入 PDF 行失败，跳过该行: err=%s", e.getMessage()));
+                            failedCount[0]++;
                         }
-                    })
-                    .forEach(context::writeLine);
+                    }
+
+                    processedCount[0]++;
+
+                } catch (Exception e) {
+                    failedCount[0]++;
+                    log.warn(String.format("处理段落失败，跳过该段落（第 %d 个段落）: err=%s",
+                            paragraphs.indexOf(paragraph) + 1, e.getMessage()));
+                    // 继续处理下一个段落，不中断整个转换过程
+                }
+            }
+
+            // 如果所有段落都处理失败，至少创建一个空页面
+            if (processedCount[0] == 0 && failedCount[0] > 0) {
+                log.warn(String.format("所有段落处理失败（共 %d 个段落），创建空 PDF", paragraphs.size()));
+                context.writeLine("（文档内容无法正确解析）");
+            }
 
             context.endPage();
+        } catch (Exception e) {
+            log.error(String.format("创建 PDF 过程失败: err=%s", e.getMessage()), e);
+            throw new IOException("创建 PDF 失败: " + e.getMessage(), e);
         } finally {
             context.close();
         }
 
-        pdfDoc.save(pdfFile.toFile());
+        // 保存 PDF
+        try {
+            pdfDoc.save(pdfFile.toFile());
+            log.info(String.format("PDF 创建完成: 成功处理 %d 个段落，失败 %d 个段落",
+                    processedCount[0], failedCount[0]));
+        } catch (Exception e) {
+            log.error(String.format("保存 PDF 文件失败: err=%s", e.getMessage()), e);
+            throw new IOException("保存 PDF 文件失败: " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -388,12 +521,68 @@ public class FileConvertServiceImpl implements FileConvertService {
 
     /**
      * 提取段落文本
+     * 增强容错性：处理各种边界情况，包括空 run、异常 run、特殊字符等
      */
     private String extractParagraphText(XWPFParagraph paragraph) {
-        return paragraph.getRuns().stream()
-                .map(run -> run.getText(0))
-                .filter(text -> text != null && !text.isEmpty())
-                .collect(java.util.stream.Collectors.joining());
+        if (paragraph == null) {
+            return "";
+        }
+
+        try {
+            var runs = paragraph.getRuns();
+            if (runs == null || runs.isEmpty()) {
+                return "";
+            }
+
+            return runs.stream()
+                    .filter(run -> run != null)
+                    .<String>map(run -> {
+                        try {
+                            // 尝试获取文本（可能抛出异常）
+                            var text = run.getText(0);
+                            return text != null ? text : "";
+                        } catch (Exception e) {
+                            // 如果获取文本失败，记录日志并返回空字符串
+                            log.debug(String.format("提取 run 文本失败: err=%s", e.getMessage()));
+                            return "";
+                        }
+                    })
+                    .filter(text -> !text.isEmpty())
+                    .collect(java.util.stream.Collectors.joining());
+        } catch (Exception e) {
+            log.warn(String.format("提取段落文本失败: err=%s", e.getMessage()));
+            return "";
+        }
+    }
+
+    /**
+     * 验证文档是否可读
+     * 检查文档的基本结构是否完整
+     */
+    private void validateDocument(XWPFDocument document) {
+        if (document == null) {
+            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED, "文档对象为空");
+        }
+
+        try {
+            // 尝试获取段落列表（如果文档损坏，这里可能会抛出异常）
+            var paragraphs = document.getParagraphs();
+            if (paragraphs == null) {
+                log.warn("文档段落列表为 null，但继续处理");
+            }
+
+            // 尝试获取文档属性（验证文档结构）
+            var properties = document.getProperties();
+            if (properties == null) {
+                log.warn("文档属性为 null，但继续处理");
+            }
+
+            log.debug("文档验证通过");
+        } catch (Exception e) {
+            log.error(String.format("文档验证失败: err=%s", e.getMessage()), e);
+            throw BusinessException.of(ResultCode.FILE_CONVERT_FAILED,
+                    "文档格式异常，无法读取: %s", e.getMessage());
+        }
     }
 
     /**

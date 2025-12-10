@@ -19,6 +19,7 @@
           clearable
           style="width: 250px"
           @keyup.enter="handleSearch"
+          @blur="handleSearch"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
@@ -29,7 +30,7 @@
           <el-icon><Search /></el-icon>
           {{ t('common.search') }}
         </el-button>
-        <el-button @click="handleReset">
+        <el-button type="primary" @click="handleReset">
           <el-icon><Refresh /></el-icon>
           {{ t('common.reset') }}
         </el-button>
@@ -45,7 +46,7 @@
         :columns="tableColumns"
         :loading="loading"
         :pagination="pagination"
-        :action-width="360"
+        :action-width="180"
         action-fixed="right"
         :empty-text="t('common.noData')"
         stripe
@@ -53,48 +54,56 @@
         @current-change="handlePageChange"
         @size-change="handlePageSizeChange"
       >
-        <!-- 用户数量列自定义 -->
+        <!-- 用户数量列自定义 - 圆形显示 -->
         <template #userCount="{ row }">
-          <el-tag 
-            type="info" 
-            class="user-count-tag"
+          <span
+            class="user-count-circle"
             :class="{ 'clickable': row.userCount > 0 }"
             @click="row.userCount > 0 && handleViewRoleUsers(row)"
           >
             {{ row.userCount || 0 }}
-          </el-tag>
+          </span>
         </template>
 
-        <!-- 创建时间列自定义 -->
+        <!-- 创建时间列自定义 - 只显示年月日时分 -->
         <template #createdTime="{ row }">
-          {{ formatDate(row.createdTime, 'YYYY-MM-DD HH:mm:ss') }}
+          {{ formatDate(row.createdTime, 'YYYY-MM-DD HH:mm') }}
         </template>
 
-        <!-- 操作列 -->
+        <!-- 操作列 - 使用图标按钮 -->
         <template #actions="{ row }">
           <div class="action-buttons">
-            <div class="action-row">
+            <!-- 编辑按钮 -->
+            <BaseTooltip :content="t('common.edit')" placement="top">
               <button
                 class="action-btn btn-primary"
-                @click="handleEdit(row)"
+                @click.stop="handleEdit(row)"
               >
-                {{ t('common.edit') }}
+                <el-icon><Edit /></el-icon>
               </button>
+            </BaseTooltip>
+            <!-- 配置权限按钮 -->
+            <BaseTooltip :content="t('system.role.configPermission')" placement="top">
               <button
                 class="action-btn btn-info"
-                @click="handleConfigPermission(row)"
+                @click.stop="handleConfigPermission(row)"
               >
-                {{ t('system.role.configPermission') }}
+                <el-icon><Setting /></el-icon>
               </button>
+            </BaseTooltip>
+            <!-- 删除按钮 -->
+            <BaseTooltip 
+              :content="getDeleteButtonTitle(row) || t('common.delete')" 
+              placement="top"
+            >
               <button
                 class="action-btn btn-danger"
                 :disabled="row.userCount > 0 || isSystemRole(row)"
-                :title="getDeleteButtonTitle(row)"
-                @click="handleDelete(row)"
+                @click.stop="handleDelete(row)"
               >
-                {{ t('common.delete') }}
+                <el-icon><Delete /></el-icon>
               </button>
-            </div>
+            </BaseTooltip>
           </div>
         </template>
       </BaseTable>
@@ -112,6 +121,7 @@
         :model="roleFormData"
         :rules="roleFormRules"
         label-width="100px"
+        class="role-form"
       >
         <el-form-item :label="t('system.role.roleName')" prop="name">
           <el-input v-model="roleFormData.name" />
@@ -142,6 +152,7 @@
       v-model="showPermissionDialog"
       :title="t('system.role.configPermission')"
       width="800px"
+      class="permission-dialog"
       @close="handlePermissionDialogClose"
     >
       <div class="permission-config">
@@ -227,19 +238,14 @@
         <div class="view-users-search">
           <el-input
             v-model="roleUserSearchKeyword"
-            :placeholder="t('system.role.searchUserPlaceholder')"
+            placeholder="请输入用户名/真实姓名/邮箱"
             clearable
             style="width: 100%"
-            @keyup.enter="handleSearchRoleUsers"
           >
             <template #prefix>
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
-          <el-button type="primary" @click="handleSearchRoleUsers">
-            <el-icon><Search /></el-icon>
-            {{ t('common.search') }}
-          </el-button>
         </div>
 
         <!-- 用户列表表格 -->
@@ -273,12 +279,12 @@
 <script setup>
 import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Refresh, Folder, Document, Menu, Setting } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Folder, Document, Menu, Setting, Edit, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { formatDate } from '@/utils/date'
 import { validateRoleName } from '@/utils/validate'
 import { createLogger } from '@/utils/simpleLogger'
-import { BaseCard, BaseButton, BaseTable } from '@/components/Common/index.js'
+import { BaseCard, BaseButton, BaseTable, BaseTooltip } from '@/components/Common/index.js'
 import {
   getRoles,
   createRole,
@@ -391,17 +397,18 @@ const searchForm = reactive({
 // 角色列表数据
 const roleList = ref([])
 
-// 表格列配置
+// 表格列配置 - 所有列内容居中
 const tableColumns = computed(() => [
-  { prop: 'roleName', label: t('system.role.roleName'), minWidth: 150 },
+  { prop: 'roleName', label: t('system.role.roleName'), minWidth: 150, align: 'center' },
   { 
     prop: 'description', 
     label: t('system.role.roleDescription'), 
     minWidth: 200, 
-    wrap: true // 🔥 允许换行，充分利用空间
+    wrap: true, // 🔥 允许换行，充分利用空间
+    align: 'center'
   },
   { prop: 'userCount', label: t('system.role.userCount'), minWidth: 120, align: 'center' },
-  { prop: 'createdTime', label: t('common.createTime'), minWidth: 180 }
+  { prop: 'createdTime', label: t('common.createTime'), minWidth: 180, align: 'center' }
 ])
 
 // 用户表格列配置
@@ -1067,10 +1074,25 @@ const loadRoleUsers = async () => {
   }
 }
 
-const handleSearchRoleUsers = () => {
-  roleUserPagination.current = 1
-  loadRoleUsers()
-}
+// 🔥 使用 watch 监听搜索关键词变化，自动触发查询（带防抖）
+let roleUserSearchTimer = null
+watch(
+  () => roleUserSearchKeyword.value,
+  () => {
+    // 清除之前的定时器
+    if (roleUserSearchTimer) {
+      clearTimeout(roleUserSearchTimer)
+    }
+    // 设置新的定时器，300ms 后执行查询（输入框防抖）
+    roleUserSearchTimer = setTimeout(() => {
+      logger.info('Role user search keyword changed, auto search', { 
+        keyword: roleUserSearchKeyword.value
+      })
+      roleUserPagination.current = 1
+      loadRoleUsers()
+    }, 300)
+  }
+)
 
 const handleRoleUserPageChange = (page) => {
   roleUserPagination.current = page
@@ -1084,6 +1106,11 @@ const handleRoleUserPageSizeChange = (size) => {
 }
 
 const handleViewUsersDialogClose = () => {
+  // 🔥 清除防抖定时器
+  if (roleUserSearchTimer) {
+    clearTimeout(roleUserSearchTimer)
+    roleUserSearchTimer = null
+  }
   currentRole.value = null
   roleUserList.value = []
   roleUserSearchKeyword.value = ''
@@ -1406,22 +1433,23 @@ onMounted(() => {
       gap: var(--gap-sm);
       align-items: center;
       
-      // 按钮样式 - 使用系统主题色
+      // 按钮样式 - 与保存权限按钮主题一致（primary 主题）
       :deep(.el-button) {
-        color: var(--text-2);
-        border-color: var(--border-color);
-        background: var(--bg-secondary);
+        color: #ffffff !important; // 🔥 白色字体
+        border-color: var(--color-primary) !important;
+        background: var(--color-primary) !important; // 🔥 主题色背景
+        border-radius: 6px !important; // 🔥 增加圆角
         
         &:hover {
-          color: var(--color-primary);
-          border-color: var(--color-primary);
-          background: var(--bg);
+          color: #ffffff !important;
+          border-color: var(--color-primary-dark) !important;
+          background: var(--color-primary-dark) !important; // 🔥 悬浮时稍深的主题色
         }
         
         &:active {
-          color: var(--color-primary);
-          border-color: var(--color-primary);
-          background: var(--bg-secondary);
+          color: #ffffff !important;
+          border-color: var(--color-primary-dark) !important;
+          background: var(--color-primary-dark) !important;
         }
       }
     }
@@ -1464,17 +1492,28 @@ onMounted(() => {
   }
 }
 
-// 用户数量标签样式
-.user-count-tag {
+// 用户数量圆形样式
+.user-count-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; // 🔥 缩小圆圈尺寸
+  height: 24px; // 🔥 缩小圆圈尺寸
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  color: #ffffff; // 🔥 白色字体，在蓝色背景上更清晰
+  font-size: 14px; // 🔥 按照 @页面修改.md 表单内容字体大小
+  font-weight: 400; // 🔥 按照 @页面修改.md 表单内容字体粗细（normal）
   cursor: default;
   transition: all 0.2s;
+  margin-left: -2px; // 🔥 往左偏移一点，确保完全居中
 
   &.clickable {
     cursor: pointer;
 
     &:hover {
       opacity: 0.8;
-      transform: scale(1.05);
+      transform: scale(1.1);
     }
   }
 }
@@ -1512,14 +1551,32 @@ onMounted(() => {
   }
 }
 
-// 角色表格样式 - 减小列间距
+// 角色表格样式 - 减小列间距，确保内容居中
 .role-table {
   :deep(.el-table__cell) {
     padding: 12px 8px !important; // 减小列间距
+    text-align: center !important; // 🔥 强制表格内容居中
   }
   
   :deep(.el-table__header .el-table__cell) {
     padding: 12px 8px !important;
+    text-align: center !important; // 🔥 强制表头居中
+  }
+  
+  // 🔥 确保单元格内容居中
+  :deep(.el-table__body-wrapper .el-table__body .el-table__row .el-table__cell .cell) {
+    text-align: center !important;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  // 🔥 确保表头内容居中
+  :deep(.el-table__header-wrapper .el-table__header .el-table__row .el-table__cell .cell) {
+    text-align: center !important;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 }
 
@@ -1555,6 +1612,44 @@ onMounted(() => {
 :deep(.el-dialog__footer) {
   border-top: 1px solid var(--border-color);
   padding: var(--gap-md) var(--gap-xl) var(--gap-lg);
+}
+
+// 🔥 统一弹窗取消按钮样式 - 参考 UserManagement.vue
+:deep(.el-dialog__footer .base-button:not(.el-button--primary)),
+:deep(.permission-dialog .el-dialog__footer .base-button:not(.el-button--primary)) {
+  color: var(--text-2) !important;
+  border-color: var(--border) !important;
+  background-color: var(--surface) !important;
+  
+  &:hover {
+    color: var(--text-2) !important;
+    border-color: var(--border-hover) !important;
+    background-color: var(--hover) !important;
+  }
+  
+  &:active {
+    color: var(--text-2) !important;
+    border-color: var(--border) !important;
+    background-color: var(--surface) !important;
+  }
+}
+
+// 🔥 编辑角色弹窗表单样式 - 按照 @页面修改.md
+.role-form {
+  :deep(.el-form-item__label) {
+    font-size: 14px !important;
+    color: var(--text-2) !important;
+    font-weight: 600 !important;
+  }
+  
+  :deep(.el-input__inner),
+  :deep(.el-textarea__inner),
+  :deep(.el-select .el-input__inner),
+  :deep(.el-date-editor .el-input__inner) {
+    font-size: 14px !important;
+    color: var(--text-3) !important;
+    font-weight: 400 !important;
+  }
 }
 
 :deep(.el-tree) {
@@ -1675,23 +1770,20 @@ onMounted(() => {
   }
 }
 
-// 操作按钮样式 - 与 UserManagement.vue 保持一致
+// 操作按钮样式 - 图标按钮横向排列
 .action-buttons {
   display: flex;
-  flex-direction: column;
+  flex-direction: row; // 🔥 改为横向排列，图标按钮一行显示
   gap: 8px;
   justify-content: center;
   align-items: center;
-  
-  .action-row {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-  }
+  flex-wrap: nowrap; // 🔥 确保不换行
 }
 
 .action-btn {
-  padding: 5px 12px;
+  padding: 4px; // 🔥 图标按钮使用更小的内边距
+  min-width: 32px; // 🔥 确保图标按钮有最小宽度
+  height: 28px; // 🔥 统一高度
   border: 1px solid transparent;
   border-radius: 4px;
   font-size: 13px;
@@ -1699,6 +1791,18 @@ onMounted(() => {
   transition: all 0.2s;
   background: none;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center; // 🔥 图标居中显示
+  gap: 0; // 🔥 只有图标，不需要 gap
+  
+  // 🔥 图标样式
+  .el-icon {
+    font-size: 16px; // 🔥 图标大小
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   
   &:disabled {
     opacity: 0.5;

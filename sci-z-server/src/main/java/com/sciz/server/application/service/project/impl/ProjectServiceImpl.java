@@ -183,27 +183,42 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     public PageResult<ProjectListResp> page(ProjectListQueryReq req) {
-        log.info(String.format("分页查询项目列表: pageNo=%s, pageSize=%s, keyword=%s",
-                req.pageNo(), req.pageSize(), req.keyword()));
+        log.info(String.format("分页查询项目列表: pageNo=%s, pageSize=%s, keyword=%s, startTime=%s, endTime=%s",
+                req.pageNo(), req.pageSize(), req.keyword(), req.startTime(), req.endTime()));
 
         var baseQuery = req.toBaseQuery();
         var page = new Page<Project>(baseQuery.pageNo(), baseQuery.pageSize());
         var asc = "ASC".equalsIgnoreCase(baseQuery.sortOrder());
         var sortBy = Optional.ofNullable(baseQuery.sortBy()).orElse("createdTime");
 
-        // 1. 查询项目列表
-        IPage<Project> projectPage = projectRepo.page(
-                page, req.keyword(), req.status(), sortBy, asc);
+        // 1. 如果提供了时间范围，先查询符合条件的申报ID（性能优化：利用申报表索引）
+        List<Long> declarationIds = null;
+        if (req.startTime() != null || req.endTime() != null) {
+            declarationIds = declarationRepo.findIdsByTimeRange(req.startTime(), req.endTime());
 
-        // 2. 批量查询申报信息（获取开始时间、预计完成时间和项目负责人）
-        var declarationIds = projectPage.getRecords().stream()
+            // 如果没有符合条件的申报，直接返回空结果（避免无效查询）
+            if (declarationIds.isEmpty()) {
+                log.info(String.format("没有符合条件的申报（时间范围筛选），返回空结果: startTime=%s, endTime=%s",
+                        req.startTime(), req.endTime()));
+                return PageResult.empty(baseQuery.pageNo(), baseQuery.pageSize());
+            }
+
+            log.debug(String.format("时间范围筛选找到 %d 个符合条件的申报ID", declarationIds.size()));
+        }
+
+        // 2. 查询项目列表（如果提供了时间范围，只查询符合条件的申报关联的项目）
+        IPage<Project> projectPage = projectRepo.page(
+                page, req.keyword(), req.status(), sortBy, asc, declarationIds);
+
+        // 3. 批量查询申报信息（获取开始时间、预计完成时间和项目负责人）
+        var projectDeclarationIds = projectPage.getRecords().stream()
                 .map(Project::getDeclarationId)
                 .filter(id -> id != null)
                 .distinct()
                 .toList();
-        var declarationMap = declarationRepo.findByIds(declarationIds);
+        var declarationMap = declarationRepo.findByIds(projectDeclarationIds);
 
-        // 3. 转换为响应对象，直接使用项目主表的进度值，并设置状态描述和时间信息
+        // 4. 转换为响应对象，直接使用项目主表的进度值，并设置状态描述和时间信息
         var records = projectPage.getRecords().stream()
                 .map(project -> {
                     var baseResp = projectConverter.toListResp(project);

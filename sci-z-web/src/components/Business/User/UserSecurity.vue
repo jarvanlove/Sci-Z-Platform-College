@@ -111,43 +111,45 @@
           />
         </div>
 
-        <BaseTable
-          :data="loginLogs"
-          :columns="tableColumns"
-          :loading="logsLoading"
-          :pagination="pagination"
-          :empty-text="t('common.noData')"
-          stripe
-          class="login-logs-table"
-          @current-change="handlePageChange"
-          @size-change="handlePageSizeChange"
-        >
-          <!-- 登录时间列自定义 -->
-          <template #loginTime="{ row }">
-            {{ formatDisplayTime(row.loginTime) }}
-          </template>
+        <div class="table-wrapper">
+          <BaseTable
+            :data="loginLogs"
+            :columns="tableColumns"
+            :loading="logsLoading"
+            :pagination="pagination"
+            :empty-text="t('common.noData')"
+            stripe
+            class="login-logs-table"
+            @current-change="handlePageChange"
+            @size-change="handlePageSizeChange"
+          >
+            <!-- 登录时间列自定义 -->
+            <template #loginTime="{ row }">
+              {{ formatDisplayTime(row.loginTime) }}
+            </template>
 
-          <!-- 登录IP列自定义 -->
-          <template #loginIp="{ row }">
-            {{ row.loginIp || row.ip }}
-          </template>
+            <!-- 登录IP列自定义 -->
+            <template #loginIp="{ row }">
+              {{ row.loginIp || row.ip }}
+            </template>
 
-          <!-- 登录地点列自定义 -->
-          <template #loginLocation="{ row }">
-            {{ row.loginLocation || row.location }}
-          </template>
+            <!-- 登录地点列自定义 -->
+            <template #loginLocation="{ row }">
+              {{ row.loginLocation || row.location }}
+            </template>
 
-          <!-- 登录状态列自定义 -->
-          <template #status="{ row }">
-            <el-tag
-              :type="statusTagType(row.status === 1 ? 'success' : row.status === 0 ? 'failed' : 'warning')"
-              effect="light"
-              size="small"
-            >
-              {{ statusText(row.status) || row.message }}
-            </el-tag>
-          </template>
-        </BaseTable>
+            <!-- 登录状态列自定义 -->
+            <template #status="{ row }">
+              <el-tag
+                :type="statusTagType(row.status === 1 ? 'success' : row.status === 0 ? 'failed' : 'warning')"
+                effect="light"
+                size="small"
+              >
+                {{ statusText(row.status) || row.message }}
+              </el-tag>
+            </template>
+          </BaseTable>
+        </div>
       </BaseCard>
     </div>
   </div>
@@ -223,35 +225,39 @@ const tableColumns = computed(() => [
   {
     prop: 'loginTime',
     label: t('user.security.loginTime'),
-    minWidth: 180
+    minWidth: 140, // 🔥 减小列宽，让列更紧凑
+    align: 'center'
   },
   {
     prop: 'loginIp',
     label: t('user.security.loginIP'),
-    minWidth: 140
+    minWidth: 100 // 🔥 减小列宽
   },
   {
     prop: 'loginLocation',
     label: t('user.security.loginLocation'),
-    minWidth: 160,
-    wrap: true // 🔥 允许换行，充分利用空间
+    minWidth: 100, // 🔥 减小列宽
+    wrap: true,
+    align: 'center'
   },
   {
     prop: 'browser',
     label: t('user.security.browser'),
-    minWidth: 150,
-    wrap: true // 🔥 允许换行，充分利用空间
+    minWidth: 120, // 🔥 减小列宽
+    wrap: true,
+    align: 'center'
   },
   {
     prop: 'os',
     label: t('user.security.operatingSystem'),
-    minWidth: 140,
-    wrap: true // 🔥 允许换行，充分利用空间
+    minWidth: 110, // 🔥 减小列宽
+    wrap: true,
+    align: 'center'
   },
   {
     prop: 'status',
     label: t('user.security.loginStatus'),
-    minWidth: 120,
+    minWidth: 90, // 🔥 减小列宽
     align: 'center'
   }
 ])
@@ -475,11 +481,25 @@ watch(
 .card-title {
   font-size: 18px;
   font-weight: 600;
-  color: var(--text-1);
+  color: var(--color-primary); // 🔥 与"安全设置"标题颜色保持一致
 }
 
 .password-form {
   max-width: 540px;
+  
+  // 🔥 表单标签样式 - 按照页面修改.md规范
+  :deep(.el-form-item__label) {
+    font-size: 14px !important; // 🔥 字体大小：14px
+    font-weight: 600 !important; // 🔥 字体粗细：600（加粗）
+    color: var(--text-2) !important; // 🔥 字体颜色：var(--text-2) 或 #4b5563
+  }
+  
+  // 🔥 表单内容样式 - 按照页面修改.md规范
+  :deep(.el-input__inner) {
+    font-size: 14px !important; // 🔥 字体大小：14px（与 placeholder 一致）
+    color: var(--text-3) !important; // 🔥 字体颜色：var(--text-3) 或 #6b7280
+    font-weight: 400 !important; // 🔥 字体粗细：400（normal）
+  }
 }
 
 .strength-container {
@@ -562,11 +582,82 @@ watch(
   border-radius: 8px;
 }
 
+.table-wrapper {
+  width: 100%;
+  overflow: visible; // 🔥 确保容器不产生滚动条
+}
+
 .login-logs-table {
   width: 100%;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--border);
+  
+  // 🔥 调整表头间距
+  :deep(.el-table__header th) {
+    padding: 12px 12px !important; // 🔥 减小左右内边距，让列更紧凑（从 16px 改为 12px）
+  }
+  
+  // 🔥 调整表体单元格内边距，与表头保持一致
+  :deep(.el-table__body td) {
+    padding: 12px 12px !important; // 🔥 减小左右内边距，让列更紧凑
+  }
+  
+  // 🔥 确保表格底部不出现滚动条 - 使用 table-layout: auto 让列宽自适应
+  // 🔥 使用更高的选择器优先级，确保覆盖 BaseTable 的样式
+  :deep(.base-table__table) {
+    overflow: visible !important; // 🔥 允许内容可见，不裁剪
+    width: 100% !important;
+    max-width: 100% !important; // 🔥 确保不超过容器宽度
+  }
+  
+  // 🔥 使用最高优先级的选择器，确保覆盖 BaseTable 的所有样式
+  :deep(.base-table__table .el-table) {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: auto !important; // 🔥 使用 auto 布局，让列宽根据内容自适应
+    
+    // 🔥 覆盖 BaseTable 的 table-layout: fixed（使用更高优先级）
+    .el-table__header-wrapper table,
+    .el-table__body-wrapper table {
+      table-layout: auto !important; // 🔥 覆盖 BaseTable 的 fixed 布局
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    
+    .el-table__header-wrapper {
+      overflow-x: hidden !important; // 🔥 隐藏表头横向滚动
+      overflow-y: hidden !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    
+    .el-table__body-wrapper {
+      overflow-x: hidden !important; // 🔥 隐藏表体横向滚动，确保不出现滚动条
+      overflow-y: visible !important; // 🔥 改为 visible，避免出现纵向滚动条
+      max-height: none !important; // 🔥 移除最大高度限制
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+  }
+  
+  // 🔥 确保列宽不超过容器，让列宽自适应分配
+  :deep(.el-table__header th),
+  :deep(.el-table__body td) {
+    max-width: none !important; // 🔥 移除最大宽度限制，让列宽自适应
+  }
+  
+  // 🔥 登录状态标签样式 - 圆角处理
+  :deep(.el-tag) {
+    border-radius: 12px !important; // 🔥 圆角：12px
+    padding: 4px 8px !important; // 🔥 内边距：4px 8px
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    transition: all 0.2s ease !important;
+  }
 }
 
 @media (max-width: 768px) {

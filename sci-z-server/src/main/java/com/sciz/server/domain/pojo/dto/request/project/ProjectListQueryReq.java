@@ -1,8 +1,12 @@
 package com.sciz.server.domain.pojo.dto.request.project;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.sciz.server.domain.pojo.dto.request.BaseQueryReq;
+import com.sciz.server.infrastructure.shared.serializer.FlexibleDateDeserializer;
 import jakarta.validation.constraints.Min;
 import org.springframework.util.StringUtils;
+
+import java.time.LocalDate;
 
 /**
  * 项目列表查询请求
@@ -13,6 +17,14 @@ import org.springframework.util.StringUtils;
  * @param sortOrder String 排序方式，支持 ASC 或 DESC，默认 DESC
  * @param keyword   String 搜索关键字（项目编号/项目名称）
  * @param status    String 项目状态（null表示全部）
+ * @param startTime LocalDate 项目开始时间（查询开始时间 >= startTime 的项目，null表示不限制）
+ *                  <p>
+ *                  前端可传入字符串格式：yyyy-MM-dd 或 yyyy-MM-dd HH:mm:ss，后端自动转换
+ *                  </p>
+ * @param endTime   LocalDate 项目结束时间（查询结束时间 <= endTime 的项目，null表示不限制）
+ *                  <p>
+ *                  前端可传入字符串格式：yyyy-MM-dd 或 yyyy-MM-dd HH:mm:ss，后端自动转换
+ *                  </p>
  *
  * @author JiaWen.Wu
  * @className ProjectListQueryReq
@@ -24,7 +36,9 @@ public record ProjectListQueryReq(
         String sortBy,
         String sortOrder,
         String keyword,
-        String status) {
+        String status,
+        @JsonDeserialize(using = FlexibleDateDeserializer.class) LocalDate startTime,
+        @JsonDeserialize(using = FlexibleDateDeserializer.class) LocalDate endTime) {
 
     public ProjectListQueryReq {
         var base = BaseQueryReq.of(pageNo, pageSize, sortBy, sortOrder);
@@ -45,4 +59,3 @@ public record ProjectListQueryReq(
         return BaseQueryReq.of(pageNo, pageSize, sortBy, sortOrder);
     }
 }
-

@@ -5,6 +5,7 @@ import com.sciz.server.application.service.project.ProjectService;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeCreateReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectCreateReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectUpdateReq;
+import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
 import com.sciz.server.infrastructure.shared.enums.ProjectStatus;
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationCreatedEvent;
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationSuccessEvent;
@@ -37,6 +38,7 @@ public class DeclarationEventHandler {
 
     private final ProjectService projectService;
     private final KnowledgeService knowledgeService;
+    private final SysKnowledgeBaseRepo knowledgeBaseRepo;
     private final OperationLogRecorderUtil operationLogRecorderUtil;
 
     /**
@@ -385,12 +387,15 @@ public class DeclarationEventHandler {
         var operation = operationType.getCode();
 
         try {
-            log.info(String.format("开始创建知识库: name=%s, description=%s, projectId=%s",
-                    researchTopic, researchTopic, projectId));
+            // 1. 生成唯一的知识库名称（避免与 Dify 知识库名称重复）
+            var uniqueKnowledgeName = generateUniqueKnowledgeName(researchTopic);
+            
+            log.info(String.format("开始创建知识库: originalName=%s, uniqueName=%s, description=%s, projectId=%s",
+                    researchTopic, uniqueKnowledgeName, researchTopic, projectId));
 
             var knowledgeCreateReq = new KnowledgeCreateReq();
             knowledgeCreateReq.setUserId(event.getOperatorId()); // 用户ID
-            knowledgeCreateReq.setName(researchTopic); // 知识库名称 = 研究课题
+            knowledgeCreateReq.setName(uniqueKnowledgeName); // 知识库名称（已确保唯一）
             knowledgeCreateReq.setDescription(researchTopic); // 知识库描述 = 研究课题
             knowledgeCreateReq.setProjectId(projectId); // 关联项目ID
             // AsyncUserContext 已设置，可以直接使用 create 方法，无需设置 userId
@@ -405,8 +410,14 @@ public class DeclarationEventHandler {
             // 记录操作日志（成功）
             var endTime = DateUtil.now();
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
-            var detail = String.format("%s：%s（ID: %s）", operationType.getDescription(), researchTopic,
+            var detail = String.format("%s：%s（ID: %s）", operationType.getDescription(), uniqueKnowledgeName,
                     knowledgeResp.getId());
+            // 如果名称被修改，在日志中记录原始名称
+            if (!uniqueKnowledgeName.equals(researchTopic)) {
+                detail = String.format("%s：%s（原始名称：%s，ID: %s）", operationType.getDescription(),
+                        uniqueKnowledgeName, researchTopic, knowledgeResp.getId());
+                log.info(String.format("知识库名称已自动重命名: originalName=%s, newName=%s", researchTopic, uniqueKnowledgeName));
+            }
             // 现在可以正常使用 LoginUserUtil，它会从 AsyncUserContext 获取用户信息
             operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
 
@@ -423,6 +434,56 @@ public class DeclarationEventHandler {
                     errorMessage, executionTime);
             throw BusinessException.of(ResultCode.SERVER_ERROR, "创建知识库失败: %s", e.getMessage());
         }
+    }
+
+    /**
+     * 生成唯一的知识库名称
+     * <p>
+     * 如果原始名称已存在，则自动添加后缀 _1, _2, _3... 直到找到一个不重复的名称
+     * 确保与 Dify 知识库名称不重复（Dify 知识库名称不允许重复）
+     *
+     * @param originalName 原始知识库名称
+     * @return 唯一的知识库名称
+     */
+    private String generateUniqueKnowledgeName(String originalName) {
+        if (originalName == null || originalName.trim().isEmpty()) {
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "知识库名称不能为空");
+        }
+
+        var trimmedName = originalName.trim();
+        
+        // 1. 检查原始名称是否已存在
+        var existingKnowledge = knowledgeBaseRepo.findByName(trimmedName);
+        if (existingKnowledge == null) {
+            // 原始名称可用，直接返回
+            log.debug(String.format("知识库名称可用: name=%s", trimmedName));
+            return trimmedName;
+        }
+
+        // 2. 原始名称已存在，生成新名称（添加后缀 _1, _2, _3...）
+        log.info(String.format("知识库名称已存在，开始生成唯一名称: originalName=%s, existingId=%s",
+                trimmedName, existingKnowledge.getId()));
+
+        var maxAttempts = 1000; // 最大尝试次数，防止无限循环
+        for (var suffix = 1; suffix <= maxAttempts; suffix++) {
+            var candidateName = String.format("%s_%d", trimmedName, suffix);
+            var existing = knowledgeBaseRepo.findByName(candidateName);
+            
+            if (existing == null) {
+                // 找到可用的名称
+                log.info(String.format("生成唯一知识库名称成功: originalName=%s, uniqueName=%s, attempts=%d",
+                        trimmedName, candidateName, suffix));
+                return candidateName;
+            }
+            
+            // 继续尝试下一个后缀
+            log.debug(String.format("知识库名称仍重复，继续尝试: candidateName=%s, existingId=%s",
+                    candidateName, existing.getId()));
+        }
+
+        // 理论上不应该到达这里（除非有大量重复的名称）
+        throw BusinessException.of(ResultCode.SERVER_ERROR,
+                "无法生成唯一的知识库名称，已尝试 %d 次。请检查数据库中的知识库名称。", maxAttempts);
     }
 
     /**

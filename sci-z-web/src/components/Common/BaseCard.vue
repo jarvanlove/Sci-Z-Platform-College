@@ -65,7 +65,9 @@ const cardClass = computed(() => ({
 .base-card {
   background: var(--surface);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  // 🔥 允许内容溢出时显示滚动条（特别是表格场景）
+  // 使用 overflow: visible 让子元素（如表格）可以显示自己的滚动条
+  overflow: visible;
   transition: all 0.3s ease;
 
   &--bordered {

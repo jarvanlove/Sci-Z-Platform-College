@@ -301,9 +301,12 @@ const handleLogout = async () => {
       }
 
       .username {
-        font-size: 14px;
-        color: var(--text);
-        font-weight: 500;
+        // 🔥 与下拉菜单项字体样式保持一致
+        font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+        font-size: 15px !important; // 🔥 与下拉菜单项一致
+        font-weight: 400 !important; // 🔥 与下拉菜单项一致
+        color: var(--text-2) !important; // 🔥 与下拉菜单项一致
+        letter-spacing: 0.01em !important; // 🔥 与下拉菜单项一致
       }
     }
   }
