@@ -8,6 +8,8 @@ import com.sciz.server.infrastructure.external.dify.dto.request.DeclarationWorkf
 import com.sciz.server.infrastructure.external.dify.dto.response.DeclarationWorkflowResp;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 /**
  * Dify 工作流服务接口
  * 封装所有 Dify 工作流和文件同步相关的交互逻辑
@@ -80,4 +82,40 @@ public interface DifyWorkflowService {
          * @return String Dify API 响应体（JSON字符串）
          */
         String deleteDocument(String datasetId, String documentId, Long userId, String resourceId, String keyType);
+
+        /**
+         * 获取工作流 Draft 配置
+         * GET /console/api/apps/{appId}/workflows/draft
+         *
+         * @param appId     工作流ID（Dify 应用ID）
+         * @return DifyWorkflowDraftResp 工作流 Draft 配置响应
+         */
+        com.sciz.server.infrastructure.external.dify.dto.response.DifyWorkflowDraftResp getWorkflowDraft(String appId);
+
+        /**
+         * 更新工作流 Draft 配置
+         * POST /console/api/apps/{appId}/workflows/draft
+         * 主要修改 knowledge-retrieval 类型节点的 dataset_ids
+         *
+         * @param appId     工作流ID（Dify 应用ID）
+         * @param datasetIds 新的知识库ID列表（用于更新 knowledge-retrieval 节点的 dataset_ids）
+         * @return String 更新结果响应（JSON字符串）
+         */
+        String updateWorkflowDraft(String appId, List<String> datasetIds);
+
+        /**
+         * 更新并发布工作流（综合接口）
+         * 流程：1. GET 获取工作流详情（包含 hash）
+         *       2. 使用 GET 返回的 hash 更新工作流
+         *       3. 更新成功后，再次 GET 获取更新后的 hash
+         *       4. 使用更新后的 hash 调用 publish 接口发布工作流
+         *
+         * @param appId        工作流ID（Dify 应用ID）
+         * @param datasetIds   新的知识库ID列表（用于更新 knowledge-retrieval 节点的 dataset_ids）
+         * @param markedName   标记名称（发布时使用）
+         * @param markedComment 标记注释（发布时使用）
+         * @return String 发布结果响应（JSON字符串）
+         */
+        String updateAndPublishWorkflow(String appId, List<String> datasetIds, String markedName,
+                        String markedComment);
 }

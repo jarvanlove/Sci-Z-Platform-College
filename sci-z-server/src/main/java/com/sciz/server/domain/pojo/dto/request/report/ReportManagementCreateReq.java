@@ -21,6 +21,7 @@ public record ReportManagementCreateReq(
         @NotNull(message = "项目ID不能为空") Long projectId,
         @NotBlank(message = "项目名称不能为空") String projectName,
         String projectCode,
+        @NotBlank(message = "项目知识库ID不能为空")
         String projectKnowledgeId,
         @NotBlank(message = "报告类型不能为空") String reportType,
         @NotBlank(message = "Dify API Keys ID不能为空") String difyApiKeysId,

@@ -18,7 +18,12 @@ import java.util.*;
 public class DifyChatbotModelConfigRequest {
 
     @JsonProperty("pre_prompt")
-    private String prePrompt = "你的名字是小查，根据知识库内容回答，不要做太多延申。";
+    private String prePrompt = "你的名字是小查";
+
+    // @JsonProperty("pre_prompt")
+    // private String AiChatPrePrompt = "你的名字是小查";
+    // @JsonProperty("pre_prompt")
+    // private String knowledgeBasePrePrompt = "你的名字是小查，根据知识库内容回答，不要做太多延申。";
 
     @JsonProperty("prompt_type")
     private String promptType = "simple";
