@@ -10,24 +10,27 @@
 - 🚀 **单体应用架构**：简化部署，易于维护，支持未来拆分为微服务
 - 🤖 **AI 智能化**：集成 Dify 平台，实现智能工作流编排
 - 📊 **全生命周期管理**：覆盖申报、执行、报告全流程
-- 🔒 **安全可靠**：基于 Sa-Token 的 JWT 认证体系
+- 🔒 **安全可靠**：基于 Sa-Token 的认证体系（Token 认证）
 - ⚡ **Java 21 新特性**：虚拟线程、记录模式、模式匹配等
 
 ## 🏗️ 技术架构
 
 ### 后端技术栈
 
-| 技术             | 版本     | 说明                           |
-| ---------------- | -------- | ------------------------------ |
-| **Java**         | 21 (LTS) | 编程语言，支持虚拟线程等新特性 |
-| **Spring Boot**  | 3.2.x    | 应用框架，原生支持 Java 21     |
-| **PostgreSQL**   | 14+      | 关系型数据库                   |
-| **Redis**        | 7.x      | 缓存、会话、分布式锁           |
-| **Apache Kafka** | 3.x      | 消息队列（领域事件发布）       |
-| **MinIO**        | Latest   | 对象存储（文件存储）           |
-| **Sa-Token**     | 1.37.0+  | 轻量级权限认证框架             |
-| **MyBatis-Plus** | 3.5.5+   | ORM 框架                       |
-| **LangChain4j**  | 0.34.0+  | LLM 集成框架                   |
+| 技术             | 版本     | 说明                            |
+| ---------------- | -------- | ------------------------------- |
+| **Java**         | 21 (LTS) | 编程语言，支持虚拟线程等新特性  |
+| **Spring Boot**  | 3.2.x    | 应用框架，原生支持 Java 21      |
+| **PostgreSQL**   | 14+      | 关系型数据库                    |
+| **Redis**        | 7.x      | 缓存、会话、分布式锁            |
+| **Apache Kafka** | 3.x      | 消息队列（领域事件发布）        |
+| **MinIO**        | Latest   | 对象存储（文件存储）            |
+| **Sa-Token**     | 1.38.0   | 轻量级权限认证框架              |
+| **MyBatis-Plus** | 3.5.6    | ORM 框架                        |
+| **LangChain4j**  | 0.34.0   | LLM 集成框架                    |
+| **Knife4j**      | 4.5.0    | API 文档工具（Swagger UI 增强） |
+| **MapStruct**    | 1.5.5    | 对象映射框架                    |
+| **Resilience4j** | 2.2.0    | 容错和弹性库                    |
 
 ### AI 平台
 
@@ -52,173 +55,247 @@ sci-z-server/
     │   │
     │   ├── interfaces/                  # 接口层 - 对外接口
     │   │   ├── controller/              # 控制器
-    │   │   │   ├── AuthController.java          # 认证控制器
-    │   │   │   ├── UserController.java          # 用户控制器
-    │   │   │   ├── ProjectController.java       # 项目控制器
-    │   │   │   ├── DeclarationController.java   # 申报控制器
-    │   │   │   ├── ReportController.java        # 报告控制器
-    │   │   │   ├── KnowledgeController.java     # 知识库控制器
-    │   │   │   └── ChatController.java          # AI对话控制器
+    │   │   │   ├── AuthController.java                    # 认证控制器
+    │   │   │   ├── UserController.java                    # 用户控制器
+    │   │   │   ├── ProjectController.java                 # 项目控制器
+    │   │   │   ├── DeclarationController.java             # 申报控制器
+    │   │   │   ├── ReportController.java                  # 报告控制器
+    │   │   │   ├── ReportManagementController.java        # 报告管理控制器
+    │   │   │   ├── KnowledgeController.java               # 知识库控制器
+    │   │   │   ├── KnowledgeFileRelationController.java   # 知识库文件关联控制器
+    │   │   │   ├── ChatController.java                    # AI对话控制器
+    │   │   │   ├── AiConversationController.java          # AI会话控制器
+    │   │   │   ├── AiMessageController.java               # AI消息控制器
+    │   │   │   ├── FileController.java                    # 文件控制器
+    │   │   │   └── HealthController.java                  # 健康检查控制器
     │   │   └── converter/                # 统一转换器（单次转换）
+    │   │       ├── AuthConverter.java
     │   │       ├── UserConverter.java
     │   │       ├── ProjectConverter.java
-    │   │       └── DeclarationConverter.java
+    │   │       ├── DeclarationConverter.java
+    │   │       ├── ReportManagementConverter.java
+    │   │       ├── KnowledgeConverter.java
+    │   │       ├── KnowledgeFileRelationConverter.java
+    │   │       ├── FileConverter.java
+    │   │       ├── AiConversationConverter.java
+    │   │       └── AiMessageConverter.java
     │   │
     │   ├── application/                 # 应用层 - 业务编排
-    │   │   ├── service/                 # 应用服务
-    │   │   │   ├── AuthService.java             # 认证服务接口
-    │   │   │   ├── UserService.java             # 用户服务接口
-    │   │   │   ├── ProjectService.java          # 项目服务接口
-    │   │   │   ├── DeclarationService.java      # 申报服务接口
-    │   │   │   ├── ReportService.java           # 报告服务接口
-    │   │   │   ├── KnowledgeService.java        # 知识库服务接口
-    │   │   │   └── ChatService.java             # AI对话服务接口
-    │   │   ├── impl/                    # 应用服务实现
-    │   │   │   ├── AuthServiceImpl.java         # 认证服务实现
-    │   │   │   ├── UserServiceImpl.java         # 用户服务实现
-    │   │   │   ├── ProjectServiceImpl.java      # 项目服务实现
-    │   │   │   ├── DeclarationServiceImpl.java  # 申报服务实现
-    │   │   │   ├── ReportServiceImpl.java       # 报告服务实现
-    │   │   │   ├── KnowledgeServiceImpl.java    # 知识库服务实现
-    │   │   │   └── ChatServiceImpl.java         # AI对话服务实现
+    │   │   ├── service/                 # 应用服务（按模块组织）
+    │   │   │   ├── user/                # 用户相关服务
+    │   │   │   │   ├── AuthService.java
+    │   │   │   │   ├── UserService.java
+    │   │   │   │   ├── UserRoleService.java
+    │   │   │   │   ├── RolePermissionService.java
+    │   │   │   │   ├── PermissionService.java
+    │   │   │   │   ├── LoginLogAndStatsService.java
+    │   │   │   │   └── impl/            # 服务实现
+    │   │   │   ├── project/             # 项目相关服务
+    │   │   │   │   ├── ProjectService.java
+    │   │   │   │   └── impl/            # 服务实现
+    │   │   │   ├── declaration/         # 申报相关服务
+    │   │   │   │   ├── DeclarationService.java
+    │   │   │   │   └── impl/            # 服务实现
+    │   │   │   ├── report/              # 报告相关服务
+    │   │   │   │   ├── ReportService.java
+    │   │   │   │   ├── ReportManagementService.java
+    │   │   │   │   └── impl/            # 服务实现
+    │   │   │   ├── knowledge/           # 知识库相关服务
+    │   │   │   │   ├── KnowledgeService.java
+    │   │   │   │   ├── KnowledgeFileRelationService.java
+    │   │   │   │   └── impl/            # 服务实现
+    │   │   │   ├── file/                # 文件相关服务
+    │   │   │   │   ├── FileService.java
+    │   │   │   │   ├── FileConvertService.java
+    │   │   │   │   └── impl/            # 服务实现
+    │   │   │   ├── ai/                  # AI相关服务
+    │   │   │   │   ├── ChatService.java
+    │   │   │   │   ├── AiConversationService.java
+    │   │   │   │   ├── AiMessageService.java
+    │   │   │   │   └── impl/            # 服务实现
+    │   │   │   └── log/                 # 日志相关服务
+    │   │   │       ├── OperationLogService.java
+    │   │   │       ├── LoginLogService.java
+    │   │   │       └── impl/            # 服务实现
     │   │   └── task/                    # 任务调度
-    │   │       ├── ScheduledTask.java           # 定时任务
-    │   │       ├── AsyncTask.java               # 异步任务
-    │   │       └── WorkflowTask.java            # 工作流任务
+    │   │       └── DeclarationWorkflowTask.java  # 申报工作流任务
     │   │
     │   ├── domain/                      # 领域层 - 核心业务
-    │   │   ├── pojo/                    # 对象模型
-    │   │   │   ├── entity/              # 领域实体
-    │   │   │   │   ├── user/            # 用户相关实体
-    │   │   │   │   │   ├── User.java            # 用户实体
-    │   │   │   │   │   ├── Role.java            # 角色实体
-    │   │   │   │   │   └── Permission.java      # 权限实体
-    │   │   │   │   ├── project/         # 项目相关实体
-    │   │   │   │   │   ├── Project.java         # 项目实体
-    │   │   │   │   │   ├── ProjectMember.java   # 项目成员实体
-    │   │   │   │   │   └── ProjectDocument.java # 项目文档实体
-    │   │   │   │   ├── declaration/     # 申报相关实体
-    │   │   │   │   │   ├── Declaration.java     # 申报实体
-    │   │   │   │   │   └── DeclarationTemplate.java # 申报模板实体
-    │   │   │   │   ├── report/          # 报告相关实体
-    │   │   │   │   │   ├── Report.java          # 报告实体
-    │   │   │   │   │   └── ReportTemplate.java  # 报告模板实体
-    │   │   │   │   ├── knowledge/       # 知识库相关实体
-    │   │   │   │   │   ├── KnowledgeBase.java   # 知识库实体
-    │   │   │   │   │   └── KnowledgeFile.java   # 知识库文件实体
-    │   │   │   │   └── ai/              # AI相关实体
-    │   │   │   │       ├── Conversation.java    # 对话实体
-    │   │   │   │       └── Message.java         # 消息实体
-    │   │   │   ├── dto/                 # 数据传输对象
-    │   │   │   │   ├── request/         # 请求DTO
-    │   │   │   │   │   ├── LoginReq.java
-    │   │   │   │   │   ├── RegisterReq.java
-    │   │   │   │   │   ├── ProjectCreateReq.java
-    │   │   │   │   │   ├── DeclarationSubmitReq.java
-    │   │   │   │   │   └── ReportGenerateReq.java
-    │   │   │   │   └── response/        # 响应DTO
-    │   │   │   │       ├── LoginResp.java
-    │   │   │   │       ├── UserInfoResp.java
-    │   │   │   │       ├── ProjectInfoResp.java
-    │   │   │   │       ├── DeclarationInfoResp.java
-    │   │   │   │       └── ReportInfoResp.java
-    │   │   ├── mapper/                  # 数据映射接口
-    │   │   │   ├── UserMapper.java
-    │   │   │   ├── ProjectMapper.java
-    │   │   │   ├── DeclarationMapper.java
-    │   │   │   ├── ReportMapper.java
-    │   │   │   ├── KnowledgeMapper.java
-    │   │   │   └── ConversationMapper.java
-    │   │   └── repository/             # 仓储接口
-    │   │       ├── UserRepository.java
-    │   │       ├── ProjectRepository.java
-    │   │       ├── DeclarationRepository.java
-    │   │       ├── ReportRepository.java
-    │   │       ├── KnowledgeRepository.java
-    │   │       └── ConversationRepository.java
+    │   │   └── pojo/                    # 对象模型
+    │   │       ├── entity/              # 领域实体（按模块组织）
+    │   │       │   ├── BaseEntity.java  # 基础实体类
+    │   │       │   ├── user/            # 用户相关实体
+    │   │       │   │   ├── SysUser.java
+    │   │       │   │   ├── SysRole.java
+    │   │       │   │   ├── SysPermission.java
+    │   │       │   │   ├── SysUserRole.java
+    │   │       │   │   ├── SysRolePermission.java
+    │   │       │   │   ├── SysUserProfile.java
+    │   │       │   │   ├── SysDepartment.java
+    │   │       │   │   ├── SysConfig.java
+    │   │       │   │   ├── SysIndustryConfig.java
+    │   │       │   │   ├── SysProfileField.java
+    │   │       │   │   └── SysProfileFieldOption.java
+    │   │       │   ├── project/         # 项目相关实体
+    │   │       │   │   ├── Project.java
+    │   │       │   │   ├── ProjectMember.java
+    │   │       │   │   └── ProjectProgress.java
+    │   │       │   ├── declaration/     # 申报相关实体
+    │   │       │   │   ├── Declaration.java
+    │   │       │   │   └── SysWorkflowTemplate.java
+    │   │       │   ├── report/          # 报告相关实体
+    │   │       │   │   ├── ReportManagement.java
+    │   │       │   │   ├── ReportContent.java
+    │   │       │   │   └── ReportGenerationConfig.java
+    │   │       │   ├── knowledge/       # 知识库相关实体
+    │   │       │   │   ├── SysKnowledgeBase.java
+    │   │       │   │   ├── SysKnowledgeFolder.java
+    │   │       │   │   └── SysKnowledgeFileRelation.java
+    │   │       │   ├── file/            # 文件相关实体
+    │   │       │   │   ├── SysAttachment.java
+    │   │       │   │   └── SysAttachmentRelation.java
+    │   │       │   ├── ai/              # AI相关实体
+    │   │       │   │   ├── AiConversation.java
+    │   │       │   │   └── AiMessage.java
+    │   │       │   └── log/             # 日志相关实体
+    │   │       │       ├── SysOperationLog.java
+    │   │       │       └── SysLoginLog.java
+    │   │       ├── dto/                 # 数据传输对象（按模块组织）
+    │   │       │   ├── request/         # 请求DTO
+    │   │       │   │   ├── BaseQueryReq.java  # 基础查询请求
+    │   │       │   │   ├── user/        # 用户相关请求
+    │   │       │   │   ├── project/     # 项目相关请求
+    │   │       │   │   ├── declaration/ # 申报相关请求
+    │   │       │   │   ├── report/      # 报告相关请求
+    │   │       │   │   ├── knowledge/   # 知识库相关请求
+    │   │       │   │   ├── file/        # 文件相关请求
+    │   │       │   │   ├── ai/          # AI相关请求
+    │   │       │   │   ├── log/         # 日志相关请求
+    │   │       │   │   ├── system/      # 系统相关请求
+    │   │       │   │   └── chat/        # 聊天相关请求
+    │   │       │   └── response/        # 响应DTO
+    │   │       │       ├── user/        # 用户相关响应
+    │   │       │       ├── project/     # 项目相关响应
+    │   │       │       ├── declaration/ # 申报相关响应
+    │   │       │       ├── report/      # 报告相关响应
+    │   │       │       ├── knowledge/   # 知识库相关响应
+    │   │       │       ├── file/        # 文件相关响应
+    │   │       │       ├── ai/          # AI相关响应
+    │   │       │       ├── log/         # 日志相关响应
+    │   │       │       └── system/      # 系统相关响应
+    │   │       ├── mapper/              # 数据映射接口（按模块组织）
+    │   │       │   ├── user/            # 用户相关Mapper
+    │   │       │   ├── project/         # 项目相关Mapper
+    │   │       │   ├── declaration/     # 申报相关Mapper
+    │   │       │   ├── report/          # 报告相关Mapper
+    │   │       │   ├── knowledge/       # 知识库相关Mapper
+    │   │       │   ├── file/            # 文件相关Mapper
+    │   │       │   ├── ai/              # AI相关Mapper
+    │   │       │   └── log/             # 日志相关Mapper
+    │   │       └── repository/          # 仓储接口（按模块组织）
+    │   │           ├── user/            # 用户相关Repository
+    │   │           │   ├── SysUserRepo.java
+    │   │           │   ├── SysRoleRepo.java
+    │   │           │   └── impl/        # Repository实现
+    │   │           ├── project/         # 项目相关Repository
+    │   │           │   ├── ProjectRepo.java
+    │   │           │   ├── ProjectMemberRepo.java
+    │   │           │   ├── ProjectProgressRepo.java
+    │   │           │   └── impl/        # Repository实现
+    │   │           ├── declaration/     # 申报相关Repository
+    │   │           │   ├── DeclarationRepo.java
+    │   │           │   ├── SysWorkflowTemplateRepo.java
+    │   │           │   └── impl/        # Repository实现
+    │   │           ├── report/          # 报告相关Repository
+    │   │           │   ├── ReportManagementRepo.java
+    │   │           │   ├── ReportContentRepo.java
+    │   │           │   ├── ReportGenerationConfigRepo.java
+    │   │           │   └── impl/        # Repository实现
+    │   │           ├── knowledge/       # 知识库相关Repository
+    │   │           │   ├── SysKnowledgeBaseRepo.java
+    │   │           │   ├── SysKnowledgeFolderRepo.java
+    │   │           │   ├── SysKnowledgeFileRelationRepo.java
+    │   │           │   └── impl/        # Repository实现
+    │   │           ├── file/            # 文件相关Repository
+    │   │           │   ├── SysAttachmentRepo.java
+    │   │           │   ├── SysAttachmentRelationRepo.java
+    │   │           │   └── impl/        # Repository实现
+    │   │           ├── ai/              # AI相关Repository
+    │   │           │   ├── AiConversationRepo.java
+    │   │           │   ├── AiMessageRepo.java
+    │   │           │   └── impl/        # Repository实现
+    │   │           └── log/             # 日志相关Repository
+    │   │               ├── SysOperationLogRepo.java
+    │   │               ├── LoginLogRepo.java
+    │   │               └── impl/        # Repository实现
     │   │
     │   └── infrastructure/               # 基础设施层 - 技术实现
     │       ├── config/                  # 配置类
     │       │   ├── database/            # 数据库配置
     │       │   │   ├── DatabaseConfig.java
-    │       │   │   └── MyBatisConfig.java
+    │       │   │   └── MyBatispPlusConfig.java
     │       │   ├── cache/               # 缓存配置
-    │       │   │   └── RedisConfig.java
+    │       │   │   ├── RedisConfig.java
+    │       │   │   └── IndustryConfigCache.java
     │       │   ├── mq/                  # 消息队列配置
     │       │   │   └── KafkaConfig.java
     │       │   ├── security/           # 安全配置
     │       │   │   ├── SecurityConfig.java
-    │       │   │   └── JwtConfig.java
+    │       │   │   └── CustomStpInterface.java
     │       │   ├── storage/            # 存储配置
     │       │   │   └── MinioConfig.java
     │       │   ├── ai/                 # AI配置
-    │       │   │   └── DifyConfig.java
+    │       │   │   └── LangChain4jConfig.java
     │       │   ├── web/                # Web配置
     │       │   │   ├── WebConfig.java
+    │       │   │   ├── WebMvcConfig.java
     │       │   │   └── SwaggerConfig.java
-    │       │   ├── idempotent/         # 幂等性配置
-    │       │   │   └── IdempotentConfig.java
-    │       │   ├── retry/              # 重试配置
-    │       │   │   └── RetryConfig.java
-    │       │   └── trace/              # 链路追踪配置
-    │       │       └── TraceConfig.java
+    │       │   ├── event/              # 事件配置
+    │       │   │   ├── AsyncEventConfig.java
+    │       │   │   └── AsyncGlobalConfig.java
+    │       │   ├── http/               # HTTP配置
+    │       │   │   └── HttpClientConfig.java
+    │       │   ├── mail/               # 邮件配置
+    │       │   │   ├── MailIntegrationConfig.java
+    │       │   │   ├── MailProviderConfig.java
+    │       │   │   └── MailProviderProperties.java
+    │       │   ├── sms/                # 短信配置
+    │       │   │   ├── SmsIntegrationConfig.java
+    │       │   │   └── SmsProviderProperties.java
+    │       │   ├── trace/              # 链路追踪配置
+    │       │   │   └── TraceConfig.java
+    │       │   └── health/             # 健康检查配置
+    │       │       └── HealthCheckConfig.java
     │       ├── external/               # 外部服务集成
     │       │   ├── dify/               # Dify平台集成
-    │       │   │   ├── DifyService.java
-    │       │   │   ├── WorkflowService.java
-    │       │   │   ├── KnowledgeBaseService.java
-    │       │   │   ├── dto/            # Dify API模型
-    │       │   │   │   ├── request/    # 请求模型
-    │       │   │   │   │   ├── DifyChatReq.java
-    │       │   │   │   │   ├── DifyWorkflowReq.java
-    │       │   │   │   │   ├── DifyKnowledgeReq.java
-    │       │   │   │   │   └── DifyFileUploadReq.java
-    │       │   │   │   └── response/   # 响应模型
-    │       │   │   │       ├── DifyChatResp.java
-    │       │   │   │       ├── DifyWorkflowResp.java
-    │       │   │   │       ├── DifyKnowledgeResp.java
-    │       │   │   │       └── DifyFileUploadResp.java
-    │       │   │   └── converter/      # Dify模型转换器
-    │       │   │       └── DifyConverter.java
     │       │   ├── minio/              # MinIO存储集成
     │       │   │   ├── MinioService.java
     │       │   │   ├── FileUploadService.java
     │       │   │   ├── FileDownloadService.java
     │       │   │   └── dto/            # MinIO API模型
-    │       │   │       ├── request/    # 请求模型
-    │       │   │       │   ├── MinioUploadReq.java
-    │       │   │       │   ├── MinioDownloadReq.java
-    │       │   │       │   └── MinioDeleteReq.java
-    │       │   │       └── response/   # 响应模型
-    │       │   │           ├── MinioUploadResp.java
-    │       │   │           ├── MinioDownloadResp.java
-    │       │   │           └── MinioDeleteResp.java
     │       │   ├── kafka/              # Kafka消息集成
     │       │   │   ├── KafkaProducer.java
     │       │   │   ├── KafkaConsumer.java
     │       │   │   └── dto/            # Kafka消息模型
-    │       │   │       ├── request/    # 请求模型
-    │       │   │       │   ├── KafkaMessageReq.java
-    │       │   │       │   └── KafkaEventReq.java
-    │       │   │       └── response/   # 响应模型
-    │       │   │           ├── KafkaMessageResp.java
-    │       │   │           └── KafkaEventResp.java
-    │       │   └── redis/              # Redis缓存集成
-    │       │       ├── RedisService.java
-    │       │       └── dto/            # Redis缓存模型
-    │       │           ├── request/    # 请求模型
-    │       │           │   ├── RedisSetReq.java
-    │       │           │   ├── RedisGetReq.java
-    │       │           │   └── RedisDeleteReq.java
-    │       │           └── response/   # 响应模型
-    │       │               ├── RedisSetResp.java
-    │       │               ├── RedisGetResp.java
-    │       │               └── RedisDeleteResp.java
+    │       │   ├── redis/              # Redis缓存集成
+    │       │   │   ├── RedisService.java
+    │       │   │   └── dto/            # Redis缓存模型
+    │       │   ├── mail/               # 邮件服务集成
+    │       │   │   ├── MailService.java
+    │       │   │   ├── provider/       # 邮件提供商
+    │       │   │   └── impl/           # 邮件服务实现
+    │       │   ├── sms/                # 短信服务集成
+    │       │   │   ├── SmsService.java
+    │       │   │   ├── SmsProvider.java
+    │       │   │   └── impl/           # 短信服务实现
+    │       │   └── Ip2region/          # IP定位服务
+    │       │       └── IpLocationService.java
     │       ├── common/                 # 通用组件
     │       │   ├── annotation/         # 自定义注解
     │       │   │   ├── Log.java
     │       │   │   ├── Idempotent.java
-    │       │   │   └── Retry.java
+    │       │   │   ├── Retry.java
+    │       │   │   └── AnnotationExamples.java
     │       │   ├── interceptor/        # 拦截器
     │       │   │   ├── AuthInterceptor.java
     │       │   │   ├── LogInterceptor.java
@@ -227,63 +304,111 @@ sci-z-server/
     │       │   │   ├── LogAspect.java
     │       │   │   ├── IdempotentAspect.java
     │       │   │   └── RetryAspect.java
-    │       │   ├── handler/            # 处理器
-    │       │   │   ├── GlobalExceptionHandler.java
-    │       │   │   ├── GlobalEventHandler.java
-    │       │   │   └── SecurityHandler.java
-    │       │   └── filter/             # 过滤器
-    │       │       ├── AuthFilter.java
-    │       │       ├── LogFilter.java
-    │       │       └── TraceFilter.java
+    │       │   ├── filter/             # 过滤器
+    │       │   │   ├── AuthFilter.java
+    │       │   │   ├── LogFilter.java
+    │       │   │   └── TraceFilter.java
+    │       │   └── advice/             # 增强器
+    │       │       └── ResponseBodyCacheAdvice.java
     │       └── shared/                 # 共享组件
     │           ├── result/             # 统一返回结果
     │           │   ├── Result.java
     │           │   ├── ResultCode.java
-    │           │   └── PageResult.java
+    │           │   ├── PageResult.java
+    │           │   └── ResultExample.java
     │           ├── exception/           # 异常处理
     │           │   ├── BusinessException.java
-    │           │   ├── ValidationException.java
-    │           │   └── NotFoundException.java
-    │           ├── event/               # 事件
+    │           │   ├── BusinessExceptionExample.java
+    │           │   └── GlobalExceptionHandler.java
+    │           ├── event/               # 事件（按模块组织）
     │           │   ├── EventPublisher.java        # 事件发布器
-    │           │   ├── DomainEvent.java
-    │           │   ├── UserLoginEvent.java
-    │           │   ├── UserLogoutEvent.java
-    │           │   ├── UserRegisteredEvent.java
-    │           │   └── ProjectCreatedEvent.java
+    │           │   ├── DomainEvent.java           # 领域事件基类
+    │           │   ├── user/           # 用户相关事件
+    │           │   ├── project/        # 项目相关事件
+    │           │   ├── declaration/    # 申报相关事件
+    │           │   ├── report/         # 报告相关事件
+    │           │   ├── knowledge/      # 知识库相关事件
+    │           │   ├── file/           # 文件相关事件
+    │           │   ├── ai/             # AI相关事件
+    │           │   └── log/            # 日志相关事件
+    │           ├── handler/             # 事件处理器（按模块组织）
+    │           │   ├── user/           # 用户相关处理器
+    │           │   ├── project/        # 项目相关处理器
+    │           │   ├── declaration/    # 申报相关处理器
+    │           │   ├── report/         # 报告相关处理器
+    │           │   ├── knowledge/      # 知识库相关处理器
+    │           │   ├── file/           # 文件相关处理器
+    │           │   ├── ai/             # AI相关处理器
+    │           │   └── log/            # 日志相关处理器
     │           ├── constant/           # 常量
     │           │   ├── SystemConstant.java
     │           │   ├── CacheConstant.java
     │           │   └── MessageConstant.java
     │           ├── enums/              # 枚举
+    │           │   ├── EnableStatus.java
+    │           │   ├── DeleteStatus.java
     │           │   ├── UserStatus.java
     │           │   ├── ProjectStatus.java
-    │           │   └── DeclarationStatus.java
+    │           │   ├── DeclarationStatus.java
+    │           │   ├── LoginStatus.java
+    │           │   ├── PermissionStatus.java
+    │           │   ├── WorkflowStatus.java
+    │           │   ├── AttachmentCategoryStatus.java
+    │           │   ├── AttachmentRelationStatus.java
+    │           │   ├── MailProviderStatus.java
+    │           │   ├── LogLevelStatus.java
+    │           │   └── OperationLogRecorderStatus.java
+    │           ├── context/            # 上下文
+    │           │   └── AsyncUserContext.java
+    │           ├── serializer/         # 序列化器
+    │           │   ├── FlexibleDateDeserializer.java
+    │           │   └── FlexibleDateTimeDeserializer.java
+    │           ├── typehandler/        # 类型处理器
+    │           │   └── JsonTypeHandler.java
     │           └── utils/              # 工具类
-    │               ├── JsonUtils.java
-    │               ├── DateUtils.java
-    │               ├── FileUtils.java
-    │               └── ValidationUtils.java
+    │               ├── JsonUtil.java
+    │               ├── DateUtil.java
+    │               ├── FileUtil.java
+    │               ├── ValidationUtil.java
+    │               ├── RedisUtil.java
+    │               ├── MinioUtil.java
+    │               ├── KafkaUtil.java
+    │               ├── LoginUserUtil.java
+    │               ├── CaptchaUtil.java
+    │               ├── ClientInfoUtil.java
+    │               ├── TraceIdUtil.java
+    │               ├── HttpClientHelperUtil.java
+    │               ├── OperationLogRecorderUtil.java
+    │               └── DeclarationUtil.java
     │
     └── resources/                       # 资源文件
         ├── application.yml              # 应用配置
         ├── application-dev.yml          # 开发环境配置
-        ├── application-prod.yml        # 生产环境配置
-        ├── mapper/                     # MyBatis映射文件
-        │   ├── user/                   # 用户相关映射文件
+        ├── application-local.yml        # 本地环境配置
+        ├── application-prod.yml         # 生产环境配置
+        ├── logback-spring.xml           # 日志配置
+        ├── mapper/                      # MyBatis映射文件（按模块组织）
+        │   ├── user/                    # 用户相关映射文件
         │   │   └── UserMapper.xml
-        │   ├── project/                # 项目相关映射文件
+        │   ├── project/                 # 项目相关映射文件
         │   │   └── ProjectMapper.xml
-        │   ├── declaration/            # 申报相关映射文件
+        │   ├── declaration/             # 申报相关映射文件
         │   │   └── DeclarationMapper.xml
-        │   ├── report/                 # 报告相关映射文件
+        │   ├── report/                  # 报告相关映射文件
         │   │   └── ReportMapper.xml
-        │   ├── knowledge/              # 知识库相关映射文件
+        │   ├── knowledge/               # 知识库相关映射文件
         │   │   └── KnowledgeMapper.xml
-        │   └── ai/                     # AI相关映射文件
+        │   └── ai/                      # AI相关映射文件
         │       └── ConversationMapper.xml
-        ├── static/                     # 静态资源
-        └── templates/                  # 模板文件
+        ├── db/                          # 数据库相关文件
+        │   ├── migration/               # 数据库迁移脚本
+        │   └── seed/                    # 数据库种子数据
+        ├── config/                      # 配置文件
+        │   └── production.env.properties  # 生产环境配置
+        ├── ip2region/                   # IP定位数据
+        │   └── ip2region.xdb
+        └── static/                      # 静态资源
+            └── index.html
 ```
 
 ### DDD 分层职责说明
@@ -317,22 +442,26 @@ sci-z-server/
 
 - **职责**：技术实现、外部系统集成、数据持久化
 - **核心组件**：
-  - Config：配置类（database、cache、mq、security、storage、ai、web、idempotent、retry、trace）
-  - External：外部服务集成（dify、minio、kafka、redis）
-  - Common：通用组件（annotation、interceptor、aspect、handler、filter）
-  - Shared：共享组件（result、exception、event、constant、enums、utils）
+  - Config：配置类（database、cache、mq、security、storage、ai、web、event、http、mail、sms、trace、health）
+  - External：外部服务集成（dify、minio、kafka、redis、mail、sms、Ip2region）
+  - Common：通用组件（annotation、interceptor、aspect、filter、advice）
+  - Shared：共享组件（result、exception、event、handler、constant、enums、context、serializer、typehandler、utils）
 
 ## 🚀 功能模块
 
-本系统共包含 **9 大核心功能模块**，覆盖科研项目全生命周期管理。
+本系统共包含 **10 大核心功能模块**，覆盖科研项目全生命周期管理。
 
 ### 2.1 🔐 认证模块
 
-- **用户登录**：支持用户名/邮箱登录，可选记住登录状态
-- **用户注册**：新用户注册，支持邮箱/手机验证
+- **用户登录**：支持用户名/邮箱登录，可选记住登录状态（7 天免登录）
+- **用户注册**：新用户注册，支持邮箱/手机验证、行业配置、部门选择
 - **密码重置**：通过邮箱/手机验证码重置密码
 - **验证码**：图形验证码防止暴力破解
-- **自动登录**：支持 7 天免登录
+- **权限控制**：基于 Sa-Token 的细粒度权限管理
+  - **菜单权限**：动态菜单渲染，根据用户权限显示
+  - **按钮权限**：接口级权限控制，防止越权访问
+  - **角色权限**：角色与权限的关联管理
+  - **数据权限**：支持数据级权限控制
 
 ### 2.2 📊 仪表板模块
 
@@ -351,67 +480,76 @@ sci-z-server/
 
 ### 2.4 📊 项目模块
 
-- **项目列表**：查看所有项目，支持搜索、筛选、分页
-- **项目详情**：查看项目基本信息、成员、进度、文档
+- **项目列表**：查看所有项目，支持搜索、筛选、分页、时间范围查询
+- **项目详情**：查看项目基本信息、成员、进度、文档、附件
+- **项目创建**：创建新项目，支持项目初始化、知识库自动创建
 - **成员管理**：添加/移除项目成员，分配成员角色
-- **进度跟踪**：项目里程碑、任务分配、进度更新
+- **进度跟踪**：项目进度管理、进度更新、进度附件关联
+- **进度附件**：项目进度附件上传、删除、关联管理
 - **文档管理**：项目相关文档的上传、分类、版本控制
-- **知识库集成**：项目专属知识库，支持 AI 问答
+- **知识库集成**：项目专属知识库，支持 AI 问答、自动同步项目文档
 
 ### 2.5 📄 报告管理模块
 
-- **报告列表**：查看所有报告，支持搜索、筛选、分页
-- **创建报告**：选择项目和报告类型，配置生成参数
-- **生成报告**：触发 Dify 工作流，实时显示生成进度
-- **报告预览**：在线预览生成的报告内容
+- **报告列表**：查看所有报告，支持搜索、筛选、分页、状态查询
+- **创建报告**：选择项目和报告类型，配置生成参数、工作流选择
+- **生成报告**：触发 Dify 工作流，实时显示生成进度，支持流式输出
+- **报告预览**：在线预览生成的报告内容（HTML 格式）
 - **报告导出**：支持 PDF、Word、Excel 等格式导出
-- **报告模板**：可配置的报告模板和样式
+- **报告附件**：报告附件管理，支持附件关联和下载
+- **报告配置**：报告生成配置管理，支持工作流 ID、API 密钥配置
 
 ### 2.6 📁 文件管理模块
 
-- **文件上传**：单文件/批量文件上传
-- **文件列表**：查看文件列表，支持筛选、搜索
+- **文件上传**：单文件/批量文件上传，支持 MD5 去重检测
+- **文件列表**：查看文件列表，支持筛选、搜索、分页
 - **文件预览**：在线预览 PDF、图片等文件
 - **文件下载**：支持单文件/批量下载
-- **文件去重**：基于文件哈希值自动去重
-- **MinIO 集成**：分布式文件存储，支持高可用
+- **文件去重**：基于文件 MD5 哈希值自动去重，避免重复存储
+- **文件关联**：支持文件与业务对象关联（项目、申报、报告等）
+- **文件转换**：支持文件格式转换（如 Word 转 PDF）
+- **MinIO 集成**：分布式文件存储，支持高可用、对象存储
 
 ### 2.7 📚 知识库模块
 
-- **知识库创建**：创建独立知识库或关联项目知识库
-- **文件夹管理**：创建多级文件夹，支持重命名、删除
-- **文件管理**：上传、重命名、删除、移动文件
-- **AI 问答**：基于知识库内容的智能问答
-- **语义搜索**：向量化搜索，支持语义理解
-- **Dify 同步**：与 Dify 平台知识库双向同步
+- **知识库创建**：创建独立知识库或关联项目知识库，支持知识库命名和描述
+- **文件夹管理**：创建多级文件夹，支持重命名、删除、移动
+- **文件管理**：上传、重命名、删除、移动文件，支持文件关联管理
+- **文件关联**：知识库文件与系统附件的关联关系管理
+- **AI 问答**：基于知识库内容的智能问答，支持流式输出
+- **语义搜索**：向量化搜索，支持语义理解，通过 Dify 平台实现
+- **Dify 同步**：与 Dify 平台知识库双向同步，自动同步文件和文件夹结构
 
 ### 2.8 🤖 AI 助手模块
 
-- **创建会话**：创建新的对话会话
-- **发送消息**：发送用户消息，接收 AI 回复
-- **会话列表**：查看所有对话会话
-- **会话管理**：删除、重命名会话
-- **上下文理解**：基于项目上下文的智能回答
-- **多模态支持**：支持文本、图片等多种输入格式
+- **创建会话**：创建新的对话会话，支持会话命名和管理
+- **发送消息**：发送用户消息，接收 AI 回复，支持流式输出
+- **会话列表**：查看所有对话会话，支持搜索、筛选
+- **会话管理**：删除、重命名会话，查看会话历史
+- **消息管理**：查看会话消息历史，支持消息查询
+- **流式对话**：支持 SSE（Server-Sent Events）流式响应，实时显示 AI 回复
+- **上下文理解**：基于项目上下文的智能回答，集成知识库内容
+- **工作流集成**：支持调用 Dify 工作流进行复杂任务处理
 
 ### 2.9 👤 用户中心模块
 
-- **个人信息**：查看和编辑个人基本信息
-- **头像上传**：上传和更换用户头像
-- **密码修改**：修改登录密码
+- **个人信息**：查看和编辑个人基本信息、用户资料字段
+- **头像上传**：上传和更换用户头像，支持图片裁剪
+- **密码修改**：修改登录密码，支持密码强度校验
 - **安全设置**：绑定手机号、邮箱，设置安全选项
-- **行业配置**：根据行业类型显示不同的字段配置
-- **操作日志**：查看个人操作历史记录
+- **行业配置**：根据行业类型显示不同的字段配置和部门标签
+- **登录日志**：查看个人登录历史记录，包括 IP、浏览器、操作系统等信息
 
 ### 2.10 ⚙️ 系统管理模块
 
-- **用户管理**：用户列表查询、创建、编辑、删除用户
-- **角色管理**：角色创建、权限分配、角色继承
-- **权限管理**：权限点管理、菜单权限、数据权限
-- **部门管理**：组织架构管理、部门层级设置
-- **系统配置**：系统参数配置、行业配置管理
-- **日志管理**：操作日志、登录日志、系统日志查询
-- **数据统计**：系统使用情况统计、用户活跃度分析
+- **用户管理**：用户列表查询、创建、编辑、删除用户、禁用启用、重置密码
+- **角色管理**：角色创建、权限分配、角色继承、角色权限关联
+- **权限管理**：权限点管理、菜单权限、数据权限、权限树结构
+- **部门管理**：组织架构管理、部门层级设置、部门标签配置
+- **系统配置**：系统参数配置、行业配置管理、邮件配置、短信配置
+- **API 密钥管理**：Dify API 密钥配置和管理
+- **日志管理**：操作日志查询、登录日志查询、日志导出、日志级别管理
+- **健康检查**：系统健康状态检查、服务可用性监控
 
 ## 🚀 快速开始
 
@@ -646,55 +784,6 @@ sudo apt-get install redis-server
 
 # macOS
 brew install redis
-```
-
-### 代码规范
-
-#### 类名注释模板
-
-```java
-/**
- * @author JiaWen.Wu
- * @className 当前类名
- * @date 当前时间(yyyy-MM-dd HH:mm)
- */
-```
-
-#### 方法名注释模板
-
-```java
-/**
- * 方法是做什么的
- *
- * @param 参数类型 参数描述
- * @return 返回结果
- */
-```
-
-### 统一返回格式
-
-所有接口使用统一的返回结果格式：
-
-```java
-public class Result<T> {
-    private Integer code;
-    private String message;
-    private T data;
-    private Long timestamp;
-}
-```
-
-### 日志规范
-
-```java
-// 使用 SLF4J + Logback
-private static final Logger logger = LoggerFactory.getLogger(YourClass.class);
-
-// 日志级别使用
-logger.debug("调试信息");
-logger.info("一般信息");
-logger.warn("警告信息");
-logger.error("错误信息", exception);
 ```
 
 ### 提交规范

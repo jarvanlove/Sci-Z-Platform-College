@@ -12,19 +12,20 @@
 - 🚀 **组件化开发**：高度可复用的组件库，提升开发效率
 - 🤖 **AI 智能化**：集成 Dify 平台，实现智能工作流编排
 - 📊 **全生命周期管理**：覆盖申报、执行、报告全流程
-- 🔒 **安全可靠**：基于 JWT 的前端认证体系
+- 🔒 **安全可靠**：基于 Token 的前端认证体系（Bearer Token）
 - ⚡ **Vue 3 新特性**：Composition API、响应式系统、Teleport 等
 
 ## 🛠 前端技术栈
 
 ### 核心技术
 
-- **Vue.js 3.x** - 渐进式 JavaScript 框架
-- **Vue Router 4.x** - 官方路由管理器
-- **Pinia** - 新一代状态管理
+- **Vue.js 3.4.0+** - 渐进式 JavaScript 框架
+- **Vue Router 4.2.5+** - 官方路由管理器
+- **Pinia 2.1.7+** - 新一代状态管理
 - **Element Plus 2.3.14** - Vue 3 企业级组件库
-- **Axios** - HTTP 客户端
-- **Vite 5.x** - 新一代前端构建工具
+- **Axios 1.6.2+** - HTTP 客户端
+- **Vite 5.0.8+** - 新一代前端构建工具
+- **Vue I18n 9.14.5+** - 国际化解决方案
 - **SCSS** - CSS 预处理器
 - **ESLint + Prettier** - 代码质量工具
 
@@ -40,209 +41,204 @@
 #### 🏗️ 分层架构设计
 
 ```
-┌─────────────────────────────────────────┐
-│                Views 层                 │  ← 页面布局层
-│  (页面结构、路由导航、组件组合)          │
-├─────────────────────────────────────────┤
-│              Business 层                │  ← 业务逻辑层
-│  (业务组件、数据处理、用户交互)          │
-├─────────────────────────────────────────┤
-│               Common 层                 │  ← 通用组件层
-│  (基础组件、布局组件、工具组件)          │
-├─────────────────────────────────────────┤
-│                API 层                   │  ← 数据接口层
-│  (接口封装、数据适配、错误处理)          │
-├─────────────────────────────────────────┤
-│               Store 层                   │  ← 状态管理层
-│  (全局状态、模块状态、持久化)            │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                    Views 层                              │  ← 页面视图层（极薄包装层）
+│  (页面路由挂载、业务组件引入、布局组合)                  │
+├─────────────────────────────────────────────────────────┤
+│                    Layout 层                             │  ← 布局组件层
+│  (页面结构布局、导航菜单、头部侧边栏)                    │
+├─────────────────────────────────────────────────────────┤
+│                   Business 层                           │  ← 业务逻辑层
+│  (业务组件、数据处理、用户交互、表单验证)                │
+├─────────────────────────────────────────────────────────┤
+│                    Common 层                             │  ← 通用组件层
+│  (基础UI组件、按钮、卡片、表格、对话框等)                │
+├─────────────────────────────────────────────────────────┤
+│                  Composables 层                         │  ← 组合式函数层
+│  (可复用逻辑封装、文件上传、状态处理等)                  │
+├─────────────────────────────────────────────────────────┤
+│                     API 层                               │  ← 数据接口层
+│  (接口封装、数据适配、请求拦截、错误处理)                │
+├─────────────────────────────────────────────────────────┤
+│                    Store 层                              │  ← 状态管理层
+│  (全局状态、模块状态、数据持久化、响应式更新)            │
+├─────────────────────────────────────────────────────────┤
+│                    Router 层                             │  ← 路由配置层
+│  (路由定义、权限控制、导航守卫、懒加载)                  │
+├─────────────────────────────────────────────────────────┤
+│                    Utils 层                              │  ← 工具函数层
+│  (工具方法、日期处理、文件处理、请求封装、日志)          │
+├─────────────────────────────────────────────────────────┤
+│                  Constants 层                            │  ← 常量定义层
+│  (常量定义、枚举值、配置项)                              │
+├─────────────────────────────────────────────────────────┤
+│                  Directives 层                           │  ← 自定义指令层
+│  (权限指令、DOM 操作指令)                                 │
+├─────────────────────────────────────────────────────────┤
+│                   Locales 层                             │  ← 国际化配置层
+│  (多语言支持、语言包管理)                                │
+├─────────────────────────────────────────────────────────┤
+│                    Assets 层                             │  ← 静态资源层
+│  (图片资源、全局样式、设计系统变量)                      │
+└─────────────────────────────────────────────────────────┘
 ```
 
 #### 📋 各层职责详解
 
-##### **1. Views 层 - 页面布局层**
-- **职责**：页面结构、路由导航、组件组合
-- **特点**：不包含业务逻辑，专注于页面布局和导航
-- **示例**：`src/views/Login/index.vue` - 登录页面布局
+##### **1. Views 层 - 页面视图层**
+- **职责**：页面路由挂载、业务组件引入、布局组合
+- **特点**：极薄包装层，不包含业务逻辑，专注于路由挂载和组件引入
+- **位置**：`src/views/` 目录
+- **说明**：Views 层是页面入口，仅负责从 Business 层引入业务组件并挂载到路由，实现页面与路由的映射关系
 
-```vue
-<!-- Views 层示例 -->
-<template>
-  <div class="login-page">
-    <!-- 页面布局 -->
-    <div class="login-container">
-      <!-- 组合 Business 组件 -->
-      <LoginForm @login-success="handleLoginSuccess" />
-    </div>
-  </div>
-</template>
+##### **2. Layout 层 - 布局组件层**
+- **职责**：页面结构布局、导航菜单、头部侧边栏
+- **特点**：提供统一的页面布局框架，支持多布局模式
+- **位置**：`src/components/Layout/` 目录
+- **说明**：Layout 层提供页面布局框架，包括主布局、头部导航、侧边栏菜单等，确保整个应用的布局一致性
 
-<script setup>
-// 页面级逻辑：路由导航
-const handleLoginSuccess = () => {
-  router.push('/dashboard')  // ✅ Views 层处理路由
-}
-</script>
-```
+##### **3. Business 层 - 业务逻辑层**
+- **职责**：业务逻辑、数据处理、用户交互、API调用、表单验证
+- **特点**：高度可复用，可在多个页面中使用，包含完整的业务逻辑
+- **位置**：`src/components/Business/` 目录
+- **说明**：Business 层是核心业务逻辑层，负责处理 API 调用、数据格式化、表单验证、错误处理、状态管理等业务相关操作，通过事件向 Views 层传递处理结果
 
-##### **2. Business 层 - 业务逻辑层**
-- **职责**：业务逻辑、数据处理、用户交互、API调用
-- **特点**：高度可复用，可在多个页面中使用
-- **示例**：`src/components/Business/Auth/LoginForm.vue` - 登录表单组件
-
-```vue
-<!-- Business 层示例 -->
-<template>
-  <el-form @submit.prevent="handleLogin">
-    <!-- 业务UI -->
-    <el-form-item>
-      <el-input v-model="form.username" />
-    </el-form-item>
-    <el-button @click="handleLogin">登录</el-button>
-  </el-form>
-</template>
-
-<script setup>
-// 业务逻辑：API调用、数据处理
-const handleLogin = async () => {
-  try {
-    const response = await login(form)  // ✅ Business 层处理API
-    ElMessage.success('登录成功')        // ✅ Business 层处理提示
-    emit('login-success', response)     // ✅ 向 Views 层发送事件
-  } catch (error) {
-    ElMessage.error('登录失败')          // ✅ Business 层处理错误
-  }
-}
-</script>
-```
-
-##### **3. Common 层 - 通用组件层**
-- **职责**：基础组件、布局组件、工具组件
+##### **4. Common 层 - 通用组件层**
+- **职责**：基础UI组件、按钮、卡片、表格、对话框等
 - **特点**：纯UI组件，无业务逻辑，高度可复用
-- **示例**：`src/components/Common/BaseButton.vue` - 基础按钮组件
+- **位置**：`src/components/Common/` 目录
+- **说明**：Common 层提供基础UI组件库，这些组件只负责UI展示和样式，不包含任何业务逻辑，可在整个项目中复用
 
-```vue
-<!-- Common 层示例 -->
-<template>
-  <button 
-    :class="buttonClass" 
-    :disabled="disabled"
-    @click="handleClick"
-  >
-    <slot />
-  </button>
-</template>
+##### **5. Composables 层 - 组合式函数层**
+- **职责**：可复用逻辑封装、状态处理、副作用管理
+- **特点**：基于 Composition API，提供可复用的组合式函数
+- **位置**：`src/composables/` 目录
+- **说明**：Composables 层封装可复用的组合式函数，如文件上传、表单处理、状态管理等，供 Business 层和 Common 层使用
 
-<script setup>
-// 纯UI逻辑：样式、状态
-const buttonClass = computed(() => ({
-  'base-button': true,
-  [`base-button--${type}`]: true,
-  'base-button--disabled': disabled
-}))
-</script>
-```
-
-##### **4. API 层 - 数据接口层**
+##### **6. API 层 - 数据接口层**
 - **职责**：接口封装、数据适配、错误处理、请求拦截
 - **特点**：统一的API调用方式，集中管理接口
-- **示例**：`src/api/Auth/auth.js` - 认证相关接口
+- **位置**：`src/api/` 目录
+- **说明**：API 层统一封装所有后端接口调用，提供统一的请求方式，处理数据格式转换、错误处理、请求拦截等功能，Business 层通过调用 API 层的方法来获取数据
 
-```javascript
-// API 层示例
-import request from '@/utils/request'
+##### **7. Store 层 - 状态管理层**
+- **职责**：全局状态、模块状态、数据持久化、响应式更新
+- **特点**：集中式状态管理，基于 Pinia，响应式数据更新
+- **位置**：`src/store/modules/` 目录
+- **说明**：Store 层使用 Pinia 进行状态管理，存储全局状态如用户信息、认证状态、行业配置等，提供响应式数据更新和数据持久化功能
 
-export const login = (data) => {
-  return request({
-    url: '/auth/login',
-    method: 'POST',
-    data
-  })
-}
+##### **8. Router 层 - 路由配置层**
+- **职责**：路由定义、权限控制、导航守卫、懒加载
+- **特点**：集中管理路由配置，支持权限控制和懒加载
+- **位置**：`src/router/` 目录
+- **说明**：Router 层使用 Vue Router 管理应用路由，定义路由规则，实现权限控制、导航守卫、路由懒加载等功能
 
-export const getUserInfo = () => {
-  return request({
-    url: '/auth/user',
-    method: 'GET'
-  })
-}
-```
+##### **9. Utils 层 - 工具函数层**
+- **职责**：工具方法、日期处理、文件处理、请求封装、日志工具
+- **特点**：纯函数工具集合，无副作用
+- **位置**：`src/utils/` 目录
+- **说明**：Utils 层提供各种工具函数，包括认证工具、日期处理、文件处理、请求封装、表单验证、日志工具等，供各个层级使用
 
-##### **5. Store 层 - 状态管理层**
-- **职责**：全局状态、模块状态、数据持久化
-- **特点**：集中式状态管理，响应式数据更新
-- **示例**：`src/store/modules/auth.js` - 认证状态管理
+##### **10. Constants 层 - 常量定义层**
+- **职责**：常量定义、枚举值、配置项
+- **特点**：集中管理项目常量，避免魔法值
+- **位置**：`src/constants/` 目录
+- **说明**：Constants 层定义项目中的常量、枚举值、配置项等，如附件类型、状态枚举等，确保常量使用的统一性
 
-```javascript
-// Store 层示例
-export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    token: getToken(),
-    userInfo: getUserInfo(),
-    permissions: []
-  }),
-  
-  actions: {
-    async login(credentials) {
-      const response = await login(credentials)
-      this.token = response.token
-      this.userInfo = response.user
-      setToken(response.token)
-    }
-  }
-})
-```
+##### **11. Directives 层 - 自定义指令层**
+- **职责**：权限指令、DOM操作指令
+- **特点**：扩展 Vue 指令功能，实现特定DOM操作
+- **位置**：`src/directives/` 目录
+- **说明**：Directives 层提供自定义 Vue 指令，如权限控制指令 `v-permission`，实现基于权限的DOM元素显示控制
+
+##### **12. Locales 层 - 国际化配置层**
+- **职责**：多语言支持、语言包管理
+- **特点**：支持多语言切换，集中管理语言包
+- **位置**：`src/locales/` 目录
+- **说明**：Locales 层使用 vue-i18n 实现国际化，支持中文、英文、日文、韩文等多种语言，提供语言包管理和语言切换功能
+
+##### **13. Assets 层 - 静态资源层**
+- **职责**：图片资源、全局样式、设计系统变量
+- **特点**：静态资源管理，提供全局样式和设计系统
+- **位置**：`src/assets/` 目录
+- **说明**：Assets 层管理静态资源，包括图片、全局样式文件、SCSS变量、混入等，提供统一的设计系统和样式规范
 
 #### 🔄 数据流向
 
 ```
-用户操作 → Business组件 → API调用 → Store更新 → Views组件 → 路由导航
-    ↓           ↓           ↓         ↓         ↓         ↓
-  交互事件    业务逻辑    数据获取   状态管理   页面更新   导航跳转
+用户操作
+    ↓
+Views 层（页面入口）
+    ↓
+Layout 层（布局框架）
+    ↓
+Business 层（业务逻辑）
+    ↓                    ↓
+Composables 层      Common 层（UI组件）
+    ↓                    ↓
+Utils 层（工具函数）  Directives 层（指令）
+    ↓                    ↓
+API 层（接口调用）   Constants 层（常量）
+    ↓
+Store 层（状态管理）
+    ↓
+Router 层（路由导航）
+    ↓
+页面更新反馈
+```
+
+**完整数据流示例：**
+```
+用户点击按钮 
+  → Views 层接收事件 
+  → Business 层处理业务逻辑 
+  → 调用 Composables 组合函数 
+  → 使用 Utils 工具函数处理数据 
+  → 调用 API 层请求后端接口 
+  → 更新 Store 状态 
+  → 通过 Router 层导航 
+  → Common 层UI组件响应状态变化 
+  → 页面更新展示结果
 ```
 
 #### 🎯 架构优势
 
 ##### **✅ 关注点分离**
-- **Views层**：专注页面布局和导航
+- **Views层**：专注路由挂载和组件引入
+- **Layout层**：专注页面布局框架
 - **Business层**：专注业务逻辑和数据处理
 - **Common层**：专注UI组件和样式
+- **Composables层**：专注可复用逻辑封装
 - **API层**：专注数据接口和网络请求
 - **Store层**：专注状态管理和数据持久化
+- **Router层**：专注路由配置和权限控制
+- **Utils层**：专注工具函数提供
+- **Constants层**：专注常量定义管理
+- **Directives层**：专注自定义指令功能
+- **Locales层**：专注国际化支持
+- **Assets层**：专注静态资源管理
 
 ##### **✅ 高度可复用**
 - **Business组件**：可在多个页面中复用
 - **Common组件**：可在整个项目中复用
-- **API接口**：统一的调用方式
+- **Composables函数**：可在多个组件中复用逻辑
+- **API接口**：统一的调用方式，便于维护
 - **Store模块**：模块化的状态管理
+- **Utils工具**：通用工具函数，提高开发效率
+- **Constants常量**：统一常量管理，避免魔法值
 
 ##### **✅ 易于维护**
-- **分层清晰**：每层职责明确，便于定位问题
-- **模块化**：按功能模块组织，便于扩展
+- **分层清晰**：13层架构，每层职责明确，便于定位问题
+- **模块化**：按功能模块组织，便于扩展和维护
 - **标准化**：统一的开发规范和代码风格
+- **类型安全**：TypeScript支持，提高代码质量
 
 ##### **✅ 团队协作**
-- **并行开发**：不同层可以并行开发
-- **代码复用**：减少重复代码，提高效率
-- **知识共享**：清晰的架构便于团队理解
+- **并行开发**：不同层可以并行开发，减少冲突
+- **代码复用**：减少重复代码，提高开发效率
+- **知识共享**：清晰的架构便于团队理解和学习
+- **职责明确**：每层职责清晰，便于分工协作
 
-#### 📊 组件分类
-
-| 组件类型 | 位置 | 职责 | 复用性 | 示例 |
-|----------|------|------|--------|------|
-| **页面组件** | `views/` | 页面布局、路由导航 | 低 | `Login/index.vue` |
-| **业务组件** | `components/Business/` | 业务逻辑、数据处理 | 高 | `LoginForm.vue` |
-| **通用组件** | `components/Common/` | UI展示、基础功能 | 极高 | `BaseButton.vue` |
-| **布局组件** | `components/Layout/` | 页面结构、导航 | 中 | `MainLayout.vue` |
-
-#### 🚀 开发流程
-
-1. **需求分析** → 确定功能模块和页面结构
-2. **API设计** → 定义接口规范和数据结构
-3. **组件设计** → 设计Business组件和Common组件
-4. **页面开发** → 组合组件实现页面功能
-5. **状态管理** → 管理全局状态和模块状态
-6. **测试验证** → 功能测试和性能优化
 
 ## 📁 项目结构
 
@@ -265,6 +261,9 @@ sci-z-web/
 │   │   │   └── index.js       # 模块导出
 │   │   ├── Declaration/       # 申报相关接口
 │   │   │   ├── declaration.js # 申报管理 API
+│   │   │   └── index.js       # 模块导出
+│   │   ├── Dify/              # Dify 平台接口
+│   │   │   ├── dify.js        # Dify API 封装
 │   │   │   └── index.js       # 模块导出
 │   │   ├── File/              # 文件管理接口
 │   │   │   ├── file.js        # 文件上传、下载 API
@@ -316,6 +315,7 @@ sci-z-web/
 │   │   │   │   ├── FileUpload.vue     # 文件上传
 │   │   │   │   ├── FormActions.vue    # 表单操作
 │   │   │   │   ├── FormSection.vue    # 表单区块
+│   │   │   │   ├── WorkflowSelect.vue # 工作流选择器
 │   │   │   │   └── index.js            # 模块导出
 │   │   │   ├── Knowledge/      # 知识库组件
 │   │   │   ├── Legacy/         # 遗留组件
@@ -331,18 +331,38 @@ sci-z-web/
 │   │   │   │   ├── StatusTag.vue      # 状态标签
 │   │   │   │   └── index.js           # 模块导出
 │   │   │   ├── Project/        # 项目相关组件
+│   │   │   │   ├── ProjectDetail.vue   # 项目详情
+│   │   │   │   ├── ProjectList.vue     # 项目列表
+│   │   │   │   ├── ProjectProgress.vue # 项目进度
+│   │   │   │   └── index.js            # 模块导出
 │   │   │   ├── Report/         # 报告相关组件
+│   │   │   │   ├── ReportGenerate.vue  # 报告生成
+│   │   │   │   ├── ReportList.vue      # 报告列表
+│   │   │   │   └── index.js            # 模块导出
 │   │   │   ├── System/         # 系统管理组件
+│   │   │   │   ├── ApiKeyManagement.vue # API 密钥管理
+│   │   │   │   ├── LogManagement.vue    # 日志管理
+│   │   │   │   ├── RoleManagement.vue   # 角色管理
+│   │   │   │   ├── SystemConfig.vue     # 系统配置
+│   │   │   │   ├── UserManagement.vue   # 用户管理
+│   │   │   │   └── index.js             # 模块导出
 │   │   │   ├── User/           # 用户相关组件
 │   │   │   └── index.js        # 业务组件统一导出
 │   │   ├── Common/             # 通用组件
+│   │   │   ├── AgreementNotice.vue # 协议提醒组件
+│   │   │   ├── BackButton.vue  # 返回按钮
 │   │   │   ├── BaseButton.vue  # 基础按钮
 │   │   │   ├── BaseCard.vue    # 基础卡片
+│   │   │   ├── BaseDatePicker.vue # 基础日期选择器
 │   │   │   ├── BaseDialog.vue  # 基础对话框
 │   │   │   ├── BasePagination.vue # 基础分页
 │   │   │   ├── BaseScrollbar.vue # 基础滚动条
+│   │   │   ├── BaseSwitch.vue  # 基础开关
 │   │   │   ├── BaseTable.vue   # 基础表格
+│   │   │   ├── BaseTooltip.vue # 基础提示框
+│   │   │   ├── FilePreview.vue # 文件预览组件
 │   │   │   ├── LanguageSwitcher.vue # 语言切换器
+│   │   │   ├── ProjectProgressBar.vue # 项目进度条
 │   │   │   └── index.js        # 通用组件导出
 │   │   ├── Layout/             # 布局组件
 │   │   │   ├── Header.vue       # 页面头部
@@ -357,10 +377,15 @@ sci-z-web/
 │   │   └── index.js            # i18n 配置
 │   ├── router/                 # 路由配置
 │   │   └── index.js           # 路由主文件
+│   ├── composables/           # 组合式函数
+│   │   └── useFileUpload.js   # 文件上传组合函数
+│   ├── constants/             # 常量定义
+│   │   └── attachment.js      # 附件相关常量
 │   ├── store/                  # 状态管理（Pinia）
 │   │   ├── modules/           # Store 模块
 │   │   │   ├── app.js         # 应用状态
-│   │   │   └── auth.js         # 认证状态
+│   │   │   ├── auth.js         # 认证状态
+│   │   │   └── industry.js     # 行业配置状态
 │   │   ├── types.ts            # 类型定义
 │   │   └── index.js            # Store 入口
 │   ├── directives/            # 自定义指令
@@ -371,6 +396,7 @@ sci-z-web/
 │   │   ├── date.js            # 日期处理
 │   │   ├── file.js            # 文件处理
 │   │   ├── request.js         # Axios 封装
+│   │   ├── simpleLogger.js    # 简单日志工具
 │   │   └── validate.js        # 表单验证
 │   ├── views/                  # 页面视图层
 │   │   ├── AI/                # AI 助手页面
@@ -400,6 +426,7 @@ sci-z-web/
 │   │   ├── ResetPassword/      # 重置密码页面
 │   │   │   └── index.vue      # 重置密码首页
 │   │   ├── System/             # 系统管理页面
+│   │   │   ├── ApiKey.vue     # API 密钥管理
 │   │   │   ├── Config.vue     # 系统配置
 │   │   │   ├── Logs.vue       # 日志管理
 │   │   │   ├── Role.vue       # 角色管理
@@ -407,12 +434,11 @@ sci-z-web/
 │   │   ├── User/               # 用户中心页面
 │   │   │   ├── Profile.vue    # 个人资料
 │   │   │   └── Security.vue   # 安全设置
-│   │   └── ComponentTest.vue   # 组件测试页面
 │   ├── App.vue                 # 根组件
 │   └── main.js                 # 入口文件
 ├── index.html                  # HTML 入口文件
-├── .env.development            # 开发环境配置
-├── .env.production             # 生产环境配置
+├── env.development             # 开发环境配置
+├── env.production              # 生产环境配置
 ├── .eslintrc.js                # ESLint 配置
 ├── .prettierrc.js              # Prettier 配置
 ├── vite.config.js              # Vite 配置
@@ -503,6 +529,7 @@ sci-z-web/
 - **角色权限管理**：角色列表查询、新建角色、配置角色权限
 - **系统配置**：行业配置、基本配置、Dify 配置、邮件配置
 - **日志管理**：操作日志查询、登录日志查询、日志导出
+- **API 密钥管理**：Dify API 密钥的配置和管理
 
 ## 🚀 启动部署
 
@@ -573,7 +600,7 @@ server {
 
 #### 3. 环境变量配置
 
-**开发环境 (.env.development)**
+**开发环境 (env.development)**
 
 ```env
 # API 基础地址
@@ -588,7 +615,7 @@ VITE_APP_TITLE=高校科研项目管理平台
 VITE_APP_VERSION=1.0.0
 ```
 
-**生产环境 (.env.production)**
+**生产环境 (env.production)**
 
 ```env
 # API 基础地址
@@ -615,12 +642,6 @@ VITE_APP_VERSION=1.0.0
 - `test:` 测试相关
 - `chore:` 构建过程或辅助工具的变动
 
-### 性能优化
-
-- **代码分割**：路由懒加载，组件懒加载
-- **静态资源优化**：CDN 加速，资源压缩
-- **缓存策略**：浏览器缓存，HTTP 缓存
-- **构建优化**：Tree-shaking，代码压缩
 
 ## 📄 许可证
 
