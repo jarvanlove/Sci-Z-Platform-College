@@ -67,4 +67,19 @@ public interface ProjectRepo {
      * @return Long 项目数量
      */
     Long countByStatus(String status);
+
+    /**
+     * 查询所有活跃项目（用于定时任务自动更新）
+     * 排除已取消和已删除的项目
+     *
+     * @return List<Project> 活跃项目列表
+     */
+    List<Project> findAllActiveProjects();
+
+    /**
+     * 查询所有项目（用于下拉框，排除已删除的项目）
+     *
+     * @return List<Project> 项目列表
+     */
+    List<Project> findAll();
 }

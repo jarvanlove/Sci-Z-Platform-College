@@ -12,6 +12,11 @@ import com.sciz.server.domain.pojo.mapper.knowledge.SysKnowledgeFileRelationMapp
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeFileRelationRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.CollectionUtils;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 知识库文件关系仓储实现
@@ -89,20 +94,27 @@ public class SysKnowledgeFileRelationRepoImpl implements SysKnowledgeFileRelatio
                 .set(SysKnowledgeFileRelation::getUpdatedTime, LocalDateTime.now())) > 0;
     }
 
-    /**
-     * 统计知识库中的文档数量（未删除的）
-     *
-     * @param knowledgeId 知识库ID
-     * @return 文档数量
-     */
     @Override
-    public long countByKnowledgeId(Long knowledgeId) {
+    public Long countByKnowledgeId(Long knowledgeId) {
         if (knowledgeId == null) {
-            return 0;
+            return 0L;
         }
-        LambdaQueryWrapper<SysKnowledgeFileRelation> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(SysKnowledgeFileRelation::getKnowledgeId, knowledgeId)
-                .eq(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
-        return mapper.selectCount(queryWrapper);
+        return mapper.selectCount(new LambdaQueryWrapper<SysKnowledgeFileRelation>()
+                .eq(SysKnowledgeFileRelation::getKnowledgeId, knowledgeId)
+                .eq(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode()));
+    }
+
+    @Override
+    public Map<Long, List<Long>> findAttachmentIdsByKnowledgeIds(List<Long> knowledgeIds) {
+        if (CollectionUtils.isEmpty(knowledgeIds)) {
+            return Map.of();
+        }
+        var records = mapper.selectList(new LambdaQueryWrapper<SysKnowledgeFileRelation>()
+                .in(SysKnowledgeFileRelation::getKnowledgeId, knowledgeIds)
+                .eq(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode()));
+        return records.stream()
+                .collect(Collectors.groupingBy(
+                        SysKnowledgeFileRelation::getKnowledgeId,
+                        Collectors.mapping(SysKnowledgeFileRelation::getAttachmentId, Collectors.toList())));
     }
 }

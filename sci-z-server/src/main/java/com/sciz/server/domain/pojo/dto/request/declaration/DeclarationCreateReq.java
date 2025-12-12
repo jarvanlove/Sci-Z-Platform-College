@@ -17,27 +17,36 @@ import java.util.List;
  * @param researchFields      List<String> 研究领域（最多10个）
  * @param researchDirection   String 研究方向（富文本）
  * @param researchTopic       String 研究课题
- * @param workflowId          String 工作流ID（工作流模板ID）
+ * @param workflowId          String 工作流ID（工作流模板ID，默认值：workflow_003）
  * @author JiaWen.Wu
  * @className DeclarationCreateReq
  * @date 2025-01-20 15:00
  */
 public record DeclarationCreateReq(
-        @NotBlank(message = "课题发布部门不能为空") String department,
+                @NotBlank(message = "课题发布部门不能为空") String department,
 
-        @NotBlank(message = "项目负责人不能为空") String projectLeader,
+                @NotBlank(message = "项目负责人不能为空") String projectLeader,
 
-        @NotNull(message = "红头文件发布时间不能为空") LocalDate documentPublishTime,
+                @NotNull(message = "红头文件发布时间不能为空") LocalDate documentPublishTime,
 
-        @NotNull(message = "项目开始时间不能为空") LocalDate projectStartTime,
+                @NotNull(message = "项目开始时间不能为空") LocalDate projectStartTime,
 
-        @NotNull(message = "项目结束时间不能为空") LocalDate projectEndTime,
+                @NotNull(message = "项目结束时间不能为空") LocalDate projectEndTime,
 
-        List<String> researchFields,
+                List<String> researchFields,
 
-        @NotBlank(message = "研究方向不能为空") String researchDirection,
+                @NotBlank(message = "研究方向不能为空") String researchDirection,
 
-        @NotBlank(message = "研究课题不能为空") String researchTopic,
+                @NotBlank(message = "研究课题不能为空") String researchTopic,
 
-        @NotBlank(message = "工作流ID不能为空") String workflowId) {
+                String workflowId) {
+
+        /**
+         * 紧凑构造方法：设置 workflowId 默认值
+         */
+        public DeclarationCreateReq {
+                if (workflowId == null || workflowId.trim().isEmpty()) {
+                        workflowId = "workflow_003";
+                }
+        }
 }

@@ -7,105 +7,87 @@
 -->
 <template>
   <div class="report-list-container">
-    <!-- 页面头部 -->
+    <!-- 页面标题 -->
     <div class="page-header">
       <h1 class="page-title">{{ $t('report.listPage.title') }}</h1>
-      <BaseButton type="primary" @click="handleGenerateReport">
-        <el-icon><Plus /></el-icon>
-        {{ $t('report.listPage.generateNewReport') }}
-      </BaseButton>
     </div>
 
-    <!-- 搜索筛选区域 -->
-    <BaseCard class="search-card">
-      <el-form :model="searchForm" class="search-form" label-width="100px">
-        <el-form-item :label="$t('report.listPage.keywordSearch')">
-          <el-input
-            v-model="searchForm.keyword"
-            :placeholder="$t('report.listPage.keywordPlaceholder')"
-            clearable
-            style="width: 300px"
-            @keyup.enter="handleSearch"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </el-form-item>
+    <!-- 搜索筛选和列表区域 -->
+    <BaseCard class="content-card">
+      <!-- 搜索筛选区域 -->
+      <div class="filter-section">
+        <el-input
+          v-model="searchForm.keyword"
+          :placeholder="$t('report.listPage.keywordPlaceholder')"
+          clearable
+          style="width: 220px"
+          @keyup.enter="handleSearch"
+          @blur="handleKeywordBlur"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
         
-        <el-form-item :label="$t('report.type')">
-          <el-select
-            v-model="searchForm.reportType"
-            :placeholder="$t('common.all')"
-            clearable
-            style="width: 150px"
-            @change="handleFilterChange"
-          >
-            <el-option
-              v-for="option in reportTypeOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item :label="$t('report.listPage.status')">
-          <el-select
-            v-model="searchForm.status"
-            :placeholder="$t('common.all')"
-            clearable
-            style="width: 150px"
-            @change="handleFilterChange"
-          >
-            <el-option
-              v-for="option in statusOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item :label="$t('report.listPage.dateRange')">
-          <BaseDatePicker
-            v-model="searchForm.dateRange"
-            type="daterange"
-            range-separator="至"
-            :start-placeholder="$t('common.startDate')"
-            :end-placeholder="$t('common.endDate')"
-            style="width: 240px"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            @change="handleDateChange"
+        <el-select
+          v-model="searchForm.reportType"
+          placeholder="请选择报告类型"
+          clearable
+          style="width: 160px"
+          @change="handleFilterChange"
+        >
+          <el-option
+            v-for="option in reportTypeOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
           />
-        </el-form-item>
-      </el-form>
-
-      <!-- 按钮行 -->
-      <div class="search-actions">
-        <BaseButton type="primary" :loading="loading" @click="handleSearch">
+        </el-select>
+        
+        <el-select
+          v-model="searchForm.status"
+          placeholder="请选择报告状态"
+          clearable
+          style="width: 160px"
+          @change="handleFilterChange"
+        >
+          <el-option
+            v-for="option in statusOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+        
+        <BaseDatePicker
+          v-model="searchForm.dateRange"
+          type="daterange"
+          :unlink-panels="true"
+          :start-placeholder="$t('common.startDate')"
+          :end-placeholder="$t('common.endDate')"
+          style="width: 240px"
+          format="YYYY-MM-DD"
+          value-format="YYYY-MM-DD"
+          @change="handleDateChange"
+        />
+        
+        <el-button type="primary" :loading="loading" @click="handleSearch">
           <el-icon><Search /></el-icon>
           {{ $t('common.search') }}
-        </BaseButton>
-        <BaseButton @click="handleReset">
+        </el-button>
+        <el-button type="primary" @click="handleReset">
           <el-icon><Refresh /></el-icon>
           {{ $t('common.reset') }}
-        </BaseButton>
+        </el-button>
+        <el-button type="primary" @click="handleGenerateReport" style="white-space: nowrap;">
+          <el-icon><Plus /></el-icon>
+          {{ $t('report.listPage.generateNewReport') }}
+        </el-button>
       </div>
-    </BaseCard>
-
-    <!-- 报告列表卡片 -->
-    <BaseCard class="content-card">
       <!-- 加载状态 -->
       <div v-if="loading" class="loading-container">
         <el-icon class="is-loading"><Loading /></el-icon>
         <span>{{ $t('common.loading') }}</span>
-      </div>
-
-      <!-- 报告统计栏 -->
-      <div v-if="!loading && reportList.length > 0" class="result-count-bar">
-        {{ $t('report.listPage.totalReports', { total: pagination.total }) }}
       </div>
 
       <!-- 卡片视图 -->
@@ -124,58 +106,103 @@
 
           <div class="card-content">
             <h3 class="project-name">{{ report.projectName }}</h3>
-            <p class="report-summary">{{ report.summary || $t('report.listPage.noSummary') }}</p>
+            <BaseTooltip 
+              v-if="report.summary && report.summary.length > 50"
+              :content="report.summary" 
+              placement="top"
+            >
+              <p class="report-summary">{{ report.summary }}</p>
+            </BaseTooltip>
+            <p v-else class="report-summary">{{ report.summary || $t('report.listPage.noSummary') }}</p>
           </div>
 
           <div class="card-meta">
             <div class="meta-item">
-              <p class="meta-value">{{ formatDate(report.generateTime || report.createdTime) }}</p>
               <p class="meta-label">{{ $t('report.listPage.generateTime') }}</p>
+              <p class="meta-value">{{ formatDate(report.generateTime || report.createdTime) }}</p>
             </div>
             <div class="meta-item">
-              <p class="meta-value">{{ report.creatorName || '-' }}</p>
               <p class="meta-label">{{ $t('report.listPage.creator') }}</p>
+              <p class="meta-value">{{ report.creatorName || '-' }}</p>
             </div>
             <div class="meta-item">
+              <p class="meta-label">{{ $t('report.status') }}</p>
               <p class="meta-value">
-                <el-tag :type="getStatusTagType(report.status)" size="small">
+                <el-tag :type="getStatusTagType(report.status)" size="small" class="status-tag">
                   {{ getStatusText(report.status) }}
                 </el-tag>
               </p>
-              <p class="meta-label">{{ $t('report.status') }}</p>
             </div>
           </div>
 
           <div class="card-actions" @click.stop>
-            <div class="action-group-primary">
-              <BaseButton class="action-btn primary" @click="handlePreview(report)">
-                {{ $t('report.listPage.preview') }}
-              </BaseButton>
-              <el-dropdown
-                @command="(format) => handleDownload(report, format)"
-                trigger="click"
+            <!-- 预览按钮 -->
+            <BaseTooltip
+              v-if="canPreview(report)"
+              :content="$t('report.listPage.preview')"
+              placement="top"
+            >
+              <button
+                class="action-btn btn-info"
+                @click.stop="handlePreview(report)"
               >
-                <BaseButton class="action-btn primary">
-                  {{ $t('report.listPage.download') }}
-                  <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                </BaseButton>
+                <el-icon><View /></el-icon>
+              </button>
+            </BaseTooltip>
+            <!-- 下载按钮 -->
+            <BaseTooltip
+              v-if="canDownload(report)"
+              :content="$t('report.listPage.download')"
+              placement="top"
+            >
+              <el-dropdown
+                @command="handleDownload"
+                trigger="click"
+                @click.stop.prevent
+              >
+                <span 
+                  class="action-btn btn-success" 
+                  style="cursor: pointer;"
+                  @click.stop.prevent
+                >
+                  <el-icon><Download /></el-icon>
+                </span>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="pdf">PDF</el-dropdown-item>
-                    <el-dropdown-item command="word">Word</el-dropdown-item>
-                    <el-dropdown-item command="markdown">Markdown</el-dropdown-item>
+                    <el-dropdown-item
+                      :command="{id: report.id, attachmentId: report.attachmentId, format: 'word'}"
+                    >
+                      <el-icon><Edit /></el-icon>
+                      Word格式
+                    </el-dropdown-item>
+                    <el-dropdown-item
+                      :command="{id: report.id, attachmentId: report.attachmentId, format: 'pdf'}"
+                    >
+                      <el-icon><Document /></el-icon>
+                      PDF格式
+                    </el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
-              <BaseButton class="action-btn primary" @click="handleRegenerate(report)">
-                {{ $t('report.listPage.regenerate') }}
-              </BaseButton>
-            </div>
-            <div class="action-group-danger">
-              <BaseButton class="action-btn danger" @click="handleDelete(report)">
-                {{ $t('common.delete') }}
-              </BaseButton>
-            </div>
+            </BaseTooltip>
+            <!-- 重新生成按钮 -->
+            <BaseTooltip :content="$t('report.listPage.regenerate')" placement="top">
+              <button
+                class="action-btn btn-warning"
+                @click.stop="handleRegenerate(report)"
+              >
+                <el-icon><Refresh /></el-icon>
+              </button>
+            </BaseTooltip>
+            <!-- 删除按钮 -->
+            <BaseTooltip :content="$t('common.delete')" placement="top">
+              <button
+                class="action-btn btn-danger"
+                @click.stop="handleDelete(report)"
+              >
+                <el-icon><Delete /></el-icon>
+              </button>
+            </BaseTooltip>
           </div>
         </div>
       </div>
@@ -202,22 +229,22 @@
       </div>
     </BaseCard>
 
-    <!-- 文件预览弹窗 -->
+    <!-- 文件预览组件 -->
     <FilePreview
       v-model="showPreviewDialog"
       :file-info="previewFileInfo"
+      @close="closePreview"
     />
-
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Refresh, ArrowDown, Loading } from '@element-plus/icons-vue'
-import { BaseCard, BaseButton, BaseDatePicker, BasePagination, FilePreview } from '@/components/Common'
+import { Plus, Search, Refresh, Loading, View, Download, Delete, Document, Edit } from '@element-plus/icons-vue'
+import { BaseCard, BaseButton, BaseDatePicker, BasePagination, BaseTooltip, FilePreview } from '@/components/Common'
 import { getReportManagementList, deleteReportManagement } from '@/api/Report'
 import { downloadFile } from '@/api/File/file'
 import { createLogger } from '@/utils/simpleLogger'
@@ -233,18 +260,11 @@ const reportList = ref([])
 
 // 文件预览相关
 const showPreviewDialog = ref(false)
-const previewFileInfo = ref({
-  name: '',
-  attachmentId: null
-})
+const previewFileInfo = ref(null)
 
 // 定时刷新相关
 const refreshTimer = ref(null)
-const REFRESH_INTERVAL = 10000 // 10秒刷新一次（优化：减少刷新频率）
-const userInteracting = ref(false) // 用户是否正在交互
-const userInteractionTimer = ref(null) // 用户交互计时器
-const USER_INTERACTION_DELAY = 3000 // 用户停止操作后3秒再恢复刷新
-const isPageVisible = ref(true) // 页面是否可见
+const REFRESH_INTERVAL = 5000 // 5秒刷新一次
 
 // 搜索表单
 const searchForm = reactive({
@@ -384,7 +404,6 @@ const loadReportList = async () => {
 
 // 搜索处理
 const handleSearch = () => {
-  markUserInteracting() // 标记用户正在交互
   logger.info('User performed search', {
     keyword: searchForm.keyword,
     reportType: searchForm.reportType,
@@ -396,7 +415,6 @@ const handleSearch = () => {
 
 // 筛选变化处理
 const handleFilterChange = () => {
-  markUserInteracting() // 标记用户正在交互
   logger.info('User changed filter')
   pagination.current = 1
   loadReportList()
@@ -404,7 +422,6 @@ const handleFilterChange = () => {
 
 // 日期变化处理
 const handleDateChange = () => {
-  markUserInteracting() // 标记用户正在交互
   logger.info('User changed date range')
   pagination.current = 1
   loadReportList()
@@ -428,93 +445,97 @@ const handleGenerateReport = () => {
   router.push('/report/generate')
 }
 
-// 预览报告
-const handlePreview = (report) => {
-  try {
-    logger.info('User previewed report', { id: report.id, attachmentId: report.attachmentId })
-    
-    // 检查是否有附件 ID
-    if (!report.attachmentId) {
-      ElMessage.warning(t('report.listPage.noAttachment') || '报告文件尚未生成，无法预览')
-      return
-    }
-    
-    // 设置预览文件信息
-    previewFileInfo.value = {
-      name: report.projectName || report.number || '报告预览',
-      attachmentId: report.attachmentId
-    }
-    
-    // 显示预览弹窗
-    showPreviewDialog.value = true
-    logger.info('Preview dialog opened', { id: report.id, attachmentId: report.attachmentId })
-  } catch (error) {
-    logger.error('Failed to preview report', error)
-    const errorMessage = error.response?.data?.message || error.message || t('report.listPage.previewError') || '预览失败'
-    ElMessage.error(errorMessage)
-  }
+// 判断是否可以下载/预览
+// 规则：attachmentId 有值 → 可以下载/预览
+const canDownloadPreview = (record) => {
+  return record.attachmentId != null
 }
 
-// 下载报告
-const handleDownload = async (report, format) => {
+// 判断是否可以下载
+const canDownload = (record) => {
+  return canDownloadPreview(record)
+}
+
+// 判断是否可以预览
+const canPreview = (record) => {
+  return canDownloadPreview(record)
+}
+
+// 预览处理 - 完全按照申报列表的实现
+const handlePreview = (report) => {
+  const { id, attachmentId, projectName } = report
+  
+  logger.info('User started preview', { id, attachmentId })
+  
+  // 必须有 attachmentId 才能预览
+  if (!attachmentId) {
+    ElMessage.error(t('report.listPage.noAttachment') || '报告文件尚未生成，无法预览')
+    logger.warn('Preview failed: attachmentId is missing', { id })
+    return
+  }
+  
+  // 使用通用预览组件
+  // 注意：由于列表接口可能没有返回文件名，使用默认的 .docx 扩展名
+  // FilePreview 组件会从预览 URL 中自动识别文件类型
+  previewFileInfo.value = {
+    name: `${projectName || '报告文件'}.docx`, // 添加默认扩展名，帮助识别文件类型
+    attachmentId
+  }
+  showPreviewDialog.value = true
+}
+
+/**
+ * 关闭预览
+ */
+const closePreview = () => {
+  showPreviewDialog.value = false
+  previewFileInfo.value = null
+}
+
+// 下载报告 - 参考申报列表的实现
+const handleDownload = async (command) => {
+  const { id, attachmentId, format } = command
+  const formatNames = {
+    pdf: 'PDF',
+    docx: 'Word',
+    word: 'Word'
+  }
+  
   try {
-    logger.info('User downloaded report', { id: report.id, attachmentId: report.attachmentId, format })
+    logger.info('User started download', { id, attachmentId, format })
     
-    // 检查是否有附件 ID
-    if (!report.attachmentId) {
-      ElMessage.warning(t('report.listPage.noAttachment') || '报告文件尚未生成，无法下载')
+    // 必须有 attachmentId 才能下载
+    if (!attachmentId) {
+      ElMessage.error(t('report.listPage.noAttachment') || '报告文件尚未生成，无法下载')
+      logger.warn('Download failed: attachmentId is missing', { id })
       return
     }
-    
-    // 根据格式参数决定下载格式
-    let downloadFormat = null
-    if (format === 'pdf') {
-      downloadFormat = 'pdf'
-    } else if (format === 'word') {
-      downloadFormat = 'docx'
-    }
-    // markdown 格式不转换，直接下载原文件
+  
+    const fileFormat = format === 'word' ? 'docx' : format // 将 word 转换为 docx
     
     // 调用下载接口
-    const response = await downloadFile(report.attachmentId, downloadFormat)
+    const response = await downloadFile(attachmentId, fileFormat)
     
-    // 创建 Blob 对象
+    // 创建 blob URL 并触发下载
+    // 后端应该正确设置 Content-Disposition 头，浏览器会自动处理文件名
     const blob = new Blob([response.data], { 
       type: response.headers['content-type'] || 'application/octet-stream' 
     })
-    
-    // 创建下载链接
-    const url = window.URL.createObjectURL(blob)
+    const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    
-    // 从响应头获取文件名，或使用默认文件名
-    const contentDisposition = response.headers['content-disposition']
-    let fileName = `报告_${report.number || report.id}`
-    
-    if (contentDisposition) {
-      const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
-      if (fileNameMatch && fileNameMatch[1]) {
-        fileName = decodeURIComponent(fileNameMatch[1].replace(/['"]/g, ''))
-      }
-    } else {
-      // 根据格式添加扩展名
-      const ext = format === 'pdf' ? '.pdf' : format === 'word' ? '.docx' : format === 'markdown' ? '.md' : ''
-      fileName += ext
-    }
-    
-    link.download = fileName
+    // 使用简单的默认文件名，如果后端正确设置了 Content-Disposition 头，浏览器会使用后端提供的文件名
+    link.download = `报告_${id}.${fileFormat || 'pdf'}`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
+    URL.revokeObjectURL(url)
     
-    ElMessage.success(t('report.listPage.downloadSuccess') || '下载成功')
-    logger.info('Download completed successfully', { id: report.id, fileName, format })
+    ElMessage.success(t('report.listPage.downloadComplete', { format: formatNames[format] || '文件' }) || '文档下载完成')
+    logger.info('Download completed', { id, attachmentId, format: fileFormat })
   } catch (error) {
-    logger.error('Failed to download report', error)
-    const errorMessage = error.response?.data?.message || error.message || t('report.listPage.downloadError') || '下载失败'
-    ElMessage.error(errorMessage)
+    logger.error('Download failed', error)
+    ElMessage.error(t('report.listPage.downloadError') || '下载失败')
   }
 }
 
@@ -568,7 +589,6 @@ const handleDelete = async (report) => {
 
 // 分页变化处理
 const handlePageChange = (page) => {
-  markUserInteracting() // 标记用户正在交互
   logger.info('User changed page', { page })
   pagination.current = page
   loadReportList()
@@ -576,7 +596,6 @@ const handlePageChange = (page) => {
 
 // 每页数量变化处理
 const handlePageSizeChange = (size) => {
-  markUserInteracting() // 标记用户正在交互
   logger.info('User changed page size', { size })
   pagination.size = size
   pagination.current = 1
@@ -601,20 +620,10 @@ const startAutoRefresh = () => {
 
   logger.info('Starting auto refresh timer', { interval: REFRESH_INTERVAL })
   refreshTimer.value = setInterval(() => {
-    // 优化：只在以下条件都满足时才刷新
-    // 1. 没有正在加载
-    // 2. 用户没有正在交互
-    // 3. 页面可见
-    if (!loading.value && !userInteracting.value && isPageVisible.value) {
-      logger.debug('Auto refreshing report list (silent mode)')
-      // 静默刷新：不显示loading状态，避免打断用户
-      loadReportListSilently()
-    } else {
-      logger.debug('Skipping auto refresh', {
-        loading: loading.value,
-        userInteracting: userInteracting.value,
-        isPageVisible: isPageVisible.value
-      })
+    // 只有在没有正在加载时才刷新
+    if (!loading.value) {
+      logger.debug('Auto refreshing report list')
+      loadReportList()
     }
   }, REFRESH_INTERVAL)
 }
@@ -628,94 +637,12 @@ const stopAutoRefresh = () => {
   }
 }
 
-// 静默刷新报告列表（不显示loading状态）
-const loadReportListSilently = async () => {
-  try {
-    // 不设置 loading.value = true，避免显示加载状态
-    logger.debug('Silent loading report list')
-
-    const params = {
-      pageNo: pagination.current,
-      pageSize: pagination.size,
-      sortBy: 'generateTime',
-      sortOrder: 'DESC'
-    }
-
-    // 添加筛选条件
-    if (searchForm.keyword) {
-      params.keyword = searchForm.keyword
-    }
-    if (searchForm.reportType) {
-      params.reportType = searchForm.reportType
-    }
-    if (searchForm.status) {
-      params.status = searchForm.status
-    }
-
-    const response = await getReportManagementList(params)
-    const result = response || {}
-
-    if (result.code !== 200) {
-      logger.warn('Silent refresh failed', { message: result.message })
-      return
-    }
-
-    const data = result.data || {}
-    reportList.value = data.records || data.list || []
-    pagination.total = data.total || 0
-    pagination.current = data.current || data.pageNo || pagination.current
-    pagination.size = data.size || data.pageSize || pagination.size
-
-    logger.debug('Silent refresh completed', {
-      count: reportList.value.length,
-      total: pagination.total
-    })
-
-    // 检查是否需要继续定时刷新
-    checkAndStartAutoRefresh()
-  } catch (error) {
-    logger.warn('Silent refresh error', error)
-    // 静默刷新失败时不显示错误提示，避免打扰用户
-  }
-}
-
-// 标记用户正在交互
-const markUserInteracting = () => {
-  userInteracting.value = true
-  
-  // 清除之前的计时器
-  if (userInteractionTimer.value) {
-    clearTimeout(userInteractionTimer.value)
-  }
-  
-  // 用户停止操作后，延迟恢复刷新
-  userInteractionTimer.value = setTimeout(() => {
-    userInteracting.value = false
-    logger.debug('User interaction ended, resuming auto refresh')
-    // 如果还有待刷新的报告，确保定时器在运行
-    if (hasPendingOrGeneratingReports()) {
-      checkAndStartAutoRefresh()
-    }
-  }, USER_INTERACTION_DELAY)
-}
-
 // 检查并启动/停止定时刷新
 const checkAndStartAutoRefresh = () => {
   if (hasPendingOrGeneratingReports()) {
     startAutoRefresh()
   } else {
     stopAutoRefresh()
-  }
-}
-
-// 页面可见性变化处理
-const handleVisibilityChange = () => {
-  isPageVisible.value = !document.hidden
-  logger.debug('Page visibility changed', { isVisible: isPageVisible.value })
-  
-  // 页面可见时，如果有待刷新的报告，确保定时器在运行
-  if (isPageVisible.value && hasPendingOrGeneratingReports()) {
-    checkAndStartAutoRefresh()
   }
 }
 
@@ -731,39 +658,23 @@ watch(
 // 组件挂载
 onMounted(() => {
   logger.info('Report list page mounted')
-  
-  // 监听页面可见性变化
-  document.addEventListener('visibilitychange', handleVisibilityChange)
-  
-  // 初始化页面可见性状态
-  isPageVisible.value = !document.hidden
-  
   loadReportList()
 })
 
-// 组件卸载时清理定时器和事件监听
-onBeforeUnmount(() => {
-  logger.info('Report list page unmounting, cleaning up')
-  
-  // 清理定时器
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  logger.info('Report list page unmounted, cleaning up timer')
   stopAutoRefresh()
-  
-  // 清理用户交互计时器
-  if (userInteractionTimer.value) {
-    clearTimeout(userInteractionTimer.value)
-    userInteractionTimer.value = null
-  }
-  
-  // 移除页面可见性监听
-  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 
 <style lang="scss" scoped>
 .report-list-container {
   padding: var(--gap-lg);
-  background: var(--background, #f7f9fc);
+  background: var(--bg-secondary);
   min-height: calc(100vh - 56px);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .page-header {
@@ -771,78 +682,99 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--gap-lg);
-
-  .page-title {
-    font-size: 24px;
-    font-weight: 600;
-    color: var(--color-primary, #1e3a8a);
-    margin: 0;
-  }
 }
 
-.search-card {
-  margin-bottom: var(--gap-lg);
-
-  .search-form {
-    display: flex;
-    gap: var(--gap-md);
-    align-items: end;
-    flex-wrap: wrap;
-
-    :deep(.el-form-item) {
-      margin-bottom: 0;
-    }
-  }
-
-  .search-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--gap-sm);
-    margin-top: var(--gap-md);
-  }
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin: 0;
 }
 
 .content-card {
-  .loading-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 20px;
-    color: var(--text-secondary, #6b7280);
-    font-size: 14px;
-    gap: var(--gap-sm);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: var(--gap-lg);
+  
+  :deep(.base-card__content) {
+    padding: 0;
+    width: 100%;
+  }
+}
 
-    .el-icon {
-      font-size: 20px;
+.filter-section {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: nowrap;
+  align-items: center;
+  
+  // 暗色主题下重置按钮样式优化
+  :deep(.el-button:not(.el-button--primary)) {
+    background-color: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--text-2) !important;
+    
+    &:hover {
+      background-color: var(--hover) !important;
+      border-color: var(--border-hover) !important;
+      color: var(--text-1) !important;
+    }
+    
+    &:active {
+      background-color: var(--hover-light) !important;
+      border-color: var(--border) !important;
     }
   }
+}
 
-  .result-count-bar {
-    font-size: 14px;
-    color: var(--text-secondary, #6b7280);
-    margin-bottom: var(--gap-lg);
-    padding: var(--gap-sm) 0;
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+  gap: var(--gap-sm);
+
+  .el-icon {
+    font-size: 20px;
   }
+}
 
-  .card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: var(--gap-lg);
-    margin-bottom: var(--gap-lg);
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap-lg);
+  margin-bottom: var(--gap-lg);
+  
+  @media (max-width: 1400px) {
+    grid-template-columns: repeat(2, 1fr);
   }
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
 
-  .report-card {
-    background: var(--surface, #ffffff);
-    border-radius: 8px;
+.report-card {
+    background: var(--surface);
+    border-radius: 12px;
     padding: var(--gap-lg);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    border: 1px solid var(--border-color, #e5e7eb);
-    transition: all 0.2s;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+    transition: all 0.3s ease;
     cursor: pointer;
+    position: relative;
+    overflow: hidden;
 
     &:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      box-shadow: var(--shadow-md);
       transform: translateY(-2px);
+      border-color: var(--border-hover);
     }
 
     .card-header {
@@ -862,12 +794,12 @@ onBeforeUnmount(() => {
 
         &.tech {
           background: #dbeafe;
-          color: #1e40af;
+          color: var(--color-primary) !important;
         }
 
         &.self {
           background: #e0f2fe;
-          color: #0369a1;
+          color: var(--color-primary) !important;
         }
       }
     }
@@ -885,7 +817,8 @@ onBeforeUnmount(() => {
 
       .report-summary {
         font-size: 14px;
-        color: var(--text-secondary, #6b7280);
+        color: var(--text-3, #6b7280);
+        font-weight: 400;
         line-height: 1.6;
         margin: 0;
         display: -webkit-box;
@@ -893,6 +826,7 @@ onBeforeUnmount(() => {
         line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+        text-overflow: ellipsis;
       }
     }
 
@@ -910,94 +844,66 @@ onBeforeUnmount(() => {
 
         .meta-value {
           font-size: 14px;
-          font-weight: 600;
-          color: var(--color-primary, #1e3a8a);
-          margin: 0 0 2px 0;
+          font-weight: 400;
+          color: var(--text-3, #6b7280);
+          margin: 0;
+          
+          .status-tag {
+            border-radius: 12px !important;
+            padding: 4px 8px !important;
+            font-size: 12px !important;
+            font-weight: 500 !important;
+          }
         }
 
         .meta-label {
-          font-size: 12px;
-          color: var(--text-secondary, #9ca3af);
-          margin: 0;
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--color-primary);
+          margin: 0 0 4px 0;
         }
       }
     }
 
     .card-actions {
       display: flex;
-      gap: var(--gap-sm);
+      gap: 12px;
       padding-top: var(--gap-md);
       border-top: 1px solid var(--border-color, #f3f4f6);
       box-sizing: border-box;
-
-      .action-group-primary {
-        display: flex;
-        gap: var(--gap-sm);
+      width: 100%;
+      justify-content: space-between;
+      align-items: center;
+      
+      > * {
         flex: 1;
-        min-width: 0;
-      }
-
-      .action-group-danger {
-        display: flex;
-        gap: var(--gap-sm);
-        padding-left: var(--gap-sm);
-        border-left: 1px solid var(--border-color, #e5e7eb);
-        flex-shrink: 0;
-      }
-
-      .action-btn {
-        flex: 1;
-        padding: 8px 12px;
-        border: 1px solid var(--border-color, #e5e7eb);
-        border-radius: 6px;
-        background: var(--surface, #ffffff);
-        color: var(--text-secondary, #6b7280);
-        cursor: pointer;
-        font-size: 12px;
-        transition: all 0.2s;
-        text-align: center;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 4px;
-        min-width: 0;
-        box-sizing: border-box;
-
-        &:hover {
-          background: var(--background-hover, #f9fafb);
-          color: var(--text-primary, #374151);
-          border-color: var(--border-color-hover, #d1d5db);
-        }
-
-        &.primary {
-          background: var(--color-primary, #1e3a8a);
-          color: var(--surface, #ffffff);
-          border-color: var(--color-primary, #1e3a8a);
-
-          &:hover {
-            background: var(--color-primary-hover, #1e40af);
-          }
-        }
-
-        &.danger {
-          background: #dc2626;
-          color: var(--surface, #ffffff);
-          border-color: #dc2626;
-          font-weight: 600;
-          flex: 0 0 auto;
-          min-width: 70px;
-          max-width: 80px;
-
-          &:hover {
-            background: #b91c1c;
-            border-color: #b91c1c;
-          }
+      }
+      
+      .action-btn {
+        min-width: 32px;
+        width: 100%;
+        height: 28px;
+        padding: 4px;
+      }
+      
+      .el-dropdown {
+        flex: 1;
+        display: flex;
+        
+        .action-btn {
+          width: 100%;
+          min-width: 32px;
+          height: 28px;
+          padding: 4px;
         }
       }
     }
-  }
+}
 
-  .empty-state {
+.empty-state {
     text-align: center;
     padding: 80px 20px;
     background: var(--surface, #ffffff);
@@ -1024,8 +930,105 @@ onBeforeUnmount(() => {
     }
   }
 
-  .pagination-section {
-    margin-top: var(--gap-lg);
+.pagination-section {
+  margin-top: var(--gap-lg);
+}
+
+.action-btn {
+  padding: 4px;
+  min-width: 32px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  user-select: none;
+  
+  .el-icon {
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    
+    &:hover {
+      background: none;
+      color: inherit;
+    }
+  }
+  
+  &.btn-primary {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    
+    &:hover:not(:disabled) {
+      background: var(--color-primary);
+      color: var(--surface);
+    }
+  }
+  
+  &.btn-success {
+    color: #16a34a;
+    border-color: #16a34a;
+    
+    &:hover:not(:disabled) {
+      background: #16a34a;
+      color: var(--surface);
+    }
+  }
+  
+  &.btn-info {
+    color: var(--text-3);
+    border-color: var(--text-3);
+    
+    &:hover:not(:disabled) {
+      background: var(--text-3);
+      color: var(--surface);
+    }
+  }
+  
+  &.btn-warning {
+    color: #f59e0b;
+    border-color: #f59e0b;
+    
+    &:hover:not(:disabled) {
+      background: #f59e0b;
+      color: var(--surface);
+    }
+  }
+  
+  &.btn-danger {
+    color: #dc2626;
+    border-color: #dc2626;
+    
+    &:hover:not(:disabled) {
+      background: #dc2626;
+      color: var(--surface);
+    }
+  }
+}
+
+// 下载下拉菜单样式
+:deep(.el-dropdown-menu) {
+  .el-dropdown-menu__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .el-icon {
+      font-size: 16px;
+    }
   }
 }
 
@@ -1047,18 +1050,10 @@ onBeforeUnmount(() => {
     gap: var(--gap-md);
   }
 
-  .search-form {
+  .filter-section {
     flex-direction: column;
-    align-items: stretch !important;
-
-    :deep(.el-form-item) {
-      width: 100%;
-
-      .el-input,
-      .el-select {
-        width: 100% !important;
-      }
-    }
+    align-items: stretch;
+    gap: var(--gap-sm);
   }
 
   .card-grid {

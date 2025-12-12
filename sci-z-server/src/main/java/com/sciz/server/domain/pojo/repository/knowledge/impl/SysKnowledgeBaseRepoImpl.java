@@ -10,6 +10,11 @@ import com.sciz.server.domain.pojo.mapper.knowledge.SysKnowledgeBaseMapper;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.CollectionUtils;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 知识库仓储实现
@@ -95,20 +100,33 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
     }
 
     /**
-     * 更新知识库的文件夹数量
+     * 更新知识库文件数量
      *
-     * @param id 知识库ID
-     * @param folderCount 文件夹数量
+     * @param knowledgeId 知识库ID
+     * @param fileCount   文件数量
      * @return 是否更新成功
      */
     @Override
-    public boolean updateFolderCount(Long id, Integer folderCount) {
-        if (id == null || folderCount == null) {
+    public boolean updateFileCount(Long knowledgeId, Integer fileCount) {
+        if (knowledgeId == null) {
             return false;
         }
         return new LambdaUpdateChainWrapper<>(mapper)
-                .eq(SysKnowledgeBase::getId, id)
-                .set(SysKnowledgeBase::getFolderCount, folderCount)
+                .eq(SysKnowledgeBase::getId, knowledgeId)
+                .set(SysKnowledgeBase::getFileCount, fileCount)
                 .update();
+    }
+
+    @Override
+    public Map<Long, SysKnowledgeBase> findByProjectIds(List<Long> projectIds) {
+        if (CollectionUtils.isEmpty(projectIds)) {
+            return Map.of();
+        }
+        var records = mapper.selectList(new LambdaQueryWrapper<SysKnowledgeBase>()
+                .in(SysKnowledgeBase::getProjectId, projectIds)
+                .eq(SysKnowledgeBase::getIsDeleted, DeleteStatus.NOT_DELETED.getCode()));
+        return records.stream()
+                .collect(Collectors.toMap(SysKnowledgeBase::getProjectId, knowledge -> knowledge,
+                        (existing, replacement) -> existing));
     }
 }

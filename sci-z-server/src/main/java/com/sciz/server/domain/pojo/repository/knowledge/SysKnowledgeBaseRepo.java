@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * 知识库仓储（领域层抽象）
  * 
@@ -63,11 +66,19 @@ public interface SysKnowledgeBaseRepo {
     boolean deleteById(Long id);
 
     /**
-     * 更新知识库的文件夹数量
+     * 更新知识库文件数量
      *
-     * @param id 知识库ID
-     * @param folderCount 文件夹数量
+     * @param knowledgeId 知识库ID
+     * @param fileCount   文件数量
      * @return 是否更新成功
      */
-    boolean updateFolderCount(Long id, Integer folderCount);
+    boolean updateFileCount(Long knowledgeId, Integer fileCount);
+
+    /**
+     * 根据项目ID列表批量查询知识库
+     *
+     * @param projectIds 项目ID列表
+     * @return Map<Long, SysKnowledgeBase> 项目ID -> 知识库实体映射
+     */
+    Map<Long, SysKnowledgeBase> findByProjectIds(List<Long> projectIds);
 }
