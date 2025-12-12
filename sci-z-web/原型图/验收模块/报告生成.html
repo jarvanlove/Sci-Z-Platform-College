@@ -116,7 +116,7 @@
 
       .config-form {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
         gap: 24px;
         margin-bottom: 24px;
       }
@@ -1408,7 +1408,8 @@
                 </div>
               </div>
 
-              <!-- 工作流选择 -->
+              <!-- 工作流选择 - 已注释 -->
+              <!--
               <div class="form-group">
                 <label class="form-label required">选择工作流</label>
                 <el-select
@@ -1447,6 +1448,7 @@
                   </div>
                 </div>
               </div>
+              -->
 
               <!-- 报告类型选择 -->
               <div class="form-group">
@@ -1533,7 +1535,7 @@
               </button>
               <div v-if="!canGenerate" class="generate-hint">
                 <span class="generate-hint-icon">💡</span>
-                请选择项目、工作流和报告类型
+                请选择项目和报告类型
               </div>
             </div>
           </div>
@@ -1995,7 +1997,7 @@
           const canGenerate = computed(() => {
             return (
               config.value.projectId &&
-              config.value.workflow &&
+              // config.value.workflow && // 工作流已注释
               config.value.reportType &&
               !generating.value
             );

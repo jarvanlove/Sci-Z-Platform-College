@@ -360,4 +360,207 @@ public class DifyWorkflowServiceImpl implements DifyWorkflowService {
 
                 return responseBody;
         }
+
+        /**
+         * 获取工作流 Draft 配置
+         * GET /console/api/apps/{appId}/workflows/draft
+         *
+         * @param appId     工作流ID（Dify 应用ID）
+         * @return DifyWorkflowDraftResp 工作流 Draft 配置响应
+         */
+        @Override
+        public com.sciz.server.infrastructure.external.dify.dto.response.DifyWorkflowDraftResp getWorkflowDraft(
+                        String appId) {
+                log.info(String.format("获取工作流 Draft 配置: appId=%s", appId));
+
+                try {
+                        // 1. 调用 Dify API 获取工作流配置
+                        ResponseEntity<String> difyResponse = difyApiService.getWorkflowDraft(appId);
+
+                        // 2. 验证 HTTP 响应状态
+                        String responseBody = DifyWorkflowRespBuilder.validateHttpResponse(difyResponse,
+                                        "获取工作流 Draft 配置");
+
+                        // 3. 解析响应为 DifyWorkflowDraftResp
+                        com.sciz.server.infrastructure.external.dify.dto.response.DifyWorkflowDraftResp draftResp = objectMapper
+                                        .readValue(responseBody,
+                                                        com.sciz.server.infrastructure.external.dify.dto.response.DifyWorkflowDraftResp.class);
+
+                        log.info(String.format("获取工作流 Draft 配置成功: appId=%s, hash=%s", appId,
+                                        draftResp.getHash()));
+                        return draftResp;
+                } catch (JsonProcessingException e) {
+                        log.error(String.format("解析工作流 Draft 配置失败: appId=%s, err=%s", appId, e.getMessage()),
+                                        e);
+                        throw BusinessException.of(ResultCode.SERVER_ERROR, "解析工作流 Draft 配置失败: %s",
+                                        e.getMessage());
+                } catch (Exception e) {
+                        log.error(String.format("获取工作流 Draft 配置异常: appId=%s, err=%s", appId, e.getMessage()),
+                                        e);
+                        throw BusinessException.of(ResultCode.SERVER_ERROR, "获取工作流 Draft 配置异常: %s",
+                                        e.getMessage());
+                }
+        }
+
+        /**
+         * 更新工作流 Draft 配置
+         * POST /console/api/apps/{appId}/workflows/draft
+         * 主要修改 knowledge-retrieval 类型节点的 dataset_ids
+         *
+         * @param appId     工作流ID（Dify 应用ID）
+         * @param datasetIds 新的知识库ID列表（用于更新 knowledge-retrieval 节点的 dataset_ids）
+         * @return String 更新结果响应（JSON字符串）
+         */
+        @Override
+        public String updateWorkflowDraft(String appId, List<String> datasetIds) {
+                log.info(String.format("更新工作流 Draft 配置: appId=%s, datasetIds=%s", appId, datasetIds));
+
+                try {
+                        // 1. 先 GET 获取当前配置（包含 hash）
+                        var currentDraft = getWorkflowDraft(appId);
+                        String hash = currentDraft.getHash();
+                        if (hash == null || hash.trim().isEmpty()) {
+                                throw BusinessException.of(ResultCode.SERVER_ERROR,
+                                                "获取工作流配置失败：hash 值为空");
+                        }
+
+                        log.info(String.format("获取当前工作流配置成功: appId=%s, hash=%s", appId, hash));
+
+                        // 2. 更新 knowledge-retrieval 节点的 dataset_ids
+                        int updatedCount = currentDraft.updateKnowledgeRetrievalDatasetIds(datasetIds);
+                        if (updatedCount == 0) {
+                                log.warn(String.format("未找到 knowledge-retrieval 类型的节点: appId=%s", appId));
+                        } else {
+                                log.info(String.format("更新 knowledge-retrieval 节点完成: appId=%s, updatedCount=%d, datasetIds=%s",
+                                                appId, updatedCount, datasetIds));
+                        }
+
+                        // 3. 将更新后的配置转换为更新请求对象
+                        var updateReq = new com.sciz.server.infrastructure.external.dify.dto.request.DifyWorkflowDraftUpdateReq();
+                        updateReq.setId(currentDraft.getId());
+                        updateReq.setGraph(currentDraft.getGraph());
+                        updateReq.setFeatures(currentDraft.getFeatures());
+                        updateReq.setHash(hash); // 保持 hash 值不变
+                        updateReq.setVersion(currentDraft.getVersion());
+                        updateReq.setMarkedName(currentDraft.getMarkedName());
+                        updateReq.setMarkedComment(currentDraft.getMarkedComment());
+                        updateReq.setEnvironmentVariables(currentDraft.getEnvironmentVariables());
+                        updateReq.setConversationVariables(currentDraft.getConversationVariables());
+
+                        // 4. 调用 Dify API 更新工作流配置
+                        ResponseEntity<String> difyResponse = difyApiService.updateWorkflowDraft(appId, updateReq);
+
+                        // 5. 验证 HTTP 响应状态
+                        String responseBody = DifyWorkflowRespBuilder.validateHttpResponse(difyResponse,
+                                        "更新工作流 Draft 配置");
+
+                        log.info(String.format("更新工作流 Draft 配置成功: appId=%s, datasetIds=%s", appId, datasetIds));
+                        return responseBody;
+                } catch (BusinessException e) {
+                        throw e;
+                } catch (Exception e) {
+                        log.error(String.format("更新工作流 Draft 配置异常: appId=%s, datasetIds=%s, err=%s", appId,
+                                        datasetIds, e.getMessage()), e);
+                        throw BusinessException.of(ResultCode.SERVER_ERROR, "更新工作流 Draft 配置异常: %s",
+                                        e.getMessage());
+                }
+        }
+
+        /**
+         * 更新并发布工作流（综合接口）
+         * 流程：1. GET 获取工作流详情（包含 hash）
+         *       2. 使用 GET 返回的 hash 更新工作流
+         *       3. 更新成功后，再次 GET 获取更新后的 hash
+         *       4. 使用更新后的 hash 调用 publish 接口发布工作流
+         *
+         * @param appId        工作流ID（Dify 应用ID）
+         * @param datasetIds   新的知识库ID列表（用于更新 knowledge-retrieval 节点的 dataset_ids）
+         * @param markedName   标记名称（发布时使用）
+         * @param markedComment 标记注释（发布时使用）
+         * @return String 发布结果响应（JSON字符串）
+         */
+        @Override
+        public String updateAndPublishWorkflow(String appId, List<String> datasetIds, String markedName,
+                        String markedComment) {
+                log.info(String.format("更新并发布工作流: appId=%s, datasetIds=%s, markedName=%s, markedComment=%s",
+                                appId, datasetIds, markedName, markedComment));
+
+                try {
+                        // 1. GET 获取工作流详情（包含 hash）
+                        log.info(String.format("步骤1: 获取工作流详情: appId=%s", appId));
+                        var currentDraft = getWorkflowDraft(appId);
+                        String originalHash = currentDraft.getHash();
+                        if (originalHash == null || originalHash.trim().isEmpty()) {
+                                throw BusinessException.of(ResultCode.SERVER_ERROR,
+                                                "获取工作流配置失败：hash 值为空");
+                        }
+                        log.info(String.format("获取工作流详情成功: appId=%s, hash=%s", appId, originalHash));
+
+                        // 2. 更新 knowledge-retrieval 节点的 dataset_ids
+                        log.info(String.format("步骤2: 更新 knowledge-retrieval 节点: appId=%s, datasetIds=%s", appId,
+                                        datasetIds));
+                        int updatedCount = currentDraft.updateKnowledgeRetrievalDatasetIds(datasetIds);
+                        if (updatedCount == 0) {
+                                log.warn(String.format("未找到 knowledge-retrieval 类型的节点: appId=%s", appId));
+                        } else {
+                                log.info(String.format("更新 knowledge-retrieval 节点完成: appId=%s, updatedCount=%d, datasetIds=%s",
+                                                appId, updatedCount, datasetIds));
+                        }
+
+                        // 3. 将更新后的配置转换为更新请求对象
+                        var updateReq = new com.sciz.server.infrastructure.external.dify.dto.request.DifyWorkflowDraftUpdateReq();
+                        updateReq.setId(currentDraft.getId());
+                        updateReq.setGraph(currentDraft.getGraph());
+                        updateReq.setFeatures(currentDraft.getFeatures());
+                        updateReq.setHash(originalHash); // 使用 GET 返回的 hash
+                        updateReq.setVersion(currentDraft.getVersion());
+                        updateReq.setMarkedName(currentDraft.getMarkedName());
+                        updateReq.setMarkedComment(currentDraft.getMarkedComment());
+                        updateReq.setEnvironmentVariables(currentDraft.getEnvironmentVariables());
+                        updateReq.setConversationVariables(currentDraft.getConversationVariables());
+
+                        // 4. 调用 Dify API 更新工作流配置
+                        log.info(String.format("步骤3: 更新工作流 Draft 配置: appId=%s", appId));
+                        ResponseEntity<String> updateResponse = difyApiService.updateWorkflowDraft(appId, updateReq);
+
+                        // 5. 验证更新响应状态
+                        DifyWorkflowRespBuilder.validateHttpResponse(updateResponse,
+                                        "更新工作流 Draft 配置");
+                        log.info(String.format("更新工作流 Draft 配置成功: appId=%s", appId));
+
+                        // 6. 更新成功后，再次 GET 获取更新后的 hash
+                        log.info(String.format("步骤4: 获取更新后的工作流详情: appId=%s", appId));
+                        var updatedDraft = getWorkflowDraft(appId);
+                        String updatedHash = updatedDraft.getHash();
+                        if (updatedHash == null || updatedHash.trim().isEmpty()) {
+                                throw BusinessException.of(ResultCode.SERVER_ERROR,
+                                                "获取更新后的工作流配置失败：hash 值为空");
+                        }
+                        log.info(String.format("获取更新后的工作流详情成功: appId=%s, hash=%s", appId, updatedHash));
+
+                        // 7. 构建发布请求对象（使用更新后的 hash）
+                        var publishReq = new com.sciz.server.infrastructure.external.dify.dto.request.DifyWorkflowPublishReq();
+                        publishReq.setHash(updatedHash); // 使用更新后的 hash
+                        publishReq.setMarkedName(markedName != null ? markedName : "");
+                        publishReq.setMarkedComment(markedComment != null ? markedComment : "");
+
+                        // 8. 调用 Dify API 发布工作流（使用更新后的 hash）
+                        log.info(String.format("步骤5: 发布工作流: appId=%s, hash=%s", appId, updatedHash));
+                        ResponseEntity<String> publishResponse = difyApiService.publishWorkflow(appId, publishReq);
+
+                        // 9. 验证发布响应状态
+                        String publishResponseBody = DifyWorkflowRespBuilder.validateHttpResponse(publishResponse,
+                                        "发布工作流");
+                        log.info(String.format("发布工作流成功: appId=%s", appId));
+
+                        return publishResponseBody;
+                } catch (BusinessException e) {
+                        throw e;
+                } catch (Exception e) {
+                        log.error(String.format("更新并发布工作流异常: appId=%s, datasetIds=%s, err=%s", appId,
+                                        datasetIds, e.getMessage()), e);
+                        throw BusinessException.of(ResultCode.SERVER_ERROR, "更新并发布工作流异常: %s",
+                                        e.getMessage());
+                }
+        }
 }

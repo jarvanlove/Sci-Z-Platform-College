@@ -14,6 +14,7 @@ import com.sciz.server.domain.pojo.dto.response.project.MilestoneDocumentUploadR
 import com.sciz.server.domain.pojo.dto.response.project.ProjectDetailResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectListResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectProgressResp;
+import com.sciz.server.domain.pojo.dto.response.project.ProjectSelectResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectStatisticsResp;
 import com.sciz.server.domain.pojo.entity.project.Project;
 import com.sciz.server.domain.pojo.dto.response.project.MilestoneAttachmentResp;
@@ -36,6 +37,7 @@ import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeFileRelationRepo;
+import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeFileRelation;
 import com.sciz.server.infrastructure.external.dify.dto.response.DifyDocumentBatchUploadResp;
 import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
@@ -329,9 +331,31 @@ public class ProjectServiceImpl implements ProjectService {
             updateProjectMembers(req.id(), req.members(), userId, realName);
 
             // 5. 处理里程碑（新增、更新、删除），返回新增的里程碑列表
+            // 注意：updateProjectMilestones 内部会调用 recalculateProjectProgress 重新计算项目进度
             var newMilestones = updateProjectMilestones(req.id(), req.milestones(), userId, realName);
 
-            // 6. 发布项目更新事件（如果存在新增的里程碑，用于同步更新待关联附件）
+            // 6. 重新查询项目（获取最新进度），自动判断并更新状态
+            // 注意：updateProjectBasicInfo 已经处理了状态更新，但这里需要根据最新进度重新判断
+            // 因为里程碑更新后，项目进度可能发生变化，状态也需要相应更新
+            // 前端传的 status 只是回显值（状态字段不可编辑），因此总是自动计算状态
+            var updatedProject = projectRepo.findById(req.id());
+            if (updatedProject != null) {
+                String originalStatus = updatedProject.getStatus();
+                var declaration = updatedProject.getDeclarationId() != null
+                        ? declarationRepo.findById(updatedProject.getDeclarationId())
+                        : null;
+                String autoStatus = determineProjectStatus(updatedProject, declaration);
+                if (!autoStatus.equals(originalStatus)) {
+                    updatedProject.setStatus(autoStatus);
+                    updatedProject.setUpdatedBy(userId);
+                    updatedProject.setUpdatedTime(LocalDateTime.now());
+                    projectRepo.updateById(updatedProject);
+                    log.info(String.format("自动更新项目状态: projectId=%s, progress=%s, oldStatus=%s, newStatus=%s",
+                            req.id(), updatedProject.getProgress(), originalStatus, autoStatus));
+                }
+            }
+
+            // 7. 发布项目更新事件（如果存在新增的里程碑，用于同步更新待关联附件）
             // 注意：使用同步事件处理，确保在主事务中执行，避免事务提交时机问题
             if (!newMilestones.isEmpty()) {
                 var event = new ProjectUpdatedEvent(
@@ -385,9 +409,19 @@ public class ProjectServiceImpl implements ProjectService {
         if (StringUtils.hasText(req.description())) {
             project.setDescription(req.description());
         }
-        if (StringUtils.hasText(req.status())) {
-            project.setStatus(req.status());
-        }
+
+        // 状态更新逻辑：
+        // 前端传的 status 只是当前状态的回显值（状态字段不可编辑），因此忽略前端传入的 status
+        // 总是根据项目进度和时间自动计算状态
+        // 注意：已取消状态不会自动更新（在 determineProjectStatus 中已处理）
+        var declaration = project.getDeclarationId() != null
+                ? declarationRepo.findById(project.getDeclarationId())
+                : null;
+        String autoStatus = determineProjectStatus(project, declaration);
+        project.setStatus(autoStatus);
+        log.info(String.format("自动判断项目状态: projectId=%s, progress=%s, status=%s",
+                project.getId(), project.getProgress(), autoStatus));
+
         if (StringUtils.hasText(req.difyKnowledgeId())) {
             project.setDifyKnowledgeId(req.difyKnowledgeId());
         }
@@ -733,7 +767,7 @@ public class ProjectServiceImpl implements ProjectService {
      *
      * @param milestoneId  里程碑ID
      * @param documentReqs 文档更新请求列表
-     * @param projectId    项目ID（已废弃，保留用于兼容）
+     * @param projectId    项目ID（用于更新知识库文件数量）
      */
     private void updateMilestoneDocuments(Long milestoneId, List<MilestoneDocumentUpdateReq> documentReqs,
             Long projectId) {
@@ -751,10 +785,44 @@ public class ProjectServiceImpl implements ProjectService {
                 .filter(id -> id != null)
                 .collect(Collectors.toSet());
 
-        // 3. 删除不在请求中的关联
-        existingAttachmentIds.stream()
+        // 3. 删除不在请求中的关联（同时删除知识库文件关联）
+        var deletedAttachmentIds = existingAttachmentIds.stream()
                 .filter(id -> !requestAttachmentIds.contains(id))
-                .forEach(sysAttachmentRelationRepo::deleteByAttachmentId);
+                .toList();
+
+        if (!deletedAttachmentIds.isEmpty()) {
+            // 3.1. 删除附件关联
+            deletedAttachmentIds.forEach(sysAttachmentRelationRepo::deleteByAttachmentId);
+
+            // 3.2. 删除知识库文件关联并更新文件数量
+            Long knowledgeId = null;
+            if (projectId != null) {
+                var project = projectRepo.findById(projectId);
+                if (project != null && project.getDifyKnowledgeId() != null) {
+                    try {
+                        knowledgeId = Long.parseLong(project.getDifyKnowledgeId());
+                    } catch (NumberFormatException e) {
+                        log.warn(String.format("项目知识库ID格式错误: projectId=%s, difyKnowledgeId=%s", projectId,
+                                project.getDifyKnowledgeId()));
+                    }
+                }
+            }
+
+            // 删除知识库文件关联
+            deletedAttachmentIds.forEach(attachmentId -> {
+                try {
+                    knowledgeFileRelationRepo.deleteByAttachmentId(attachmentId);
+                } catch (Exception e) {
+                    log.error(String.format("删除知识库文件关联失败: attachmentId=%s, err=%s", attachmentId, e.getMessage()), e);
+                    // 不抛出异常，避免影响主流程
+                }
+            });
+
+            // 更新知识库文件数量
+            if (knowledgeId != null) {
+                updateKnowledgeBaseFileCount(knowledgeId);
+            }
+        }
     }
 
     /**
@@ -1093,6 +1161,67 @@ public class ProjectServiceImpl implements ProjectService {
         }
     }
 
+    /**
+     * 自动更新单个项目的进度和状态
+     * <p>
+     * 用于定时任务批量更新项目
+     *
+     * @param projectId 项目ID
+     * @return boolean 是否更新成功
+     */
+    @Override
+    public boolean autoUpdateProjectProgressAndStatus(Long projectId) {
+        try {
+            // 1. 查询项目实体
+            var project = projectRepo.findById(projectId);
+            if (project == null) {
+                log.warn(String.format("项目不存在，跳过自动更新: projectId=%s", projectId));
+                return false;
+            }
+
+            // 2. 已取消的项目不自动更新
+            if (ProjectStatus.CANCELLED.getCode().toString().equals(project.getStatus())) {
+                log.debug(String.format("项目已取消，跳过自动更新: projectId=%s", projectId));
+                return true;
+            }
+
+            // 3. 重新计算项目进度
+            recalculateProjectProgress(projectId);
+
+            // 4. 重新查询项目（获取最新进度）
+            var updatedProject = projectRepo.findById(projectId);
+            if (updatedProject == null) {
+                return false;
+            }
+
+            // 5. 查询申报信息（获取开始时间、结束时间）
+            var declaration = updatedProject.getDeclarationId() != null
+                    ? declarationRepo.findById(updatedProject.getDeclarationId())
+                    : null;
+
+            // 6. 自动判断并更新状态
+            String oldStatus = updatedProject.getStatus();
+            String newStatus = determineProjectStatus(updatedProject, declaration);
+
+            // 7. 如果状态发生变化，更新数据库
+            if (!newStatus.equals(oldStatus)) {
+                updatedProject.setStatus(newStatus);
+                updatedProject.setUpdatedTime(LocalDateTime.now());
+                projectRepo.updateById(updatedProject);
+                log.info(String.format("自动更新项目状态: projectId=%s, progress=%s, oldStatus=%s, newStatus=%s",
+                        projectId, updatedProject.getProgress(), oldStatus, newStatus));
+            } else {
+                log.debug(String.format("项目状态无需更新: projectId=%s, progress=%s, status=%s",
+                        projectId, updatedProject.getProgress(), oldStatus));
+            }
+
+            return true;
+        } catch (Exception e) {
+            log.error(String.format("自动更新项目失败: projectId=%s, err=%s", projectId, e.getMessage()), e);
+            return false;
+        }
+    }
+
     @Override
     public ProjectStatisticsResp getStatistics() {
         log.info("获取项目统计信息");
@@ -1329,8 +1458,21 @@ public class ProjectServiceImpl implements ProjectService {
                     .orElseThrow(() -> BusinessException.of(ResultCode.DATA_NOT_FOUND, "附件不存在"));
 
             // 2. 删除知识库文件关联表（同步删除，避免数据不一致）
+            Long knowledgeId = null;
             try {
                 log.info(String.format("开始删除知识库文件关联: attachmentId=%s", attachmentId));
+                // 先通过项目ID获取知识库ID（用于后续更新文件数量）
+                if (projectId != null) {
+                    var project = projectRepo.findById(projectId);
+                    if (project != null && project.getDifyKnowledgeId() != null) {
+                        try {
+                            knowledgeId = Long.parseLong(project.getDifyKnowledgeId());
+                        } catch (NumberFormatException e) {
+                            log.warn(String.format("项目知识库ID格式错误: projectId=%s, difyKnowledgeId=%s", projectId,
+                                    project.getDifyKnowledgeId()));
+                        }
+                    }
+                }
                 var deleted = knowledgeFileRelationRepo.deleteByAttachmentId(attachmentId);
                 if (deleted) {
                     log.info(String.format("知识库文件关联删除成功: attachmentId=%s", attachmentId));
@@ -1341,6 +1483,16 @@ public class ProjectServiceImpl implements ProjectService {
                 log.error(String.format("删除知识库文件关联失败: attachmentId=%s, err=%s", attachmentId,
                         e.getMessage()), e);
                 // 不抛出异常，避免影响主流程
+            }
+
+            // 2.1. 更新知识库文件数量（如果成功删除了关联）
+            if (knowledgeId != null) {
+                try {
+                    updateKnowledgeBaseFileCount(knowledgeId);
+                } catch (Exception e) {
+                    log.error(String.format("更新知识库文件数量失败: knowledgeId=%s, err=%s", knowledgeId, e.getMessage()), e);
+                    // 不抛出异常，避免影响主流程
+                }
             }
 
             // 3. 同步顺序删除 MinIO 文件和 Dify 知识库文档（改为同步执行，便于排查问题）
@@ -1569,6 +1721,50 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     /**
+     * 根据项目进度和时间自动判断项目状态
+     * <p>
+     * 判断规则（优先级从高到低）：
+     * 1. 已取消：status = "4"（用户手动设置，不自动更新）
+     * 2. 已完成：progress = 100%（所有里程碑完成，不依赖结束时间）
+     * 3. 已延期：progress < 100% 且 当前时间 > 项目结束时间
+     * 4. 未开始：progress = 0% 且 当前时间 < 项目开始时间
+     * 5. 进行中：其他情况（默认状态）
+     *
+     * @param project     项目实体
+     * @param declaration 申报实体（包含开始时间、结束时间）
+     * @return 项目状态代码（字符串）
+     */
+    private String determineProjectStatus(Project project, Declaration declaration) {
+        // 1. 已取消状态不自动更新（用户手动设置）
+        if (ProjectStatus.CANCELLED.getCode().toString().equals(project.getStatus())) {
+            return project.getStatus();
+        }
+
+        int progress = project.getProgress() != null ? project.getProgress() : 0;
+        LocalDate today = LocalDate.now();
+        LocalDate startTime = declaration != null ? declaration.getProjectStartTime() : null;
+        LocalDate endTime = declaration != null ? declaration.getProjectEndTime() : null;
+
+        // 2. 已完成：进度 = 100%（不依赖结束时间，提前完成也算完成）
+        if (progress == 100) {
+            return ProjectStatus.COMPLETED.getCode().toString();
+        }
+
+        // 3. 已延期：进度 < 100% 且 当前时间 > 项目结束时间
+        if (progress < 100 && endTime != null && today.isAfter(endTime)) {
+            return ProjectStatus.DELAYED.getCode().toString();
+        }
+
+        // 4. 未开始：进度 = 0% 且 当前时间 < 项目开始时间
+        if (progress == 0 && startTime != null && today.isBefore(startTime)) {
+            return ProjectStatus.NOT_STARTED.getCode().toString();
+        }
+
+        // 5. 默认：进行中
+        return ProjectStatus.IN_PROGRESS.getCode().toString();
+    }
+
+    /**
      * 判断里程碑状态
      *
      * @param progress Integer 进度百分比
@@ -1730,6 +1926,8 @@ public class ProjectServiceImpl implements ProjectService {
                         });
                 log.info(String.format("批量创建知识库文件关联成功: knowledgeId=%s, fileCount=%s, documentCount=%s",
                         knowledgeId, fileInfoRespList.size(), documentCount));
+                // 更新知识库文件数量
+                updateKnowledgeBaseFileCount(knowledgeId);
                 return;
             }
 
@@ -1750,6 +1948,8 @@ public class ProjectServiceImpl implements ProjectService {
                         log.info(String.format("创建第一个文件的知识库关联成功: knowledgeId=%s, attachmentId=%s, difyDocId=%s",
                                 knowledgeId, firstFileInfo.id(), difyDocId));
                     }
+                    // 更新知识库文件数量
+                    updateKnowledgeBaseFileCount(knowledgeId);
                 } else {
                     // 单文件上传，fileInfoRespList 中只有一个文件，创建该文件的知识库关联
                     var lastFileInfo = fileInfoRespList.get(fileInfoRespList.size() - 1);
@@ -1757,6 +1957,8 @@ public class ProjectServiceImpl implements ProjectService {
                             batchUploadResp);
                     log.info(String.format("创建知识库文件关联成功: knowledgeId=%s, attachmentId=%s, difyDocId=%s",
                             knowledgeId, lastFileInfo.id(), difyDocId));
+                    // 更新知识库文件数量
+                    updateKnowledgeBaseFileCount(knowledgeId);
                 }
                 return;
             }
@@ -1807,6 +2009,29 @@ public class ProjectServiceImpl implements ProjectService {
         } catch (Exception e) {
             log.error(String.format("创建知识库文件关联异常: knowledgeId=%s, attachmentId=%s, err=%s",
                     knowledgeId, fileInfo.id(), e.getMessage()), e);
+            // 不抛出异常，避免影响主流程
+        }
+    }
+
+    /**
+     * 更新知识库文件数量
+     *
+     * @param knowledgeId 知识库ID
+     */
+    private void updateKnowledgeBaseFileCount(Long knowledgeId) {
+        if (knowledgeId == null) {
+            return;
+        }
+        try {
+            var fileCount = knowledgeFileRelationRepo.countByKnowledgeId(knowledgeId);
+            var updated = knowledgeBaseRepo.updateFileCount(knowledgeId, fileCount.intValue());
+            if (updated) {
+                log.debug(String.format("更新知识库文件数量成功: knowledgeId=%s, fileCount=%s", knowledgeId, fileCount));
+            } else {
+                log.warn(String.format("更新知识库文件数量失败: knowledgeId=%s, fileCount=%s", knowledgeId, fileCount));
+            }
+        } catch (Exception e) {
+            log.error(String.format("更新知识库文件数量异常: knowledgeId=%s, err=%s", knowledgeId, e.getMessage()), e);
             // 不抛出异常，避免影响主流程
         }
     }
@@ -2027,5 +2252,98 @@ public class ProjectServiceImpl implements ProjectService {
         public void transferTo(java.io.File dest) {
             throw new UnsupportedOperationException("transferTo not supported");
         }
+    }
+
+    @Override
+    public List<ProjectSelectResp> findSelectList() {
+        log.info("开始查询项目下拉框列表");
+
+        // 1. 查询所有项目（未删除）
+        var projects = projectRepo.findAll();
+        if (projects.isEmpty()) {
+            log.info("没有找到项目");
+            return List.of();
+        }
+
+        var projectIds = projects.stream()
+                .map(Project::getId)
+                .toList();
+
+        // 2. 批量查询知识库信息（通过 projectId）
+        Map<Long, SysKnowledgeBase> knowledgeBaseMap = knowledgeBaseRepo.findByProjectIds(projectIds);
+
+        // 3. 批量查询文件关联和附件信息
+        List<Long> knowledgeIds = knowledgeBaseMap.values().stream()
+                .map(SysKnowledgeBase::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        // 3.1. 批量查询知识库文件关联（knowledgeId -> attachmentIds）
+        Map<Long, List<Long>> knowledgeAttachmentMap = knowledgeFileRelationRepo
+                .findAttachmentIdsByKnowledgeIds(knowledgeIds);
+
+        // 3.2. 收集所有附件ID
+        var allAttachmentIds = knowledgeAttachmentMap.values().stream()
+                .flatMap(List::stream)
+                .distinct()
+                .toList();
+
+        // 3.3. 批量查询附件信息（获取 fileSize）
+        final Map<Long, SysAttachment> attachmentMap;
+        if (!allAttachmentIds.isEmpty()) {
+            var attachments = sysAttachmentRepo.findByIds(allAttachmentIds);
+            attachmentMap = attachments.stream()
+                    .collect(Collectors.toMap(SysAttachment::getId, attachment -> attachment,
+                            (existing, replacement) -> existing));
+        } else {
+            attachmentMap = Map.of();
+        }
+
+        // 4. 组装数据并返回（使用 Stream API，避免 fori 循环）
+        return projects.stream()
+                .map(project -> {
+                    // 5.1. 获取知识库信息
+                    var knowledgeBase = knowledgeBaseMap.get(project.getId());
+                    var documentCount = knowledgeBase != null && knowledgeBase.getFileCount() != null
+                            ? knowledgeBase.getFileCount()
+                            : 0;
+
+                    // 5.2. 计算文档总字数和下载总次数
+                    Long totalWords = 0L;
+                    Long totalDownloadCount = 0L;
+                    if (knowledgeBase != null) {
+                        var knowledgeId = knowledgeBase.getId();
+                        var attachmentIds = knowledgeAttachmentMap.getOrDefault(knowledgeId, List.of());
+                        totalWords = attachmentIds.stream()
+                                .map(attachmentMap::get)
+                                .filter(Objects::nonNull)
+                                .map(SysAttachment::getFileSize)
+                                .filter(Objects::nonNull)
+                                .mapToLong(size -> size / 2) // 字节转字数（中文字符占2字节）
+                                .sum();
+                        totalDownloadCount = attachmentIds.stream()
+                                .map(attachmentMap::get)
+                                .filter(Objects::nonNull)
+                                .map(SysAttachment::getDownloadCount)
+                                .filter(Objects::nonNull)
+                                .mapToLong(count -> count.longValue())
+                                .sum();
+                    }
+
+                    // 5.3. 获取项目状态描述
+                    var statusDescription = getProjectStatusDescription(project.getStatus());
+
+                    // 5.4. 构建响应对象
+                    return new ProjectSelectResp(
+                            project.getId(),
+                            project.getNumber(),
+                            project.getName(),
+                            statusDescription,
+                            documentCount,
+                            totalWords,
+                            totalDownloadCount,
+                            project.getProgress());
+                })
+                .toList();
     }
 }

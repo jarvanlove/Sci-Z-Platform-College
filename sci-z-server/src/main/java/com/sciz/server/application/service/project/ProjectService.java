@@ -11,6 +11,7 @@ import com.sciz.server.domain.pojo.dto.response.project.ProjectProgressResp;
 
 import java.util.List;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectListResp;
+import com.sciz.server.domain.pojo.dto.response.project.ProjectSelectResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectStatisticsResp;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 
@@ -113,4 +114,23 @@ public interface ProjectService {
      * @param milestoneId 里程碑ID
      */
     void cancelCompleteMilestone(Long milestoneId);
+
+    /**
+     * 自动更新单个项目的进度和状态
+     * <p>
+     * 用于定时任务批量更新项目
+     *
+     * @param projectId 项目ID
+     * @return boolean 是否更新成功
+     */
+    boolean autoUpdateProjectProgressAndStatus(Long projectId);
+
+    /**
+     * 查询项目下拉框列表
+     * <p>
+     * 返回所有项目的下拉框数据，包括项目ID、编号、名称、状态描述、文档数量、文档总字数、项目进度
+     *
+     * @return List<ProjectSelectResp> 项目下拉框列表
+     */
+    List<ProjectSelectResp> findSelectList();
 }

@@ -237,3 +237,23 @@ export const cancelProject = (id) => {
     method: HTTP_METHODS.PUT
   })
 }
+
+/**
+ * 获取报告生成可选项目列表
+ * @returns {Promise} 项目列表响应
+ * 响应格式：{ code: 200, message: "操作成功", data: [{ id, number, name, statusDescription, documentCount, totalWords, progress, totalDownloadCount }] }
+ * @property {number} id - 项目ID
+ * @property {string} number - 项目编号
+ * @property {string} name - 项目名称
+ * @property {string} statusDescription - 状态描述（如：进行中、已完成）
+ * @property {number} documentCount - 文档数量
+ * @property {number} totalWords - 总字数
+ * @property {number} progress - 项目进度（0-100）
+ * @property {number} totalDownloadCount - 下载总次数
+ */
+export const getProjectReportSelect = () => {
+  return request({
+    url: PROJECT_API.REPORT_SELECT,
+    method: HTTP_METHODS.GET
+  })
+}

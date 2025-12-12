@@ -1,6 +1,5 @@
 -- 为 report_management 表添加 attachment_id 字段
 -- 用于存储 MinIO 返回的附件 ID
-
 -- 添加 attachment_id 字段
 ALTER TABLE report_management
 ADD COLUMN IF NOT EXISTS attachment_id BIGINT;

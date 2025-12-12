@@ -10,6 +10,7 @@ import com.sciz.server.domain.pojo.entity.project.Project;
 import com.sciz.server.domain.pojo.mapper.project.ProjectMapper;
 import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
+import com.sciz.server.infrastructure.shared.enums.ProjectStatus;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 import java.util.List;
@@ -128,5 +129,27 @@ public class ProjectRepoImpl implements ProjectRepo {
         }
 
         return mapper.selectCount(queryWrapper);
+    }
+
+    @Override
+    public List<Project> findAllActiveProjects() {
+        var queryWrapper = new LambdaQueryWrapper<Project>();
+        // 排除已删除的项目
+        queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+        // 排除已取消的项目（已取消的项目不需要自动更新）
+        queryWrapper.ne(Project::getStatus, ProjectStatus.CANCELLED.getCode().toString());
+
+        return mapper.selectList(queryWrapper);
+    }
+
+    @Override
+    public List<Project> findAll() {
+        var queryWrapper = new LambdaQueryWrapper<Project>();
+        // 排除已删除的项目
+        queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+        // 按创建时间倒序
+        queryWrapper.orderByDesc(Project::getCreatedTime);
+
+        return mapper.selectList(queryWrapper);
     }
 }

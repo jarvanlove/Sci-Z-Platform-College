@@ -27,9 +27,9 @@
         
         <el-select
           v-model="searchForm.keyType"
-          :placeholder="t('system.apikey.keyType')"
+          :placeholder="t('system.apikey.keyTypePlaceholder')"
           clearable
-          style="width: 150px"
+          style="width: 180px"
         >
           <el-option :label="t('common.all')" value="" />
           <el-option :label="t('system.apikey.keyTypeDataset')" value="dataset" />
@@ -39,9 +39,9 @@
         
         <el-select
           v-model="searchForm.isActive"
-          :placeholder="t('common.status')"
+          :placeholder="t('system.apikey.statusPlaceholder')"
           clearable
-          style="width: 120px"
+          style="width: 150px"
         >
           <el-option :label="t('common.all')" value="" />
           <el-option :label="t('system.apikey.active')" :value="true" />
@@ -52,8 +52,9 @@
           <el-icon><Search /></el-icon>
           {{ t('common.search') }}
         </el-button>
-        <el-button @click="handleReset">
-          {{ t('common.reset') }}
+        <el-button type="primary" @click="handleReset">
+          <el-icon><Refresh /></el-icon>
+          <span class="button-text">{{ t('common.reset') }}</span>
         </el-button>
         <el-button type="primary" @click="handleAdd">
           <el-icon><Plus /></el-icon>
@@ -85,30 +86,23 @@
         </template>
         <!-- 密钥类型列自定义 -->
         <template #keyType="{ row }">
-          <el-tag :type="getKeyTypeTagType(row.keyType)">
+          <el-tag :type="getKeyTypeTagType(row.keyType)" class="key-type-tag">
             {{ getKeyTypeText(row.keyType) }}
           </el-tag>
         </template>
         <!-- 状态列自定义 -->
         <template #isActive="{ row }">
-          <el-tag :type="row.isActive ? 'success' : 'info'">
+          <el-tag :type="row.isActive ? 'success' : 'info'" class="status-tag">
             {{ row.isActive ? t('system.apikey.active') : t('system.apikey.inactive') }}
           </el-tag>
         </template>
-        <!-- API Key 列自定义（部分隐藏） -->
+        <!-- API Key 列自定义（部分隐藏，悬浮显示完整） -->
         <template #apiKey="{ row }">
-          <div class="api-key-cell">
-            <span class="api-key-masked">{{ maskApiKey(row.apiKey) }}</span>
-            <el-button
-              link
-              type="primary"
-              size="small"
-              @click="handleCopyApiKey(row.apiKey)"
-            >
-              <el-icon><DocumentCopy /></el-icon>
-              {{ t('system.apikey.copy') }}
-            </el-button>
-          </div>
+          <BaseTooltip :content="row.apiKey || ''" placement="top">
+            <div class="api-key-cell">
+              <span class="api-key-masked">{{ maskApiKey(row.apiKey) }}</span>
+            </div>
+          </BaseTooltip>
         </template>
 
         <!-- 创建时间列自定义 -->
@@ -119,25 +113,42 @@
         <!-- 操作列 -->
         <template #actions="{ row }">
           <div class="action-buttons">
-            <button
-              class="action-btn btn-primary"
-              @click="handleEdit(row)"
+            <!-- 编辑按钮 -->
+            <BaseTooltip :content="t('common.edit')" placement="top">
+              <button
+                class="action-btn btn-primary"
+                @click.stop="handleEdit(row)"
+              >
+                <el-icon><Edit /></el-icon>
+              </button>
+            </BaseTooltip>
+            <!-- 启用/禁用按钮 -->
+            <BaseTooltip 
+              :content="row.isActive ? t('common.disable') : t('common.enable')" 
+              placement="top"
             >
-              {{ t('common.edit') }}
-            </button>
-            <button
-              class="action-btn"
-              :class="row.isActive ? 'btn-warning' : 'btn-success'"
-              @click="handleToggleStatus(row)"
-            >
-              {{ row.isActive ? t('common.disable') : t('common.enable') }}
-            </button>
-            <button
-              class="action-btn btn-danger"
-              @click="handleDelete(row)"
-            >
-              {{ t('common.delete') }}
-            </button>
+              <button
+                class="action-btn"
+                :class="row.isActive ? 'btn-info' : 'btn-success'"
+                @click.stop="handleToggleStatus(row)"
+              >
+                <el-icon v-if="row.isActive">
+                  <CircleClose />
+                </el-icon>
+                <el-icon v-else>
+                  <CircleCheck />
+                </el-icon>
+              </button>
+            </BaseTooltip>
+            <!-- 删除按钮 -->
+            <BaseTooltip :content="t('common.delete')" placement="top">
+              <button
+                class="action-btn btn-danger"
+                @click.stop="handleDelete(row)"
+              >
+                <el-icon><Delete /></el-icon>
+              </button>
+            </BaseTooltip>
           </div>
         </template>
       </BaseTable>
@@ -155,6 +166,7 @@
         :model="formData"
         :rules="formRules"
         label-width="100px"
+        class="apikey-form"
       >
         <el-form-item :label="t('system.apikey.keyType')" prop="keyType">
           <el-select
@@ -197,8 +209,6 @@
         <el-form-item :label="t('common.status')" prop="isActive">
           <el-switch
             v-model="formData.isActive"
-            :active-text="t('system.apikey.active')"
-            :inactive-text="t('system.apikey.inactive')"
           />
         </el-form-item>
       </el-form>
@@ -219,8 +229,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { Plus, Search, DocumentCopy } from '@element-plus/icons-vue'
-import { BaseButton, BaseCard, BaseTable, BaseDialog } from '@/components/Common'
+import { Plus, Search, Refresh, Edit, Delete, CircleClose, CircleCheck } from '@element-plus/icons-vue'
+import { BaseButton, BaseCard, BaseTable, BaseDialog, BaseTooltip } from '@/components/Common'
 import { getApiKeyList, createApiKey, updateApiKey, deleteApiKey } from '@/api/Dify/dify'
 import { formatDate } from '@/utils/date'
 import { createLogger } from '@/utils/simpleLogger'
@@ -271,48 +281,48 @@ const dialogTitle = computed(() => {
   return isEdit.value ? t('system.apikey.editApiKey') : t('system.apikey.addApiKey')
 })
 
-// 表格列配置
+// 表格列配置 - 优化自适应策略，参考 DeclarationList.vue
 const tableColumns = computed(() => [
   {
     prop: 'keyName',
     label: t('system.apikey.keyName'),
-    width: 150,
+    minWidth: 150,
+    align: 'center',
     showOverflowTooltip: true
   },
   {
     prop: 'keyType',
     label: t('system.apikey.keyType'),
-    width: 120,
+    minWidth: 100,
     align: 'center'
-  },
-  {
-    prop: 'resourceId',
-    label: t('system.apikey.resourceId'),
-    width: 200,
-    showOverflowTooltip: true
   },
   {
     prop: 'apiKey',
     label: t('system.apikey.apiKey'),
-    width: 250,
+    minWidth: 180,
+    align: 'center',
     showOverflowTooltip: false
   },
   {
     prop: 'description',
     label: t('system.apikey.description'),
     minWidth: 200,
-    showOverflowTooltip: true
+    showOverflowTooltip: false,
+    wrap: true,
+    align: 'center',
+    headerAlign: 'center'
   },
   {
     prop: 'isActive',
     label: t('common.status'),
-    width: 100,
+    minWidth: 100,
     align: 'center'
   },
   {
     prop: 'createdTime',
     label: t('common.createTime'),
-    width: 200,
+    minWidth: 140,
+    align: 'center',
     showOverflowTooltip: true
   }
 ])
@@ -360,21 +370,11 @@ const maskApiKey = (apiKey) => {
   return `${apiKey.substring(0, 4)}****${apiKey.substring(apiKey.length - 4)}`
 }
 
-// 复制 API Key
-const handleCopyApiKey = async (apiKey) => {
-  try {
-    await navigator.clipboard.writeText(apiKey)
-    ElMessage.success(t('system.apikey.copySuccess'))
-  } catch (error) {
-    logger.error('Failed to copy API Key', error)
-    ElMessage.error(t('system.apikey.copyFailed'))
-  }
-}
 
-// 格式化显示时间
+// 格式化显示时间 - 只显示年月日时分
 const formatDisplayTime = (time) => {
   if (!time) return '—'
-  return formatDate(time, 'YYYY-MM-DD HH:mm:ss')
+  return formatDate(time, 'YYYY-MM-DD HH:mm')
 }
 
 // 加载 API Key 列表
@@ -529,7 +529,25 @@ const handleDelete = async (row) => {
 
 // 切换状态
 const handleToggleStatus = async (row) => {
+  const isActive = row.isActive
+  const action = isActive ? t('common.disable') : t('common.enable')
   try {
+    await ElMessageBox.confirm(
+      t('system.apikey.toggleStatusConfirm', { action, name: row.keyName }),
+      t('system.apikey.toggleStatus'),
+      {
+        type: 'warning',
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel')
+      }
+    )
+
+    logger.info('Toggle API Key status', {
+      id: row.id,
+      keyName: row.keyName,
+      action
+    })
+
     const newStatus = !row.isActive
     const response = await updateApiKey({
       id: row.id,
@@ -543,12 +561,19 @@ const handleToggleStatus = async (row) => {
       throw new Error(result.message || t('system.apikey.toggleFailed'))
     }
     
-    ElMessage.success(t('system.apikey.toggleSuccess'))
+    ElMessage.success(t('system.apikey.toggleStatusSuccess', { action }))
+    logger.info('API Key status toggled successfully', {
+      id: row.id,
+      newStatus
+    })
+    
     loadApiKeyList()
   } catch (error) {
-    logger.error('Failed to toggle API Key status', error)
-    const errorMessage = error.response?.data?.message || error.message || t('system.apikey.toggleFailed')
-    ElMessage.error(errorMessage)
+    if (error !== 'cancel') {
+      logger.error('Failed to toggle API Key status', error)
+      const errorMessage = error.response?.data?.message || error.message || t('system.apikey.toggleFailed')
+      ElMessage.error(errorMessage)
+    }
   }
 }
 
@@ -647,6 +672,7 @@ onMounted(() => {
 <style lang="scss" scoped>
 .apikey-management-container {
   padding: 20px;
+  overflow-x: hidden;
 
   .page-header {
     margin-bottom: 20px;
@@ -654,7 +680,7 @@ onMounted(() => {
     .page-title {
       font-size: 24px;
       font-weight: 600;
-      color: var(--el-text-color-primary);
+      color: var(--color-primary);
       margin: 0;
     }
   }
@@ -665,30 +691,155 @@ onMounted(() => {
       gap: 12px;
       margin-bottom: 20px;
       flex-wrap: wrap;
+      align-items: center;
+      
+      // 🔥 按钮图标和文字间距优化
+      :deep(.el-button) {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important; // 🔥 图标和文字之间的间距
+        
+        // 确保图标和文字之间有间距
+        .el-icon {
+          margin-right: 0 !important;
+          margin-left: 0 !important;
+        }
+        
+        .button-text,
+        span:not(.el-icon) {
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+        }
+        
+        // 针对 Element Plus 按钮内部结构
+        > * {
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+        }
+      }
     }
 
     .apikey-table {
+      width: 100%;
+      border-radius: 8px;
+      overflow: visible;
+      border: 1px solid var(--border);
+      
+      // 🔥 确保表格自适应，参考 DeclarationList.vue
+      :deep(.base-table) {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: visible;
+      }
+      
+      :deep(.base-table__table) {
+        width: 100% !important;
+        flex: 1;
+        overflow: visible;
+      }
+      
+      // 🔥 确保表格自适应，不出现横向滚动条
+      :deep(.el-table) {
+        width: 100%;
+        
+        // 表头样式
+        .el-table__header {
+          th {
+            padding: 14px 16px !important;
+            font-size: 14px;
+            font-weight: 600 !important;
+            color: var(--text-2);
+            background-color: var(--surface) !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          
+          // 🔥 所有表头居中对齐
+          th.is-center {
+            text-align: center !important;
+            
+            .cell {
+              text-align: center !important;
+              display: flex !important;
+              justify-content: center !important;
+              align-items: center !important;
+            }
+          }
+        }
+        
+        // 表体样式
+        .el-table__body {
+          td {
+            padding: 12px 16px !important;
+            font-size: 14px;
+            color: var(--text);
+          }
+          
+          // 🔥 所有列内容居中对齐
+          td.is-center {
+            text-align: center !important;
+            
+            .cell {
+              text-align: center !important;
+              display: flex !important;
+              justify-content: center !important;
+              align-items: center !important;
+            }
+          }
+          
+          // 🔥 描述列允许换行，但内容居中
+          td[data-column-key="description"] {
+            white-space: normal;
+            word-break: break-word;
+            line-height: 1.6;
+            
+            .cell {
+              text-align: center !important;
+            }
+          }
+        }
+        
+        // 操作列固定右侧
+        .el-table__fixed-right {
+          right: 0 !important;
+          box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+        }
+      }
+      
       .api-key-cell {
         display: flex;
         align-items: center;
-        gap: 8px;
+        cursor: default;
 
         .api-key-masked {
           font-family: monospace;
-          color: var(--el-text-color-regular);
+          color: var(--text-3);
         }
+      }
+
+      // 🔥 密钥类型和状态标签圆角处理
+      .key-type-tag,
+      .status-tag {
+        border-radius: 12px !important;
+        padding: 4px 8px !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
       }
 
       .action-buttons {
         display: flex;
-        flex-direction: column;
+        flex-direction: row; // 🔥 改为横向排列，图标按钮一行显示
         gap: 8px;
         justify-content: center;
         align-items: center;
-        width: 100%;
+        flex-wrap: nowrap; // 🔥 确保不换行
 
         .action-btn {
-          padding: 5px 12px;
+          padding: 4px; // 🔥 图标按钮使用更小的内边距
+          min-width: 32px; // 🔥 确保图标按钮有最小宽度
+          height: 28px; // 🔥 统一高度
           border: 1px solid transparent;
           border-radius: 4px;
           font-size: 13px;
@@ -696,8 +847,18 @@ onMounted(() => {
           transition: all 0.2s;
           background: none;
           white-space: nowrap;
-          width: 100%;
-          text-align: center;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center; // 🔥 图标居中显示
+          gap: 0; // 🔥 只有图标，不需要 gap
+          
+          // 🔥 图标样式
+          .el-icon {
+            font-size: 16px; // 🔥 图标大小
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
 
           &:disabled {
             opacity: 0.5;
@@ -710,22 +871,22 @@ onMounted(() => {
           }
 
           &.btn-primary {
-            color: var(--color-primary, var(--el-color-primary));
-            border-color: var(--color-primary, var(--el-color-primary));
+            color: var(--color-primary);
+            border-color: var(--color-primary);
 
             &:hover:not(:disabled) {
-              background: var(--color-primary, var(--el-color-primary));
-              color: var(--surface, white);
+              background: var(--color-primary);
+              color: var(--surface);
             }
           }
 
-          &.btn-warning {
-            color: #f59e0b;
-            border-color: #f59e0b;
+          &.btn-info {
+            color: var(--text-3);
+            border-color: var(--text-3);
 
             &:hover:not(:disabled) {
-              background: #f59e0b;
-              color: var(--surface, white);
+              background: var(--text-3);
+              color: var(--surface);
             }
           }
 
@@ -735,7 +896,7 @@ onMounted(() => {
 
             &:hover:not(:disabled) {
               background: #16a34a;
-              color: var(--surface, white);
+              color: var(--surface);
             }
           }
 
@@ -745,13 +906,57 @@ onMounted(() => {
 
             &:hover:not(:disabled) {
               background: #dc2626;
-              color: var(--surface, white);
+              color: var(--surface);
             }
           }
         }
       }
     }
 
+  }
+}
+
+// 🔥 表单样式 - 按照 @页面修改.md
+.apikey-form {
+  :deep(.el-form-item__label) {
+    font-size: 14px !important;
+    color: var(--text-2) !important;
+    font-weight: 600 !important;
+  }
+  
+  :deep(.el-input__inner),
+  :deep(.el-textarea__inner),
+  :deep(.el-select .el-input__inner) {
+    font-size: 14px !important;
+    color: var(--text-3) !important;
+    font-weight: 400 !important;
+  }
+  
+  :deep(.el-tag),
+  :deep(.status-tag) {
+    border-radius: 12px !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+  }
+}
+
+// 🔥 统一弹窗取消按钮样式 - 确保与删除弹窗一致
+:deep(.base-dialog__footer .base-button:not(.el-button--primary)) {
+  color: var(--text-2) !important;
+  border-color: var(--border) !important;
+  background-color: var(--surface) !important;
+  
+  &:hover {
+    color: var(--text-2) !important;
+    border-color: var(--border-hover) !important;
+    background-color: var(--hover) !important;
+  }
+  
+  &:active {
+    color: var(--text-2) !important;
+    border-color: var(--border) !important;
+    background-color: var(--surface) !important;
   }
 }
 </style>

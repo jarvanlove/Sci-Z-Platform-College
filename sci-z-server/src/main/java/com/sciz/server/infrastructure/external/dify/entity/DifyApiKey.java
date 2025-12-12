@@ -60,6 +60,7 @@ public class DifyApiKey extends BaseEntity {
     @TableField("is_active")
     private Boolean isActive;
 
+
     /**
      * 密钥类型枚举
      */

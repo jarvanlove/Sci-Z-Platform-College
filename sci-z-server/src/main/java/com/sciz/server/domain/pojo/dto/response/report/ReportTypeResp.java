@@ -32,5 +32,10 @@ public class ReportTypeResp {
      * 密钥描述
      */
     private String description;
+
+    /**
+     * 工作流关联的知识库ID（Dify知识库ID）
+     */
+    private String difyKnowledgeId;
 }
 
