@@ -19,34 +19,28 @@ import java.util.List;
 public class ChatWorkflowRunReq {
 
     /**
-     * 知识库ID（Dify知识库ID，String类型）
+     * 用户问题（必填）
      */
-    @Schema(description = "知识库ID", required = true, example = "knowledge_base_001")
-    @NotBlank(message = "知识库ID不能为空")
-    private String knowledgeId;
+    @Schema(description = "用户问题", example = "你好")
+    @NotBlank(message = "用户问题不能为空")
+    private String query;
 
     /**
-     * 工作流ID（可选，如果不指定则使用API Token绑定的默认工作流）
+     * 知识库ID（可选，支持多个，用逗号分隔或传数组）
+     */
+    @Schema(description = "知识库ID列表", example = "knowledge_base_001,knowledge_base_002")
+    private String[] knowledgeIds;
+
+    /**
+     * 工作流ID（可选，仅在传文件时使用）
      */
     @Schema(description = "工作流ID", example = "workflow-id")
     private String workflowId;
 
     /**
-     * 响应模式（blocking 或 streaming）
+     * 上传的文件列表（可选，不传则直接调用 chatbot）
      */
-    @Schema(description = "响应模式", example = "blocking", allowableValues = {"blocking", "streaming"})
-    private String responseMode = "blocking";
-
-    /**
-     * 用户标识（可选）
-     */
-    @Schema(description = "用户标识", example = "user-001")
-    private String user;
-
-    /**
-     * 上传的文件列表（支持单文件或多文件）
-     */
-    @Schema(description = "上传的文件列表", required = true)
+    @Schema(description = "上传的文件列表")
     private List<MultipartFile> files;
 
     /**
@@ -54,6 +48,12 @@ public class ChatWorkflowRunReq {
      */
     @Schema(description = "会话ID", example = "conversation-001")
     private String conversationId;
+
+    /**
+     * 用户标识（可选）
+     */
+    @Schema(description = "用户标识", example = "user-001")
+    private String user;
 }
 
 

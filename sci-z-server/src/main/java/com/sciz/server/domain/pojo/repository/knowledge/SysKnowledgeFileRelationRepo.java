@@ -63,4 +63,12 @@ public interface SysKnowledgeFileRelationRepo {
      * @return 是否删除成功
      */
     boolean deleteByAttachmentId(Long attachmentId);
+
+    /**
+     * 统计知识库中的文档数量（未删除的）
+     *
+     * @param knowledgeId 知识库ID
+     * @return 文档数量
+     */
+    long countByKnowledgeId(Long knowledgeId);
 }

@@ -65,7 +65,6 @@ public class DifyApiClient {
             throw new RuntimeException("URL 格式错误: " + url, e);
         }
     }
-
     /**
      * GET 请求方法（无请求体，无查询参数）
      * 
@@ -214,7 +213,8 @@ public class DifyApiClient {
             int IsKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        if (IsKey == 0) {
+        // 如果提供了 userId、resourceId、keyType，则使用动态密钥（无论是 baseUrl 还是 privateUrl）
+        if (userId != null && resourceId != null && keyType != null) {
             // 动态获取API密钥
             String apiKey = difyApiKeyService.getApiKey(userId, resourceId, keyType);
             headers.set("Authorization", "Bearer " + apiKey);
@@ -312,7 +312,87 @@ public class DifyApiClient {
     }
 
     /**
+     * 真正的流式请求方法（使用 WebClient 处理 text/event-stream 响应，实时回调）
+     * 在接收到每一行数据时立即调用回调函数，不等待完整响应
+     * 
+     * @param method     请求类型 (POST)
+     * @param path       请求路径
+     * @param body       请求体
+     * @param userId     用户ID
+     * @param resourceId 资源ID
+     * @param keyType    密钥类型
+     * @param onData     数据回调函数，每收到一行数据时立即调用
+     */
+    public void requestStreamWithCallback(String method, String path, Object body,
+            Long userId, String resourceId, String keyType,
+            java.util.function.Consumer<String> onData) {
+        String url = buildUrl(path, null, 0);
+        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType, 0);
+
+        log.debug(String.format("Dify %s 流式请求（实时回调）: %s, userId=%s, resourceId=%s, keyType=%s, hasBody=%s",
+                method, url, userId, resourceId, keyType, body != null));
+
+        try {
+            // 构建请求体
+            String jsonBody;
+            if (entity.getBody() instanceof String) {
+                jsonBody = (String) entity.getBody();
+            } else if (entity.getBody() != null) {
+                jsonBody = objectMapper.writeValueAsString(entity.getBody());
+            } else {
+                jsonBody = "{}";
+            }
+            
+            // 构建 WebClient 请求
+            WebClient.RequestBodySpec requestSpec = webClient.method(HttpMethod.valueOf(method.toUpperCase()))
+                    .uri(url)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.TEXT_EVENT_STREAM);
+            
+            // 添加请求头（从 entity 中获取）
+            HttpHeaders headers = entity.getHeaders();
+            if (headers != null) {
+                headers.forEach((name, values) -> {
+                    if (values != null && !values.isEmpty() && !name.equalsIgnoreCase("Content-Type")) {
+                        requestSpec.header(name, values.get(0));
+                    }
+                });
+            }
+            
+            // 使用 bodyToFlux 接收流式响应，实时处理每一行数据
+            Flux<String> eventStream = requestSpec
+                    .bodyValue(jsonBody)
+                    .retrieve()
+                    .bodyToFlux(String.class);
+            
+            // 订阅流式数据，每收到一行立即调用回调
+            eventStream
+                    .doOnNext(event -> {
+                        // 立即调用回调，不等待完整响应
+                        if (onData != null && event != null) {
+                            String trimmedEvent = event.trim();
+                            if (!trimmedEvent.isEmpty()) {
+                                onData.accept(trimmedEvent);
+                            }
+                        }
+                    })
+                    .doOnError(error -> {
+                        log.error(String.format("流式请求处理错误: url=%s, err=%s", url, error.getMessage()), error);
+                    })
+                    .doOnComplete(() -> {
+                        log.debug(String.format("流式响应读取完成: url=%s", url));
+                    })
+                    .blockLast(Duration.ofMinutes(10)); // 阻塞等待流结束，最多等待10分钟
+            
+        } catch (Exception e) {
+            log.error(String.format("Dify 流式请求异常: url=%s, err=%s", url, e.getMessage()), e);
+            throw new RuntimeException("Dify 流式请求异常: " + url, e);
+        }
+    }
+
+    /**
      * 流式请求方法（使用 WebClient 处理 text/event-stream 响应）
+     * 注意：此方法会等待完整响应后才返回，不是真正的实时流式
      * 
      * @param method     请求类型 (POST)
      * @param path       请求路径

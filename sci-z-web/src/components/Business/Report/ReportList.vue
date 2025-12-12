@@ -202,18 +202,24 @@
       </div>
     </BaseCard>
 
+    <!-- 文件预览弹窗 -->
+    <FilePreview
+      v-model="showPreviewDialog"
+      :file-info="previewFileInfo"
+    />
+
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, ArrowDown, Loading } from '@element-plus/icons-vue'
-import { BaseCard, BaseButton, BaseDatePicker, BasePagination } from '@/components/Common'
+import { BaseCard, BaseButton, BaseDatePicker, BasePagination, FilePreview } from '@/components/Common'
 import { getReportManagementList, deleteReportManagement } from '@/api/Report'
-import { previewFile, downloadFile } from '@/api/File/file'
+import { downloadFile } from '@/api/File/file'
 import { createLogger } from '@/utils/simpleLogger'
 import { formatDate } from '@/utils/date'
 
@@ -225,9 +231,20 @@ const logger = createLogger('ReportList')
 const loading = ref(false)
 const reportList = ref([])
 
+// 文件预览相关
+const showPreviewDialog = ref(false)
+const previewFileInfo = ref({
+  name: '',
+  attachmentId: null
+})
+
 // 定时刷新相关
 const refreshTimer = ref(null)
-const REFRESH_INTERVAL = 5000 // 5秒刷新一次
+const REFRESH_INTERVAL = 10000 // 10秒刷新一次（优化：减少刷新频率）
+const userInteracting = ref(false) // 用户是否正在交互
+const userInteractionTimer = ref(null) // 用户交互计时器
+const USER_INTERACTION_DELAY = 3000 // 用户停止操作后3秒再恢复刷新
+const isPageVisible = ref(true) // 页面是否可见
 
 // 搜索表单
 const searchForm = reactive({
@@ -367,6 +384,7 @@ const loadReportList = async () => {
 
 // 搜索处理
 const handleSearch = () => {
+  markUserInteracting() // 标记用户正在交互
   logger.info('User performed search', {
     keyword: searchForm.keyword,
     reportType: searchForm.reportType,
@@ -378,6 +396,7 @@ const handleSearch = () => {
 
 // 筛选变化处理
 const handleFilterChange = () => {
+  markUserInteracting() // 标记用户正在交互
   logger.info('User changed filter')
   pagination.current = 1
   loadReportList()
@@ -385,6 +404,7 @@ const handleFilterChange = () => {
 
 // 日期变化处理
 const handleDateChange = () => {
+  markUserInteracting() // 标记用户正在交互
   logger.info('User changed date range')
   pagination.current = 1
   loadReportList()
@@ -409,7 +429,7 @@ const handleGenerateReport = () => {
 }
 
 // 预览报告
-const handlePreview = async (report) => {
+const handlePreview = (report) => {
   try {
     logger.info('User previewed report', { id: report.id, attachmentId: report.attachmentId })
     
@@ -419,19 +439,15 @@ const handlePreview = async (report) => {
       return
     }
     
-    // 调用预览接口获取预览 URL
-    const response = await previewFile(report.attachmentId)
-    const responseData = response?.data || response
-    const previewUrl = responseData?.data || responseData
-    
-    if (previewUrl) {
-      // 在新窗口打开预览
-      window.open(previewUrl, '_blank')
-      ElMessage.success(t('report.listPage.previewSuccess') || '预览已打开')
-      logger.info('Preview opened successfully', { id: report.id, previewUrl })
-    } else {
-      throw new Error('预览 URL 为空')
+    // 设置预览文件信息
+    previewFileInfo.value = {
+      name: report.projectName || report.number || '报告预览',
+      attachmentId: report.attachmentId
     }
+    
+    // 显示预览弹窗
+    showPreviewDialog.value = true
+    logger.info('Preview dialog opened', { id: report.id, attachmentId: report.attachmentId })
   } catch (error) {
     logger.error('Failed to preview report', error)
     const errorMessage = error.response?.data?.message || error.message || t('report.listPage.previewError') || '预览失败'
@@ -552,6 +568,7 @@ const handleDelete = async (report) => {
 
 // 分页变化处理
 const handlePageChange = (page) => {
+  markUserInteracting() // 标记用户正在交互
   logger.info('User changed page', { page })
   pagination.current = page
   loadReportList()
@@ -559,6 +576,7 @@ const handlePageChange = (page) => {
 
 // 每页数量变化处理
 const handlePageSizeChange = (size) => {
+  markUserInteracting() // 标记用户正在交互
   logger.info('User changed page size', { size })
   pagination.size = size
   pagination.current = 1
@@ -583,10 +601,20 @@ const startAutoRefresh = () => {
 
   logger.info('Starting auto refresh timer', { interval: REFRESH_INTERVAL })
   refreshTimer.value = setInterval(() => {
-    // 只有在没有正在加载时才刷新
-    if (!loading.value) {
-      logger.debug('Auto refreshing report list')
-      loadReportList()
+    // 优化：只在以下条件都满足时才刷新
+    // 1. 没有正在加载
+    // 2. 用户没有正在交互
+    // 3. 页面可见
+    if (!loading.value && !userInteracting.value && isPageVisible.value) {
+      logger.debug('Auto refreshing report list (silent mode)')
+      // 静默刷新：不显示loading状态，避免打断用户
+      loadReportListSilently()
+    } else {
+      logger.debug('Skipping auto refresh', {
+        loading: loading.value,
+        userInteracting: userInteracting.value,
+        isPageVisible: isPageVisible.value
+      })
     }
   }, REFRESH_INTERVAL)
 }
@@ -600,12 +628,94 @@ const stopAutoRefresh = () => {
   }
 }
 
+// 静默刷新报告列表（不显示loading状态）
+const loadReportListSilently = async () => {
+  try {
+    // 不设置 loading.value = true，避免显示加载状态
+    logger.debug('Silent loading report list')
+
+    const params = {
+      pageNo: pagination.current,
+      pageSize: pagination.size,
+      sortBy: 'generateTime',
+      sortOrder: 'DESC'
+    }
+
+    // 添加筛选条件
+    if (searchForm.keyword) {
+      params.keyword = searchForm.keyword
+    }
+    if (searchForm.reportType) {
+      params.reportType = searchForm.reportType
+    }
+    if (searchForm.status) {
+      params.status = searchForm.status
+    }
+
+    const response = await getReportManagementList(params)
+    const result = response || {}
+
+    if (result.code !== 200) {
+      logger.warn('Silent refresh failed', { message: result.message })
+      return
+    }
+
+    const data = result.data || {}
+    reportList.value = data.records || data.list || []
+    pagination.total = data.total || 0
+    pagination.current = data.current || data.pageNo || pagination.current
+    pagination.size = data.size || data.pageSize || pagination.size
+
+    logger.debug('Silent refresh completed', {
+      count: reportList.value.length,
+      total: pagination.total
+    })
+
+    // 检查是否需要继续定时刷新
+    checkAndStartAutoRefresh()
+  } catch (error) {
+    logger.warn('Silent refresh error', error)
+    // 静默刷新失败时不显示错误提示，避免打扰用户
+  }
+}
+
+// 标记用户正在交互
+const markUserInteracting = () => {
+  userInteracting.value = true
+  
+  // 清除之前的计时器
+  if (userInteractionTimer.value) {
+    clearTimeout(userInteractionTimer.value)
+  }
+  
+  // 用户停止操作后，延迟恢复刷新
+  userInteractionTimer.value = setTimeout(() => {
+    userInteracting.value = false
+    logger.debug('User interaction ended, resuming auto refresh')
+    // 如果还有待刷新的报告，确保定时器在运行
+    if (hasPendingOrGeneratingReports()) {
+      checkAndStartAutoRefresh()
+    }
+  }, USER_INTERACTION_DELAY)
+}
+
 // 检查并启动/停止定时刷新
 const checkAndStartAutoRefresh = () => {
   if (hasPendingOrGeneratingReports()) {
     startAutoRefresh()
   } else {
     stopAutoRefresh()
+  }
+}
+
+// 页面可见性变化处理
+const handleVisibilityChange = () => {
+  isPageVisible.value = !document.hidden
+  logger.debug('Page visibility changed', { isVisible: isPageVisible.value })
+  
+  // 页面可见时，如果有待刷新的报告，确保定时器在运行
+  if (isPageVisible.value && hasPendingOrGeneratingReports()) {
+    checkAndStartAutoRefresh()
   }
 }
 
@@ -621,13 +731,31 @@ watch(
 // 组件挂载
 onMounted(() => {
   logger.info('Report list page mounted')
+  
+  // 监听页面可见性变化
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  
+  // 初始化页面可见性状态
+  isPageVisible.value = !document.hidden
+  
   loadReportList()
 })
 
-// 组件卸载时清理定时器
-onUnmounted(() => {
-  logger.info('Report list page unmounted, cleaning up timer')
+// 组件卸载时清理定时器和事件监听
+onBeforeUnmount(() => {
+  logger.info('Report list page unmounting, cleaning up')
+  
+  // 清理定时器
   stopAutoRefresh()
+  
+  // 清理用户交互计时器
+  if (userInteractionTimer.value) {
+    clearTimeout(userInteractionTimer.value)
+    userInteractionTimer.value = null
+  }
+  
+  // 移除页面可见性监听
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 

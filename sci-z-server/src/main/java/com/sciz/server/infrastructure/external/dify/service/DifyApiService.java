@@ -109,47 +109,24 @@ public class DifyApiService {
     }
 
     /**
-     * 发送 Chatbot 流式对话（SSE）
+     * 发送 Chatbot 流式对话（SSE）- 真正的实时流式
+     * 在接收到每一行数据时立即调用回调函数，不等待完整响应
      * 
      * @param request 对话请求
-     * @param onData  数据回调函数，每收到一行数据时调用
-     * @return 响应结果
+     * @param onData  数据回调函数，每收到一行数据时立即调用
      */
-    public ResponseEntity<String> sendChatbotMessageStream(DifyChatbotMessageRequest request,
+    public void sendChatbotMessageStream(DifyChatbotMessageRequest request,
             java.util.function.Consumer<String> onData) {
         try {
-            log.info(String.format("发送 Chatbot 流式对话请求: userId=%s, resourceId=%s, query=%s, responseMode=%s",
+            log.info(String.format("发送 Chatbot 流式对话请求（实时）: userId=%s, resourceId=%s, query=%s, responseMode=%s",
                     request.getUserId(), request.getResourceId(), request.getQuery(), request.getResponseMode()));
 
-            // 调用普通 HTTP 请求获取完整响应体
-            ResponseEntity<String> response = difyApiClient.requestStream("POST", "/chat-messages", request,
-                    request.getUserId(), request.getResourceId(), request.getKeyType());
+            // 调用真正的流式请求方法，实时回调
+            difyApiClient.requestStreamWithCallback("POST", "/chat-messages", request,
+                    request.getUserId(), request.getResourceId(), request.getKeyType(), onData);
 
-            log.info(String.format("Chatbot 流式对话响应: statusCode=%s, hasBody=%s, contentType=%s",
-                    response.getStatusCode(), response.getBody() != null,
-                    response.getHeaders().getContentType()));
-
-            // 如果响应体不为空，解析 SSE 格式并逐行调用回调
-            if (response.getBody() != null && onData != null) {
-                String responseBody = response.getBody();
-                log.debug(String.format("响应体长度: %d 字符", responseBody.length()));
-
-                // 按行分割响应体（SSE 格式通常是按行分隔的）
-                String[] lines = responseBody.split("\n");
-                log.debug(String.format("响应体行数: %d", lines.length));
-
-                for (String line : lines) {
-                    String trimmedLine = line.trim();
-                    if (!trimmedLine.isEmpty()) {
-                        onData.accept(trimmedLine);
-                    }
-                }
-            } else {
-                log.warn(String.format("响应体为空或回调函数为空: hasBody=%s, hasCallback=%s",
-                        response.getBody() != null, onData != null));
-            }
-
-            return response;
+            log.info(String.format("Chatbot 流式对话完成: userId=%s, resourceId=%s",
+                    request.getUserId(), request.getResourceId()));
         } catch (Exception e) {
             log.error(String.format("发送 Chatbot 流式对话失败: err=%s", e.getMessage()), e);
             throw e;
@@ -868,4 +845,72 @@ public class DifyApiService {
             String resourceId) {
         return uploadFilesWithDynamicKey(user, files, userId, resourceId, DifyApiKey.KeyType.DATASET.getCode());
     }
+
+    /**
+     * 获取工作流 Draft 配置
+     * GET /console/api/apps/{appId}/workflows/draft
+     *
+     * @param appId     工作流ID（Dify 应用ID）
+     * @return 工作流 Draft 配置响应
+     */
+    public ResponseEntity<String> getWorkflowDraft(String appId) {
+        try {
+            String path = "/console/api/apps/" + appId + "/workflows/draft";
+            log.info(String.format("获取工作流 Draft 配置: appId=%s", appId));
+            // 使用 privateUrl (key=1) 调用 console API，GET 请求 body 和 params 都为 null，不传 userId/resourceId/keyType
+            return difyApiClient.request("GET", path, null, null, null, null, null, 1);
+        } catch (HttpClientErrorException e) {
+            log.error(String.format("获取工作流 Draft 配置失败: appId=%s, err=%s", appId, e.getMessage()), e);
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        } catch (Exception e) {
+            log.error(String.format("获取工作流 Draft 配置异常: appId=%s, err=%s", appId, e.getMessage()), e);
+            return ResponseEntity.status(500).body("{\"error\": \"获取工作流 Draft 配置异常: " + e.getMessage() + "\"}");
+        }
+    }
+    /**
+     * 更新工作流 Draft 配置
+     * POST /console/api/apps/{appId}/workflows/draft
+     *
+     * @param appId     工作流ID（Dify 应用ID）
+     * @param body      更新请求体（包含 graph、hash 等）
+     * @return 更新结果响应
+     */
+    public ResponseEntity<String> updateWorkflowDraft(String appId, Object body) {
+        try {
+            String path = "/console/api/apps/" + appId + "/workflows/draft";
+            log.info(String.format("更新工作流 Draft 配置: appId=%s", appId));
+            // 使用 privateUrl (key=1) 调用 console API，不传 userId/resourceId/keyType
+            return difyApiClient.request("POST", path, body, null, null, null, 1);
+        } catch (HttpClientErrorException e) {
+            log.error(String.format("更新工作流 Draft 配置失败: appId=%s, err=%s", appId, e.getMessage()), e);
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        } catch (Exception e) {
+            log.error(String.format("更新工作流 Draft 配置异常: appId=%s, err=%s", appId, e.getMessage()), e);
+            return ResponseEntity.status(500).body("{\"error\": \"更新工作流 Draft 配置异常: " + e.getMessage() + "\"}");
+        }
+    }
+
+    /**
+     * 发布工作流
+     * POST /console/api/apps/{appId}/workflows/publish
+     *
+     * @param appId     工作流ID（Dify 应用ID）
+     * @param body      发布请求体（包含 marked_name、marked_comment 等）
+     * @return 发布结果响应
+     */
+    public ResponseEntity<String> publishWorkflow(String appId, Object body) {
+        try {
+            String path = "/console/api/apps/" + appId + "/workflows/publish";
+            log.info(String.format("发布工作流: appId=%s", appId));
+            // 使用 privateUrl (key=1) 调用 console API，不传 userId/resourceId/keyType
+            return difyApiClient.request("POST", path, body, null, null, null, 1);
+        } catch (HttpClientErrorException e) {
+            log.error(String.format("发布工作流失败: appId=%s, err=%s", appId, e.getMessage()), e);
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        } catch (Exception e) {
+            log.error(String.format("发布工作流异常: appId=%s, err=%s", appId, e.getMessage()), e);
+            return ResponseEntity.status(500).body("{\"error\": \"发布工作流异常: " + e.getMessage() + "\"}");
+        }
+    }
+
 }

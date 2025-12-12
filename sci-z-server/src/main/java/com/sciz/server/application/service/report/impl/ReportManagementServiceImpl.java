@@ -17,6 +17,7 @@ import com.sciz.server.infrastructure.external.dify.config.DifyConfig;
 import com.sciz.server.infrastructure.external.dify.dto.DifyWorkflowRequest;
 import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiKeyService;
+import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
 import com.sciz.server.infrastructure.external.dify.util.DifyApiClient;
 import com.sciz.server.infrastructure.shared.enums.AttachmentCategoryStatus;
 import com.sciz.server.infrastructure.shared.enums.AttachmentRelationStatus;
@@ -55,6 +56,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -74,6 +76,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
     private final ReportManagementRepo reportManagementRepo;
     private final ReportManagementConverter reportManagementConverter;
     private final DifyApiKeyService difyApiKeyService;
+    private final DifyWorkflowService difyWorkflowService;
     private final DifyApiClient difyApiClient;
     private final ObjectMapper objectMapper;
     private final DifyConfig difyConfig;
@@ -92,6 +95,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             ReportManagementRepo reportManagementRepo,
             ReportManagementConverter reportManagementConverter,
             DifyApiKeyService difyApiKeyService,
+            DifyWorkflowService difyWorkflowService,
             DifyApiClient difyApiClient,
             ObjectMapper objectMapper,
             DifyConfig difyConfig,
@@ -103,6 +107,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
         this.reportManagementRepo = reportManagementRepo;
         this.reportManagementConverter = reportManagementConverter;
         this.difyApiKeyService = difyApiKeyService;
+        this.difyWorkflowService = difyWorkflowService;
         this.difyApiClient = difyApiClient;
         this.objectMapper = objectMapper;
         this.difyConfig = difyConfig;
@@ -324,16 +329,13 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             entity.setUpdatedTime(LocalDateTime.now());
             reportManagementRepo.updateById(entity);
             log.info(String.format("报告状态已更新为生成中: reportId=%s", reportId));
-            
             // 3. 执行工作流
             triggerDifyWorkflow(entity, userId, realName);
-            
             // 4. 工作流执行成功，状态已在 downloadAndSaveFile 中更新为 "generated"
             log.info(String.format("Dify 工作流异步执行完成: reportId=%s", reportId));
             
         } catch (Exception e) {
             log.error(String.format("Dify 工作流异步执行失败: reportId=%s, err=%s", reportId, e.getMessage()), e);
-            
             // 5. 更新报告状态为"失败"
             try {
                 var report = reportManagementRepo.findById(reportId);
@@ -367,6 +369,8 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             log.warn(String.format("Dify API Keys ID 为空，跳过工作流调用: reportId=%s", entity.getId()));
             return;
         }
+
+
         Long difyApiKeysId;
         try {
             difyApiKeysId = Long.parseLong(entity.getDifyApiKeysId());
@@ -390,24 +394,52 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                 workflowId, difyApiKey.getKeyName(), 
                 difyApiKey.getApiKey() != null ? "***" + difyApiKey.getApiKey().substring(Math.max(0, difyApiKey.getApiKey().length() - 4)) : "null"));
 
-        // 2. 构建工作流请求参数
+        // 2. 如果存在项目知识库ID，先更新工作流配置（更新 knowledge-retrieval 节点的 dataset_ids）
+        if (StringUtils.hasText(entity.getProjectKnowledgeId())) {
+            try {
+                log.info(String.format("开始更新工作流配置: workflowId=%s, projectKnowledgeId=%s", 
+                        workflowId, entity.getProjectKnowledgeId()));
+                
+                // 将 projectKnowledgeId 转换为 List
+                List<String> projectKnowledgeIds = List.of(entity.getProjectKnowledgeId());
+                
+                // 调用综合接口更新并发布工作流
+                difyWorkflowService.updateAndPublishWorkflow(
+                        workflowId,  // appId 就是 workflowId
+                        projectKnowledgeIds,  // 知识库ID列表
+                        "",  // markedName 为空
+                        ""   // markedComment 为空
+                );
+                
+                log.info(String.format("工作流配置更新并发布成功: workflowId=%s, projectKnowledgeId=%s", 
+                        workflowId, entity.getProjectKnowledgeId()));
+            } catch (Exception e) {
+                log.error(String.format("更新工作流配置失败: workflowId=%s, projectKnowledgeId=%s, err=%s", 
+                        workflowId, entity.getProjectKnowledgeId(), e.getMessage()), e);
+                // 更新失败不影响后续工作流执行，只记录日志
+            }
+        } else {
+            log.warn(String.format("项目知识库ID为空，跳过工作流配置更新: reportId=%s", entity.getId()));
+        }
+
+        // 3. 构建工作流请求参数
         Map<String, Object> inputs = new HashMap<>();
-        inputs.put("technology_report", "科技报告");
+        inputs.put("technology_report", "南极无人观测站智能照明技术目标可行性及路径研究科技报告");
         inputs.put("SetCongfig", entity.getProjectName());
 
-        // 3. 构建工作流请求（使用流式模式）
+        // 4. 构建工作流请求（使用流式模式）
         var workflowRequest = new DifyWorkflowRequest();
         workflowRequest.setInputs(inputs);
         workflowRequest.setResponseMode("streaming"); // 使用流式模式
         workflowRequest.setUser(String.valueOf(userId));
 
-        // 4. 构建请求体
+        // 5. 构建请求体
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("inputs", inputs);
         requestBody.put("response_mode", "streaming");
         requestBody.put("user", String.valueOf(userId));
 
-        // 5. 使用流式方式调用工作流
+        // 6. 使用流式方式调用工作流
         log.info(String.format("调用 Dify 工作流（流式）: workflowId=%s, userId=%s", workflowId, userId));
         ResponseEntity<String> response = difyApiClient.requestStream(
                 "POST", "/workflows/run", requestBody, userId, workflowId, DifyApiKey.KeyType.WORKFLOW.getCode());
@@ -786,7 +818,6 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                 throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED, "附件保存失败");
             }
             attachment.setId(attachmentId);
-            
             // 9. 创建附件关联
             var relation = new SysAttachmentRelation();
             relation.setAttachmentId(attachmentId);
@@ -815,7 +846,6 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED, "文件上传失败: " + e.getMessage());
         }
     }
-
     /**
      * 字节数组 MultipartFile 实现
      */
@@ -823,43 +853,35 @@ public class ReportManagementServiceImpl implements ReportManagementService {
         private final String fileName;
         private final byte[] content;
         private final String contentType;
-
         public ByteArrayMultipartFile(String fileName, byte[] content, String contentType) {
             this.fileName = fileName;
             this.content = content;
             this.contentType = contentType;
         }
-
         @Override
         public String getName() {
             return "file";
         }
-
         @Override
         public String getOriginalFilename() {
             return fileName;
         }
-
         @Override
         public String getContentType() {
             return contentType;
         }
-
         @Override
         public boolean isEmpty() {
             return content == null || content.length == 0;
         }
-
         @Override
         public long getSize() {
             return content != null ? content.length : 0;
         }
-
         @Override
         public byte[] getBytes() {
             return content;
         }
-
         @Override
         public InputStream getInputStream() {
             return new ByteArrayInputStream(content);

@@ -65,7 +65,7 @@
               >
                 <div class="project-option">
                   <span class="project-name">{{ project.name }}</span>
-                  <span v-if="project.code" class="project-code">{{ project.code }}</span>
+                  <span v-if="project.number" class="project-code">{{ project.number }}</span>
                 </div>
               </el-option>
             </el-select>
@@ -367,13 +367,14 @@ const loadWorkflows = async () => {
     }
     
     // 转换数据格式：将后端返回的格式转换为组件需要的格式
-    // 后端格式：{ id (difyApiKeysId), resourceId, keyName, description }
+    // 后端格式：{ id (difyApiKeysId), resourceId, keyName, description, difyKnowledgeId }
     // id 是 dify_api_keys 表的主键 ID，即 difyApiKeysId
     workflowOptions.value = workflowsData.map(workflow => ({
       id: workflow.id, // 使用 dify_api_keys 表的主键 ID（difyApiKeysId）
       resourceId: workflow.resourceId, // Dify 工作流的 resourceId（保留用于显示）
       name: workflow.keyName || workflow.name || '',
-      description: workflow.description || ''
+      description: workflow.description || '',
+      difyKnowledgeId: workflow.difyKnowledgeId || workflow.dify_knowledge_id || '' // 工作流关联的知识库ID
     }))
     
     logger.info(`加载工作流列表成功: ${workflowOptions.value.length} 个工作流`, {
@@ -393,9 +394,10 @@ const handleProjectChange = (projectId) => {
   const project = projectList.value.find(p => p.id === projectId)
   if (project) {
     formData.projectName = project.name || ''
-    formData.projectCode = project.code || ''
-    formData.projectKnowledgeId = project.knowledgeId || ''
-    logger.info(`选择项目: ${project.name} (ID: ${projectId})`)
+    formData.projectCode = project.code || project.number || ''
+    // 项目列表接口返回的是 difyKnowledgeId，不是 knowledgeId
+    formData.projectKnowledgeId = project.difyKnowledgeId || ''
+    logger.info(`选择项目: ${project.name} (ID: ${projectId}), 知识库ID: ${project.difyKnowledgeId || '未设置'}`)
   } else {
     formData.projectName = ''
     formData.projectCode = ''
@@ -406,6 +408,20 @@ const handleProjectChange = (projectId) => {
 // 工作流选择变化
 const handleWorkflowChange = (workflowId) => {
   logger.info(`选择工作流: ID=${workflowId}`)
+  
+  // 获取选中的工作流对象
+  const workflow = workflowOptions.value.find(w => w.id === workflowId)
+  if (workflow) {
+    // 如果工作流有 dify_knowledge_id，则赋值给 project_knowledge_id（优先级高于项目的知识库ID）
+    // 支持多种字段名：difyKnowledgeId、dify_knowledge_id
+    const difyKnowledgeId = workflow.difyKnowledgeId || workflow.dify_knowledge_id
+    if (difyKnowledgeId) {
+      formData.projectKnowledgeId = difyKnowledgeId
+      logger.info(`工作流关联的知识库ID已赋值: ${difyKnowledgeId}`)
+    } else {
+      logger.debug(`工作流 ${workflowId} 没有关联的知识库ID，保持项目的知识库ID: ${formData.projectKnowledgeId || '未设置'}`)
+    }
+  }
 }
 
 // 切换高级配置显示
@@ -425,6 +441,32 @@ const handleGenerate = async () => {
     return
   }
 
+  // 确保 projectKnowledgeId 有值
+  // 优先级：工作流的 difyKnowledgeId > 项目的 difyKnowledgeId
+  let projectKnowledgeId = formData.projectKnowledgeId
+  if (!projectKnowledgeId) {
+    // 如果工作流没有 difyKnowledgeId，尝试从项目获取
+    const selectedProject = projectList.value.find(p => p.id === formData.projectId)
+    if (selectedProject && selectedProject.difyKnowledgeId) {
+      projectKnowledgeId = selectedProject.difyKnowledgeId
+      formData.projectKnowledgeId = projectKnowledgeId
+      logger.info(`使用项目的知识库ID: ${projectKnowledgeId}`)
+    } else {
+      // 如果都没有，提示用户
+      ElMessage.error('项目知识库ID不能为空，请确保项目已关联知识库或工作流已关联知识库')
+      logger.error('项目知识库ID为空，无法创建报告', {
+        projectId: formData.projectId,
+        workflowId: formData.workflowId,
+        selectedProject: selectedProject ? {
+          id: selectedProject.id,
+          name: selectedProject.name,
+          difyKnowledgeId: selectedProject.difyKnowledgeId
+        } : null
+      })
+      return
+    }
+  }
+
   generating.value = true
   
   try {
@@ -432,7 +474,7 @@ const handleGenerate = async () => {
       projectId: formData.projectId,
       projectName: formData.projectName,
       projectCode: formData.projectCode || undefined,
-      projectKnowledgeId: formData.projectKnowledgeId || undefined,
+      projectKnowledgeId: projectKnowledgeId, // 确保有值
       difyApiKeysId: formData.workflowId, // 工作流ID就是difyApiKeysId
       workflowId: formData.workflowId,
       reportType: formData.reportType,

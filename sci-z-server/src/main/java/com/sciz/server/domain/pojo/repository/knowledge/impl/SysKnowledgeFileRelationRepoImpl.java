@@ -88,4 +88,21 @@ public class SysKnowledgeFileRelationRepoImpl implements SysKnowledgeFileRelatio
                 .set(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.DELETED.getCode())
                 .set(SysKnowledgeFileRelation::getUpdatedTime, LocalDateTime.now())) > 0;
     }
+
+    /**
+     * 统计知识库中的文档数量（未删除的）
+     *
+     * @param knowledgeId 知识库ID
+     * @return 文档数量
+     */
+    @Override
+    public long countByKnowledgeId(Long knowledgeId) {
+        if (knowledgeId == null) {
+            return 0;
+        }
+        LambdaQueryWrapper<SysKnowledgeFileRelation> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(SysKnowledgeFileRelation::getKnowledgeId, knowledgeId)
+                .eq(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+        return mapper.selectCount(queryWrapper);
+    }
 }

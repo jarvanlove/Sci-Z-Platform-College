@@ -93,4 +93,22 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
                 .set(SysKnowledgeBase::getIsDeleted, DeleteStatus.DELETED.getCode())
                 .update();
     }
+
+    /**
+     * 更新知识库的文件夹数量
+     *
+     * @param id 知识库ID
+     * @param folderCount 文件夹数量
+     * @return 是否更新成功
+     */
+    @Override
+    public boolean updateFolderCount(Long id, Integer folderCount) {
+        if (id == null || folderCount == null) {
+            return false;
+        }
+        return new LambdaUpdateChainWrapper<>(mapper)
+                .eq(SysKnowledgeBase::getId, id)
+                .set(SysKnowledgeBase::getFolderCount, folderCount)
+                .update();
+    }
 }
