@@ -11,7 +11,6 @@ import jakarta.validation.constraints.NotNull;
  * @param projectCode        String 项目编号
  * @param projectKnowledgeId String 项目知识库ID
  * @param reportType         String 报告类型(tech/self)
- * @param difyApiKeysId      String Dify API Keys 表 ID（从报告类型选择中获取的 id）
  * @param summary            String 报告摘要
  * @author JiaWen.Wu
  * @className ReportManagementCreateReq
@@ -24,7 +23,6 @@ public record ReportManagementCreateReq(
         @NotBlank(message = "项目知识库ID不能为空")
         String projectKnowledgeId,
         @NotBlank(message = "报告类型不能为空") String reportType,
-        @NotBlank(message = "Dify API Keys ID不能为空") String difyApiKeysId,
         String summary) {
 }
 

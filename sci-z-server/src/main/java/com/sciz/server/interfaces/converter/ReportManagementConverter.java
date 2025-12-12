@@ -34,6 +34,7 @@ public interface ReportManagementConverter {
     @Mapping(target = "creatorName", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "generateTime", ignore = true)
+    @Mapping(target = "difyApiKeysId", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "createdTime", ignore = true)
