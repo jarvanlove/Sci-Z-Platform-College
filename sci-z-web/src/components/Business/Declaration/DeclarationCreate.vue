@@ -248,12 +248,13 @@
             </el-form-item>
           </div>
   
-          <!-- 工作流选择 -->
+          <!-- 工作流选择 - 已注释，后端会自行处理 -->
+          <!--
           <div class="form-group">
             <div class="group-title">
               {{ $t('declaration.workflow') }} <span class="required-mark">*</span>
             </div>
-            <el-form-item :label="$t('declaration.selectWorkflow')" prop="workflow">
+            <el-form-item :label="$t('declaration.createPage.selectWorkflow')" prop="workflow">
               <WorkflowSelect
                 v-model="form.workflow"
                 :options="workflowOptions"
@@ -264,6 +265,7 @@
               />
             </el-form-item>
           </div>
+          -->
   
           <!-- 表单操作按钮 -->
           <div class="form-actions">
@@ -296,11 +298,11 @@
     Document
   } from '@element-plus/icons-vue'
   import { BaseCard, BaseButton, BaseDatePicker, BackButton } from '@/components/Common'
-  import { WorkflowSelect } from '@/components/Business/Form'
+  // import { WorkflowSelect } from '@/components/Business/Form' // 🔥 已注释，后端会自行处理
   import { DECLARATION_DEPARTMENT_OPTIONS } from '@/utils/constants'
   import { createLogger } from '@/utils/simpleLogger'
   import { uploadRedHeaderFile, createDeclaration } from '@/api/Declaration/declaration'
-  import { getWorkflows } from '@/api/User/user'
+  // import { getWorkflows } from '@/api/User/user' // 🔥 已注释，后端会自行处理
   import { validateFileSize, validateFileType } from '@/constants/attachment'
   
   const router = useRouter()
@@ -322,7 +324,7 @@
     researchDirection: '',
     researchTopic: '',
     researchField: [],
-    workflow: ''
+    // workflow: '' // 🔥 已注释，后端会自行处理
   })
   
   // 表单验证规则
@@ -391,13 +393,13 @@
         trigger: 'change'
       }
     ],
-    workflow: [
-      {
-        required: true,
-        message: t('declaration.workflowRequired'),
-        trigger: 'change'
-      }
-    ]
+    // workflow: [ // 🔥 已注释，后端会自行处理
+    //   {
+    //     required: true,
+    //     message: t('declaration.workflowRequired'),
+    //     trigger: 'change'
+    //   }
+    // ]
   }))
   
   // 状态管理
@@ -410,9 +412,9 @@
   // 部门选项
   const departmentOptions = DECLARATION_DEPARTMENT_OPTIONS
   
-  // 工作流选项
-  const workflowOptions = ref([])
-  const workflowLoading = ref(false)
+  // 工作流选项 - 已注释，后端会自行处理
+  // const workflowOptions = ref([])
+  // const workflowLoading = ref(false)
   
   // 标签输入
   const tagInput = ref('')
@@ -605,69 +607,69 @@
     }
   }
   
-  // 加载工作流选项
-  const loadWorkflowOptions = async () => {
-    try {
-      workflowLoading.value = true
-      logger.info('Loading workflow options')
+  // 加载工作流选项 - 已注释，后端会自行处理
+  // const loadWorkflowOptions = async () => {
+  //   try {
+  //     workflowLoading.value = true
+  //     logger.info('Loading workflow options')
 
-      // 调用工作流列表接口
-      const response = await getWorkflows()
+  //     // 调用工作流列表接口
+  //     const response = await getWorkflows()
       
-      // 处理响应数据：支持多种响应格式
-      // 标准响应格式：{ code, message, data: [...] } 或直接是数组
-      let workflowsData = []
+  //     // 处理响应数据：支持多种响应格式
+  //     // 标准响应格式：{ code, message, data: [...] } 或直接是数组
+  //     let workflowsData = []
       
-      // 检查 response.data 是否为数组（标准格式：{ data: [...] }）
-      if (Array.isArray(response?.data)) {
-        workflowsData = response.data
-      } 
-      // 检查 response.data.data 是否为数组（嵌套格式：{ data: { data: [...] } }）
-      else if (Array.isArray(response?.data?.data)) {
-        workflowsData = response.data.data
-      }
-      // 如果 response 本身就是数组（直接返回数组）
-      else if (Array.isArray(response)) {
-        workflowsData = response
-      }
-      // 如果都没有，尝试从 data 字段获取
-      else {
-        workflowsData = response?.data || []
-      }
+  //     // 检查 response.data 是否为数组（标准格式：{ data: [...] }）
+  //     if (Array.isArray(response?.data)) {
+  //       workflowsData = response.data
+  //     } 
+  //     // 检查 response.data.data 是否为数组（嵌套格式：{ data: { data: [...] } }）
+  //     else if (Array.isArray(response?.data?.data)) {
+  //       workflowsData = response.data.data
+  //     }
+  //     // 如果 response 本身就是数组（直接返回数组）
+  //     else if (Array.isArray(response)) {
+  //       workflowsData = response
+  //     }
+  //     // 如果都没有，尝试从 data 字段获取
+  //     else {
+  //       workflowsData = response?.data || []
+  //     }
       
-      logger.info('Raw workflows data received', { 
-        rawData: workflowsData, 
-        count: workflowsData.length,
-        responseType: typeof response,
-        isArray: Array.isArray(response),
-        hasData: !!response?.data,
-        isDataArray: Array.isArray(response?.data)
-      })
+  //     logger.info('Raw workflows data received', { 
+  //       rawData: workflowsData, 
+  //       count: workflowsData.length,
+  //       responseType: typeof response,
+  //       isArray: Array.isArray(response),
+  //       hasData: !!response?.data,
+  //       isDataArray: Array.isArray(response?.data)
+  //     })
       
-      // 转换数据格式：将后端返回的格式转换为组件需要的格式
-      // 后端格式：{ id, userId, keyType, resourceId, keyName, description }
-      // 组件格式：{ id, name, description }
-      // 注意：后端已经过滤了 keyType === 'workflow' 的工作流，前端不需要再过滤
-      workflowOptions.value = workflowsData.map(workflow => ({
-        id: workflow.resourceId, // 使用 resourceId 作为工作流ID
-        name: workflow.keyName || '',
-        description: workflow.description || ''
-      }))
+  //     // 转换数据格式：将后端返回的格式转换为组件需要的格式
+  //     // 后端格式：{ id, userId, keyType, resourceId, keyName, description }
+  //     // 组件格式：{ id, name, description }
+  //     // 注意：后端已经过滤了 keyType === 'workflow' 的工作流，前端不需要再过滤
+  //     workflowOptions.value = workflowsData.map(workflow => ({
+  //       id: workflow.resourceId, // 使用 resourceId 作为工作流ID
+  //       name: workflow.keyName || '',
+  //       description: workflow.description || ''
+  //     }))
       
-      logger.info('Workflow options loaded successfully', { 
-        total: workflowsData.length,
-        loaded: workflowOptions.value.length,
-        options: workflowOptions.value
-      })
-    } catch (error) {
-      logger.error('Failed to load workflow options', error)
-      ElMessage.error(t('declaration.workflowLoadError'))
-      // 加载失败时设置为空数组，避免组件报错
-      workflowOptions.value = []
-    } finally {
-      workflowLoading.value = false
-    }
-  }
+  //     logger.info('Workflow options loaded successfully', { 
+  //       total: workflowsData.length,
+  //       loaded: workflowOptions.value.length,
+  //       options: workflowOptions.value
+  //     })
+  //   } catch (error) {
+  //     logger.error('Failed to load workflow options', error)
+  //     ElMessage.error(t('declaration.workflowLoadError'))
+  //     // 加载失败时设置为空数组，避免组件报错
+  //     workflowOptions.value = []
+  //   } finally {
+  //     workflowLoading.value = false
+  //   }
+  // }
   
   // 提交申报
   const handleSubmit = async () => {
@@ -701,8 +703,8 @@
         projectEndTime: form.projectEndTime,
         researchFields: form.researchField, // 数组格式
         researchDirection: form.researchDirection,
-        researchTopic: form.researchTopic,
-        workflowId: form.workflow // workflowId 对应表单中的 workflow 字段
+        researchTopic: form.researchTopic
+        // workflowId: form.workflow // 🔥 已注释，后端会自行处理
       }
 
       // 调用创建申报接口
@@ -759,7 +761,7 @@
   
   // 生命周期
   onMounted(() => {
-    loadWorkflowOptions()
+    // loadWorkflowOptions() // 🔥 已注释，后端会自行处理
   })
   </script>
   

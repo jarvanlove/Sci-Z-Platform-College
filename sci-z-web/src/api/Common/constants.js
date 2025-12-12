@@ -80,7 +80,8 @@ export const PROJECT_API = {
   MILESTONE_DOCUMENT_DELETE: buildApiUrl('/project/milestone/document/delete'), // 删除里程碑文档
   MILESTONE_COMPLETE: (milestoneId) => buildApiUrl(`/project/milestone/${milestoneId}/complete`), // 完成里程碑
   MILESTONE_CANCEL_COMPLETE: (milestoneId) => buildApiUrl(`/project/milestone/${milestoneId}/cancel-complete`), // 取消完成里程碑
-  CANCEL: (id) => buildApiUrl(`/project/${id}/cancel`) // 取消项目
+  CANCEL: (id) => buildApiUrl(`/project/${id}/cancel`), // 取消项目
+  REPORT_SELECT: buildApiUrl('/project/report/select') // 获取报告生成可选项目列表
 }
 
 // ================================

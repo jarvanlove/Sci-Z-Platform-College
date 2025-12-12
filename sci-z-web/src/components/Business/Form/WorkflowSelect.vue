@@ -17,11 +17,13 @@
         popper-class="workflow-select-dropdown"
         style="width: 100%"
         filterable
+        clearable
         :filter-method="filterWorkflow"
         :no-match-text="noMatchText"
         :no-data-text="noDataText"
         @update:model-value="handleValueChange"
         @visible-change="handleVisibleChange"
+        @clear="handleClear"
       >
         <el-option
           v-for="workflow in filteredWorkflowOptions"
@@ -35,13 +37,6 @@
           </div>
         </el-option>
       </el-select>
-      <div
-        v-if="modelValue && showClear"
-        class="workflow-clear-btn"
-        @click.stop="handleClear"
-      >
-        <el-icon><Close /></el-icon>
-      </div>
     </div>
     <div v-if="selectedWorkflow && showInfo" class="workflow-info">
       <div class="workflow-info-title">{{ selectedWorkflow.name }}</div>
@@ -205,41 +200,6 @@ defineExpose({
   width: 100%;
   flex-shrink: 0;
   
-  .workflow-clear-btn {
-    position: absolute;
-    right: 35px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    z-index: 10;
-    color: #9ca3af;
-    transition: all 0.2s ease;
-    border-radius: 50%;
-    background-color: transparent;
-    
-    &:hover {
-      color: #dc2626;
-      background-color: rgba(220, 38, 38, 0.1);
-    }
-    
-    &:active {
-      transform: translateY(-50%) scale(0.95);
-    }
-    
-    .el-icon {
-      font-size: 14px;
-    }
-  }
-  
-  // 调整箭头图标位置，为清除按钮留出空间
-  :deep(.el-select .el-input__suffix) {
-    right: 12px;
-  }
 }
 
 // 工作流选项内容样式（用于 scoped 样式中）

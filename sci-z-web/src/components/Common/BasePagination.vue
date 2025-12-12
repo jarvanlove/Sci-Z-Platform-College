@@ -339,6 +339,18 @@ const handleJumpEnter = () => {
       background-color: var(--hover);
       cursor: not-allowed;
     }
+    
+    // 🔥 下拉框选项选中状态使用主题色
+    option {
+      background-color: var(--surface);
+      color: var(--text-2);
+      
+      &:checked,
+      &:selected {
+        background-color: var(--color-primary) !important;
+        color: var(--surface) !important;
+      }
+    }
   }
 
   &__controls {

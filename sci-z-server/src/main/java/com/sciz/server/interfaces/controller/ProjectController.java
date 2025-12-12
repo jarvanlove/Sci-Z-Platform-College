@@ -12,6 +12,7 @@ import com.sciz.server.domain.pojo.dto.response.project.ProjectProgressResp;
 
 import java.util.List;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectListResp;
+import com.sciz.server.domain.pojo.dto.response.project.ProjectSelectResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectStatisticsResp;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.PageResult;
@@ -190,5 +191,17 @@ public class ProjectController {
     public Result<Void> cancelCompleteMilestone(@PathVariable Long milestoneId) {
         projectService.cancelCompleteMilestone(milestoneId);
         return Result.success();
+    }
+
+    /**
+     * 查询报告项目下拉框列表
+     *
+     * @return 项目下拉框列表（包含项目ID、编号、名称、状态描述、文档数量、文档总字数、项目进度）
+     */
+    @Operation(summary = "查询报告项目下拉框列表", description = "查询所有项目的下拉框数据，用于报告生成等场景的项目选择")
+    @GetMapping("report/select")
+    public Result<List<ProjectSelectResp>> getProjectSelectList() {
+        var respList = projectService.findSelectList();
+        return Result.success(respList);
     }
 }

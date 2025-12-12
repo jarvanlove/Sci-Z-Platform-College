@@ -807,13 +807,13 @@ body {
   
   /* 日期范围选择器的图标 */
   .el-range__icon {
-    color: var(--text-2) !important;
+    color: var(--color-primary) !important;
   }
   
   /* 前缀和后缀图标 */
   .el-input__prefix,
   .el-input__suffix {
-    color: var(--text-2) !important;
+    color: var(--color-primary) !important;
   }
 }
 
@@ -846,12 +846,13 @@ body {
       background-color: var(--surface) !important;
       border-bottom: 1px solid var(--border) !important;
       
-      /* 左侧箭头按钮（与下拉框箭头颜色一致） */
+      /* 左侧箭头按钮（使用主题色） */
       .el-picker-panel__icon-btn {
-        color: var(--text-2) !important;
+        color: var(--color-primary) !important;
         
         &:hover {
-          color: var(--color-primary) !important;
+          color: var(--color-primary-dark) !important;
+          background-color: var(--hover) !important;
         }
       }
       
@@ -887,21 +888,28 @@ body {
             
             &:hover {
               color: var(--color-primary) !important;
+              background-color: var(--hover) !important;
               
               span {
                 color: var(--color-primary) !important;
+                background-color: var(--hover) !important;
               }
             }
           }
           
           &.current:not(.disabled) {
             color: var(--color-primary) !important;
+            
+            span {
+              color: var(--color-primary) !important;
+            }
           }
           
           &.today {
             span {
               color: var(--color-primary) !important;
               font-weight: 600;
+              border-color: var(--color-primary) !important;
             }
           }
           
@@ -1318,5 +1326,34 @@ body {
   
   .card {
     padding: var(--gap-md);
+  }
+}
+
+// ================================
+// 分页组件下拉框统一样式（全局样式）
+// ================================
+
+/* 🔥 分页组件下拉框选中项使用主题色 */
+.base-pagination__size-select {
+  option {
+    background-color: var(--surface) !important;
+    color: var(--text-2) !important;
+    
+    &:checked,
+    &:selected {
+      background-color: var(--color-primary) !important;
+      color: var(--surface) !important;
+    }
+  }
+}
+
+/* 🔥 全局样式：确保所有 select 下拉框的选中项使用主题色 */
+select {
+  option {
+    &:checked,
+    &:selected {
+      background-color: var(--color-primary) !important;
+      color: var(--surface) !important;
+    }
   }
 }

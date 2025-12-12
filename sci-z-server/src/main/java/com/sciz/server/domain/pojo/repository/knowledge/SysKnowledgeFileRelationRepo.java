@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeFileRelation;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * 知识库文件关系仓储（领域层抽象）
  * 
@@ -63,4 +66,20 @@ public interface SysKnowledgeFileRelationRepo {
      * @return 是否删除成功
      */
     boolean deleteByAttachmentId(Long attachmentId);
+
+    /**
+     * 根据知识库ID统计文件数量（未删除的文件）
+     *
+     * @param knowledgeId 知识库ID
+     * @return 文件数量
+     */
+    Long countByKnowledgeId(Long knowledgeId);
+
+    /**
+     * 根据知识库ID列表批量查询附件ID
+     *
+     * @param knowledgeIds 知识库ID列表
+     * @return Map<Long, List<Long>> 知识库ID -> 附件ID列表映射
+     */
+    Map<Long, List<Long>> findAttachmentIdsByKnowledgeIds(List<Long> knowledgeIds);
 }
