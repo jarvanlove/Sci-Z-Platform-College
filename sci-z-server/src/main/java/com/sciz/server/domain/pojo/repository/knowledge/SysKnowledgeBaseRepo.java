@@ -61,4 +61,13 @@ public interface SysKnowledgeBaseRepo {
      * @return 是否删除成功
      */
     boolean deleteById(Long id);
+
+    /**
+     * 更新知识库的文件夹数量
+     *
+     * @param id 知识库ID
+     * @param folderCount 文件夹数量
+     * @return 是否更新成功
+     */
+    boolean updateFolderCount(Long id, Integer folderCount);
 }

@@ -202,6 +202,12 @@
       </div>
     </BaseCard>
 
+    <!-- 文件预览弹窗 -->
+    <FilePreview
+      v-model="showPreviewDialog"
+      :file-info="previewFileInfo"
+    />
+
   </div>
 </template>
 
@@ -211,9 +217,9 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, ArrowDown, Loading } from '@element-plus/icons-vue'
-import { BaseCard, BaseButton, BaseDatePicker, BasePagination } from '@/components/Common'
+import { BaseCard, BaseButton, BaseDatePicker, BasePagination, FilePreview } from '@/components/Common'
 import { getReportManagementList, deleteReportManagement } from '@/api/Report'
-import { previewFile, downloadFile } from '@/api/File/file'
+import { downloadFile } from '@/api/File/file'
 import { createLogger } from '@/utils/simpleLogger'
 import { formatDate } from '@/utils/date'
 
@@ -224,6 +230,13 @@ const logger = createLogger('ReportList')
 // 响应式数据
 const loading = ref(false)
 const reportList = ref([])
+
+// 文件预览相关
+const showPreviewDialog = ref(false)
+const previewFileInfo = ref({
+  name: '',
+  attachmentId: null
+})
 
 // 定时刷新相关
 const refreshTimer = ref(null)
@@ -416,7 +429,7 @@ const handleGenerateReport = () => {
 }
 
 // 预览报告
-const handlePreview = async (report) => {
+const handlePreview = (report) => {
   try {
     logger.info('User previewed report', { id: report.id, attachmentId: report.attachmentId })
     
@@ -426,19 +439,15 @@ const handlePreview = async (report) => {
       return
     }
     
-    // 调用预览接口获取预览 URL
-    const response = await previewFile(report.attachmentId)
-    const responseData = response?.data || response
-    const previewUrl = responseData?.data || responseData
-    
-    if (previewUrl) {
-      // 在新窗口打开预览
-      window.open(previewUrl, '_blank')
-      ElMessage.success(t('report.listPage.previewSuccess') || '预览已打开')
-      logger.info('Preview opened successfully', { id: report.id, previewUrl })
-    } else {
-      throw new Error('预览 URL 为空')
+    // 设置预览文件信息
+    previewFileInfo.value = {
+      name: report.projectName || report.number || '报告预览',
+      attachmentId: report.attachmentId
     }
+    
+    // 显示预览弹窗
+    showPreviewDialog.value = true
+    logger.info('Preview dialog opened', { id: report.id, attachmentId: report.attachmentId })
   } catch (error) {
     logger.error('Failed to preview report', error)
     const errorMessage = error.response?.data?.message || error.message || t('report.listPage.previewError') || '预览失败'
