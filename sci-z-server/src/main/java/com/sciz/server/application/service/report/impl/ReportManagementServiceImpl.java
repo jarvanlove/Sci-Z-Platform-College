@@ -128,8 +128,8 @@ public class ReportManagementServiceImpl implements ReportManagementService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long create(ReportManagementCreateReq req) {
-        log.info(String.format("开始创建报告管理: Id=%s, reportType=%s, difyApiKeysId=%s",
-                req.projectId(), req.reportType(), req.difyApiKeysId()));
+        log.info(String.format("开始创建报告管理: Id=%s, reportType=%s",
+                req.projectId(), req.reportType()));
         try {
             // 1. 获取当前登录用户
             var currentUser = LoginUserUtil.requireCurrentUser();
@@ -139,17 +139,21 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             // 2. 转换为实体
             var entity = reportManagementConverter.toEntity(req);
 
-            // 3. 设置报告基本信息
+            // 3. 设置固定值：difyApiKeysId = "9"
+            entity.setDifyApiKeysId("9");
+            log.info(String.format("设置 Dify API Keys ID 为固定值: difyApiKeysId=9"));
+
+            // 4. 设置报告基本信息
             initializeReportEntity(entity, userId, realName);
 
-            // 4. 保存报告
+            // 5. 保存报告
             var reportId = reportManagementRepo.save(entity);
             if (reportId == null) {
                 throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED, "报告保存失败");
             }
             log.info(String.format("报告保存成功: reportId=%s, number=%s", reportId, entity.getNumber()));
 
-            // 5. 异步调用 Dify 工作流生成报告（使用 CompletableFuture 实现真正的异步）
+            // 6. 异步调用 Dify 工作流生成报告（使用 CompletableFuture 实现真正的异步）
             // 注意：在异步线程中无法获取 Web 上下文，所以需要在调用前获取用户信息
             CompletableFuture.runAsync(() -> {
                 try {

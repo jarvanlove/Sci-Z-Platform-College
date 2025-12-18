@@ -19,6 +19,7 @@
           clearable
           style="width: 250px"
           @keyup.enter="handleSearch"
+          @blur="handleSearch"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
@@ -30,6 +31,7 @@
           :placeholder="t('system.apikey.keyTypePlaceholder')"
           clearable
           style="width: 180px"
+          @change="handleSearch"
         >
           <el-option :label="t('common.all')" value="" />
           <el-option :label="t('system.apikey.keyTypeDataset')" value="dataset" />
@@ -42,6 +44,7 @@
           :placeholder="t('system.apikey.statusPlaceholder')"
           clearable
           style="width: 150px"
+          @change="handleSearch"
         >
           <el-option :label="t('common.all')" value="" />
           <el-option :label="t('system.apikey.active')" :value="true" />
