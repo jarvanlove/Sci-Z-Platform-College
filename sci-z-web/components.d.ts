@@ -9,6 +9,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     ActionButtons: typeof import('./src/components/Business/List/ActionButtons.vue')['default']
     AgreementNotice: typeof import('./src/components/Common/AgreementNotice.vue')['default']
+    AIChat: typeof import('./src/components/Business/AI/AIChat.vue')['default']
     ApiKeyManagement: typeof import('./src/components/Business/System/ApiKeyManagement.vue')['default']
     AttachmentList: typeof import('./src/components/Business/Detail/AttachmentList.vue')['default']
     BackButton: typeof import('./src/components/Common/BackButton.vue')['default']
@@ -76,6 +77,7 @@ declare module 'vue' {
     FormSection: typeof import('./src/components/Business/Form/FormSection.vue')['default']
     Header: typeof import('./src/components/Layout/Header.vue')['default']
     InfoCard: typeof import('./src/components/Business/Detail/InfoCard.vue')['default']
+    KnowledgeList: typeof import('./src/components/Business/Knowledge/KnowledgeList.vue')['default']
     LanguageSwitcher: typeof import('./src/components/Common/LanguageSwitcher.vue')['default']
     LiteratureDetail: typeof import('./src/components/Business/Literature/LiteratureDetail.vue')['default']
     LiteratureSearch: typeof import('./src/components/Business/Literature/LiteratureSearch.vue')['default']

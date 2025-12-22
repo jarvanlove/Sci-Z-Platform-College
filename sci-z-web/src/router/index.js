@@ -166,17 +166,6 @@ const routes = [
           permission: 'menu:knowledge:list',
           layout: 'main'
         }
-      },
-      {
-        path: 'detail/:id',
-        name: 'KnowledgeDetail',
-        component: () => import('@/views/Knowledge/Detail.vue'),
-        meta: { 
-          title: '知识库详情', 
-          requiresAuth: true,
-          permission: 'menu:knowledge:detail',
-          layout: 'main'
-        }
       }
     ]
   },
