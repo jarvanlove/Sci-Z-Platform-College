@@ -172,11 +172,23 @@ export const KNOWLEDGE_API = {
   FILE_RELATION_UPDATE: (id) => buildApiUrl(`/knowledge/file-relation/${id}`), // PUT /api/knowledge/file-relation/{id}
   FILE_RELATION_DELETE: (id) => buildApiUrl(`/knowledge/file-relation/${id}`), // DELETE /api/knowledge/file-relation/{id}
   FILE_RELATION_DETAIL: (id) => buildApiUrl(`/knowledge/file-relation/${id}`), // GET /api/knowledge/file-relation/{id}
-  FILE_RELATION_LIST: buildApiUrl('/knowledge/file-relation') // GET /api/knowledge/file-relation?knowledgeId=1&folderId=0&page=1&size=10
+  FILE_RELATION_LIST: buildApiUrl('/knowledge/file-relation'), // GET /api/knowledge/file-relation?knowledgeId=1&folderId=0&page=1&size=10
+  COLLECT_FROM_PDF_URL: (id) => buildApiUrl(`/knowledge/${id}/collect-from-pdf-url`) // POST /api/knowledge/{id}/collect-from-pdf-url
 }
 
 // ================================
-// 9. 文件管理模块 API 路径
+// 9. 文献搜索模块 API 路径
+// ================================
+
+export const LITERATURE_API = {
+  BASE_PATH: buildApiUrl('/literature'), // 文献搜索模块基础路径
+  SEARCH: buildApiUrl('/literature/search'), // 搜索文献
+  DETAIL: buildApiUrl('/literature/detail'), // 获取文献详情
+  DOWNLOAD: (id) => buildApiUrl(`/literature/${id}/download`) // 下载文献
+}
+
+// ================================
+// 10. 文件管理模块 API 路径
 // ================================
 
 export const FILE_API = {
@@ -192,7 +204,7 @@ export const FILE_API = {
 }
 
 // ================================
-// 10. 系统管理模块 API 路径
+// 11. 系统管理模块 API 路径
 // ================================
 
 export const SYSTEM_API = {
@@ -224,7 +236,7 @@ export const SYSTEM_API = {
 }
 
 // ================================
-// 11. 用户模块 API 路径
+// 12. 用户模块 API 路径
 // ================================
 
 export const USER_API = {
@@ -237,7 +249,7 @@ export const USER_API = {
 }
 
 // ================================
-// 12. HTTP 方法常量
+// 13. HTTP 方法常量
 // ================================
 
 export const HTTP_METHODS = {
@@ -249,7 +261,7 @@ export const HTTP_METHODS = {
 }
 
 // ================================
-// 13. 响应状态码常量
+// 14. 响应状态码常量
 // ================================
 
 export const RESPONSE_CODES = {
@@ -263,7 +275,7 @@ export const RESPONSE_CODES = {
 }
 
 // ================================
-// 14. 文件类型常量
+// 15. 文件类型常量
 // ================================
 
 export const FILE_TYPES = {
@@ -275,7 +287,7 @@ export const FILE_TYPES = {
 }
 
 // ================================
-// 15. 状态常量
+// 16. 状态常量
 // ================================
 
 export const STATUS = {
@@ -291,7 +303,7 @@ export const STATUS = {
 }
 
 // ================================
-// 16. 导出所有常量
+// 17. 导出所有常量
 // ================================
 
 export default {
@@ -305,6 +317,7 @@ export default {
   REPORT_API,
   AI_API,
   KNOWLEDGE_API,
+  LITERATURE_API,
   FILE_API,
   SYSTEM_API,
   USER_API,

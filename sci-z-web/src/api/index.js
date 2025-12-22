@@ -24,6 +24,9 @@ export * from './Report'
 // 知识库模块
 export * from './Knowledge'
 
+// 文献搜索模块
+export * from './Literature'
+
 // AI助手模块
 export * from './AI'
 

@@ -530,3 +530,23 @@ export const getKnowledgeFileRelationList = (params) => {
     }
   })
 }
+
+/**
+ * 从PDF URL收藏到知识库
+ * @param {string} knowledgeId - 知识库ID（Dify知识库ID）
+ * @param {string} pdfUrl - PDF文件URL
+ * @param {string} fileName - 文件名
+ * @param {number} folderId - 文件夹ID，默认为0
+ * @returns {Promise} 收藏响应
+ */
+export const collectFromPdfUrl = (knowledgeId, pdfUrl, fileName, folderId = 0) => {
+  return request({
+    url: KNOWLEDGE_API.COLLECT_FROM_PDF_URL(knowledgeId),
+    method: HTTP_METHODS.POST,
+    data: {
+      pdfUrl: pdfUrl,
+      fileName: fileName,
+      folderId: folderId
+    }
+  })
+}

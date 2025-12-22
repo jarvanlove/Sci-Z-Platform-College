@@ -263,37 +263,10 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
             throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
         }
 
-        // 7. 更新知识库的文件夹数量
-        updateKnowledgeBaseFolderCount(knowledgeBase.getId());
 
         log.info(String.format("删除知识库文件关联成功: id=%s", id));
     }
 
-    /**
-     * 更新知识库的文件夹数量
-     *
-     * @param knowledgeId 知识库ID（数据库主键ID）
-     */
-    private void updateKnowledgeBaseFolderCount(Long knowledgeId) {
-        try {
-            // 统计知识库中的文档数量
-            long documentCount = fileRelationRepo.countByKnowledgeId(knowledgeId);
-            
-            // 更新知识库的 folderCount
-            boolean success = knowledgeBaseRepo.updateFolderCount(knowledgeId, (int) documentCount);
-            if (success) {
-                log.info(String.format("更新知识库文件夹数量成功: knowledgeId=%s, folderCount=%d", 
-                        knowledgeId, documentCount));
-            } else {
-                log.warn(String.format("更新知识库文件夹数量失败: knowledgeId=%s, folderCount=%d", 
-                        knowledgeId, documentCount));
-            }
-        } catch (Exception e) {
-            log.error(String.format("更新知识库文件夹数量异常: knowledgeId=%s, err=%s", 
-                    knowledgeId, e.getMessage()), e);
-            // 不抛出异常，避免影响主流程
-        }
-    }
 
     /**
      * 根据ID查询知识库文件关联详情

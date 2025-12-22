@@ -295,4 +295,52 @@ public class CacheConstant {
      * 员工ID标签配置键
      */
     public static final String CONFIG_KEY_LABEL_EMP = "label.employee_id";
+
+    // ==================== PDF缓存相关常量 ====================
+    /**
+     * PDF缓存前缀
+     * 格式：pdf:cache:{id}
+     */
+    public static final String PDF_CACHE_PREFIX = "pdf:cache:";
+
+    /**
+     * PDF缓存过期时间（秒）
+     * 默认：600秒（10分钟）
+     */
+    public static final Long PDF_CACHE_EXPIRE = 600L;
+
+    /**
+     * PDF预览URL过期时间（秒）
+     * 默认：86400秒（24小时），比文件清理时间稍长
+     */
+    public static final Integer PDF_PREVIEW_EXPIRE_SECONDS = 86400;
+
+    /**
+     * PDF缓存文件存储目录（MinIO）
+     */
+    public static final String PDF_CACHE_DIR = "pdf-cache/";
+}
+
+    /**
+     * PDF缓存前缀
+     * 格式：pdf:cache:{id}
+     */
+    public static final String PDF_CACHE_PREFIX = "pdf:cache:";
+
+    /**
+     * PDF缓存过期时间（秒）
+     * 默认：600秒（10分钟）
+     */
+    public static final Long PDF_CACHE_EXPIRE = 600L;
+
+    /**
+     * PDF预览URL过期时间（秒）
+     * 默认：86400秒（24小时），比文件清理时间稍长
+     */
+    public static final Integer PDF_PREVIEW_EXPIRE_SECONDS = 86400;
+
+    /**
+     * PDF缓存文件存储目录（MinIO）
+     */
+    public static final String PDF_CACHE_DIR = "pdf-cache/";
 }
