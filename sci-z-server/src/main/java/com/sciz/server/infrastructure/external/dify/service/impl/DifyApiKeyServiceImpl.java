@@ -7,6 +7,8 @@ import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
 import com.sciz.server.infrastructure.external.dify.mapper.DifyApiKeyMapper;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiKeyService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -14,15 +16,27 @@ import java.util.List;
 
 /**
  * Dify API 密钥管理服务实现类
+ * 
  * @author shihang.shang
  * @className DifyApiKeyServiceImpl
  * @date 2025-01-28 12:30
-*/
+ */
 
 @Slf4j
 @Service
 public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, DifyApiKey> implements DifyApiKeyService {
+    /**
+     * 根据用户ID、资源ID和密钥类型获取API密钥
+     * 缓存 key: "dify:api-key:{userId}:{resourceId}:{keyType}"
+     * TTL: 10 分钟（默认配置）
+     *
+     * @param userId     用户ID
+     * @param resourceId 资源ID
+     * @param keyType    密钥类型
+     * @return API密钥
+     */
     @Override
+    @Cacheable(value = "dify:api-key", key = "#userId + ':' + (#resourceId != null ? #resourceId : 'null') + ':' + (#keyType != null ? #keyType : 'null')", unless = "#result == null")
     public String getApiKey(Long userId, String resourceId, String keyType) {
         try {
             LambdaQueryWrapper<DifyApiKey> queryWrapper = new LambdaQueryWrapper<>();
@@ -50,7 +64,21 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
         }
     }
 
+    /**
+     * 保存或更新API密钥
+     * 更新时清除相关缓存
+     *
+     * @param userId      用户ID
+     * @param resourceId  资源ID
+     * @param keyType     密钥类型
+     * @param apiKey      API密钥
+     * @param keyName     密钥名称
+     * @param description 描述
+     * @param operator    操作者
+     * @return 保存的密钥信息
+     */
     @Override
+    @CacheEvict(value = "dify:api-key", key = "#userId + ':' + (#resourceId != null ? #resourceId : 'null') + ':' + (#keyType != null ? #keyType : 'null')")
     public DifyApiKey saveOrUpdateApiKey(Long userId, String resourceId, String keyType,
             String apiKey, String keyName, String description, String operator) {
         try {
@@ -123,7 +151,15 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
         return this.list(queryWrapper);
     }
 
+    /**
+     * 停用API密钥
+     * 停用时清除相关缓存
+     *
+     * @param id       密钥ID
+     * @param operator 操作者
+     */
     @Override
+    @CacheEvict(value = "dify:api-key", allEntries = true)
     public void deactivateApiKey(Long id, String operator) {
         try {
             DifyApiKey apiKey = this.getById(id);
@@ -147,10 +183,10 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
         try {
             QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
             queryWrapper.eq("key_type", DifyApiKey.KeyType.WORKFLOW.getCode())
-                       .like("key_name", "报告")
-                       .eq("is_active", true)
-                       .orderByDesc("created_time");
-            
+                    .like("key_name", "报告")
+                    .eq("is_active", true)
+                    .orderByDesc("created_time");
+
             List<DifyApiKey> reportTypes = this.list(queryWrapper);
             log.info(String.format("查询报告类型列表成功: 数量=%d", reportTypes.size()));
             return reportTypes;

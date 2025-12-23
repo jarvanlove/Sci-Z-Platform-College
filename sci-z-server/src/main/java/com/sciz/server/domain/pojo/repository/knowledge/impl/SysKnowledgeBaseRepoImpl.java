@@ -117,6 +117,24 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
                 .update();
     }
 
+    /**
+     * 更新知识库文件夹数量
+     *
+     * @param knowledgeId 知识库ID
+     * @param folderCount 文件夹数量
+     * @return 是否更新成功
+     */
+    @Override
+    public boolean updateFolderCount(Long knowledgeId, Integer folderCount) {
+        if (knowledgeId == null) {
+            return false;
+        }
+        return new LambdaUpdateChainWrapper<>(mapper)
+                .eq(SysKnowledgeBase::getId, knowledgeId)
+                .set(SysKnowledgeBase::getFolderCount, folderCount)
+                .update();
+    }
+
     @Override
     public Map<Long, SysKnowledgeBase> findByProjectIds(List<Long> projectIds) {
         if (CollectionUtils.isEmpty(projectIds)) {

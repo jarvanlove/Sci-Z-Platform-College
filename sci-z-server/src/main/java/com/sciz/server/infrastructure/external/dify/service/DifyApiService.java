@@ -9,6 +9,7 @@ import com.sciz.server.infrastructure.external.dify.service.impl.DifyApiKeyServi
 import com.sciz.server.infrastructure.external.dify.util.DifyApiClient;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -187,8 +188,9 @@ public class DifyApiService {
     }
 
     /**
-     * 创建数据集
+     * 创建数据集（带重试机制）
      */
+    @Retry(name = "difyApi")
     public ResponseEntity<String> createDataset(DifyDatasetRequest request, Long userId, String resourceId,
             String keyType) {
         try {
@@ -633,6 +635,7 @@ public class DifyApiService {
      * @param keyType    密钥类型（workflow/file）
      * @return 工作流执行结果
      */
+    @Retry(name = "difyApi")
     public ResponseEntity<String> runWorkflowWithDynamicKey(DifyWorkflowRequest request, Long userId, String workflowId,
             String keyType) {
         try {
@@ -850,14 +853,15 @@ public class DifyApiService {
      * 获取工作流 Draft 配置
      * GET /console/api/apps/{appId}/workflows/draft
      *
-     * @param appId     工作流ID（Dify 应用ID）
+     * @param appId 工作流ID（Dify 应用ID）
      * @return 工作流 Draft 配置响应
      */
     public ResponseEntity<String> getWorkflowDraft(String appId) {
         try {
             String path = "/console/api/apps/" + appId + "/workflows/draft";
             log.info(String.format("获取工作流 Draft 配置: appId=%s", appId));
-            // 使用 privateUrl (key=1) 调用 console API，GET 请求 body 和 params 都为 null，不传 userId/resourceId/keyType
+            // 使用 privateUrl (key=1) 调用 console API，GET 请求 body 和 params 都为 null，不传
+            // userId/resourceId/keyType
             return difyApiClient.request("GET", path, null, null, null, null, null, 1);
         } catch (HttpClientErrorException e) {
             log.error(String.format("获取工作流 Draft 配置失败: appId=%s, err=%s", appId, e.getMessage()), e);
@@ -867,12 +871,13 @@ public class DifyApiService {
             return ResponseEntity.status(500).body("{\"error\": \"获取工作流 Draft 配置异常: " + e.getMessage() + "\"}");
         }
     }
+
     /**
      * 更新工作流 Draft 配置
      * POST /console/api/apps/{appId}/workflows/draft
      *
-     * @param appId     工作流ID（Dify 应用ID）
-     * @param body      更新请求体（包含 graph、hash 等）
+     * @param appId 工作流ID（Dify 应用ID）
+     * @param body  更新请求体（包含 graph、hash 等）
      * @return 更新结果响应
      */
     public ResponseEntity<String> updateWorkflowDraft(String appId, Object body) {
@@ -894,8 +899,8 @@ public class DifyApiService {
      * 发布工作流
      * POST /console/api/apps/{appId}/workflows/publish
      *
-     * @param appId     工作流ID（Dify 应用ID）
-     * @param body      发布请求体（包含 marked_name、marked_comment 等）
+     * @param appId 工作流ID（Dify 应用ID）
+     * @param body  发布请求体（包含 marked_name、marked_comment 等）
      * @return 发布结果响应
      */
     public ResponseEntity<String> publishWorkflow(String appId, Object body) {

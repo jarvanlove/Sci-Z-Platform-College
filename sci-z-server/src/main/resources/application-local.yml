@@ -53,8 +53,8 @@ dify:
   http:
     connect-timeout-ms: 5000 # 连接超时(ms)
     read-timeout-ms: 60000 # 读超时(ms)
- # base-url: http://218.1.139.89:15654/v1
- # private-url: http://218.1.139.89:15654
+  # base-url: http://218.1.139.89:15654/v1
+  # private-url: http://218.1.139.89:15654
   base-url: http://192.168.1.203/v1
   private-url: http://192.168.1.203
   api-key: dataset-MwOxGbIDhZmg6bUdHEid0rhX # Dify API 测试知识库 密钥
@@ -102,3 +102,10 @@ management:
   endpoint:
     health:
       show-details: always # 开发环境显示详细信息
+
+# SSE 配置
+sciz:
+  sse:
+    knowledge-timeout: 30000 # 知识库对话超时（毫秒），默认 30 秒
+    workflow-timeout: 60000 # 工作流对话超时（毫秒），默认 60 秒
+    heartbeat-interval: 15 # 心跳间隔（秒），默认 15 秒

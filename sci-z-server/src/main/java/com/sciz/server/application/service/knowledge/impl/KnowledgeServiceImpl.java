@@ -33,6 +33,8 @@ import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.interfaces.converter.KnowledgeConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.sciz.server.infrastructure.config.sse.SseProperties;
+import com.sciz.server.infrastructure.external.dify.util.SseStreamHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,13 +44,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * 知识库应用服务实现类
@@ -71,6 +73,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private final SysAttachmentRepo attachmentRepo;
     private final SysKnowledgeFileRelationRepo fileRelationRepo;
     private final FileService fileService;
+    private final SseProperties sseProperties;
+    private final SseStreamHandler sseStreamHandler;
 
     @Autowired
     @Qualifier("globalTaskExecutor")
@@ -247,6 +251,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 result.getTotal(), result.getCurrent(), result.getSize()));
         return result;
     }
+
     /**
      * 上传文件到知识库
      *
@@ -265,8 +270,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
      * 上传多个文件到知识库（异步上传）
      *
      * @param knowledgeId 知识库ID（Dify知识库ID，String类型）
-     * @param files 上传的文件列表
-     * @param folderId 文件夹ID（可选，0为根目录）
+     * @param files       上传的文件列表
+     * @param folderId    文件夹ID（可选，0为根目录）
      */
     @Transactional(rollbackFor = Exception.class)
     public void uploadFiles(int knowledgeId, List<MultipartFile> files, Long folderId) {
@@ -321,19 +326,19 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                     fileUploadReq.setRelationName(knowledgeBase.getName());
                     fileUploadReq.setAttachmentType(AttachmentCategoryStatus.DOCUMENT.getCode());
                     fileUploadReq.setIsPublic(0);
-                    
+
                     log.info(String.format("异步上传文件到 MinIO: fileName=%s", file.getOriginalFilename()));
                     return fileService.upload(fileUploadReq, userId, user.getRealName());
                 } catch (BusinessException e) {
                     // 如果是业务异常（如文件大小超出限制），直接抛出，保留原始错误信息
-                    log.error(String.format("MinIO上传文件失败（业务异常）: fileName=%s, error=%s", 
+                    log.error(String.format("MinIO上传文件失败（业务异常）: fileName=%s, error=%s",
                             file.getOriginalFilename(), e.getMessage()), e);
                     throw e;
                 } catch (Exception e) {
                     // 其他异常包装成业务异常
-                    log.error(String.format("MinIO上传文件失败: fileName=%s, error=%s", 
+                    log.error(String.format("MinIO上传文件失败: fileName=%s, error=%s",
                             file.getOriginalFilename(), e.getMessage()), e);
-                    throw new BusinessException(ResultCode.SERVER_ERROR, 
+                    throw new BusinessException(ResultCode.SERVER_ERROR,
                             String.format("MinIO上传文件失败: %s - %s", file.getOriginalFilename(), e.getMessage()));
                 }
             }, globalTaskExecutor);
@@ -342,7 +347,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
         // 8. 等待所有 MinIO 上传完成
         CompletableFuture.allOf(minioFutures.toArray(new CompletableFuture[0])).join();
-        
+
         // 9. 收集 MinIO 上传结果
         List<FileInfoResp> minioResults = new ArrayList<>();
         for (int i = 0; i < minioFutures.size(); i++) {
@@ -354,7 +359,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                     minioResults.add(result);
                     log.info(String.format("MinIO上传成功: attachmentId=%s", result.id()));
                 } else {
-                    throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED, 
+                    throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED,
                             String.format("MinIO上传失败: %s - 返回结果为空", file.getOriginalFilename()));
                 }
             } catch (java.util.concurrent.ExecutionException e) {
@@ -362,28 +367,28 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 Throwable cause = e.getCause();
                 if (cause instanceof BusinessException) {
                     // 如果是业务异常，直接抛出，保留原始错误信息
-                    log.error(String.format("获取MinIO上传结果失败（业务异常）: fileName=%s, error=%s", 
+                    log.error(String.format("获取MinIO上传结果失败（业务异常）: fileName=%s, error=%s",
                             file.getOriginalFilename(), cause.getMessage()), cause);
                     throw (BusinessException) cause;
                 } else {
                     // 其他异常包装成业务异常
-                    log.error(String.format("获取MinIO上传结果失败: fileName=%s, error=%s", 
+                    log.error(String.format("获取MinIO上传结果失败: fileName=%s, error=%s",
                             file.getOriginalFilename(), cause != null ? cause.getMessage() : e.getMessage()), e);
-                    throw new BusinessException(ResultCode.SERVER_ERROR, 
-                            String.format("MinIO上传失败: %s - %s", 
-                                    file.getOriginalFilename(), 
+                    throw new BusinessException(ResultCode.SERVER_ERROR,
+                            String.format("MinIO上传失败: %s - %s",
+                                    file.getOriginalFilename(),
                                     cause != null ? cause.getMessage() : e.getMessage()));
                 }
             } catch (Exception e) {
-                log.error(String.format("获取MinIO上传结果失败: fileName=%s, error=%s", 
+                log.error(String.format("获取MinIO上传结果失败: fileName=%s, error=%s",
                         file.getOriginalFilename(), e.getMessage()), e);
-                throw new BusinessException(ResultCode.SERVER_ERROR, 
+                throw new BusinessException(ResultCode.SERVER_ERROR,
                         String.format("MinIO上传失败: %s - %s", file.getOriginalFilename(), e.getMessage()));
             }
         }
 
         if (minioResults.size() != files.size()) {
-            log.error(String.format("MinIO上传结果数量不匹配: expected=%d, actual=%d", 
+            log.error(String.format("MinIO上传结果数量不匹配: expected=%d, actual=%d",
                     files.size(), minioResults.size()));
             throw new BusinessException(ResultCode.SERVER_ERROR, "MinIO上传失败: 结果数量不匹配");
         }
@@ -403,7 +408,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         }
 
         if (difyResponses == null || difyResponses.size() != files.size()) {
-            log.error(String.format("Dify上传结果数量不匹配: expected=%d, actual=%d", 
+            log.error(String.format("Dify上传结果数量不匹配: expected=%d, actual=%d",
                     files.size(), difyResponses != null ? difyResponses.size() : 0));
             throw new BusinessException(ResultCode.SERVER_ERROR, "Dify上传失败: 结果数量不匹配");
         }
@@ -423,7 +428,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 log.info(String.format("文件上传成功: fileName=%s", file.getOriginalFilename()));
             } catch (Exception e) {
                 failedFiles.add(file.getOriginalFilename());
-                log.error(String.format("处理文件上传结果失败: fileName=%s, error=%s", 
+                log.error(String.format("处理文件上传结果失败: fileName=%s, error=%s",
                         file.getOriginalFilename(), e.getMessage()), e);
             }
         }
@@ -433,7 +438,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
         // 10. 如果有文件上传失败，抛出异常
         if (!failedFiles.isEmpty()) {
-            throw new BusinessException(ResultCode.SERVER_ERROR, 
+            throw new BusinessException(ResultCode.SERVER_ERROR,
                     String.format("部分文件上传失败: %s", String.join(", ", failedFiles)));
         }
 
@@ -450,18 +455,18 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         try {
             // 统计知识库中的文档数量
             long documentCount = fileRelationRepo.countByKnowledgeId(knowledgeId);
-            
+
             // 更新知识库的 folderCount
             boolean success = knowledgeBaseRepo.updateFolderCount(knowledgeId, (int) documentCount);
             if (success) {
-                log.info(String.format("更新知识库文件夹数量成功: knowledgeId=%s, folderCount=%d", 
+                log.info(String.format("更新知识库文件夹数量成功: knowledgeId=%s, folderCount=%d",
                         knowledgeId, documentCount));
             } else {
-                log.warn(String.format("更新知识库文件夹数量失败: knowledgeId=%s, folderCount=%d", 
+                log.warn(String.format("更新知识库文件夹数量失败: knowledgeId=%s, folderCount=%d",
                         knowledgeId, documentCount));
             }
         } catch (Exception e) {
-            log.error(String.format("更新知识库文件夹数量异常: knowledgeId=%s, err=%s", 
+            log.error(String.format("更新知识库文件夹数量异常: knowledgeId=%s, err=%s",
                     knowledgeId, e.getMessage()), e);
             // 不抛出异常，避免影响主流程
         }
@@ -591,8 +596,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         log.info(String.format("知识库Chatbot流式对话: userId=%s, knowledgeId=%s, query=%s",
                 userId, req.getKnowledgeId(), req.getQuery()));
 
-        // 2. 创建 SSE Emitter（超时时间设置为30秒）
-        SseEmitter emitter = new SseEmitter(30000L);
+        // 2. 创建 SSE Emitter（使用配置的超时时间）
+        SseEmitter emitter = new SseEmitter(sseProperties.getKnowledgeTimeout());
 
         // 3. 检查用户是否创建了 Chatbot
         List<DifyApiKey> chatbotKeys = difyApiKeyService.getUserApiKeysByType(userId, "chatbot");
@@ -641,61 +646,25 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             difyRequest.setUser(String.valueOf(userId)); // 默认使用用户ID作为用户标识
         }
 
-        // 6. 异步调用 Dify API 并转发流式响应
-        new Thread(() -> {
+        // 6. 异步调用 Dify API 并转发流式响应（使用线程池）
+        CompletableFuture.runAsync(() -> {
             try {
                 // 调用 Dify API 进行流式对话（使用流式请求方法）
                 difyApiService.sendChatbotMessageStream(difyRequest, line -> {
-                    try {
-                        String trimmedLine = line.trim();
-                        if (trimmedLine.isEmpty()) {
-                            return;
-                        }
-
-                        // 处理 SSE 格式的数据行
-                        if (trimmedLine.startsWith("data:")) {
-                            String data = trimmedLine.substring(5).trim();
-                            if (!data.isEmpty() && !data.equals("[DONE]")) {
-                                emitter.send(SseEmitter.event()
-                                        .name("message")
-                                        .data(data));
-                            }
-                        } else if (trimmedLine.startsWith("event:")) {
-                            // 处理事件类型
-                            String eventType = trimmedLine.substring(6).trim();
-                            log.debug(String.format("收到SSE事件: %s", eventType));
-                        } else {
-                            // 如果不是标准 SSE 格式，直接发送原始数据
-                            emitter.send(SseEmitter.event()
-                                    .name("message")
-                                    .data(trimmedLine));
-                        }
-                    } catch (Exception e) {
-                        log.warn(String.format("处理流式数据行失败: line=%s, err=%s", line, e.getMessage()));
-                    }
+                    sseStreamHandler.handleStreamLine(emitter, line);
                 });
 
                 // 发送完成事件
-                emitter.send(SseEmitter.event()
-                        .name("message_end")
-                        .data("{}"));
-                emitter.complete();
+                sseStreamHandler.completeStream(emitter);
 
                 log.info(String.format("知识库Chatbot流式对话完成: userId=%s, knowledgeId=%s",
                         userId, req.getKnowledgeId()));
             } catch (Exception e) {
                 log.error(String.format("知识库Chatbot流式对话失败: userId=%s, knowledgeId=%s, err=%s",
                         userId, req.getKnowledgeId(), e.getMessage()), e);
-                try {
-                    emitter.send(SseEmitter.event()
-                            .name("error")
-                            .data(String.format("{\"error\": true, \"message\": \"%s\"}", e.getMessage())));
-                } catch (Exception sendException) {
-                    log.error("发送错误消息失败", sendException);
-                }
-                emitter.completeWithError(e);
+                sseStreamHandler.sendErrorAndComplete(emitter, e.getMessage());
             }
-        }).start();
+        }, globalTaskExecutor);
 
         return emitter;
     }

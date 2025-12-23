@@ -15,6 +15,8 @@ import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.interfaces.converter.AiConversationConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -57,7 +59,7 @@ public class AiConversationServiceImpl implements AiConversationService {
         if (req.getIsPinned() == null) {
             entity.setIsPinned(0);
         }
-        
+
         // 2. 如果标题为空或空字符串，设置为默认值"新建对话"
         if (!StringUtils.hasText(entity.getTitle())) {
             entity.setTitle("新建对话");
@@ -85,12 +87,14 @@ public class AiConversationServiceImpl implements AiConversationService {
 
     /**
      * 更新会话
+     * 更新时清除会话ID映射缓存
      *
      * @param req 更新请求
      * @return 响应
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "conversation:mapping", key = "#req.id")
     public AiConversationResp update(AiConversationUpdateReq req) {
         Long userId = StpUtil.getLoginIdAsLong();
         log.info(String.format("更新AI会话: userId=%s, id=%s", userId, req.getId()));
@@ -168,11 +172,15 @@ public class AiConversationServiceImpl implements AiConversationService {
 
     /**
      * 根据ID查询详情（带权限检查）
+     * 缓存会话ID映射（内部ID -> Dify会话ID）
+     * 缓存 key: "conversation:mapping:{id}"
+     * TTL: 1 小时（用于会话ID映射，相对稳定）
      *
      * @param id 会话ID
      * @return 响应
      */
     @Override
+    @Cacheable(value = "conversation:mapping", key = "#id", unless = "#result == null || #result.difyConversationId == null || #result.difyConversationId.isEmpty()")
     public AiConversationResp findDetail(String id) {
         Long userId = StpUtil.getLoginIdAsLong();
         log.info(String.format("查询AI会话详情: userId=%s, id=%s", userId, id));
@@ -209,7 +217,7 @@ public class AiConversationServiceImpl implements AiConversationService {
     @Override
     public PageResult<AiConversationResp> page(AiConversationQueryReq req) {
         Long userId = StpUtil.getLoginIdAsLong();
-        log.info(String.format("分页查询AI会话: userId=%s, pageNo=%s, pageSize=%s", 
+        log.info(String.format("分页查询AI会话: userId=%s, pageNo=%s, pageSize=%s",
                 userId, req.pageNo(), req.pageSize()));
 
         // 1. 构建分页对象
@@ -235,10 +243,9 @@ public class AiConversationServiceImpl implements AiConversationService {
                 respList,
                 pageResult.getTotal(),
                 pageResult.getCurrent(),
-                pageResult.getSize()
-        );
+                pageResult.getSize());
 
-        log.info(String.format("分页查询AI会话成功: total=%s, current=%s, size=%s", 
+        log.info(String.format("分页查询AI会话成功: total=%s, current=%s, size=%s",
                 result.getTotal(), result.getCurrent(), result.getSize()));
         return result;
     }
@@ -252,7 +259,7 @@ public class AiConversationServiceImpl implements AiConversationService {
     @Override
     public PageResult<AiConversationResp> pageByUserId(AiConversationQueryReq req) {
         Long userId = StpUtil.getLoginIdAsLong();
-        log.info(String.format("分页查询AI会话: userId=%s, pageNo=%s, pageSize=%s", 
+        log.info(String.format("分页查询AI会话: userId=%s, pageNo=%s, pageSize=%s",
                 userId, req.pageNo(), req.pageSize()));
 
         // 1. 构建分页对象
@@ -270,10 +277,9 @@ public class AiConversationServiceImpl implements AiConversationService {
                 respList,
                 pageResult.getTotal(),
                 pageResult.getCurrent(),
-                pageResult.getSize()
-        );
+                pageResult.getSize());
 
-        log.info(String.format("分页查询AI会话成功: total=%s, current=%s, size=%s", 
+        log.info(String.format("分页查询AI会话成功: total=%s, current=%s, size=%s",
                 result.getTotal(), result.getCurrent(), result.getSize()));
         return result;
     }
@@ -314,11 +320,13 @@ public class AiConversationServiceImpl implements AiConversationService {
 
     /**
      * 根据ID删除
+     * 删除时清除会话ID映射缓存
      *
      * @param id 会话ID
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "conversation:mapping", key = "#id")
     public void deleteById(String id) {
         Long userId = StpUtil.getLoginIdAsLong();
         log.info(String.format("删除AI会话: userId=%s, id=%s", userId, id));
@@ -404,7 +412,7 @@ public class AiConversationServiceImpl implements AiConversationService {
     /**
      * 更新置顶状态
      *
-     * @param id 会话ID
+     * @param id       会话ID
      * @param isPinned 是否置顶(0:否,1:是)
      * @return 响应
      */
@@ -449,4 +457,3 @@ public class AiConversationServiceImpl implements AiConversationService {
         return converter.toResp(updatedEntity);
     }
 }
-
