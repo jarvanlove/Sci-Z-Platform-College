@@ -273,7 +273,21 @@
           <!-- 消息列表 -->
           <div class="chat-messages" ref="chatMessagesRef">
             <div v-if="chatMessages.length === 0" class="empty-chat-message">
-              <p>Hi，任何问题都可以问我</p>
+              <p v-if="hasPdfFile || chatAttachments.length > 0">Hi，任何问题都可以问我</p>
+              <div v-else class="no-file-tip">
+                <el-icon class="tip-icon"><Document /></el-icon>
+                <p class="tip-title">当前文献没有PDF文件</p>
+                <p class="tip-content">请手动下载文献PDF后，点击上方📎按钮上传进行对话</p>
+                <el-button 
+                  type="primary" 
+                  size="small" 
+                  @click="handleChatFileUpload"
+                  style="margin-top: 12px"
+                >
+                  <el-icon><Upload /></el-icon>
+                  上传文件
+                </el-button>
+              </div>
             </div>
             <div
               v-for="(message, index) in chatMessages"
@@ -436,7 +450,8 @@ import {
   ArrowUp,
   Close,
   StarFilled,
-  View
+  View,
+  Upload
 } from '@element-plus/icons-vue'
 import { getKnowledgeList, uploadFilesToKnowledge } from '@/api/Knowledge/knowledge'
 import { runWorkflowStream } from '@/api/AI/ai'
@@ -538,8 +553,6 @@ const downloadPdfForChat = async () => {
   const fileName = `${literature.value.paperInfo?.title || '文献'}.pdf`
 
   try {
-    ElMessage.info('正在下载PDF文件...')
-    
     const proxyUrl = `/api/proxy/pdf?url=${encodeURIComponent(pdfUrl)}`
     const response = await fetch(proxyUrl)
     
@@ -805,7 +818,6 @@ const handleConfirmCollect = async () => {
     }
 
     // 下载PDF文件
-    ElMessage.info('正在下载PDF文件...')
     const rawFileName = `${literature.value.paperInfo?.title || '文献'}.pdf`
     const fileName = sanitizeFileName(rawFileName)
     
@@ -952,6 +964,37 @@ const sendChatMessage = async () => {
     return
   }
 
+  // 检查是否有文件（PDF或附件）
+  if (!hasPdfFile.value && chatAttachments.value.length === 0) {
+    // 添加用户消息
+    const userMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: message,
+      timestamp: new Date()
+    }
+    chatMessages.value.push(userMessage)
+
+    // 添加AI提示消息
+    const aiMessageId = Date.now() + 1
+    const aiMessage = {
+      id: aiMessageId,
+      type: 'ai',
+      content: '你好，我是小查～\n\n不过你提到的"这篇文献"我还没看到具体内容哦！当前文献没有PDF文件，请手动下载文献PDF后，点击上方📎按钮上传文件，这样我才能帮你准确分析文献内容～\n\n等你上传文件后，我立马为你梳理重点、提炼核心观点，保证清晰易懂！📚✨',
+      isGenerating: false,
+      timestamp: new Date()
+    }
+    chatMessages.value.push(aiMessage)
+
+    // 清空输入
+    chatInputMessage.value = ''
+
+    // 滚动到底部
+    await nextTick()
+    scrollChatToBottom()
+    return
+  }
+
   // 添加用户消息
   const userMessage = {
     id: Date.now(),
@@ -1084,22 +1127,26 @@ onMounted(() => {
 <style scoped lang="scss">
 .literature-detail-container {
   padding: 0;
-  min-height: calc(100vh - 60px);
+  height: calc(100vh - 60px);
   background: #f5f5f5;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 
   .main-content-wrapper {
     display: flex;
     flex: 1;
     overflow: hidden;
+    min-height: 0; // 确保 flex 子元素可以收缩
   }
 
   .main-content {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 20px;
     background: #fff;
+    min-height: 0; // 确保可以滚动
 
     .loading-container {
       display: flex;
@@ -1463,17 +1510,21 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
+    min-height: 0; // 确保可以收缩
+    overflow: hidden;
 
     .chat-sidebar-content {
       display: flex;
       flex-direction: column;
       height: 100%;
       overflow: hidden;
+      min-height: 0; // 确保可以收缩
 
       .chat-greeting {
         padding: 20px;
         text-align: center;
         border-bottom: 1px solid #e5e7eb;
+        flex-shrink: 0; // 固定高度，不收缩
 
         h2 {
           font-size: 20px;
@@ -1489,6 +1540,7 @@ onMounted(() => {
         background: #f9fafb;
         border: 1px solid #e5e7eb;
         border-radius: 8px;
+        flex-shrink: 0; // 固定高度，不收缩
 
         .document-card-header {
           display: flex;
@@ -1524,6 +1576,7 @@ onMounted(() => {
         padding: 12px;
         background: #f9fafb;
         border-radius: 8px;
+        flex-shrink: 0; // 固定高度，不收缩
 
         .chat-attachment-item {
           display: flex;
@@ -1563,6 +1616,7 @@ onMounted(() => {
         display: flex;
         flex-direction: column;
         gap: 8px;
+        flex-shrink: 0; // 固定高度，不收缩
 
         .action-item {
           display: flex;
@@ -1587,6 +1641,7 @@ onMounted(() => {
       .chat-messages {
         flex: 1;
         overflow-y: auto;
+        overflow-x: hidden;
         padding: 16px;
         display: flex;
         flex-direction: column;
@@ -1594,11 +1649,41 @@ onMounted(() => {
         // 确保消息从上到下排列，新消息追加到底部
         justify-content: flex-start;
         align-items: stretch;
+        min-height: 0; // 确保可以滚动
 
         .empty-chat-message {
           text-align: center;
           color: #9ca3af;
           padding: 40px 20px;
+
+          .no-file-tip {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+
+            .tip-icon {
+              font-size: 48px;
+              color: #d1d5db;
+              margin-bottom: 16px;
+            }
+
+            .tip-title {
+              font-size: 16px;
+              font-weight: 600;
+              color: #374151;
+              margin: 0 0 8px 0;
+            }
+
+            .tip-content {
+              font-size: 14px;
+              color: #6b7280;
+              margin: 0;
+              line-height: 1.6;
+              max-width: 300px;
+            }
+          }
         }
 
         .chat-message {
@@ -1686,6 +1771,7 @@ onMounted(() => {
         border-top: 1px solid #e5e7eb;
         padding: 16px;
         background: #fff;
+        flex-shrink: 0; // 输入区域固定，不收缩
 
         .input-toolbar {
           margin-bottom: 8px;
@@ -1781,30 +1867,3 @@ onMounted(() => {
 }
 </style>
 
-      height: 100%;
-      border: none;
-      display: block;
-    }
-
-    .pdf-preview-loading-dialog {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      gap: 12px;
-      color: var(--el-text-color-secondary);
-
-      .el-icon {
-        font-size: 32px;
-      }
-    }
-  }
-
-  .pdf-dialog-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-  }
-}
-</style>

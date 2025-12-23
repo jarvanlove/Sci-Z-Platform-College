@@ -169,7 +169,7 @@
                       <el-icon><Document /></el-icon>
                     </div>
                     <div class="content-item-info">
-                      <div class="content-item-name">{{ item.name }}</div>
+                      <div class="content-item-name" :title="item.name">{{ truncateFileName(item.name, 20) }}</div>
                       <div class="content-item-meta">
                         <span>{{ item.ext }}</span>
                         <span>|</span>
@@ -929,6 +929,13 @@ const resetCreateForm = () => {
 
 const triggerCoverUpload = () => {
   coverInput.value && coverInput.value.click()
+}
+
+// 截断文件名
+const truncateFileName = (fileName, maxLength = 20) => {
+  if (!fileName) return ''
+  if (fileName.length <= maxLength) return fileName
+  return fileName.substring(0, maxLength) + '...'
 }
 
 const handleCoverSelect = (e) => {
@@ -1856,6 +1863,12 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto; // 原型图：列表内容过多时滚动
   padding: 0 20px;
+  min-width: 0; // 防止 flex 子元素溢出
+  width: 100%; // 保持宽度不变
+  box-sizing: border-box; // 包含 padding
+  // 防止容器大小变化导致字体变形
+  min-height: 0; // 允许 flex 子元素收缩
+  max-width: 100%; // 限制最大宽度
 }
 
 // 自定义滚动条样式 - 对齐原型图
@@ -1898,6 +1911,13 @@ onMounted(() => {
   width: 100%; // 占满父容器宽度
   box-sizing: border-box; // 包含 padding 和 border
   min-width: 0; // 允许 flex 子元素收缩
+  max-width: 100%; // 限制最大宽度，防止溢出
+  // 防止字体变形
+  font-size: 14px; // 固定字体大小
+  line-height: 1.5; // 固定行高
+  // 防止缩放时布局变形
+  transform: scale(1); // 确保缩放基准
+  transform-origin: left center; // 设置缩放原点
 
   &:hover {
     background: #f9fafb;
@@ -1913,32 +1933,53 @@ onMounted(() => {
 .kb-item-icon {
   width: 32px;
   height: 32px;
+  min-width: 32px; // 固定最小宽度，防止缩放时变小
+  min-height: 32px; // 固定最小高度，防止缩放时变小
+  max-width: 32px; // 固定最大宽度，防止缩放时变大
+  max-height: 32px; // 固定最大高度，防止缩放时变大
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  flex-shrink: 0; // 防止图标被压缩
+  box-sizing: border-box; // 包含边框
 
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    display: block; // 防止图片下方出现空隙
   }
 }
 
 .kb-item-icon-default {
   width: 100%;
   height: 100%;
+  min-width: 32px; // 固定最小宽度
+  min-height: 32px; // 固定最小高度
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #3b82f6;
   color: #fff;
+  // 固定图标大小，不受缩放影响
+  font-size: 18px;
+  line-height: 1;
+
+  :deep(.el-icon) {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
 }
 
 .kb-item-info {
   flex: 1;
+  min-width: 0; // 允许 flex 子元素收缩
+  overflow: hidden; // 防止内容溢出
 }
 
 .kb-item-name {
@@ -1948,6 +1989,10 @@ onMounted(() => {
   overflow: hidden; // 防止文本溢出
   text-overflow: ellipsis; // 文本过长显示省略号
   white-space: nowrap; // 单行显示
+  min-width: 0; // 允许文本截断
+  flex-shrink: 1; // 允许收缩
+  max-width: 100%; // 限制最大宽度
+  display: block; // 确保文本截断生效
 }
 
 .kb-item-actions {
@@ -1965,6 +2010,10 @@ onMounted(() => {
 .kb-action-icon {
   width: 24px;
   height: 24px;
+  min-width: 24px; // 固定最小宽度
+  min-height: 24px; // 固定最小高度
+  max-width: 24px; // 固定最大宽度
+  max-height: 24px; // 固定最大高度
   background: transparent;
   border: none;
   border-radius: 4px;
@@ -1973,6 +2022,17 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   color: #6b7280;
+  flex-shrink: 0; // 防止按钮被压缩
+  // 固定图标大小
+  font-size: 16px;
+  line-height: 1;
+
+  :deep(.el-icon) {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
   transition: all 0.2s ease;
 
   &:hover {
@@ -2085,6 +2145,8 @@ onMounted(() => {
 .action-icon {
   width: 32px;
   height: 32px;
+  min-width: 32px; // 固定最小宽度，防止被压缩
+  min-height: 32px; // 固定最小高度，防止被压缩
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -2094,6 +2156,16 @@ onMounted(() => {
   justify-content: center;
   color: #374151;
   transition: all 0.2s ease;
+  flex-shrink: 0; // 防止按钮被压缩
+  // 确保图标大小固定，不受字体影响
+  font-size: 16px;
+  line-height: 1;
+
+  :deep(.el-icon) {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
 
   &:hover {
     background: #eef2ff;
@@ -2147,6 +2219,8 @@ onMounted(() => {
 
 .content-item-info {
   flex: 1;
+  min-width: 0; // 允许 flex 子元素收缩
+  overflow: hidden; // 防止内容溢出
 }
 
 .content-item-name {
@@ -2154,6 +2228,11 @@ onMounted(() => {
   font-weight: 500;
   color: #111827;
   margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .content-item-meta {
@@ -2168,8 +2247,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; // 防止按钮换行
   justify-content: flex-end;
+  flex-shrink: 0; // 防止按钮区域被压缩
+  min-width: 0; // 允许收缩，但不会影响按钮大小
 }
 
 .content-actions-dropdown {

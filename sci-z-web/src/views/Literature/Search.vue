@@ -7,8 +7,8 @@
 <template>
   <div class="literature-search-container">
     <!-- 顶部搜索栏 -->
-    <div class="search-header">
-      <div class="search-bar-wrapper">
+    <div class="search-header" :class="{ 'has-searched': hasSearched }">
+      <div class="search-bar-wrapper" :class="{ 'has-history': showSearchHistory && searchHistory.length > 0 && !searchForm.search }">
         <el-input
           v-model="searchForm.search"
           placeholder="搜索文献..."
@@ -16,36 +16,86 @@
           size="large"
           class="main-search-input"
           @keyup.enter="handleSearch"
+          @focus="showSearchHistory = true"
+          @blur="handleSearchInputBlur"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
+        
+        <!-- 搜索历史下拉 -->
+        <div v-if="showSearchHistory && searchHistory.length > 0 && !searchForm.search" class="search-history-dropdown">
+          <div class="search-history-header">
+            <span class="history-title">搜索历史</span>
+            <el-button
+              text
+              size="small"
+              @click="clearSearchHistory"
+              class="clear-history-btn"
+            >
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </div>
+          <div class="search-history-list">
+            <div
+              v-for="(item, index) in searchHistory"
+              :key="index"
+              class="history-item"
+              @click="selectHistoryItem(item)"
+            >
+              <span class="history-text">{{ item }}</span>
+              <el-button
+                text
+                size="small"
+                class="remove-history-btn"
+                @click.stop="removeHistoryItem(index)"
+              >
+                <el-icon><Close /></el-icon>
+              </el-button>
+            </div>
+          </div>
+        </div>
       </div>
       
-      <!-- 筛选条件 -->
-      <div class="filter-bar">
-        <el-input
-          v-model="searchForm.publicationYearFilter"
-          placeholder="发表年份，如：2023-2025"
-          clearable
-          style="width: 200px"
-          size="small"
-        />
-        <el-select
-          v-model="searchForm.dataSource"
-          placeholder="数据来源"
-          style="width: 150px"
-          size="small"
-        >
-          <el-option label="OpenAlex" value="openalex" />
-        </el-select>
-        <el-button type="primary" :loading="loading" size="small" @click="handleSearch">
-          搜索
-        </el-button>
-        <el-button size="small" @click="handleReset">
-          重置
-        </el-button>
+      <!-- 搜索历史展示 -->
+      <div v-if="searchHistory.length > 0" class="search-history-bar">
+        <div class="history-bar-header">
+          <span class="history-bar-title">搜索历史</span>
+          <el-button
+            text
+            size="small"
+            @click="clearSearchHistory"
+            class="clear-all-history-btn"
+          >
+            <el-icon><Delete /></el-icon>
+            清除全部
+          </el-button>
+        </div>
+        <div class="history-tags">
+          <div
+            v-for="(item, index) in searchHistory"
+            :key="index"
+            class="history-tag"
+            @click="selectHistoryItem(item)"
+          >
+            <span class="tag-text">{{ item }}</span>
+            <el-button
+              text
+              size="small"
+              class="tag-remove-btn"
+              @click.stop="removeHistoryItem(index)"
+            >
+              <el-icon><Close /></el-icon>
+            </el-button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 搜索完成后的操作栏 -->
+      <div v-if="hasSearched" class="search-actions-bar">
+        <span class="data-source-label">OpenAlex 搜索</span>
+        <el-button size="small" @click="handleReset">重置</el-button>
       </div>
     </div>
 
@@ -185,7 +235,9 @@ import {
   Search,
   Loading,
   DocumentCopy,
-  CircleCheck
+  CircleCheck,
+  Delete,
+  Close
 } from '@element-plus/icons-vue'
 import { searchLiterature } from '@/api/Literature/literature'
 import { createLogger } from '@/utils/simpleLogger'
@@ -195,12 +247,15 @@ const logger = createLogger('LiteratureSearch')
 
 // 缓存 key
 const CACHE_KEY = 'literature_search_cache'
+const SEARCH_HISTORY_KEY = 'literature_search_history'
 
 // 响应式数据
 const loading = ref(false)
 const hasSearched = ref(false)
 const literatureList = ref([])
 const expandedAbstracts = ref({})
+const showSearchHistory = ref(false)
+const searchHistory = ref([])
 const searchForm = reactive({
   search: '',
   publicationYearFilter: '',
@@ -324,12 +379,91 @@ const clearSearchCache = () => {
   logger.info('搜索结果缓存已清除')
 }
 
+// 加载搜索历史
+const loadSearchHistory = () => {
+  try {
+    const history = localStorage.getItem(SEARCH_HISTORY_KEY)
+    if (history) {
+      const parsedHistory = JSON.parse(history)
+      // 确保最多只加载10条
+      searchHistory.value = Array.isArray(parsedHistory) ? parsedHistory.slice(0, 10) : []
+    }
+  } catch (error) {
+    logger.error('加载搜索历史失败', error)
+    searchHistory.value = []
+  }
+}
+
+// 保存搜索历史
+const saveSearchHistory = (keyword) => {
+  if (!keyword || !keyword.trim()) return
+  
+  const trimmedKeyword = keyword.trim()
+  // 移除重复项
+  const index = searchHistory.value.indexOf(trimmedKeyword)
+  if (index > -1) {
+    searchHistory.value.splice(index, 1)
+  }
+  // 添加到开头
+  searchHistory.value.unshift(trimmedKeyword)
+  // 最多保存10条
+  if (searchHistory.value.length > 10) {
+    searchHistory.value = searchHistory.value.slice(0, 10)
+  }
+  
+  try {
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(searchHistory.value))
+  } catch (error) {
+    logger.error('保存搜索历史失败', error)
+  }
+}
+
+// 清除搜索历史
+const clearSearchHistory = () => {
+  searchHistory.value = []
+  try {
+    localStorage.removeItem(SEARCH_HISTORY_KEY)
+    ElMessage.success('搜索历史已清除')
+  } catch (error) {
+    logger.error('清除搜索历史失败', error)
+  }
+}
+
+// 删除单个搜索历史项
+const removeHistoryItem = (index) => {
+  searchHistory.value.splice(index, 1)
+  try {
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(searchHistory.value))
+  } catch (error) {
+    logger.error('删除搜索历史项失败', error)
+  }
+}
+
+// 选择搜索历史项
+const selectHistoryItem = (keyword) => {
+  searchForm.search = keyword
+  showSearchHistory.value = false
+  handleSearch()
+}
+
+// 处理搜索输入框失焦
+const handleSearchInputBlur = () => {
+  // 延迟隐藏，以便点击历史项时能触发
+  setTimeout(() => {
+    showSearchHistory.value = false
+  }, 200)
+}
+
 // 搜索文献
 const handleSearch = async (forceRefresh = false) => {
   if (!searchForm.search.trim()) {
     ElMessage.warning('请输入搜索关键词')
     return
   }
+  
+  // 保存搜索历史
+  saveSearchHistory(searchForm.search.trim())
+  showSearchHistory.value = false
 
   // 如果不是强制刷新，先检查缓存
   if (!forceRefresh) {
@@ -502,6 +636,8 @@ onActivated(() => {
 onMounted(() => {
   // 尝试从缓存恢复数据
   restoreSearchCache()
+  // 加载搜索历史
+  loadSearchHistory()
 })
 </script>
 
@@ -516,25 +652,214 @@ onMounted(() => {
     padding: 20px 24px;
     border-bottom: 1px solid #e5e7eb;
     margin-bottom: 0;
+    position: relative;
+
+    &.has-searched {
+      .search-bar-wrapper {
+        margin-bottom: 0;
+      }
+    }
 
     .search-bar-wrapper {
       margin-bottom: 16px;
+      position: relative;
+      display: flex;
+      justify-content: center;
 
       .main-search-input {
         max-width: 600px;
+        width: 100%;
 
         :deep(.el-input__wrapper) {
           border-radius: 8px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          transition: border-radius 0.2s;
+        }
+      }
+
+      // 当显示搜索历史时，搜索框底部圆角变为0
+      &.has-history .main-search-input {
+        :deep(.el-input__wrapper) {
+          border-radius: 8px 8px 0 0;
+        }
+      }
+
+      // 搜索历史下拉
+      .search-history-dropdown {
+        position: absolute;
+        top: calc(100% - 1px);
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100%;
+        max-width: 600px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+
+        .search-history-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 16px;
+          border-bottom: 1px solid #f3f4f6;
+
+          .history-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #111827;
+          }
+
+          .clear-history-btn {
+            padding: 4px 8px;
+            color: #6b7280;
+
+            &:hover {
+              color: #ef4444;
+            }
+          }
+        }
+
+        .search-history-list {
+          padding: 8px;
+          max-height: 300px;
+          overflow-y: auto;
+
+          .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            background: #f9fafb;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+
+            &:hover {
+              background: #f3f4f6;
+            }
+
+            &:last-child {
+              margin-bottom: 0;
+            }
+
+            .history-text {
+              flex: 1;
+              font-size: 14px;
+              color: #374151;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+
+            .remove-history-btn {
+              padding: 4px;
+              color: #9ca3af;
+              opacity: 0;
+              transition: all 0.2s;
+
+              &:hover {
+                color: #ef4444;
+              }
+            }
+
+            &:hover .remove-history-btn {
+              opacity: 1;
+            }
+          }
         }
       }
     }
 
-    .filter-bar {
+    .search-history-bar {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #f3f4f6;
+
+      .history-bar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+
+        .history-bar-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: #111827;
+        }
+
+        .clear-all-history-btn {
+          padding: 4px 8px;
+          color: #6b7280;
+          font-size: 12px;
+
+          &:hover {
+            color: #ef4444;
+          }
+        }
+      }
+
+      .history-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        .history-tag {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          background: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 16px;
+          cursor: pointer;
+          transition: all 0.2s;
+
+          &:hover {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+          }
+
+          .tag-text {
+            font-size: 13px;
+            color: #374151;
+            white-space: nowrap;
+          }
+
+          .tag-remove-btn {
+            padding: 2px;
+            color: #9ca3af;
+            opacity: 0;
+            transition: all 0.2s;
+
+            &:hover {
+              color: #ef4444;
+            }
+          }
+
+          &:hover .tag-remove-btn {
+            opacity: 1;
+          }
+        }
+      }
+    }
+
+    .search-actions-bar {
       display: flex;
-      gap: 12px;
+      justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
+      padding-top: 12px;
+      margin-top: 12px;
+      border-top: 1px solid #f3f4f6;
+
+      .data-source-label {
+        font-size: 14px;
+        color: #6b7280;
+        font-weight: 500;
+      }
     }
   }
 
