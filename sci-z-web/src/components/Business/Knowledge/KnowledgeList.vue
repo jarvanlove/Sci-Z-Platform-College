@@ -12,12 +12,12 @@
       <div class="kb-list-header">
         <div class="kb-header-title">
           <el-icon><FolderOpened /></el-icon>
-          共享知识库
+          {{ $t('knowledge.sharedKnowledgeBase') }}
         </div>
         <div class="kb-header-actions">
           <button
             class="action-icon"
-            :title="isContentExpanded ? '收起内容区' : '展开内容区'"
+            :title="isContentExpanded ? $t('knowledge.collapseContent') : $t('knowledge.expandContent')"
             @click="toggleContentCollapse"
           >
             <el-icon>
@@ -26,7 +26,7 @@
           </button>
           <button
             class="action-icon"
-            title="新建共享知识库"
+            :title="$t('knowledge.newSharedKnowledgeBase')"
             @click="showCreateDialog = true"
           >
             <el-icon><Plus /></el-icon>
@@ -58,7 +58,7 @@
           <div class="kb-item-actions" @click.stop>
             <button
               class="kb-action-icon"
-              title="删除知识库"
+              :title="$t('knowledge.deleteKnowledgeBase')"
               @click="deleteKnowledgeBase(kb)"
             >
               <el-icon><Delete /></el-icon>
@@ -67,7 +67,7 @@
         </div>
 
         <div v-if="knowledgeBases.length === 0" class="kb-empty-tip">
-          暂无知识库，点击上方 + 创建
+          {{ $t('knowledge.noKnowledgeBase') }}
         </div>
       </div>
     </div>
@@ -82,13 +82,13 @@
               </div>
               <div>
                 <div>
-                  {{ selectedKnowledgeBase ? (selectedKnowledgeBase.shortName || selectedKnowledgeBase.name) : '科研' }}
+                  {{ selectedKnowledgeBase ? (selectedKnowledgeBase.shortName || selectedKnowledgeBase.name) : $t('knowledge.research') }}
                 </div>
                 <div class="content-meta">
-                  Sci-Z | {{ selectedKnowledgeBase ? getCurrentFileCount() : 0 }}个内容
+                  Sci-Z | {{ selectedKnowledgeBase ? getCurrentFileCount() : 0 }}{{ $t('knowledge.contentCount') }}
                 </div>
                 <div class="content-description">
-                  {{ selectedKnowledgeBase ? selectedKnowledgeBase.description : '科研项目知识库' }}
+                  {{ selectedKnowledgeBase ? selectedKnowledgeBase.description : $t('knowledge.researchProjectKb') }}
                 </div>
               </div>
             </div>
@@ -100,32 +100,32 @@
                 <div class="section-title">
                   <template v-if="currentFolder">
                     <span class="kb-breadcrumb">
-                      <span class="kb-crumb-link" @click="backToParent">内容</span>
+                      <span class="kb-crumb-link" @click="backToParent">{{ $t('knowledge.content') }}</span>
                       <span>></span>
                       <span>{{ currentFolder.name }}</span>
                     </span>
                   </template>
-                  <template v-else>内容</template>
+                  <template v-else>{{ $t('knowledge.content') }}</template>
                 </div>
                 <div class="section-actions">
                   <button
                     class="action-icon"
                     @click="toggleSearch"
-                    title="查询"
+                    :title="$t('knowledge.query')"
                   >
                     <el-icon><Search /></el-icon>
                   </button>
                   <button
                     class="action-icon"
                     @click="createFolder"
-                    title="创建文件夹"
+                    :title="$t('knowledge.createFolder')"
                   >
                     <el-icon><FolderAdd /></el-icon>
                   </button>
                   <button
                     class="action-icon"
                     @click="triggerKbUpload"
-                    title="上传本地文件"
+                    :title="$t('knowledge.uploadLocalFile')"
                   >
                     <el-icon><Upload /></el-icon>
                   </button>
@@ -150,12 +150,12 @@
                 <input
                   class="form-input"
                   v-model="kbSearchQuery"
-                  placeholder="在知识库中搜索"
+                  :placeholder="$t('knowledge.searchInKb')"
                   style="width: 100%; padding: 10px 40px 10px 36px"
                 />
                 <div
                   class="search-dismiss"
-                  title="关闭搜索"
+                  :title="$t('knowledge.closeSearch')"
                   @click="toggleSearch"
                 >
                   <el-icon><Close /></el-icon>
@@ -179,21 +179,21 @@
                     <div class="content-item-actions">
                       <button
                         class="action-icon"
-                        title="预览"
+                        :title="$t('common.preview')"
                         @click.stop="handlePreviewFile(item)"
                       >
                         <el-icon><View /></el-icon>
                       </button>
                       <button
                         class="action-icon"
-                        title="重命名"
+                        :title="$t('knowledge.renameTitle')"
                         @click.stop="renameItem(item)"
                       >
                         <el-icon><Edit /></el-icon>
                       </button>
                       <button
                         class="action-icon"
-                        title="删除"
+                        :title="$t('common.delete')"
                         @click.stop="deleteItem(item)"
                       >
                         <el-icon><Delete /></el-icon>
@@ -203,19 +203,19 @@
                         trigger="click"
                         @command="(cmd) => handleContentAction(cmd, item)"
                       >
-                        <button class="action-icon more-action" title="更多操作">
+                        <button class="action-icon more-action" :title="$t('knowledge.moreActions')">
                           <el-icon><MoreFilled /></el-icon>
                         </button>
                         <template #dropdown>
                           <el-dropdown-menu>
                             <el-dropdown-item command="preview">
-                              预览
+                              {{ $t('common.preview') }}
                             </el-dropdown-item>
                             <el-dropdown-item command="rename">
-                              重命名
+                              {{ $t('knowledge.renameTitle') }}
                             </el-dropdown-item>
                             <el-dropdown-item command="delete" divided>
-                              删除
+                              {{ $t('common.delete') }}
                             </el-dropdown-item>
                           </el-dropdown-menu>
                         </template>
@@ -230,7 +230,7 @@
                     <div class="content-item-info">
                       <div class="content-item-name">{{ item.name }}</div>
                       <div class="content-item-meta">
-                        <span>{{ (item.files || []).length }} 个文件</span>
+                        <span>{{ (item.files || []).length }} {{ $t('knowledge.fileCount') }}</span>
                       </div>
                     </div>
                     <div class="content-item-actions">
@@ -240,14 +240,14 @@
                       >▼</span>
                       <button
                         class="action-icon"
-                        title="重命名"
+                        :title="$t('knowledge.renameTitle')"
                         @click.stop="renameItem(item)"
                       >
                         <el-icon><Edit /></el-icon>
                       </button>
                       <button
                         class="action-icon"
-                        title="删除"
+                        :title="$t('common.delete')"
                         @click.stop="deleteItem(item)"
                       >
                         <el-icon><Delete /></el-icon>
@@ -257,16 +257,16 @@
                         trigger="click"
                         @command="(cmd) => handleContentAction(cmd, item)"
                       >
-                        <button class="action-icon more-action" title="更多操作">
+                        <button class="action-icon more-action" :title="$t('knowledge.moreActions')">
                           <el-icon><MoreFilled /></el-icon>
                         </button>
                         <template #dropdown>
                           <el-dropdown-menu>
                             <el-dropdown-item command="rename">
-                              重命名
+                              {{ $t('knowledge.renameTitle') }}
                             </el-dropdown-item>
                             <el-dropdown-item command="delete" divided>
-                              删除
+                              {{ $t('common.delete') }}
                             </el-dropdown-item>
                           </el-dropdown-menu>
                         </template>
@@ -280,25 +280,25 @@
                 v-if="currentFolder && currentKbDisplayItems.length === 0"
                 class="content-empty"
               >
-                <div>文件夹什么也没有，去这里添加</div>
+                <div>{{ $t('knowledge.emptyFolder') }}</div>
               </div>
               <div
                 v-else-if="!currentFolder && currentKbDisplayItems.length === 0"
                 class="content-empty"
               >
-                没有更多内容了
+                {{ $t('knowledge.noMoreContent') }}
               </div>
             </div>
 
             <div v-else class="empty-knowledge-base">
               <div class="empty-icon-large"></div>
-              <div class="empty-title">知识库什么也没有，去这里添加</div>
+              <div class="empty-title">{{ $t('knowledge.emptyKnowledgeBase') }}</div>
               <div class="empty-description">
-                上传文档、图片、视频等文件，让AI助手帮你整理和回答问题
+                {{ $t('knowledge.uploadHint') }}
               </div>
               <button class="upload-files-btn" @click="showCreateDialog = true">
                 <el-icon><Plus /></el-icon>
-                创建知识库
+                {{ $t('knowledge.createKnowledgeBase') }}
               </button>
             </div>
           </div>
@@ -309,7 +309,7 @@
     <div v-show="knowledgeBases.length > 0" class="ai-assistant" :class="{ 'ai-expanded': !isContentExpanded }">
       <div class="ai-header">
         <div class="ai-header-left">
-          <div class="ai-header-title">问知识库</div>
+          <div class="ai-header-title">{{ $t('knowledge.askKnowledgeBase') }}</div>
         </div>
       </div>
 
@@ -321,7 +321,7 @@
       >
         <!-- 空状态显示 -->
         <div v-if="kbMessagesList.length <= 1" class="empty-chat-message">
-          Hi，任何关于这个知识库的问题都可以问我
+          {{ $t('knowledge.aiWelcomeMessage') }}
         </div>
 
         <!-- 消息列表 -->
@@ -334,7 +334,7 @@
               :class="msg.type"
             >
               <div class="kb-message-avatar" :class="msg.type">
-                {{ msg.type === 'user' ? '我' : 'AI' }}
+                {{ msg.type === 'user' ? $t('knowledge.userLabel') : $t('knowledge.assistantLabel') }}
               </div>
               <div class="kb-message-bubble">
                 <div class="kb-message-content-wrapper">
@@ -344,7 +344,7 @@
                   ></div>
                   <!-- 文档片段展示 -->
                   <div v-if="msg.documents && msg.documents.length > 0" class="kb-message-documents">
-                    <div class="kb-documents-title">参考文档：</div>
+                    <div class="kb-documents-title">{{ $t('knowledge.referenceDocuments') }}</div>
                     <div class="kb-documents-list">
                       <div
                         v-for="(doc, index) in msg.documents"
@@ -354,17 +354,17 @@
                       >
                         <el-icon class="kb-document-icon"><Document /></el-icon>
                         <div class="kb-document-info">
-                          <span class="kb-document-name">{{ doc.name || `文档 ${index + 1}` }}</span>
+                          <span class="kb-document-name">{{ doc.name || $t('knowledge.documentNumber', { index: index + 1 }) }}</span>
                           <span v-if="doc.datasetName && doc.datasetName !== doc.name" class="kb-document-dataset">（{{ doc.datasetName }}）</span>
                         </div>
-                        <span v-if="doc.score" class="kb-document-score">相关度: {{ (doc.score * 100).toFixed(0) }}%</span>
+                        <span v-if="doc.score" class="kb-document-score">{{ $t('knowledge.relevance') }} {{ (doc.score * 100).toFixed(0) }}%</span>
                       </div>
                     </div>
                   </div>
                   <!-- 流式生成指示器 -->
                   <div v-if="msg.streaming" class="kb-streaming-indicator">
                     <span class="kb-streaming-dot"></span>
-                    <span class="kb-streaming-text">正在生成...</span>
+                    <span class="kb-streaming-text">{{ $t('knowledge.generating') }}</span>
                   </div>
                 </div>
                 <div class="kb-message-meta">
@@ -381,7 +381,7 @@
           <textarea
             v-model="kbInput"
             class="kb-message-input"
-            placeholder="基于知识库提问"
+            :placeholder="$t('knowledge.queryPlaceholder')"
             @keydown.enter.exact.prevent="handleEnterKey"
             @input="autoResizeInput"
           ></textarea>
@@ -398,34 +398,34 @@
             </button>
           </div>
         </div>
-        <div class="ai-footer">内容由AI生成仅供参考</div>
+        <div class="ai-footer">{{ $t('knowledge.aiContentHint') }}</div>
       </div>
     </div>
 
     <!-- 创建知识库弹窗 -->
     <el-dialog
       v-model="showCreateDialog"
-      title="创建共享知识库"
+      :title="$t('knowledge.createSharedKnowledgeBase')"
       width="700px"
       @close="resetCreateForm"
     >
       <el-form :model="newKbForm" label-width="100px">
-        <el-form-item label="名称" required>
+        <el-form-item :label="$t('knowledge.nameLabel')" required>
           <el-input
             v-model="newKbForm.name"
-            placeholder="请输入知识库名称"
+            :placeholder="$t('knowledge.namePlaceholder')"
             maxlength="50"
             show-word-limit
           />
         </el-form-item>
 
-        <el-form-item label="封面">
+        <el-form-item :label="$t('knowledge.coverLabel')">
           <div class="cover-upload">
             <div class="cover-preview" @click="triggerCoverUpload">
               <img
                 v-if="newKbForm.coverUrl"
                 :src="newKbForm.coverUrl"
-                alt="知识库封面"
+                :alt="$t('knowledge.coverAlt')"
               />
               <el-icon v-else><Picture /></el-icon>
               <div class="cover-edit-icon">
@@ -433,7 +433,7 @@
               </div>
             </div>
             <div class="cover-upload-text">
-              点击上传知识库封面图片，建议尺寸 200x200px
+              {{ $t('knowledge.coverUploadHint') }}
             </div>
             <input
               ref="coverInput"
@@ -445,25 +445,25 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="描述">
+        <el-form-item :label="$t('knowledge.descriptionLabel')">
           <el-input
             v-model="newKbForm.description"
             type="textarea"
             :rows="3"
-            placeholder="为你的共享知识库填写描述"
+            :placeholder="$t('knowledge.sharedKbDescriptionPlaceholder')"
             maxlength="200"
             show-word-limit
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
+        <el-button @click="showCreateDialog = false">{{ $t('knowledge.cancel') }}</el-button>
         <el-button
           type="primary"
           @click="createKnowledgeBase"
           :disabled="!newKbForm.name.trim()"
         >
-          确定
+          {{ $t('knowledge.confirm') }}
         </el-button>
       </template>
     </el-dialog>
@@ -471,26 +471,26 @@
     <!-- 重命名弹窗 -->
     <el-dialog
       v-model="showRenameDialog"
-      title="重命名"
+      :title="$t('knowledge.renameTitle')"
       width="500px"
     >
       <el-form>
-        <el-form-item label="名称" required>
+        <el-form-item :label="$t('knowledge.nameLabel')" required>
           <el-input
             v-model="renameForm"
-            placeholder="请输入新名称"
+            :placeholder="$t('knowledge.renamePlaceholder')"
             @keydown.enter.prevent="confirmRename"
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="cancelRename">取消</el-button>
+        <el-button @click="cancelRename">{{ $t('knowledge.cancel') }}</el-button>
         <el-button
           type="primary"
           @click="confirmRename"
           :disabled="!renameForm.trim()"
         >
-          确定
+          {{ $t('knowledge.confirm') }}
         </el-button>
       </template>
     </el-dialog>
@@ -498,24 +498,24 @@
     <!-- 删除确认弹窗 -->
     <el-dialog
       v-model="showDeleteDialog"
-      title="删除确认"
+      :title="$t('knowledge.deleteConfirmTitle')"
       width="500px"
     >
       <div style="text-align: center; padding: 20px 0">
         <div style="font-size: 16px; color: #374151; margin-bottom: 8px">
-          {{ deletingKnowledgeBase ? `确定要删除知识库"${deletingKnowledgeBase.name}"吗？` : '确定要删除该项吗？' }}
+          {{ deletingKnowledgeBase ? $t('knowledge.deleteKbConfirm', { name: deletingKnowledgeBase.name }) : $t('knowledge.deleteItemConfirm') }}
         </div>
         <div style="font-size: 14px; color: #6b7280">
-          {{ deletingKnowledgeBase ? '删除知识库将同时删除其中的所有文件和文件夹，此操作不可恢复' : '此操作不可恢复' }}
+          {{ deletingKnowledgeBase ? $t('knowledge.deleteKbWarning') : $t('knowledge.deleteItemWarning') }}
         </div>
       </div>
       <template #footer>
-        <el-button @click="cancelDelete">取消</el-button>
+        <el-button @click="cancelDelete">{{ $t('knowledge.cancel') }}</el-button>
         <el-button
           type="danger"
           @click="confirmDelete"
         >
-          删除
+          {{ $t('common.delete') }}
         </el-button>
       </template>
     </el-dialog>
@@ -523,7 +523,7 @@
     <!-- 文件预览弹窗 -->
     <el-dialog
       v-model="showPreviewDialog"
-      title="文件预览"
+      :title="$t('knowledge.filePreview')"
       width="90%"
       :close-on-click-modal="false"
       :close-on-press-escape="true"
@@ -531,19 +531,19 @@
     >
       <div class="file-preview-container">
         <div class="file-preview-header">
-          <div class="file-preview-title">{{ previewFileInfo?.name || '文件预览' }}</div>
+          <div class="file-preview-title">{{ previewFileInfo?.name || $t('knowledge.filePreview') }}</div>
           <el-button
             type="primary"
             :loading="previewLoading"
             @click="downloadPreviewFile"
           >
-            下载
+            {{ $t('knowledge.download') }}
           </el-button>
         </div>
         <div class="file-preview-content">
           <div v-if="previewLoading" class="preview-loading">
             <el-icon class="is-loading"><Loading /></el-icon>
-            <span>加载中...</span>
+            <span>{{ $t('knowledge.loading') }}</span>
           </div>
           <div v-else-if="previewError" class="preview-error">
             <el-icon><Warning /></el-icon>
@@ -564,6 +564,7 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   FolderOpened,
@@ -612,6 +613,7 @@ import request from '@/utils/request'
 import { FILE_API, HTTP_METHODS } from '@/api/Common/constants'
 
 const logger = createLogger('KnowledgeList')
+const { t } = useI18n()
 
 // 响应式数据
 const isContentExpanded = ref(true)
@@ -653,7 +655,7 @@ const kbMessagesList = ref([
   {
     id: 1,
     type: 'ai',
-    content: 'Hi，任何关于这个知识库的问题都可以问我～',
+    content: t('knowledge.aiWelcomeMessage'),
     timestamp: new Date()
   }
 ])
@@ -788,7 +790,7 @@ const selectKnowledgeBase = (kb) => {
         dify_kb_id: kb.dify_kb_id
       }
     })
-    ElMessage.warning('该知识库缺少 Dify KB ID，无法使用问答功能。请重新创建知识库或联系管理员。')
+    ElMessage.warning(t('knowledge.kbMissingDifyId'))
   }
   
   // 加载知识库文件列表，确保 ID 是数字类型
@@ -827,7 +829,7 @@ const loadKnowledgeFiles = async (knowledgeId, folderId = null) => {
       const items = records.map(record => ({
         id: record.id,
         type: 'file',
-        name: record.fileName || '未命名文件',
+        name: record.fileName || t('knowledge.unnamedFile'),
         attachmentId: record.attachmentId,
         folderId: record.folderId,
         sortOrder: record.sortOrder,
@@ -859,7 +861,7 @@ const loadKnowledgeFiles = async (knowledgeId, folderId = null) => {
     }
   } catch (error) {
     logger.error('加载文件列表失败', error)
-    ElMessage.error('加载文件列表失败')
+    ElMessage.error(t('knowledge.loadFilesError'))
     if (fId !== null && currentFolder.value) {
       currentFolder.value.files = []
     } else {
@@ -871,7 +873,7 @@ const loadKnowledgeFiles = async (knowledgeId, folderId = null) => {
 
 const createKnowledgeBase = async () => {
   if (!newKbForm.value.name.trim()) {
-    ElMessage.warning('请输入知识库名称')
+    ElMessage.warning(t('knowledge.enterKbName'))
     return
   }
 
@@ -909,13 +911,13 @@ const createKnowledgeBase = async () => {
       kbItems.value = []
       showCreateDialog.value = false
       resetCreateForm()
-      ElMessage.success('知识库创建成功')
+      ElMessage.success(t('knowledge.knowledgeCreated'))
     } else {
-      ElMessage.error(response.message || '创建知识库失败')
+      ElMessage.error(response.message || t('knowledge.createKbFailed'))
     }
   } catch (error) {
     logger.error('创建知识库失败', error)
-    ElMessage.error('创建知识库失败，请稍后重试')
+    ElMessage.error(t('knowledge.createKbFailedRetry'))
   }
 }
 
@@ -942,7 +944,7 @@ const handleCoverSelect = (e) => {
   const file = e.target.files && e.target.files[0]
   if (!file) return
   if (!file.type.startsWith('image/')) {
-    ElMessage.warning('请选择图片文件')
+    ElMessage.warning(t('knowledge.selectImageFile'))
     return
   }
   const reader = new FileReader()
@@ -979,7 +981,7 @@ const handleContentAction = (command, item) => {
  */
 const handlePreviewFile = async (item) => {
   if (!item || !item.attachmentId) {
-    ElMessage.warning('文件ID不存在，无法预览')
+    ElMessage.warning(t('knowledge.fileIdNotExists'))
     return
   }
 
@@ -1012,7 +1014,7 @@ const handlePreviewFile = async (item) => {
     }
   } catch (error) {
     logger.error('预览文件失败', error)
-    previewError.value = error.message || '预览文件失败，请稍后重试'
+    previewError.value = error.message || t('knowledge.previewFailed')
     ElMessage.error(previewError.value)
   } finally {
     previewLoading.value = false
@@ -1037,13 +1039,13 @@ const downloadPreviewFile = () => {
   if (previewUrl.value) {
     window.open(previewUrl.value, '_blank')
   } else {
-    ElMessage.warning('预览链接不存在')
+    ElMessage.warning(t('knowledge.previewLinkNotExists'))
   }
 }
 
 const createFolder = () => {
   // TODO: 后端接口待实现
-  ElMessage.info('创建文件夹功能待后端接口实现')
+  ElMessage.info(t('knowledge.createFolderPending'))
 }
 
 const triggerKbUpload = () => {
@@ -1069,16 +1071,16 @@ const handleKbUpload = async (e) => {
     const response = await uploadFilesToKnowledge(knowledgeId, files, folderId)
     
     if (response.code === 200) {
-      ElMessage.success(`成功上传 ${files.length} 个文件`)
+      ElMessage.success(t('knowledge.uploadSuccess', { count: files.length }))
       logger.info('文件批量上传成功', { fileCount: files.length })
       // 上传成功后刷新文件列表
       await loadKnowledgeFiles(Number(selectedKnowledgeBase.value.id), folderId || null)
     } else {
-      throw new Error(response.message || '上传文件失败')
+      throw new Error(response.message || t('knowledge.uploadFailed'))
     }
   } catch (error) {
     logger.error('批量上传文件失败', error)
-    ElMessage.error(error.message || '上传文件失败，请稍后重试')
+    ElMessage.error(error.message || t('knowledge.uploadFailedRetry'))
   } finally {
     e.target.value = ''
   }
@@ -1111,7 +1113,7 @@ const renameItem = (item) => {
 
 const confirmRename = async () => {
   if (!renameForm.value.trim() || !editingItem.value) {
-    ElMessage.warning('请输入新名称')
+    ElMessage.warning(t('knowledge.enterNewName'))
     return
   }
 
@@ -1122,19 +1124,19 @@ const confirmRename = async () => {
         fileName: renameForm.value.trim()
       })
       editingItem.value.name = renameForm.value.trim()
-      ElMessage.success('重命名成功')
+      ElMessage.success(t('knowledge.renameSuccess'))
     } else {
       // TODO: 文件夹重命名接口待实现
-      ElMessage.info('重命名文件夹功能待后端接口实现')
+      ElMessage.info(t('knowledge.renameFolderPending'))
       editingItem.value.name = renameForm.value.trim()
-      ElMessage.success('重命名成功')
+      ElMessage.success(t('knowledge.renameSuccess'))
     }
     showRenameDialog.value = false
     editingItem.value = null
     renameForm.value = ''
   } catch (error) {
     logger.error('重命名失败', error)
-    ElMessage.error(error.message || '重命名失败')
+    ElMessage.error(error.message || t('knowledge.renameFailed'))
   }
 }
 
@@ -1192,7 +1194,7 @@ const confirmDelete = async () => {
         kbMessagesList.value = [{
           id: 1,
           type: 'ai',
-          content: 'Hi，任何关于这个知识库的问题都可以问我～',
+          content: t('knowledge.aiWelcomeMessage'),
           timestamp: new Date()
         }]
         currentConversationId.value = null
@@ -1201,11 +1203,11 @@ const confirmDelete = async () => {
       // 从缓存中移除
       delete kbContents.value[deletingKnowledgeBase.value.id]
       
-      ElMessage.success('知识库已删除')
+      ElMessage.success(t('knowledge.knowledgeDeleted'))
       logger.info('删除知识库成功', { id: deletingKnowledgeBase.value.id })
     } catch (error) {
       logger.error('删除知识库失败', error)
-      ElMessage.error(error.message || '删除知识库失败')
+      ElMessage.error(error.message || t('knowledge.knowledgeDeleted'))
     }
     showDeleteDialog.value = false
     deletingKnowledgeBase.value = null
@@ -1242,10 +1244,10 @@ const confirmDelete = async () => {
         }
       }
       
-      ElMessage.success('已删除')
+      ElMessage.success(t('knowledge.deleted'))
     } else {
       // TODO: 文件夹删除接口待实现
-      ElMessage.info('删除文件夹功能待后端接口实现')
+      ElMessage.info(t('knowledge.deleteFolderPending'))
       const targetList = currentFolder.value
         ? currentFolder.value.files
         : kbItems.value
@@ -1254,14 +1256,14 @@ const confirmDelete = async () => {
       )
       if (idx > -1) {
         targetList.splice(idx, 1)
-        ElMessage.success('已删除')
+        ElMessage.success(t('knowledge.deleted'))
       }
     }
     showDeleteDialog.value = false
     deletingItem.value = null
   } catch (error) {
     logger.error('删除失败', error)
-    ElMessage.error(error.message || '删除失败')
+    ElMessage.error(error.message || t('knowledge.deleteFailed'))
   }
 }
 
@@ -1400,7 +1402,7 @@ const sendKbMessage = async () => {
   
   if (!selectedKnowledgeBase.value) {
     console.warn('[sendKbMessage] 未选择知识库')
-    ElMessage.warning('请先选择知识库')
+    ElMessage.warning(t('knowledge.selectKbFirst'))
     isExecuting = false
     return
   }
@@ -1425,7 +1427,7 @@ const sendKbMessage = async () => {
       kbName: kb.name,
       allFields: Object.keys(kb)
     })
-    ElMessage.warning('知识库缺少 Dify KB ID，无法使用问答功能。请重新创建知识库或联系管理员。')
+    ElMessage.warning(t('knowledge.kbMissingDifyId'))
     isExecuting = false
     return
   }
@@ -1705,11 +1707,11 @@ const sendKbMessage = async () => {
         const message = kbMessagesList.value.find(m => m.id === aiMessageId)
         if (message) {
           if (error.code === 'CHATBOT_NOT_CREATED') {
-            message.content = error.hint || '请先创建 Chatbot 应用才能使用知识库问答功能'
-            ElMessage.warning(error.message || '请先创建 Chatbot 应用')
+            message.content = error.hint || t('knowledge.chatbotNotCreated')
+            ElMessage.warning(error.message || t('knowledge.chatbotNotCreatedShort'))
           } else {
-            message.content = '抱歉，回答生成失败，请稍后再试。'
-            ElMessage.error(error.message || '回答生成失败')
+            message.content = t('knowledge.responseFailed')
+            ElMessage.error(error.message || t('knowledge.responseFailedShort'))
           }
           message.streaming = false
         }
@@ -1749,7 +1751,7 @@ const sendKbMessage = async () => {
     currentAbortController.value = null
     const message = kbMessagesList.value.find(m => m.id === aiMessageId)
     if (message) {
-      message.content = '抱歉，回答生成失败，请稍后再试。'
+      message.content = t('knowledge.responseFailed')
       message.streaming = false
     }
     
@@ -1775,7 +1777,7 @@ const sendKbMessage = async () => {
     }
     
     logger.error('流式问答异常', error)
-    ElMessage.error(error.message || '回答生成失败')
+    ElMessage.error(error.message || t('knowledge.responseFailedShort'))
     nextTick(scrollKbToBottom)
   }
 }

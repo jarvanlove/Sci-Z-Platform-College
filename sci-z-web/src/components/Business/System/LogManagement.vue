@@ -15,7 +15,7 @@
         <!-- 🔥 用户名输入框移到最左边 -->
         <el-input
           v-model="searchForm.user"
-          placeholder="请输入用户名"
+          :placeholder="$t('system.logs.userPlaceholder')"
           clearable
           style="width: 200px"
           @blur="handleUserInputBlur"

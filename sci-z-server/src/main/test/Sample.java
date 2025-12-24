@@ -1,11 +1,4 @@
-package com.sciz.server.interfaces.controller;
-
-
-import com.aliyun.tea.*;
-import com.aliyun.alimt20181012.*;
 import com.aliyun.alimt20181012.models.*;
-import com.aliyun.teaopenapi.*;
-import com.aliyun.teaopenapi.models.*;
 
 
 public class Sample {

@@ -85,7 +85,7 @@
       >
           <!-- 空状态显示 -->
           <div v-if="uniqueMessages.length === 0" class="empty-chat-message">
-            Hi，任何问题都可以问我
+            {{ $t('ai.chat.welcomeMessage') }}
           </div>
 
           <!-- 消息列表 -->
@@ -98,7 +98,7 @@
                 :class="msg.type"
               >
                 <div class="kb-message-avatar" :class="msg.type">
-                  {{ msg.type === 'user' ? '我' : 'AI' }}
+                  {{ msg.type === 'user' ? $t('ai.chat.userLabel') : $t('ai.chat.assistantLabel') }}
                 </div>
                 <div class="kb-message-bubble">
                   <div class="kb-message-content-wrapper">
@@ -108,7 +108,7 @@
                     ></div>
                     <!-- 文档片段展示 -->
                     <div v-if="msg.documents && msg.documents.length > 0" class="kb-message-documents">
-                      <div class="kb-documents-title">参考文档：</div>
+                      <div class="kb-documents-title">{{ $t('ai.chat.referenceDocuments') }}</div>
                       <div class="kb-documents-list">
                         <div
                           v-for="(doc, index) in msg.documents"
@@ -118,17 +118,17 @@
                         >
                           <el-icon class="kb-document-icon"><Document /></el-icon>
                           <div class="kb-document-info">
-                            <span class="kb-document-name">{{ doc.document_name || doc.name || `文档 ${index + 1}` }}</span>
+                            <span class="kb-document-name">{{ doc.document_name || doc.name || $t('ai.chat.documentNumber', { index: index + 1 }) }}</span>
                             <span v-if="(doc.dataset_name || doc.datasetName) && (doc.dataset_name || doc.datasetName) !== (doc.document_name || doc.name)" class="kb-document-dataset">（{{ doc.dataset_name || doc.datasetName }}）</span>
                           </div>
-                          <span v-if="doc.score" class="kb-document-score">相关度: {{ (doc.score * 100).toFixed(0) }}%</span>
+                          <span v-if="doc.score" class="kb-document-score">{{ $t('ai.chat.relevance') }} {{ (doc.score * 100).toFixed(0) }}%</span>
                         </div>
                       </div>
                     </div>
                     <!-- 流式生成指示器 -->
                     <div v-if="msg.streaming" class="kb-streaming-indicator">
                       <span class="kb-streaming-dot"></span>
-                      <span class="kb-streaming-text">正在生成...</span>
+                      <span class="kb-streaming-text">{{ $t('ai.chat.generating') }}</span>
                     </div>
                   </div>
                   <div class="kb-message-meta">
@@ -140,14 +140,14 @@
                           @click="copyKbMessage(msg.content)"
                         >
                           <el-icon><DocumentCopy /></el-icon>
-                          <span>复制</span>
+                          <span>{{ $t('ai.chat.copy') }}</span>
                         </button>
                         <button
                           class="kb-retry-btn"
                           @click="retryKbMessage(msg)"
                         >
                           <el-icon><Refresh /></el-icon>
-                          <span>重试</span>
+                          <span>{{ $t('ai.chat.retry') }}</span>
                         </button>
                       </template>
 
@@ -158,7 +158,7 @@
                           @click="copyKbMessage(msg.content)"
                         >
                           <el-icon><DocumentCopy /></el-icon>
-                          <span>复制</span>
+                          <span>{{ $t('ai.chat.copy') }}</span>
                         </button>
                       </template>
                     </div>
@@ -195,7 +195,7 @@
             <textarea
               v-model="inputMessage"
               class="kb-message-input"
-              placeholder="@知识库或直接提问"
+              :placeholder="$t('ai.chat.inputPlaceholderWithKb')"
               @keydown.enter.exact.prevent="handleEnterKey"
               @keydown.up.prevent="navigateKbList('up')"
               @keydown.down.prevent="navigateKbList('down')"
@@ -211,7 +211,7 @@
               class="knowledge-base-dropdown"
             >
               <div class="kb-dropdown-header">
-                <span class="kb-dropdown-title">共享知识库</span>
+                <span class="kb-dropdown-title">{{ $t('knowledge.sharedKnowledgeBase') }}</span>
               </div>
               <div class="kb-dropdown-section">
                 <div class="kb-list">
@@ -266,7 +266,7 @@
                 <button
                   class="kb-attachment-btn"
                   @click="handleAttachmentClick"
-                  title="添加附件（上传文件时需要选择知识库）"
+                  :title="$t('ai.chat.attachmentTitle')"
                 >
                   <el-icon><Paperclip /></el-icon>
                 </button>
@@ -303,7 +303,7 @@
               </div>
             </div>
           </div>
-          <div class="input-footer">内容由AI生成仅供参考</div>
+          <div class="input-footer">{{ $t('ai.chat.aiContentHint') }}</div>
         </div>
       </template>
     </div>
@@ -881,7 +881,7 @@ const sendKbMessage = async () => {
     const firstKb = selectedKnowledgeBases.value[0]
     knowledgeId = firstKb.difyKbId || firstKb.difyKnowledgeId
     if (!knowledgeId) {
-      ElMessage.warning('所选知识库缺少 Dify KB ID，将使用普通对话模式')
+      ElMessage.warning(t('ai.chat.kbMissingDifyId'))
       // 继续执行，使用普通对话
     }
   }
@@ -959,7 +959,7 @@ const sendKbMessage = async () => {
       }
     } catch (error) {
       logger.error('创建会话失败', error)
-      ElMessage.error('创建会话失败，消息将仅保存在本地')
+      ElMessage.error(t('ai.chat.conversationFailed'))
     }
   }
   
@@ -1323,11 +1323,11 @@ const sendKbMessage = async () => {
         const message = messages.value.find(m => m.id === aiMessageId)
         if (message) {
           if (error.code === 'CHATBOT_NOT_CREATED') {
-            message.content = error.hint || '请先创建 Chatbot 应用才能使用知识库问答功能'
-            ElMessage.warning(error.message || '请先创建 Chatbot 应用')
+            message.content = error.hint || t('ai.chat.chatbotNotCreated')
+            ElMessage.warning(error.message || t('ai.chat.chatbotNotCreatedShort'))
           } else {
-            message.content = '抱歉，回答生成失败，请稍后再试。'
-            ElMessage.error(error.message || '回答生成失败')
+            message.content = t('ai.chat.responseFailed')
+            ElMessage.error(error.message || t('ai.chat.responseFailedShort'))
           }
           message.streaming = false
         }
@@ -1345,7 +1345,7 @@ const sendKbMessage = async () => {
     currentAbortController.value = null
     const message = messages.value.find(m => m.id === aiMessageId)
     if (message) {
-      message.content = '抱歉，回答生成失败，请稍后再试。'
+      message.content = t('ai.chat.responseFailed')
       message.streaming = false
     }
     
@@ -1371,7 +1371,7 @@ const sendKbMessage = async () => {
     }
     
     logger.error('流式问答异常', error)
-    ElMessage.error(error.message || '回答生成失败')
+    ElMessage.error(error.message || t('ai.chat.responseFailedShort'))
     nextTick(scrollKbToBottom)
   }
 }
@@ -1388,7 +1388,7 @@ const stopGeneration = () => {
   const streamingMessage = messages.value.find(m => m.streaming)
   if (streamingMessage) {
     streamingMessage.streaming = false
-    streamingMessage.content += '\n\n[已停止生成]'
+    streamingMessage.content += `\n\n[${t('ai.chat.stopped')}]`
   }
 }
 
@@ -1398,9 +1398,9 @@ const copyKbMessage = async (content) => {
     // 移除HTML标签，获取纯文本
     const textContent = content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/<br>/g, '\n')
     await navigator.clipboard.writeText(textContent)
-    ElMessage.success('已复制到剪贴板')
+    ElMessage.success(t('ai.chat.copiedToClipboard'))
   } catch (error) {
-    ElMessage.error('复制失败')
+    ElMessage.error(t('ai.chat.copyFailed'))
     logger.error('复制失败', error)
   }
 }
@@ -1637,7 +1637,7 @@ const getSelectedModelName = (modelValue) => {
 const selectModel = (model) => {
   selectedModel.value = model
   showModelDropdown.value = false
-  ElMessage.success(`已切换到${getSelectedModelName(model)}`)
+  ElMessage.success(t('ai.chat.switchedTo', { model: getSelectedModelName(model) }))
 }
 
 // 附件相关方法
@@ -1734,11 +1734,11 @@ const handleChatAction = async (command, chat) => {
 const editChatTitle = async (chat) => {
   try {
     const { value: newTitle } = await ElMessageBox.prompt(
-      '请输入新的对话标题',
-      '编辑标题',
+      t('ai.chat.enterNewTitle'),
+      t('ai.chat.editTitle'),
       {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
         inputValue: chat.title || ''
       }
     )
@@ -1759,7 +1759,7 @@ const editChatTitle = async (chat) => {
         }
       }
       saveChatsToStorage()
-      ElMessage.success('标题修改成功')
+      ElMessage.success(t('ai.chat.titleUpdated'))
     }
   } catch (error) {
     // 用户取消
@@ -1791,11 +1791,11 @@ const togglePinChat = async (chat) => {
 const deleteChatConfirm = async (chat) => {
   try {
     await ElMessageBox.confirm(
-      '确定要删除该对话吗？此操作不可恢复。',
-      '删除对话',
+      t('ai.chat.deleteChatConfirm'),
+      t('ai.chat.deleteChatTitle'),
       {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning'
       }
     )
@@ -1825,7 +1825,7 @@ const deleteChatConfirm = async (chat) => {
     }
     
     saveChatsToStorage()
-    ElMessage.success('对话删除成功')
+    ElMessage.success(t('ai.chat.chatDeleted'))
   } catch (error) {
     // 用户取消
   }

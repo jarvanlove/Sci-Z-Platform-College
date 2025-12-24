@@ -320,6 +320,16 @@ public class PdfCacheServiceImpl implements PdfCacheService {
                         return Mono.error(BusinessException.of(ResultCode.FILE_DOWNLOAD_FAILED, "下载的文件为空"));
                     }
 
+                    // 检查文件大小，小于500KB则认为是需要授权访问的PDF
+                    long fileSizeInBytes = fileBytes.length;
+                    long minSizeInBytes = 500 * 1024; // 500KB
+                    if (fileSizeInBytes < minSizeInBytes) {
+                        log.warn("下载的PDF文件过小，可能需授权访问: url={}, size={} bytes", pdfUrl, fileSizeInBytes);
+                        return Mono.error(BusinessException.of(
+                                ResultCode.FORBIDDEN,
+                                "该PDF需要授权访问，请手动下载后上传"));
+                    }
+
                     try {
                         // 从URL提取文件名
                         String fileName = extractFileNameFromUrl(pdfUrl);

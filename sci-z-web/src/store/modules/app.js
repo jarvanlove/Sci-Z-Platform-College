@@ -46,7 +46,7 @@ export const useAppStore = defineStore('app', {
     // 页面加载状态
     loading: false,
     // 页面标题
-    pageTitle: '生成式高校科研管理平台'
+    pageTitle: '辅助高校科研管理平台'
   }),
 
   getters: {
