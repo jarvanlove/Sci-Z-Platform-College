@@ -60,6 +60,7 @@ import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/store/modules/app'
 import { useAuthStore } from '@/store/modules/auth'
 import LanguageSwitcher from '@/components/Common/LanguageSwitcher.vue'
+import { getMenuTitle } from '@/utils/menuI18n'
 
 const router = useRouter()
 const route = useRoute()
@@ -76,7 +77,7 @@ const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 // 主题状态
 const isDark = computed(() => appStore.theme === 'dark')
 
-// 根据当前路由获取菜单标题
+// 根据当前路由获取菜单标题（支持 i18n 翻译）
 const currentMenuTitle = computed(() => {
   const currentPath = route.path
   const menus = authStore.menus || []
@@ -86,7 +87,8 @@ const currentMenuTitle = computed(() => {
     for (const menu of menuList) {
       // 精确匹配
       if (menu.path === path) {
-        return menu.title
+        // 使用 getMenuTitle 函数获取翻译后的标题
+        return getMenuTitle(menu, t)
       }
       // 如果菜单有子项，递归查找
       if (menu.children && menu.children.length > 0) {
@@ -101,7 +103,7 @@ const currentMenuTitle = computed(() => {
   
   const matchedTitle = findMenuByPath(menus, currentPath)
   
-  // 如果找到匹配的菜单，返回标题；否则返回默认的"仪表板"
+  // 如果找到匹配的菜单，返回翻译后的标题；否则返回默认的"仪表板"
   return matchedTitle || t('menu.dashboard')
 })
 

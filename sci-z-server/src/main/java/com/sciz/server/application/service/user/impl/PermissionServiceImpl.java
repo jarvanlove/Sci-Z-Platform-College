@@ -353,17 +353,26 @@ public class PermissionServiceImpl implements PermissionService {
      * @return 菜单树
      */
     private List<LoginMenuResp> buildMenuTree(List<SysPermission> menuPerms) {
+        // 先按 sort_order 排序，确保顺序正确
+        var sortedPerms = menuPerms.stream()
+                .sorted((a, b) -> Integer.compare(
+                        Optional.ofNullable(a.getSortOrder()).orElse(0),
+                        Optional.ofNullable(b.getSortOrder()).orElse(0)))
+                .toList();
+
         var idToNode = new HashMap<Long, LoginMenuResp>();
+        var permissionToSortOrder = new HashMap<String, Integer>();
         var roots = new ArrayList<LoginMenuResp>();
 
-        // 第一遍：构建所有节点
-        for (var perm : menuPerms) {
+        // 第一遍：构建所有节点，并保存 permission -> sortOrder 映射
+        for (var perm : sortedPerms) {
             var node = toNode(perm);
             idToNode.put(perm.getId(), node);
+            permissionToSortOrder.put(perm.getPermissionCode(), Optional.ofNullable(perm.getSortOrder()).orElse(0));
         }
 
         // 第二遍：构建树形结构
-        for (var perm : menuPerms) {
+        for (var perm : sortedPerms) {
             var parentId = perm.getParentId();
             var node = idToNode.get(perm.getId());
             if (Optional.ofNullable(parentId).filter(id -> id != 0 && idToNode.containsKey(id)).isEmpty()) {
@@ -374,7 +383,36 @@ public class PermissionServiceImpl implements PermissionService {
                 parent.getChildren().add(node);
             }
         }
+
+        // 第三遍：对根节点和子节点进行排序
+        sortMenuTree(roots, permissionToSortOrder);
         return roots;
+    }
+
+    /**
+     * 递归排序菜单树（按 sortOrder 升序）
+     *
+     * @param nodes                 菜单节点列表
+     * @param permissionToSortOrder 权限编码到排序号的映射
+     */
+    private void sortMenuTree(List<LoginMenuResp> nodes, Map<String, Integer> permissionToSortOrder) {
+        if (CollectionUtils.isEmpty(nodes)) {
+            return;
+        }
+
+        // 对当前层级的节点进行排序（按 sortOrder 升序）
+        nodes.sort((a, b) -> {
+            var sortOrderA = permissionToSortOrder.getOrDefault(a.getPermission(), 0);
+            var sortOrderB = permissionToSortOrder.getOrDefault(b.getPermission(), 0);
+            return Integer.compare(sortOrderA, sortOrderB);
+        });
+
+        // 递归排序子节点
+        for (var node : nodes) {
+            if (node.getChildren() != null && !node.getChildren().isEmpty()) {
+                sortMenuTree(node.getChildren(), permissionToSortOrder);
+            }
+        }
     }
 
     /**

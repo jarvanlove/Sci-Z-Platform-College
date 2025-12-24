@@ -58,10 +58,6 @@ dify:
   retry-count: 3
   enable-retry: true
   default-resource-id: default # 默认资源ID（用于创建知识库时的resourceId参数）
-  upload: # 文件上传配置
-    dir: D:/uploadpath3/ # 上传文件存储目录（相对路径，相对于项目根目录）
-    max-file-size: 104857600 # 最大文件大小（字节），100MB = 100 * 1024 * 1024
-    allowed-extensions: .pdf,.doc,.docx,.txt,.md,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif # 允许的文件扩展名（逗号分隔）
   chatbot: # Chatbot 模型配置（开发环境）
     model: # 模型配置
       provider: langgenius/tongyi/tongyi # 模型提供商

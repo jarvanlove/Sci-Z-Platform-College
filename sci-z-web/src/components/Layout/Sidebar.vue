@@ -45,6 +45,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/store/modules/app'
 import { useAuthStore } from '@/store/modules/auth'
+import { translateMenus } from '@/utils/menuI18n'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -176,9 +177,9 @@ const defaultOpeneds = computed(() => {
 // 侧边栏折叠状态
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 
-// 根据权限过滤菜单
+// 根据权限过滤菜单并应用 i18n 翻译
 const filteredMenus = computed(() => {
-  return authStore.menus.filter(menu => {
+  const filtered = authStore.menus.filter(menu => {
     // 检查菜单权限
     if (menu.permission) {
       return authStore.hasPermission(menu.permission)
@@ -194,6 +195,9 @@ const filteredMenus = computed(() => {
     
     return true
   })
+  
+  // 应用 i18n 翻译
+  return translateMenus(filtered, t)
 })
 </script>
 

@@ -3,7 +3,7 @@ spring: # Spring 生产环境配置
   config:
     import: optional:classpath:config/production.env.properties # 生产占位符属性
   datasource:
-    url: jdbc:postgresql://localhost:5432/sciz_platform # 数据库 URL（建议改为生产地址）
+    url: jdbc:postgresql://localhost:5438/sciz_platform # 数据库 URL（建议改为生产地址）
     username: ${DB_USERNAME:postgres} # 数据库用户名（支持环境变量覆盖）
     password: ${DB_PASSWORD:password} # 数据库密码（支持环境变量覆盖）
     driver-class-name: org.postgresql.Driver # PostgreSQL 驱动
@@ -40,19 +40,37 @@ kafka: # Kafka 生产环境配置
 
 # MinIO：从环境变量读取 endpoint/ak/sk/bucket
 minio: # MinIO 生产环境配置
-  endpoint: ${MINIO_ENDPOINT:http://minio:9000}
+  endpoint: ${MINIO_ENDPOINT:http://192.168.1.203:9110}
   access-key: ${MINIO_AK}
   secret-key: ${MINIO_SK}
   bucket: ${MINIO_BUCKET:sciz-files}
 
 # Dify：生产密钥请使用环境变量/密钥管理注入
 dify: # Dify 生产环境配置
-  api:
-    base-url: https://api.dify.ai/v1 # Dify API 网关
-    api-key: ${DIFY_API_KEY} # 生产密钥（请从环境注入）
   http:
-    connect-timeout-ms: 3000 # 连接超时(ms)
-    read-timeout-ms: 60000 # 读超时(ms)
+    connect-timeout-ms: ${DIFY_CONNECT_TIMEOUT_MS:3000} # 连接超时(ms)
+    read-timeout-ms: ${DIFY_READ_TIMEOUT_MS:60000} # 读超时(ms)
+  base-url: ${DIFY_BASE_URL:http://192.168.1.203/v1} # Dify API 网关
+  private-url: ${DIFY_PRIVATE_URL:http://192.168.1.203} # Dify 私有地址
+  api-key: ${DIFY_API_KEY} # 生产密钥（请从环境注入）
+  api-workflow-key: ${DIFY_API_WORKFLOW_KEY} # Dify API 工作流密钥（请从环境注入）
+  timeout: ${DIFY_TIMEOUT:30000} # 请求超时(ms)
+  connect-timeout: ${DIFY_CONNECT_TIMEOUT:30000} # 连接超时(ms)
+  retry-count: ${DIFY_RETRY_COUNT:3} # 重试次数
+  enable-retry: ${DIFY_ENABLE_RETRY:true} # 是否启用重试
+  default-resource-id: ${DIFY_DEFAULT_RESOURCE_ID:default} # 默认资源ID（用于创建知识库时的resourceId参数）
+  upload: # 文件上传配置
+    dir: ${DIFY_UPLOAD_DIR:/tmp/upload} # 上传文件存储目录（相对路径，相对于项目根目录）
+    max-file-size: ${DIFY_UPLOAD_MAX_FILE_SIZE:104857600} # 最大文件大小（字节），100MB = 100 * 1024 * 1024
+    allowed-extensions: ${DIFY_UPLOAD_ALLOWED_EXTENSIONS:.pdf,.doc,.docx,.txt,.md,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif} # 允许的文件扩展名（逗号分隔）
+  chatbot: # Chatbot 模型配置（生产环境）
+    model: # 模型配置
+      provider: ${DIFY_CHATBOT_MODEL_PROVIDER:langgenius/tongyi/tongyi} # 模型提供商
+      name: ${DIFY_CHATBOT_MODEL_NAME:qwen3-next-80b-a3b-instruct} # 模型名称
+      mode: ${DIFY_CHATBOT_MODEL_MODE:chat} # 模型模式（chat/completion）
+    reranking-model: # 重排序模型配置
+      reranking-provider-name: ${DIFY_CHATBOT_RERANKING_PROVIDER:langgenius/tongyi/tongyi} # 重排序提供商名称
+      reranking-model-name: ${DIFY_CHATBOT_RERANKING_MODEL_NAME:gte-rerank} # 重排序模型名称
 
 # LLM：OpenAI 兼容，建议用环境变量提供密钥与模型
 llm: # LLM(OpenAI) 生产环境配置

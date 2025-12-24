@@ -31,7 +31,7 @@
         
         <el-select
           v-model="searchForm.reportType"
-          placeholder="请选择报告类型"
+          :placeholder="$t('report.listPage.reportTypePlaceholder')"
           clearable
           style="width: 160px"
           @change="handleFilterChange"
@@ -46,7 +46,7 @@
         
         <el-select
           v-model="searchForm.status"
-          placeholder="请选择报告状态"
+          :placeholder="$t('report.listPage.statusPlaceholder')"
           clearable
           style="width: 160px"
           @change="handleFilterChange"

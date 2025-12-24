@@ -161,7 +161,7 @@ const routes = [
         name: 'KnowledgeList',
         component: () => import('@/views/Knowledge/List.vue'),
         meta: { 
-          title: '知识库列表', 
+          title: '知识库', 
           requiresAuth: true,
           permission: 'menu:knowledge:list',
           layout: 'main'
