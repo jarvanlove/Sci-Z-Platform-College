@@ -74,10 +74,9 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
         LambdaQueryWrapper<SysKnowledgeBase> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(SysKnowledgeBase::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
-        // 如果指定了用户ID，则只查询该用户的知识库
-        if (userId != null) {
+
             queryWrapper.eq(SysKnowledgeBase::getOwnerId, userId);
-        }
+
 
         // 按创建时间倒序排列
         queryWrapper.orderByDesc(SysKnowledgeBase::getCreatedTime);

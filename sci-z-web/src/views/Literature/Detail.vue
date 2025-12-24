@@ -557,6 +557,13 @@ const downloadPdfForChat = async () => {
     const response = await fetch(proxyUrl)
     
     if (!response.ok) {
+      // 检查是否需要授权访问
+      const authError = await checkRequiresAuth(response)
+      if (authError) {
+        showRequiresAuthMessage(authError.message)
+        return false
+      }
+      
       const contentType = response.headers.get('content-type')
       if (contentType && contentType.includes('application/json')) {
         const errorData = await response.json()
@@ -605,6 +612,52 @@ const downloadPdfForChat = async () => {
     logger.error('下载PDF文件失败', error)
     ElMessage.warning('PDF文件无法自动下载，您可以手动上传文件进行对话')
     return false
+  }
+}
+
+// 检查响应是否为需要授权访问的错误
+const checkRequiresAuth = async (response) => {
+  if (response.status === 403) {
+    const contentType = response.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      try {
+        // 使用 clone() 避免消耗原始响应
+        const clonedResponse = response.clone()
+        const errorData = await clonedResponse.json()
+        if (errorData.requiresAuth === true) {
+          return {
+            requiresAuth: true,
+            message: errorData.message || '该PDF需要授权访问，请手动下载后上传'
+          }
+        }
+      } catch (e) {
+        // JSON解析失败，继续处理
+        logger.warn('解析错误响应失败', e)
+      }
+    }
+  }
+  return null
+}
+
+// 显示需要授权访问的提示
+const showRequiresAuthMessage = (message) => {
+  const landingPage = literature.value?.accessInfo?.landingPage
+  if (landingPage) {
+    ElMessage.warning({
+      message: `${message}，请前往官方网址手动下载`,
+      duration: 5000,
+      showClose: true
+    })
+    // 延迟打开官网，让用户看到提示
+    setTimeout(() => {
+      window.open(landingPage, '_blank')
+    }, 1000)
+  } else {
+    ElMessage.warning({
+      message: `${message}，请前往官网手动下载后上传`,
+      duration: 5000,
+      showClose: true
+    })
   }
 }
 
@@ -669,6 +722,14 @@ const handlePreviewPdf = async () => {
       const response = await fetch(proxyUrl)
       
       if (!response.ok) {
+        // 检查是否需要授权访问
+        const authError = await checkRequiresAuth(response)
+        if (authError) {
+          showRequiresAuthMessage(authError.message)
+          pdfLoading.value = false
+          return
+        }
+        
         // 代理失败，尝试直接使用原始链接
         logger.warn('代理接口失败，尝试直接使用PDF链接', { status: response.status })
         useProxy = false
@@ -834,6 +895,14 @@ const handleConfirmCollect = async () => {
         const response = await fetch(proxyUrl)
         
         if (!response.ok) {
+          // 检查是否需要授权访问
+          const authError = await checkRequiresAuth(response)
+          if (authError) {
+            showRequiresAuthMessage(authError.message)
+            collecting.value = false
+            return
+          }
+          
           throw new Error(`PDF下载失败: HTTP ${response.status}`)
         }
 

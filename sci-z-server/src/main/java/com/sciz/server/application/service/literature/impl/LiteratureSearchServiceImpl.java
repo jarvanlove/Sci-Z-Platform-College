@@ -298,11 +298,11 @@ public class LiteratureSearchServiceImpl implements LiteratureSearchService {
                 String titleTranslated = translationService.translate(work.getTitle(), sourceLanguage, "zh");
                 paperInfoBuilder.titleTranslated(titleTranslated);
             }
-            // 翻译摘要
-            if (StringUtils.hasText(abstractText)) {
-                String abstractTranslated = translationService.translate(abstractText, sourceLanguage, "zh");
-                paperInfoBuilder.abstractTranslated(abstractTranslated);
-            }
+//            // 翻译摘要
+//            if (StringUtils.hasText(abstractText)) {
+//                String abstractTranslated = translationService.translate(abstractText, sourceLanguage, "zh");
+//                paperInfoBuilder.abstractTranslated(abstractTranslated);
+//            }
         }
 
         builder.paperInfo(paperInfoBuilder.build());
