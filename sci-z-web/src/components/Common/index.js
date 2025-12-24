@@ -19,6 +19,7 @@ export { default as BaseTooltip } from './BaseTooltip.vue'
 export { default as AgreementNotice } from './AgreementNotice.vue'
 export { default as LanguageSwitcher } from './LanguageSwitcher.vue'
 export { default as FilePreview } from './FilePreview.vue'
+export { default as ExternalFilePreview } from './ExternalFilePreview.vue'
 export { default as ProjectProgressBar } from './ProjectProgressBar.vue'
 
 // 业务组件

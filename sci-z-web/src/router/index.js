@@ -170,6 +170,35 @@ const routes = [
     ]
   },
   {
+    path: '/literature',
+    component: RouterView,
+    children: [
+      {
+        path: 'search',
+        name: 'LiteratureSearch',
+        component: () => import('@/views/Literature/Search.vue'),
+        meta: { 
+          title: '文献搜索', 
+          requiresAuth: true,
+          permission: 'menu:literature:search',
+          layout: 'main'
+        }
+      },
+      {
+        path: 'detail/:id',
+        name: 'LiteratureDetail',
+        component: () => import('@/views/Literature/Detail.vue'),
+        meta: { 
+          title: '文献详情', 
+          requiresAuth: true,
+          // 详情页继承搜索页权限
+          permission: 'menu:literature:search',
+          layout: 'main'
+        }
+      }
+    ]
+  },
+  {
     path: '/ai/chat',
     name: 'AIChat',
     component: () => import('@/views/AI/Chat.vue'),

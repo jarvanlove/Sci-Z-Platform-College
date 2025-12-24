@@ -38,7 +38,10 @@ public class SecurityConfig {
                // 静态资源和文档
                .addExclude("/swagger-ui/**", "/swagger-resources/**", "/v3/api-docs/**")
                .addExclude("/webjars/**", "/static/**", "/favicon.ico")
+               // 测试AI API 接口
                .addExclude("/api/dify/**")
+               .addExclude("/api/literature/**")
+               .addExclude("/api/proxy/**")
                // 其他所有接口都需要登录
                .setAuth(obj -> SaRouter.match("/**").check(r -> StpUtil.checkLogin()))
                .setError(e -> {
