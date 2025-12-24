@@ -73,6 +73,15 @@ public interface SysKnowledgeBaseRepo {
      * @return 是否更新成功
      */
     boolean updateFileCount(Long knowledgeId, Integer fileCount);
+//
+//    /**
+//     * 更新知识库文件夹数量
+//     *
+//     * @param knowledgeId 知识库ID
+//     * @param folderCount 文件夹数量
+//     * @return 是否更新成功
+//     */
+//    boolean updateFolderCount(Long knowledgeId, Integer folderCount);
 
     /**
      * 根据项目ID列表批量查询知识库

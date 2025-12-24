@@ -80,7 +80,6 @@ public final class MinioUtil {
                 .build();
         client.putObject(args);
     }
-
     /**
      * 生成预签名下载地址
      *
