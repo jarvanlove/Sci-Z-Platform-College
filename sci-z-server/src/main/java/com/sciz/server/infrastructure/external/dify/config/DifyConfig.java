@@ -55,10 +55,6 @@ public class DifyConfig {
      */
     private Document document;
     
-    /**
-     * 文件上传配置
-     */
-    private Upload upload;
 
     /**
      * Chatbot 模型配置
@@ -78,12 +74,6 @@ public class DifyConfig {
         private Double scoreThreshold;
         private String processMode;
         private Integer maxTokens;
-    }
-    @Data
-    public static class Upload {
-        private String dir;
-        private Long maxFileSize;
-        private String allowedExtensions;
     }
 
     @Data
