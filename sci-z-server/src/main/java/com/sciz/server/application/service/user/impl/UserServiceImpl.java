@@ -1,5 +1,6 @@
 package com.sciz.server.application.service.user.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.application.service.user.UserService;
@@ -19,6 +20,10 @@ import com.sciz.server.domain.pojo.repository.user.SysRoleRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
 import com.sciz.server.application.service.user.UserRoleService;
 import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
+import com.sciz.server.infrastructure.external.dify.dto.DifyChatbotAppRequest;
+import com.sciz.server.infrastructure.external.dify.dto.DifyChatbotAppResponse;
+import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
+import com.sciz.server.infrastructure.external.dify.service.DifyApiService;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import com.sciz.server.infrastructure.shared.enums.EnableStatus;
 import com.sciz.server.infrastructure.shared.enums.UserStatus;
@@ -33,6 +38,7 @@ import com.sciz.server.interfaces.converter.UserConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.mindrot.jbcrypt.BCrypt;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,7 +72,7 @@ public class UserServiceImpl implements UserService {
     private final UserConverter userConverter;
     private final OperationLogRecorderUtil operationLogRecorderUtil;
     private final DifyApiKeyService difyApiKeyService;
-
+    private final DifyApiService difyApiService;
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Shanghai");
 
     /**
@@ -134,7 +140,22 @@ public class UserServiceImpl implements UserService {
                     user.getEmployeeId()));
 
             // 7. 转换为响应
-            return userConverter.toUserCreateResp(user);
+            var userCreateResp = userConverter.toUserCreateResp(user);
+
+            // 8. 创建 Dify Chatbot 应用并保存 API Key
+            try {
+                createDifyChatbotForUser(userCreateResp);
+                log.info(String.format("为用户创建 Dify Chatbot 成功: userId=%s, username=%s", userId, username));
+            } catch (Exception e) {
+                // Dify Chatbot 创建失败不影响用户创建，记录警告日志
+                log.warn(String.format("为用户创建 Dify Chatbot 失败，用户已创建成功: userId=%s, username=%s, error=%s",
+                        userId, username, e.getMessage()), e);
+                // 不抛出异常，用户创建已成功，Dify Chatbot 创建失败不影响主流程
+            }
+
+            return userCreateResp;
+
+
         } catch (Exception e) {
             // 记录操作日志（失败）
             var endTime = DateUtil.now();
@@ -649,6 +670,123 @@ public class UserServiceImpl implements UserService {
 
         log.info(String.format("获取所有工作流 API 密钥成功: size=%d", respList.size()));
         return respList;
+    }
+
+    /**
+     * 为用户创建 Dify Chatbot 应用并保存 API Key
+     *
+     * @param userCreateResp UserCreateResp 用户创建响应
+     * @throws BusinessException 当 Dify Chatbot 创建失败时抛出
+     */
+    private void createDifyChatbotForUser(UserCreateResp userCreateResp) {
+        var userId = userCreateResp.id();
+        var username = userCreateResp.username();
+        var chatbotAppName = String.format("用户%s chatapp应用", username);
+
+        log.info(String.format("开始为用户创建 Dify Chatbot: userId=%s, username=%s, appName=%s",
+                userId, username, chatbotAppName));
+
+        try {
+            // 1. 构建 Dify Chatbot 应用创建请求
+            var difyChatbotAppRequest = new DifyChatbotAppRequest();
+            difyChatbotAppRequest.setName(chatbotAppName);
+            difyChatbotAppRequest.setMode("chat"); // 设置为聊天模式
+            difyChatbotAppRequest.setDescription(String.format("用户 %s 的聊天应用", username));
+
+            log.info(String.format("调用 Dify API 创建 Chatbot 应用: userId=%s, appName=%s", userId, chatbotAppName));
+
+            // 2. 调用 Dify API 创建 Chatbot 应用
+            var chatbotAppResponse = difyApiService.createChatbotApp(difyChatbotAppRequest);
+
+            // 3. 校验响应状态码
+            if (chatbotAppResponse == null || !chatbotAppResponse.getStatusCode().is2xxSuccessful()) {
+                var statusCode = chatbotAppResponse != null ? chatbotAppResponse.getStatusCode() : null;
+                var errorMsg = String.format("Dify Chatbot 创建失败: userId=%s, statusCode=%s", userId, statusCode);
+                log.error(errorMsg);
+                throw BusinessException.of(ResultCode.SERVER_ERROR, errorMsg);
+            }
+
+            // 4. 校验响应体
+            var chatbotAppBody = chatbotAppResponse.getBody();
+            if (chatbotAppBody == null) {
+                var errorMsg = String.format("Dify Chatbot 创建响应体为空: userId=%s", userId);
+                log.error(errorMsg);
+                throw BusinessException.of(ResultCode.SERVER_ERROR, errorMsg);
+            }
+
+            // 5. 校验必要字段
+            var chatbotAppId = chatbotAppBody.getId();
+            var apiToken = chatbotAppBody.getApiToken();
+            if (chatbotAppId == null || chatbotAppId.isBlank()) {
+                var errorMsg = String.format("Dify Chatbot 应用ID为空: userId=%s", userId);
+                log.error(errorMsg);
+                throw BusinessException.of(ResultCode.SERVER_ERROR, errorMsg);
+            }
+            if (apiToken == null || apiToken.isBlank()) {
+                var errorMsg = String.format("Dify Chatbot API Token 为空: userId=%s, appId=%s", userId, chatbotAppId);
+                log.error(errorMsg);
+                throw BusinessException.of(ResultCode.SERVER_ERROR, errorMsg);
+            }
+
+            log.info(String.format("Dify Chatbot 创建成功: userId=%s, appId=%s", userId, chatbotAppId));
+
+            // 6. 更新 Dify API Key 的 userId（DifyApiService.createChatbotApp 内部已保存，但 userId 可能不正确）
+            try {
+                var keyName = String.format("用户%s chatapp应用", username);
+                var description = String.format("用户%s chatapp应用", username);
+                
+                // 先通过 resourceId 和 keyType 查找已存在的记录（不限制 userId，因为 persistChatbotMetadata 可能使用错误的 userId）
+                var queryWrapper = new LambdaQueryWrapper<DifyApiKey>()
+                        .eq(DifyApiKey::getResourceId, chatbotAppId)
+                        .eq(DifyApiKey::getKeyType, "chatbot")
+                        .eq(DifyApiKey::getIsActive, true)
+                        .last("LIMIT 1");
+                var existingKey = difyApiKeyService.getOne(queryWrapper);
+                
+                if (existingKey != null) {
+                    // 更新已存在的记录（修正 userId 和其他字段）
+                    existingKey.setUserId(userId);
+                    existingKey.setApiKey(apiToken);
+                    existingKey.setKeyName(keyName);
+                    existingKey.setDescription(description);
+                    existingKey.setUpdatedBy("admin");
+                    difyApiKeyService.updateById(existingKey);
+                    
+                    log.info(String.format("Dify API Key 更新成功（修正userId）: userId=%s, appId=%s, keyId=%s",
+                            userId, chatbotAppId, existingKey.getId()));
+                } else {
+                    // 如果不存在，则创建新记录
+                    var difyApiKey = difyApiKeyService.saveOrUpdateApiKey(
+                            userId,
+                            chatbotAppId,
+                            "chatbot",
+                            apiToken,
+                            keyName,
+                            description,
+                            "admin"
+                    );
+                    
+                    log.info(String.format("Dify API Key 创建成功: userId=%s, appId=%s, keyId=%s",
+                            userId, chatbotAppId, difyApiKey.getId()));
+                }
+
+            } catch (Exception e) {
+                var errorMsg = String.format("更新 Dify API Key 失败: userId=%s, appId=%s, error=%s",
+                        userId, chatbotAppId, e.getMessage());
+                log.error(errorMsg, e);
+                throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED, errorMsg);
+            }
+
+        } catch (BusinessException e) {
+            // 业务异常直接抛出
+            throw e;
+        } catch (Exception e) {
+            // 其他异常包装为业务异常
+            var errorMsg = String.format("创建 Dify Chatbot 应用异常: userId=%s, username=%s, error=%s",
+                    userId, username, e.getMessage());
+            log.error(errorMsg, e);
+            throw BusinessException.of(ResultCode.SERVER_ERROR, errorMsg);
+        }
     }
 
     /**
