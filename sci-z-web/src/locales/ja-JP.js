@@ -1035,7 +1035,8 @@ export default {
       generating: '生成中...',
       copy: 'コピー',
       retry: '再試行',
-      inputPlaceholderWithKb: '@ナレッジベースまたは直接質問',
+      // 🔥 修复：使用全角 ＠ 符号，避免 Vue I18n 编译错误
+      inputPlaceholderWithKb: '＠ナレッジベースを入力するか、直接質問してください',
       attachmentTitle: '添付ファイルを追加（ファイルをアップロードする場合はナレッジベースを選択する必要があります）',
       aiContentHint: 'AIが生成した内容は参考のみ',
       editTitle: 'タイトルを編集',

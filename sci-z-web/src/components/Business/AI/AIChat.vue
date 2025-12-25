@@ -5,7 +5,12 @@
  */
 -->
 <template>
-  <div class="ai-chat-container">
+  <div class="ai-chat-container" ref="containerRef">
+    <!-- 🔥 调试信息：确保组件已渲染（生产环境可关闭） -->
+    <div v-if="false" style="position: fixed; top: 80px; left: 10px; z-index: 99999; background: blue; color: white; padding: 4px; font-size: 12px;">
+      AIChat 组件已加载 - {{ containerRef ? '有ref' : '无ref' }}
+    </div>
+    
     <!-- 左侧对话列表 -->
     <div class="chat-list-sidebar">
       <div class="chat-list-header">
@@ -367,6 +372,7 @@ const messages = ref([])
 const inputMessage = ref('')
 const kbMessages = ref(null)
 const messageInput = ref(null) // 添加缺失的 messageInput ref
+const containerRef = ref(null) // 容器引用
 const isGenerating = ref(false)
 const isSendingMessage = ref(false) // 发送消息的锁，防止重复调用
 const currentAbortController = ref(null)
@@ -1846,6 +1852,9 @@ onMounted(async () => {
   try {
     logger.info('AI对话页面初始化开始')
     
+    // 🔥 修复：确保组件容器已渲染
+    await nextTick()
+    
     // 加载对话列表（先尝试本地存储，再尝试API）
     loadChatsFromStorage()
     
@@ -1853,6 +1862,13 @@ onMounted(async () => {
     await Promise.all([
       loadChats().catch(err => {
         logger.warn('加载对话列表失败，继续使用本地数据', err)
+        // 🔥 修复：即使API失败，也确保页面可以显示
+        if (chats.value.length === 0) {
+          // 如果本地也没有数据，创建一个新对话
+          createNewChat().catch(createErr => {
+            logger.error('创建新对话失败', createErr)
+          })
+        }
       }),
       loadKnowledgeBases().catch(err => {
         logger.warn('加载知识库列表失败，继续初始化', err)
@@ -1877,8 +1893,33 @@ onMounted(async () => {
       kbCount: knowledgeBaseList.value.length,
       hasCurrentChat: !!currentChat.value
     })
+    
+    // 🔥 修复：确保页面可见，添加调试信息
+    await nextTick()
+    const container = containerRef.value || document.querySelector('.ai-chat-container')
+    console.log('[AIChat] 页面初始化完成', {
+      containerVisible: container !== null,
+      containerElement: !!container,
+      containerHeight: container?.offsetHeight || 0,
+      containerWidth: container?.offsetWidth || 0,
+      chatsCount: chats.value.length,
+      currentChat: !!currentChat.value,
+      computedStyle: container ? window.getComputedStyle(container) : null
+    })
+    
+    // 🔥 如果容器高度为0，强制设置高度
+    if (container && container.offsetHeight === 0) {
+      console.warn('[AIChat] 容器高度为0，强制设置高度')
+      const parent = container.parentElement
+      if (parent) {
+        const parentHeight = parent.offsetHeight || window.innerHeight - 56
+        container.style.height = `${parentHeight}px`
+        container.style.minHeight = `${parentHeight}px`
+      }
+    }
   } catch (error) {
     logger.error('AI对话页面初始化失败', error)
+    console.error('[AIChat] 初始化失败', error)
     ElMessage.error('页面初始化失败，请刷新页面重试')
   }
 })
@@ -1895,23 +1936,37 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 // AI对话页面需要全屏显示，覆盖MainLayout的限制
 .ai-chat-container {
-  display: flex;
-  height: 100vh;
-  width: 100vw;
-  max-width: 100%;
-  margin: 0;
-  padding: 0;
-  background: #f7f9fc;
-  overflow: hidden;
-  position: relative;
+  display: flex !important;
+  // 🔥 修复：使用多种方式确保高度正确
+  height: calc(100vh - 56px) !important; // 减去 Header 高度
+  min-height: calc(100vh - 56px) !important;
+  // 🔥 备用方案：如果 calc 不生效，使用固定高度
+  min-height: 600px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #f7f9fc !important;
+  overflow: hidden !important;
+  position: relative !important;
+  // 🔥 确保容器占满可用空间
+  flex: 1 1 auto !important;
+  // 🔥 添加备用方案：如果 flex 不生效，使用绝对定位
+  box-sizing: border-box !important;
+  // 🔥 确保容器可见
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
+// 🔥 修复：使用更强的选择器优先级，确保在生产环境也能生效
 // 覆盖MainLayout的样式限制（使用深度选择器）
 // MainLayout 的结构：.main-layout > .layout-content > .main-content > .content-wrapper
+.ai-chat-container :deep(.main-content),
 :deep(.main-content) {
   padding: 0 !important;
   max-width: 100% !important;
   height: 100% !important;
+  overflow: hidden !important;
   
   .content-wrapper {
     max-width: 100% !important;
@@ -1919,12 +1974,15 @@ onUnmounted(() => {
     padding: 0 !important;
     height: 100% !important;
     min-height: 100% !important;
+    overflow: hidden !important;
   }
 }
 
 // 确保 layout-content 也占满高度
+.ai-chat-container :deep(.layout-content),
 :deep(.layout-content) {
   height: 100% !important;
+  overflow: hidden !important;
 }
 
 /* 左侧对话列表 */
@@ -2138,6 +2196,9 @@ onUnmounted(() => {
   flex-direction: column;
   background: #ffffff;
   position: relative;
+  // 🔥 修复：确保内容区域有最小高度，避免被压缩
+  min-height: 0;
+  overflow: hidden;
 }
 
 .chat-header {
@@ -2200,6 +2261,10 @@ onUnmounted(() => {
   justify-content: center;
   position: relative;
   z-index: 1;
+  // 🔥 修复：确保容器有最小高度，避免被压缩
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
 
   &.has-messages {
     align-items: stretch;
