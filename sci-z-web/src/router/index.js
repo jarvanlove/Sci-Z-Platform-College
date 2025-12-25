@@ -201,7 +201,13 @@ const routes = [
   {
     path: '/ai/chat',
     name: 'AIChat',
-    component: () => import('@/views/AI/Chat.vue'),
+    component: () => import('@/views/AI/Chat.vue').catch(err => {
+      console.error('[Router] AI Chat 组件加载失败', err)
+      // 返回一个错误组件
+      return {
+        template: '<div style="padding: 20px; text-align: center;"><h3>组件加载失败</h3><p>请刷新页面重试</p></div>'
+      }
+    }),
     meta: { 
       title: 'AI助手', 
       requiresAuth: true,
@@ -449,12 +455,25 @@ router.beforeEach(async (to, from, next) => {
 // 路由解析完成后的日志
 router.afterEach((to, from, failure) => {
   if (failure) {
-    routerLogger.error('路由解析失败', { 
-      to: to.path, 
-      from: from.path, 
-      failure: failure.message,
-      error: failure
-    })
+    // 🔥 修复：过滤冗余导航错误，这是 Vue Router 的正常优化行为，不应该记录为错误
+    const isRedundantNavigation = failure.message?.includes('Avoided redundant navigation') ||
+                                  failure.message?.includes('redundant navigation')
+    
+    if (isRedundantNavigation) {
+      // 冗余导航是正常的优化行为，只记录为调试信息，不记录为错误
+      routerLogger.debug('路由冗余导航已阻止（正常优化）', { 
+        to: to.path, 
+        from: from.path
+      })
+    } else {
+      // 其他类型的路由失败才记录为错误
+      routerLogger.error('路由解析失败', { 
+        to: to.path, 
+        from: from.path, 
+        failure: failure.message,
+        error: failure
+      })
+    }
   } else {
     const matchedRoute = to.matched[to.matched.length - 1]
     const componentName = matchedRoute?.components?.default?.name || 

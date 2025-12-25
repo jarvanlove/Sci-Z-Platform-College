@@ -1034,7 +1034,8 @@ export default {
       generating: '생성 중...',
       copy: '복사',
       retry: '다시 시도',
-      inputPlaceholderWithKb: '@지식베이스 또는 직접 질문',
+      // 🔥 修复：使用全角 ＠ 符号，避免 Vue I18n 编译错误
+      inputPlaceholderWithKb: '＠지식베이스를 입력하거나 직접 질문하세요',
       attachmentTitle: '첨부 파일 추가 (파일 업로드 시 지식베이스 선택 필요)',
       aiContentHint: 'AI가 생성한 내용은 참고용입니다',
       editTitle: '제목 편집',

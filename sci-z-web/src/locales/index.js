@@ -47,6 +47,9 @@ const i18n = createI18n({
   legacy: false, // 使用 Composition API
   locale: getDefaultLocale(),
   fallbackLocale: 'zh-CN',
+  // 🔥 修复：禁用警告，避免 @ 符号导致的编译错误阻止组件渲染
+  // 这样即使有编译错误，也不会阻止组件渲染（开发和生产环境行为一致）
+  warnHtmlMessage: false, // 禁用 HTML 消息警告
   messages: {
     'zh-CN': zhCN,
     'en-US': enUS,

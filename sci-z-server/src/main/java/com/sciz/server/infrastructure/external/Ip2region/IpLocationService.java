@@ -101,7 +101,7 @@ public class IpLocationService {
             var region = searcher.search(actualIp);
             if (hasText(region)) {
                 var formatted = formatLocation(region);
-                // 如果格式化后的结果有效（不是"未知"），则返回
+                // 如果格式化后的结果有效（不是"未知"且不为空），则返回
                 if (hasText(formatted) && !"未知".equals(formatted)) {
                     return formatted;
                 }
@@ -112,6 +112,16 @@ public class IpLocationService {
 
         // 解析失败或返回无效值，判断是否为内网IP
         if (isInternalIp(actualIp)) {
+            // 内网IP显示更友好的信息
+            if (actualIp.startsWith("192.168.")) {
+                return "内网（局域网）";
+            } else if (actualIp.startsWith("10.")) {
+                return "内网（私有网络）";
+            } else if (actualIp.startsWith("172.")) {
+                return "内网（私有网络）";
+            } else if (actualIp.equals("127.0.0.1") || actualIp.equals("::1") || actualIp.equals("0:0:0:0:0:0:0:1")) {
+                return "内网（本机）";
+            }
             return "内网";
         }
 
@@ -134,6 +144,11 @@ public class IpLocationService {
         return Optional.ofNullable(region)
                 .filter(this::hasText)
                 .map(value -> {
+                    // 检查是否为无效格式（包含"内网IP"等无效标识）
+                    if (value.contains("内网IP") || value.contains("内网")) {
+                        return null;  // 返回 null，让外层判断为无效
+                    }
+
                     String[] parts = value.split("\\|");
                     if (parts.length < 5) {
                         return value;
@@ -143,6 +158,13 @@ public class IpLocationService {
                     var province = parts[2];
                     var city = parts[3];
                     var isp = parts[4];
+
+                    // 检查所有字段是否都是 "0" 或无效值
+                    var allInvalid = List.of(country, province, city, isp).stream()
+                            .allMatch(item -> item == null || item.trim().isEmpty() || "0".equals(item) || item.contains("内网IP"));
+                    if (allInvalid) {
+                        return null;  // 返回 null，让外层判断为无效
+                    }
 
                     // 非中国地区，直接返回国家名
                     if (Optional.ofNullable(country)
@@ -159,6 +181,7 @@ public class IpLocationService {
                     Optional.ofNullable(province)
                             .filter(this::hasText)
                             .filter(item -> !"0".equals(item))
+                            .filter(item -> !item.contains("内网IP"))
                             .ifPresent(location::append);
 
                     // 城市信息（可能包含区县，如"上海市松江区"）
@@ -166,6 +189,7 @@ public class IpLocationService {
                     Optional.ofNullable(city)
                             .filter(this::hasText)
                             .filter(item -> !"0".equals(item))
+                            .filter(item -> !item.contains("内网IP"))
                             .filter(item -> {
                                 // 如果城市与省份相同（如"北京市"和"北京"），且城市不包含区县，则跳过
                                 var provinceVal = Optional.ofNullable(province)
@@ -190,13 +214,21 @@ public class IpLocationService {
                     if (location.length() == 0) {
                         Optional.ofNullable(country)
                                 .filter(this::hasText)
+                                .filter(item -> !"0".equals(item))
+                                .filter(item -> !item.contains("内网IP"))
                                 .ifPresent(location::append);
+                    }
+
+                    // 如果格式化后仍然为空，返回 null
+                    if (location.length() == 0) {
+                        return null;
                     }
 
                     // ISP 信息（运营商）
                     Optional.ofNullable(isp)
                             .filter(this::hasText)
                             .filter(item -> !"0".equals(item))
+                            .filter(item -> !item.contains("内网IP"))
                             .ifPresent(item -> location.append(" (").append(item).append(")"));
 
                     return location.toString();

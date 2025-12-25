@@ -42,13 +42,20 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
+    // 确保所有路由组件都被正确打包
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['vue', 'vue-router', 'pinia'],
           element: ['element-plus']
-        }
+        },
+        // 确保动态导入的路径使用相对路径
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     }
-  }
+  },
+  // 确保 base 路径正确
+  base: '/'
 })

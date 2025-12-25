@@ -441,19 +441,8 @@ export const useAuthStore = defineStore('auth', {
           if (!isLoggedIn) {
             authLogger.warn('服务端会话已失效，执行本地清理并跳转登录页')
             this.resetState()
-            // 跳转到登录页
             if (typeof window !== 'undefined') {
-              try {
-                const routerModule = await import('@/router')
-                const routerInstance = routerModule?.default || routerModule
-                if (routerInstance) {
-                  routerInstance.replace('/login').catch(() => {})
-                } else {
-                  window.location.href = '/login'
-                }
-              } catch (error) {
-                window.location.href = '/login'
-              }
+              window.location.href = '/login'
             }
             return false
           }
@@ -475,17 +464,7 @@ export const useAuthStore = defineStore('auth', {
           // 校验失败时也跳转到登录页
           this.resetState()
           if (typeof window !== 'undefined') {
-            try {
-              const routerModule = await import('@/router')
-              const routerInstance = routerModule?.default || routerModule
-              if (routerInstance) {
-                routerInstance.replace('/login').catch(() => {})
-              } else {
-                window.location.href = '/login'
-              }
-            } catch (navError) {
-              window.location.href = '/login'
-            }
+            window.location.href = '/login'
           }
           throw error
         } finally {
@@ -615,46 +594,24 @@ export const useAuthStore = defineStore('auth', {
         
         // 🔥 关键修复：退出登录后重置主题为明亮主题
         try {
-          const appStoreModule = await import('@/store/modules/app')
-          const appStore = appStoreModule.useAppStore()
+          const { useAppStore } = await import('@/store/modules/app')
+          const appStore = useAppStore()
           appStore.setTheme('light')
           authLogger.debug('退出登录后已重置主题为明亮主题')
         } catch (error) {
           authLogger.warn('退出登录后重置主题失败', { error: error.message })
         }
 
+        // 跳转到指定页面
         if (redirect && typeof window !== 'undefined') {
-          try {
-            const routerModule = await import('@/router')
-            const routerInstance = routerModule?.default || routerModule
-            if (routerInstance) {
-              const currentRoute = routerInstance.currentRoute?.value
-              const target =
-                typeof redirectPath === 'string'
-                  ? { path: redirectPath }
-                  : redirectPath || { path: '/login' }
-              const currentFullPath = currentRoute?.fullPath || currentRoute?.path
-              const targetPath =
-                typeof redirectPath === 'string'
-                  ? redirectPath
-                  : target.path || '/login'
-
-              if (currentFullPath !== targetPath) {
-                const navigation = useReplace
-                  ? routerInstance.replace(target)
-                  : routerInstance.push(target)
-                navigation.catch(() => {})
-              }
-            } else {
-              window.location.href =
-                typeof redirectPath === 'string' ? redirectPath : '/login'
-            }
-          } catch (navigationError) {
-            authLogger.error('退出后跳转登录页失败，使用浏览器跳转', {
-              error: navigationError.message
-            })
-            window.location.href =
-              typeof redirectPath === 'string' ? redirectPath : '/login'
+          const targetPath = typeof redirectPath === 'string' 
+            ? redirectPath 
+            : redirectPath?.path || '/login'
+          
+          if (useReplace) {
+            window.location.replace(targetPath)
+          } else {
+            window.location.href = targetPath
           }
         }
       }

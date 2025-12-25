@@ -50,7 +50,7 @@
         </div>
         
         <!-- 图片预览 -->
-        <BaseScrollbar
+        <div
           v-else-if="previewType === 'image' && previewUrl"
           class="preview-image-container"
         >
@@ -61,15 +61,15 @@
             @load="handleImageLoad"
             @error="handleImageError"
           />
-        </BaseScrollbar>
+        </div>
         
         <!-- Word 文档预览 - 使用 docx-preview 在浏览器中直接渲染 -->
-        <BaseScrollbar
+        <div
           v-else-if="previewType === 'office' && previewUrl"
           class="preview-office-container"
         >
           <div ref="docxPreviewContainer" class="docx-preview-wrapper"></div>
-        </BaseScrollbar>
+        </div>
 
         <!-- PPT/PPTX 预览 - 使用 Office Online Viewer -->
         <div v-else-if="previewType === 'ppt' && previewUrl" class="preview-iframe-container">
@@ -97,12 +97,12 @@
         </div>
         
         <!-- 文本文件预览 -->
-        <BaseScrollbar
+        <div
           v-else-if="previewType === 'text' && previewUrl"
           class="preview-text-container"
         >
           <pre class="preview-text" v-text="textContent"></pre>
-        </BaseScrollbar>
+        </div>
         
         <!-- 不支持的类型 -->
         <div v-else-if="previewType === 'unsupported'" class="preview-unsupported">
@@ -119,7 +119,6 @@ import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Loading, Warning, Document } from '@element-plus/icons-vue'
-import BaseScrollbar from './BaseScrollbar.vue'
 import { previewFile } from '@/api/File'
 import { createLogger } from '@/utils/simpleLogger'
 import { renderAsync } from 'docx-preview'
@@ -632,6 +631,7 @@ watch(() => props.fileInfo, (newVal) => {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  overflow: auto; // 🔥 修复：使用原生滚动，不使用 BaseScrollbar
 }
 
 .preview-image {
@@ -645,6 +645,7 @@ watch(() => props.fileInfo, (newVal) => {
   width: 100%;
   height: 100%;
   padding: 24px;
+  overflow: auto; // 🔥 修复：使用原生滚动，不使用 BaseScrollbar
 }
 
 .preview-text {
@@ -663,6 +664,7 @@ watch(() => props.fileInfo, (newVal) => {
   height: 100%;
   padding: 24px;
   background: var(--bg);
+  overflow: auto; // 🔥 修复：使用原生滚动，不使用 BaseScrollbar
 }
 
 .docx-preview-wrapper {

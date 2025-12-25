@@ -532,22 +532,41 @@ onMounted(() => {
 }
 
 .content-card {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  padding: 16px;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
+  // BaseCard 组件已经提供了基础样式，这里只需要覆盖特定样式
+  // 注意：BaseCard 的 __content 已经有 padding，这里不需要再添加 padding
+  // 如果需要自定义 padding，应该通过 :deep() 覆盖 BaseCard 的内部样式
+  
+  // 🔥 修复：移除外层 padding，避免与 BaseCard 的 __content padding 冲突
+  // BaseCard 组件本身已经有 background、border-radius、border、box-shadow
+  // 这里只需要确保样式一致性
+  width: 100%;
+  box-sizing: border-box;
+  
+  // 🔥 如果需要在 BaseCard 外层添加 padding，应该覆盖 __content 的 padding
+  :deep(.base-card__content) {
+    padding: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+  }
+  
+  // 🔥 确保 header 样式正确
+  :deep(.base-card__header) {
+    padding: 0;
+    border-bottom: none;
+  }
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  padding: var(--gap-lg);
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border);
   width: 100%;
   box-sizing: border-box;
+  margin: 0;
 }
 
 .card-title {
@@ -575,12 +594,23 @@ onMounted(() => {
 .declaration-card {
   min-height: auto;
   height: fit-content;
+  width: 100%;
+  box-sizing: border-box;
+  
+  // 🔥 表格不需要外层 padding，表格本身已经有单元格 padding
+  // content-card 已经设置了 __content padding: 0，这里不需要再设置
 }
-
 
 .quick-actions-card {
   min-height: auto;
   height: fit-content;
+  width: 100%;
+  box-sizing: border-box;
+  
+  // 🔥 快捷操作区域需要 padding
+  :deep(.base-card__content) {
+    padding: var(--gap-lg);
+  }
 }
 
 .progress-card {
@@ -588,6 +618,11 @@ onMounted(() => {
   max-width: 100%;
   overflow-x: hidden;
   box-sizing: border-box;
+  
+  // 🔥 项目进度区域需要 padding
+  :deep(.base-card__content) {
+    padding: var(--gap-lg);
+  }
 }
 
 

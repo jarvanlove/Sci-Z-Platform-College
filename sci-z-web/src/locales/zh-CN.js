@@ -1044,7 +1044,9 @@ export default {
       generating: '正在生成...',
       copy: '复制',
       retry: '重试',
-      inputPlaceholderWithKb: '@知识库或直接提问',
+      // 🔥 修复：使用全角 ＠ 符号，避免 Vue I18n 编译错误
+      // 全角字符不会被 Vue I18n 识别为链接格式，既保留了视觉效果又避免了编译错误
+      inputPlaceholderWithKb: '输入＠知识库或直接提问',
       attachmentTitle: '添加附件（上传文件时需要选择知识库）',
       aiContentHint: '内容由AI生成仅供参考',
       editTitle: '编辑标题',

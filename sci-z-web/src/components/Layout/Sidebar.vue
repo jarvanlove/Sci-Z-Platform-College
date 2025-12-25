@@ -1,12 +1,13 @@
 <template>
   <div class="layout-sidebar" :class="{ 'is-collapsed': sidebarCollapsed }">
     <el-menu
-      :default-active="activeMenu"
+      :default-active="activeMenuKey"
+      :active-text-color="'var(--color-primary)'"
       class="sidebar-menu"
       :collapse="sidebarCollapsed"
       :unique-opened="true"
-      router
       :default-openeds="defaultOpeneds"
+      @select="handleMenuSelect"
     >
       <!-- 动态渲染菜单 -->
       <template v-for="menu in filteredMenus" :key="menu.path">
@@ -40,17 +41,22 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/store/modules/app'
 import { useAuthStore } from '@/store/modules/auth'
 import { translateMenus } from '@/utils/menuI18n'
 
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
+
+// 🔥 修复：使用 ref 存储当前激活的菜单，确保响应式更新
+// Element Plus 的 el-menu 的 default-active 只在初始化时生效，所以需要使用 ref 并手动更新
+const activeMenuKey = ref('')
 
 // 递归查找菜单项（包括子菜单）
 // 优先返回第一个匹配的菜单项（即使置灰），确保菜单始终激活同一个菜单项
@@ -72,12 +78,33 @@ const findMenuByPermission = (menus, permission) => {
 }
 
 // 递归查找菜单项（包括子菜单）通过路径匹配
+// 🔥 修复：支持动态路由匹配（如 /project/detail/:id 匹配 /project/list）
 const findMenuByPath = (menus, path) => {
   for (const menu of menus) {
     // 精确匹配当前菜单路径
     if (menu.path === path) {
       return menu.path
     }
+    
+    // 🔥 修复：支持前缀匹配，用于动态路由（如 /project/detail/123 匹配 /project/list）
+    // 检查当前路径是否以菜单路径开头（用于详情页匹配列表页菜单）
+    if (menu.path && path.startsWith(menu.path + '/')) {
+      // 进一步检查是否是动态路由的情况
+      // 例如：当前路径 /project/detail/123，菜单路径 /project/list
+      // 这种情况应该匹配到 /project/list 菜单
+      const pathParts = path.split('/')
+      const menuPathParts = menu.path.split('/')
+      // 如果路径层级相同或更深，且前几级路径匹配，则认为是匹配的
+      if (pathParts.length >= menuPathParts.length) {
+        const isMatch = menuPathParts.every((part, index) => {
+          return part === pathParts[index]
+        })
+        if (isMatch) {
+          return menu.path
+        }
+      }
+    }
+    
     // 如果有子菜单，递归查找
     if (menu.children && menu.children.length > 0) {
       const found = findMenuByPath(menu.children, path)
@@ -125,9 +152,8 @@ const getMenuPermission = (menus, path) => {
 }
 
 // 当前激活的菜单
-// 优先通过路径匹配，但如果匹配到的菜单项 permission 与路由 permission 不一致，
-// 说明是详情页/创建页，应该使用 permission 匹配来激活对应的列表页菜单
-const activeMenu = computed(() => {
+// 🔥 修复：改进菜单匹配逻辑，支持动态路由和详情页匹配
+const calculateActiveMenu = () => {
   const currentPath = route.path
   const routeMeta = route.meta
   
@@ -156,8 +182,36 @@ const activeMenu = computed(() => {
     }
   }
   
-  // 如果都匹配不到，返回当前路径（Element Plus 菜单会自动处理）
+  // 如果都匹配不到，返回当前路径
   return currentPath
+}
+
+// 🔥 修复：使用 computed 确保响应式更新
+const activeMenu = computed(() => {
+  return calculateActiveMenu()
+})
+
+// 🔥 修复：监听路由变化，更新激活菜单（确保菜单选中状态实时更新）
+// 使用 nextTick 确保在路由变化后，Element Plus 菜单组件能够正确响应更新
+watch(() => route.path, async () => {
+  const newActiveMenu = calculateActiveMenu()
+  activeMenuKey.value = newActiveMenu
+  // 使用 nextTick 确保 Element Plus 菜单组件能够正确更新选中状态
+  await nextTick()
+  // 如果 nextTick 后菜单仍未正确选中，强制更新一次
+  if (activeMenuKey.value !== newActiveMenu) {
+    activeMenuKey.value = newActiveMenu
+  }
+}, { immediate: true })
+
+// 🔥 修复：同时监听路由的 meta 变化（permission 可能变化）
+watch(() => route.meta?.permission, async () => {
+  const newActiveMenu = calculateActiveMenu()
+  activeMenuKey.value = newActiveMenu
+  await nextTick()
+  if (activeMenuKey.value !== newActiveMenu) {
+    activeMenuKey.value = newActiveMenu
+  }
 })
 
 // 默认展开的父菜单（当子菜单激活时，自动展开父菜单）
@@ -199,6 +253,38 @@ const filteredMenus = computed(() => {
   // 应用 i18n 翻译
   return translateMenus(filtered, t)
 })
+
+// 🔥 修复：手动处理菜单点击，避免冗余导航，但确保菜单选中状态正确更新
+const handleMenuSelect = async (index) => {
+  // 🔥 关键修复：无论是否导航，都要立即更新菜单选中状态
+  // 这样可以确保菜单点击后立即高亮，不需要等待路由跳转完成
+  activeMenuKey.value = index
+  
+  // 如果点击的是当前已激活的菜单，不执行导航（避免冗余导航）
+  if (index === route.path || index === activeMenu.value) {
+    // 使用 nextTick 确保 Element Plus 菜单组件能够正确更新选中状态
+    await nextTick()
+    return
+  }
+  
+  // 执行路由跳转
+  try {
+    await router.push(index)
+    // 路由跳转成功后，再次确保菜单选中状态正确（防止路由跳转过程中状态丢失）
+    await nextTick()
+    activeMenuKey.value = index
+  } catch (error) {
+    // 如果是冗余导航错误，静默处理（这是正常的优化行为）
+    if (error.message?.includes('Avoided redundant navigation')) {
+      // 即使导航被阻止，菜单选中状态已经在上面更新了，这里只需要确保状态正确
+      await nextTick()
+      activeMenuKey.value = index
+      return
+    }
+    // 其他错误才抛出
+    throw error
+  }
+}
 </script>
 
 <style lang="scss" scoped>

@@ -3,7 +3,7 @@ spring: # Spring 生产环境配置
   config:
     import: optional:classpath:config/production.env.properties # 生产占位符属性
   datasource:
-    url: jdbc:postgresql://localhost:5438/sciz_platform # 数据库 URL（建议改为生产地址）
+    url: jdbc:postgresql://localhost:5438/sci-z-college # 数据库 URL（建议改为生产地址）
     username: ${DB_USERNAME:postgres} # 数据库用户名（支持环境变量覆盖）
     password: ${DB_PASSWORD:password} # 数据库密码（支持环境变量覆盖）
     driver-class-name: org.postgresql.Driver # PostgreSQL 驱动
@@ -59,10 +59,6 @@ dify: # Dify 生产环境配置
   retry-count: ${DIFY_RETRY_COUNT:3} # 重试次数
   enable-retry: ${DIFY_ENABLE_RETRY:true} # 是否启用重试
   default-resource-id: ${DIFY_DEFAULT_RESOURCE_ID:default} # 默认资源ID（用于创建知识库时的resourceId参数）
-  upload: # 文件上传配置
-    dir: ${DIFY_UPLOAD_DIR:/tmp/upload} # 上传文件存储目录（相对路径，相对于项目根目录）
-    max-file-size: ${DIFY_UPLOAD_MAX_FILE_SIZE:104857600} # 最大文件大小（字节），100MB = 100 * 1024 * 1024
-    allowed-extensions: ${DIFY_UPLOAD_ALLOWED_EXTENSIONS:.pdf,.doc,.docx,.txt,.md,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif} # 允许的文件扩展名（逗号分隔）
   chatbot: # Chatbot 模型配置（生产环境）
     model: # 模型配置
       provider: ${DIFY_CHATBOT_MODEL_PROVIDER:langgenius/tongyi/tongyi} # 模型提供商
@@ -96,7 +92,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info # 生产环境仅暴露健康检查和基本信息
+        include: "*" # 生产环境仅暴露健康检查和基本信息
   endpoint:
     health:
-      show-details: never # 生产环境不显示详细信息（避免泄露敏感信息）
+      show-details: always # 生产环境不显示详细信息（避免泄露敏感信息）
