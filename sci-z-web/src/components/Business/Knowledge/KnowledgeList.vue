@@ -520,45 +520,11 @@
       </template>
     </el-dialog>
 
-    <!-- 文件预览弹窗 -->
-    <el-dialog
+    <!-- 文件预览对话框 -->
+    <FilePreview
       v-model="showPreviewDialog"
-      :title="$t('knowledge.filePreview')"
-      width="90%"
-      :close-on-click-modal="false"
-      :close-on-press-escape="true"
-      @close="closePreview"
-    >
-      <div class="file-preview-container">
-        <div class="file-preview-header">
-          <div class="file-preview-title">{{ previewFileInfo?.name || $t('knowledge.filePreview') }}</div>
-          <el-button
-            type="primary"
-            :loading="previewLoading"
-            @click="downloadPreviewFile"
-          >
-            {{ $t('knowledge.download') }}
-          </el-button>
-        </div>
-        <div class="file-preview-content">
-          <div v-if="previewLoading" class="preview-loading">
-            <el-icon class="is-loading"><Loading /></el-icon>
-            <span>{{ $t('knowledge.loading') }}</span>
-          </div>
-          <div v-else-if="previewError" class="preview-error">
-            <el-icon><Warning /></el-icon>
-            <span>{{ previewError }}</span>
-          </div>
-          <div v-else-if="previewUrl" class="preview-iframe-container">
-            <iframe
-              :src="previewUrl"
-              class="preview-iframe"
-              frameborder="0"
-            ></iframe>
-          </div>
-        </div>
-      </div>
-    </el-dialog>
+      :file-info="previewFileInfo"
+    />
   </div>
 </template>
 
@@ -609,8 +575,7 @@ import {
   streamKnowledgeChatbot
 } from '@/api/Knowledge/knowledge'
 import { createLogger } from '@/utils/simpleLogger'
-import request from '@/utils/request'
-import { FILE_API, HTTP_METHODS } from '@/api/Common/constants'
+import { FilePreview } from '@/components/Common'
 
 const logger = createLogger('KnowledgeList')
 const { t } = useI18n()
@@ -646,9 +611,6 @@ const renameForm = ref('')
 // 文件预览相关
 const showPreviewDialog = ref(false)
 const previewFileInfo = ref(null)
-const previewUrl = ref('')
-const previewLoading = ref(false)
-const previewError = ref('')
 
 // 右侧AI助手相关
 const kbMessagesList = ref([
@@ -979,68 +941,23 @@ const handleContentAction = (command, item) => {
  * 预览文件
  * @param {Object} item - 文件项
  */
-const handlePreviewFile = async (item) => {
+const handlePreviewFile = (item) => {
   if (!item || !item.attachmentId) {
     ElMessage.warning(t('knowledge.fileIdNotExists'))
     return
   }
 
-  try {
-    previewFileInfo.value = item
-    showPreviewDialog.value = true
-    previewLoading.value = true
-    previewError.value = ''
-    previewUrl.value = ''
-
-    logger.info('开始预览文件', { 
-      fileName: item.name, 
-      attachmentId: item.attachmentId 
-    })
-
-    // 调用预览接口获取预签名URL
-    const response = await request({
-      url: FILE_API.PREVIEW(item.attachmentId),
-      method: HTTP_METHODS.GET,
-      params: {
-        expireSeconds: 3600 // 1小时有效期
-      }
-    })
-
-    if (response.code === 200 && response.data) {
-      previewUrl.value = response.data
-      logger.info('获取预览URL成功', { previewUrl: response.data })
-    } else {
-      throw new Error(response.message || '获取预览链接失败')
-    }
-  } catch (error) {
-    logger.error('预览文件失败', error)
-    previewError.value = error.message || t('knowledge.previewFailed')
-    ElMessage.error(previewError.value)
-  } finally {
-    previewLoading.value = false
+  // 设置预览文件信息，FilePreview 组件会自动处理预览逻辑
+  previewFileInfo.value = {
+    name: item.name,
+    attachmentId: item.attachmentId
   }
-}
+  showPreviewDialog.value = true
 
-/**
- * 关闭预览
- */
-const closePreview = () => {
-  showPreviewDialog.value = false
-  previewFileInfo.value = null
-  previewUrl.value = ''
-  previewError.value = ''
-  previewLoading.value = false
-}
-
-/**
- * 下载预览文件
- */
-const downloadPreviewFile = () => {
-  if (previewUrl.value) {
-    window.open(previewUrl.value, '_blank')
-  } else {
-    ElMessage.warning(t('knowledge.previewLinkNotExists'))
-  }
+  logger.info('打开文件预览', { 
+    fileName: item.name, 
+    attachmentId: item.attachmentId 
+  })
 }
 
 const createFolder = () => {
@@ -2762,79 +2679,7 @@ onMounted(() => {
   font-size: 11px;
 }
 
-/* 文件预览弹窗样式 */
-.file-preview-container {
-  display: flex;
-  flex-direction: column;
-  height: 70vh;
-  min-height: 500px;
-}
-
-.file-preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 0;
-  border-bottom: 1px solid #e5e7eb;
-  margin-bottom: 16px;
-}
-
-.file-preview-title {
-  font-size: 16px;
-  font-weight: 500;
-  color: #374151;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  margin-right: 16px;
-}
-
-.file-preview-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: #f9fafb;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.preview-loading,
-.preview-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.preview-loading .el-icon {
-  font-size: 32px;
-  color: #3b82f6;
-}
-
-.preview-error .el-icon {
-  font-size: 32px;
-  color: #ef4444;
-}
-
-.preview-iframe-container {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-.preview-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: #fff;
-}
+/* 文件预览样式已由 FilePreview 组件统一处理，此处不再需要 */
 
 /* 流式生成指示器 */
 .kb-streaming-indicator {
