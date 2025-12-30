@@ -2,13 +2,16 @@ package com.sciz.server.application.service.report.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.sciz.server.application.service.knowledge.KnowledgeService;
 import com.sciz.server.application.service.report.ReportManagementService;
 import com.sciz.server.domain.pojo.dto.request.report.ReportManagementCreateReq;
 import com.sciz.server.domain.pojo.dto.request.report.ReportManagementListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.report.ReportManagementUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.report.ReportManagementDetailResp;
 import com.sciz.server.domain.pojo.dto.response.report.ReportManagementListResp;
+import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
 import com.sciz.server.domain.pojo.entity.report.ReportManagement;
+import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
 import com.sciz.server.domain.pojo.repository.report.ReportManagementRepo;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -85,6 +88,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
     private final MinioClient minioClient;
     private final SysAttachmentRepo sysAttachmentRepo;
     private final SysAttachmentRelationRepo sysAttachmentRelationRepo;
+    private final SysKnowledgeBaseRepo knowledgeBaseRepo;
     
     private static final DateTimeFormatter DATE_FOLDER_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     
@@ -103,7 +107,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             @Qualifier("globalTaskExecutor") Executor globalTaskExecutor,
             MinioClient minioClient,
             SysAttachmentRepo sysAttachmentRepo,
-            SysAttachmentRelationRepo sysAttachmentRelationRepo) {
+            SysAttachmentRelationRepo sysAttachmentRelationRepo, KnowledgeService knowledgeService, SysKnowledgeBaseRepo knowledgeBaseRepo) {
         this.reportManagementRepo = reportManagementRepo;
         this.reportManagementConverter = reportManagementConverter;
         this.difyApiKeyService = difyApiKeyService;
@@ -116,6 +120,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
         this.minioClient = minioClient;
         this.sysAttachmentRepo = sysAttachmentRepo;
         this.sysAttachmentRelationRepo = sysAttachmentRelationRepo;
+        this.knowledgeBaseRepo = knowledgeBaseRepo;
     }
     /**
      * 报告编号前缀
@@ -136,11 +141,11 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             var userId = currentUser.userId();
             var realName = currentUser.realName();
 
+            String s = req.projectKnowledgeId();
             // 2. 转换为实体
             var entity = reportManagementConverter.toEntity(req);
 
-            // 3. 设置固定值：difyApiKeysId = "9"
-            entity.setDifyApiKeysId("9");
+
             log.info(String.format("设置 Dify API Keys ID 为固定值: difyApiKeysId=9"));
 
             // 4. 设置报告基本信息
@@ -155,15 +160,15 @@ public class ReportManagementServiceImpl implements ReportManagementService {
 
             // 6. 异步调用 Dify 工作流生成报告（使用 CompletableFuture 实现真正的异步）
             // 注意：在异步线程中无法获取 Web 上下文，所以需要在调用前获取用户信息
-            CompletableFuture.runAsync(() -> {
+//            CompletableFuture.runAsync(() -> {
                 try {
                     triggerDifyWorkflowAsync(reportId, userId, realName);
                 } catch (Exception e) {
                     log.error(String.format("异步执行 Dify 工作流失败: reportId=%s, err=%s", 
                             entity.getId(), e.getMessage()), e);
                 }
-            }, globalTaskExecutor);
-            
+//            }, globalTaskExecutor);
+//
             log.info(String.format("已提交异步任务: reportId=%s", reportId));
             return reportId;
         } catch (BusinessException e) {
@@ -322,6 +327,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
         try {
             // 1. 查询报告实体
             var entity = reportManagementRepo.findById(reportId);
+
             if (entity == null) {
                 log.error(String.format("报告不存在，无法触发工作流: reportId=%s", reportId));
                 return;
@@ -369,6 +375,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                 entity.getId(), entity.getDifyApiKeysId()));
 
         // 1. 根据 difyApiKeysId 获取 DifyApiKey
+        entity.setDifyApiKeysId("7");
         if (entity.getDifyApiKeysId() == null || entity.getDifyApiKeysId().trim().isEmpty()) {
             log.warn(String.format("Dify API Keys ID 为空，跳过工作流调用: reportId=%s", entity.getId()));
             return;
@@ -403,9 +410,10 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             try {
                 log.info(String.format("开始更新工作流配置: workflowId=%s, projectKnowledgeId=%s", 
                         workflowId, entity.getProjectKnowledgeId()));
-                
                 // 将 projectKnowledgeId 转换为 List
-                List<String> projectKnowledgeIds = List.of(entity.getProjectKnowledgeId());
+                Long id = Long.valueOf(entity.getProjectKnowledgeId());
+                SysKnowledgeBase byId = knowledgeBaseRepo.findById(id);
+                List<String> projectKnowledgeIds = List.of(byId.getDifyKbId());
                 
                 // 调用综合接口更新并发布工作流
                 difyWorkflowService.updateAndPublishWorkflow(
@@ -428,7 +436,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
 
         // 3. 构建工作流请求参数
         Map<String, Object> inputs = new HashMap<>();
-        inputs.put("technology_report", "南极无人观测站智能照明技术目标可行性及路径研究科技报告");
+        inputs.put("technology_report", entity.getProjectName());
         inputs.put("SetCongfig", entity.getProjectName());
 
         // 4. 构建工作流请求（使用流式模式）

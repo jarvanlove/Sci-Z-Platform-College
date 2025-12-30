@@ -265,6 +265,8 @@ const previewFileInfo = ref(null)
 // 定时刷新相关
 const refreshTimer = ref(null)
 const REFRESH_INTERVAL = 5000 // 5秒刷新一次
+// 上一次数据快照（用于比较数据状态是否改变）
+const lastDataSnapshot = ref(null)
 
 // 搜索表单
 const searchForm = reactive({
@@ -337,16 +339,61 @@ const getStatusTagType = (status) => {
   return typeMap[statusLower] || 'info'
 }
 
+// 生成数据快照（只保存关键字段用于比较）
+const createDataSnapshot = (list) => {
+  if (!list || list.length === 0) {
+    return null
+  }
+  // 只保存 id 和 status，用于比较数据状态是否改变
+  return list.map(item => ({
+    id: item.id,
+    status: item.status
+  }))
+}
+
+// 比较两个数据快照是否相同
+const isDataSnapshotEqual = (snapshot1, snapshot2) => {
+  if (!snapshot1 && !snapshot2) return true
+  if (!snapshot1 || !snapshot2) return false
+  if (snapshot1.length !== snapshot2.length) return false
+  
+  // 创建映射表，便于快速查找
+  const map1 = new Map(snapshot1.map(item => [item.id, item.status]))
+  const map2 = new Map(snapshot2.map(item => [item.id, item.status]))
+  
+  // 比较所有项的状态
+  for (const [id, status1] of map1) {
+    const status2 = map2.get(id)
+    if (status1 !== status2) {
+      return false
+    }
+  }
+  
+  // 检查是否有新增或删除的项
+  if (map1.size !== map2.size) return false
+  
+  return true
+}
+
 // 加载报告列表
-const loadReportList = async () => {
+const loadReportList = async (forceRefresh = false) => {
   try {
-    loading.value = true
+    // 🔥 优化：只有在需要更新界面时才显示加载状态
+    // 如果是定时刷新且数据状态可能未改变，先不显示加载状态
+    const shouldShowLoading = forceRefresh || !lastDataSnapshot.value
+    
+    if (shouldShowLoading) {
+      loading.value = true
+    }
+    
     logger.info('Starting to load report list', {
       pageNo: pagination.current,
       pageSize: pagination.size,
       keyword: searchForm.keyword,
       reportType: searchForm.reportType,
-      status: searchForm.status
+      status: searchForm.status,
+      forceRefresh,
+      shouldShowLoading
     })
 
     const params = {
@@ -381,10 +428,45 @@ const loadReportList = async () => {
     }
 
     const data = result.data || {}
-    reportList.value = data.records || data.list || []
+    const newList = data.records || data.list || []
+    
+    // 如果不是强制刷新，且存在上一次的快照，则比较数据状态
+    if (!forceRefresh && lastDataSnapshot.value) {
+      const newSnapshot = createDataSnapshot(newList)
+      const isEqual = isDataSnapshotEqual(lastDataSnapshot.value, newSnapshot)
+      
+      if (isEqual) {
+        // 数据状态没有改变，不更新列表，避免不必要的刷新
+        logger.debug('Data status unchanged, skipping list update', {
+          count: newList.length,
+          snapshot: newSnapshot
+        })
+        // 只更新分页信息（总数可能变化）
+        pagination.total = data.total || 0
+        // 不需要设置 loading.value = false，因为之前没有设置为 true
+        return
+      } else {
+        logger.info('Data status changed, updating list', {
+          oldCount: reportList.value.length,
+          newCount: newList.length,
+          oldSnapshot: lastDataSnapshot.value,
+          newSnapshot: newSnapshot
+        })
+        // 数据状态改变了，需要显示加载状态（如果之前没有显示）
+        if (!shouldShowLoading) {
+          loading.value = true
+        }
+      }
+    }
+    
+    // 数据状态改变或首次加载，更新列表
+    reportList.value = newList
     pagination.total = data.total || 0
     pagination.current = data.current || data.pageNo || pagination.current
     pagination.size = data.size || data.pageSize || pagination.size
+    
+    // 更新数据快照
+    lastDataSnapshot.value = createDataSnapshot(newList)
 
     logger.info('Report list loaded successfully', {
       count: reportList.value.length,
@@ -398,7 +480,10 @@ const loadReportList = async () => {
     const errorMessage = error.response?.data?.message || error.message || t('report.listPage.loadError')
     ElMessage.error(errorMessage)
   } finally {
-    loading.value = false
+    // 只有在设置了 loading 的情况下才重置
+    if (loading.value) {
+      loading.value = false
+    }
   }
 }
 
@@ -410,32 +495,36 @@ const handleSearch = () => {
     status: searchForm.status
   })
   pagination.current = 1
-  loadReportList()
+  lastDataSnapshot.value = null // 重置快照，强制刷新
+  loadReportList(true) // 强制刷新
 }
 
 // 筛选变化处理
 const handleFilterChange = () => {
   logger.info('User changed filter')
   pagination.current = 1
-  loadReportList()
+  lastDataSnapshot.value = null // 重置快照，强制刷新
+  loadReportList(true) // 强制刷新
 }
 
 // 日期变化处理
 const handleDateChange = () => {
   logger.info('User changed date range')
   pagination.current = 1
-  loadReportList()
+  lastDataSnapshot.value = null // 重置快照，强制刷新
+  loadReportList(true) // 强制刷新
 }
 
 // 重置搜索
 const handleReset = () => {
   logger.info('User reset search conditions')
+  lastDataSnapshot.value = null // 重置快照，强制刷新
   searchForm.keyword = ''
   searchForm.reportType = ''
   searchForm.status = ''
   searchForm.dateRange = []
   pagination.current = 1
-  loadReportList()
+  loadReportList(true) // 强制刷新
   ElMessage.info(t('common.resetSuccess'))
 }
 
@@ -577,7 +666,8 @@ const handleDelete = async (report) => {
     
     await deleteReportManagement(report.id)
     ElMessage.success(t('report.listPage.deleteSuccess'))
-    loadReportList()
+    lastDataSnapshot.value = null // 重置快照，强制刷新
+    loadReportList(true) // 强制刷新
   } catch (error) {
     if (error !== 'cancel') {
       logger.error('Failed to delete report', error)
@@ -591,7 +681,8 @@ const handleDelete = async (report) => {
 const handlePageChange = (page) => {
   logger.info('User changed page', { page })
   pagination.current = page
-  loadReportList()
+  lastDataSnapshot.value = null // 重置快照，强制刷新（因为分页变化，数据不同）
+  loadReportList(true) // 强制刷新
 }
 
 // 每页数量变化处理
@@ -599,7 +690,8 @@ const handlePageSizeChange = (size) => {
   logger.info('User changed page size', { size })
   pagination.size = size
   pagination.current = 1
-  loadReportList()
+  lastDataSnapshot.value = null // 重置快照，强制刷新（因为分页变化，数据不同）
+  loadReportList(true) // 强制刷新
 }
 
 // 检查是否有待刷新状态的报告（pending 或 generating）

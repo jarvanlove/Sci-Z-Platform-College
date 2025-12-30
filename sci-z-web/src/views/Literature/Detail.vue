@@ -729,13 +729,11 @@ const handlePreviewPdf = async () => {
           pdfLoading.value = false
           return
         }
-        
         // 代理失败，尝试直接使用原始链接
         logger.warn('代理接口失败，尝试直接使用PDF链接', { status: response.status })
         useProxy = false
       } else {
         blob = await response.blob()
-        
         // 检查文件大小（至少10KB，放宽限制）
         if (blob.size < 10 * 1024) {
           // 文件太小，可能是错误响应，尝试直接使用原始链接

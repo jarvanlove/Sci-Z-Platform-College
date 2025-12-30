@@ -333,7 +333,9 @@ export const streamKnowledgeChatbot = async (params) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        // 明确要求流式响应，避免打包后被缓冲
+        'Accept': 'text/event-stream'
       },
       body: JSON.stringify({
         knowledgeId,
@@ -367,6 +369,13 @@ export const streamKnowledgeChatbot = async (params) => {
       const error = new Error('响应体为空')
       onError?.(error)
       throw error
+    }
+
+    // 检查响应类型，确保是流式响应
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.includes('text/event-stream') && !contentType.includes('text/plain')) {
+      logger.warn('响应类型可能不是流式', { contentType, url })
+      // 不抛出错误，继续处理，因为某些服务器可能不设置正确的 Content-Type
     }
 
     const reader = response.body.getReader()

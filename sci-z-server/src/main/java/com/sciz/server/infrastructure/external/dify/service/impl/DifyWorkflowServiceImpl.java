@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sciz.server.domain.pojo.dto.request.file.FileSyncDifyReq;
 import com.sciz.server.domain.pojo.dto.response.declaration.RedHeaderFileParseResp;
+import com.sciz.server.infrastructure.external.dify.dto.request.DifyWorkflowDraftUpdateReq;
 import com.sciz.server.infrastructure.external.dify.dto.response.FileSyncDifyResp;
 import com.sciz.server.infrastructure.external.dify.dto.DifyFileUploadResponse;
 import com.sciz.server.infrastructure.external.dify.dto.DifyWorkflowRequest;
@@ -508,7 +509,7 @@ public class DifyWorkflowServiceImpl implements DifyWorkflowService {
                         }
 
                         // 3. 将更新后的配置转换为更新请求对象
-                        var updateReq = new com.sciz.server.infrastructure.external.dify.dto.request.DifyWorkflowDraftUpdateReq();
+                        var updateReq = new DifyWorkflowDraftUpdateReq();
                         updateReq.setId(currentDraft.getId());
                         updateReq.setGraph(currentDraft.getGraph());
                         updateReq.setFeatures(currentDraft.getFeatures());

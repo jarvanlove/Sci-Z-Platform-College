@@ -57,7 +57,6 @@
           </div>
         </div>
       </div>
-      
       <!-- 搜索历史展示 -->
       <div v-if="searchHistory.length > 0" class="search-history-bar">
         <div class="history-bar-header">
@@ -104,14 +103,16 @@
       <span class="result-count">论文共 {{ pagination.total }} 篇</span>
     </div>
 
-    <!-- 加载状态 -->
-    <div v-if="loading" class="loading-container">
-      <el-icon class="is-loading"><Loading /></el-icon>
-      <span>搜索中...</span>
-    </div>
+    <!-- 内容区域（可滚动） -->
+    <div class="content-area">
+      <!-- 加载状态 -->
+      <div v-if="loading" class="loading-container">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>搜索中...</span>
+      </div>
 
-    <!-- 文献列表 -->
-    <div v-if="!loading && literatureList.length > 0" class="literature-list">
+      <!-- 文献列表 -->
+      <div v-if="!loading && literatureList.length > 0" class="literature-list">
       <div
         v-for="literature in literatureList"
         :key="literature.paperInfo?.id || literature.paperInfo?.globalId"
@@ -205,24 +206,25 @@
           </div>
         </div>
       </div>
-    </div>
+      </div>
 
-    <!-- 空状态 -->
-    <div v-if="!loading && literatureList.length === 0 && hasSearched" class="empty-state">
-      <el-empty description="暂无搜索结果，请尝试其他关键词" />
-    </div>
+      <!-- 空状态 -->
+      <div v-if="!loading && literatureList.length === 0 && hasSearched" class="empty-state">
+        <el-empty description="暂无搜索结果，请尝试其他关键词" />
+      </div>
 
-    <!-- 分页 -->
-    <div v-if="!loading && pagination.total > 0" class="pagination-container">
-      <el-pagination
-        v-model:current-page="pagination.current"
-        v-model:page-size="pagination.size"
-        :total="pagination.total"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handlePageChange"
-      />
+      <!-- 分页 -->
+      <div v-if="!loading && pagination.total > 0" class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.current"
+          v-model:page-size="pagination.size"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -644,8 +646,13 @@ onMounted(() => {
 <style scoped lang="scss">
 .literature-search-container {
   padding: 0;
+  height: calc(100vh - 60px);
   min-height: calc(100vh - 60px);
+  max-height: calc(100vh - 60px);
   background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
   .search-header {
     background: #fff;
@@ -653,6 +660,7 @@ onMounted(() => {
     border-bottom: 1px solid #e5e7eb;
     margin-bottom: 0;
     position: relative;
+    flex-shrink: 0; // 固定头部，不参与滚动
 
     &.has-searched {
       .search-bar-wrapper {
@@ -870,11 +878,41 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0; // 固定结果统计，不参与滚动
 
     .result-count {
       font-size: 14px;
       color: #6b7280;
       font-weight: 500;
+    }
+  }
+
+  // 内容区域容器（包含加载、列表、空状态、分页）
+  .content-area {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    
+    // 自定义滚动条样式（仅影响当前页面）
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: #f5f5f5;
+      border-radius: 4px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 4px;
+      
+      &:hover {
+        background: #9ca3af;
+      }
     }
   }
 
@@ -886,6 +924,7 @@ onMounted(() => {
     padding: 60px 20px;
     gap: 12px;
     color: var(--el-text-color-secondary);
+    flex-shrink: 0;
 
     .el-icon {
       font-size: 32px;
@@ -897,6 +936,7 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    flex-shrink: 0; // 不收缩，让内容自然撑开
 
     .literature-card {
       background: #fff;
@@ -1055,6 +1095,7 @@ onMounted(() => {
   .empty-state {
     padding: 60px 20px;
     text-align: center;
+    flex-shrink: 0;
   }
 
   .pagination-container {
@@ -1062,6 +1103,9 @@ onMounted(() => {
     justify-content: center;
     margin-top: 20px;
     padding: 20px;
+    flex-shrink: 0; // 固定分页，不参与滚动
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
   }
 }
 </style>

@@ -26,7 +26,8 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
     public String getApiKey(Long userId, String resourceId, String keyType) {
         try {
             LambdaQueryWrapper<DifyApiKey> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(DifyApiKey::getUserId, userId)
+            queryWrapper
+                    .eq(DifyApiKey::getUserId, userId)   //去除用户ID条件 查询到对应apikey
                     .eq(StringUtils.hasText(resourceId), DifyApiKey::getResourceId, resourceId)
                     .eq(StringUtils.hasText(keyType), DifyApiKey::getKeyType, keyType)
                     .eq(DifyApiKey::getIsActive, true);
@@ -116,7 +117,8 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
     @Override
     public List<DifyApiKey> getUserApiKeysByType(Long userId, String keyType) {
         LambdaQueryWrapper<DifyApiKey> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(DifyApiKey::getUserId, userId)
+        queryWrapper
+                //.eq(DifyApiKey::getUserId, userId)   //暂时去除用户ID条件 获取所有密钥  当前使用统一一个 file和chatbot的密钥
                 .eq(StringUtils.hasText(keyType), DifyApiKey::getKeyType, keyType)
                 .eq(DifyApiKey::getIsActive, true)
                 .orderByDesc(DifyApiKey::getCreatedTime);

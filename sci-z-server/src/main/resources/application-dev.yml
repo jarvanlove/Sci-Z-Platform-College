@@ -1,6 +1,7 @@
 spring: # Spring 开发环境配置
   datasource:
-    url: jdbc:postgresql://localhost:5432/sci-z-college # 本地数据库 URL
+    #url: jdbc:postgresql://localhost:5432/sci-z-college # 本地数据库 URL
+    url: jdbc:postgresql://192.168.1.203:5438/sci-z-college # 本地数据库 URL
     username: postgres # 本地数据库用户名
     password: postgres # 本地数据库密码
     driver-class-name: org.postgresql.Driver # PostgreSQL 驱动

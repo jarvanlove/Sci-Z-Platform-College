@@ -25,5 +25,8 @@ public record ProjectSelectResp(
         Integer documentCount,
         Long totalWords,
         Long totalDownloadCount,
-        Integer progress) {
+        Integer progress,
+        String dify_knowledge_id
+
+) {
 }

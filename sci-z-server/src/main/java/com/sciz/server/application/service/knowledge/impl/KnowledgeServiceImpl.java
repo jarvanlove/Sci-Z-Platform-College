@@ -118,8 +118,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         // 查询用户的 DifyApiKey 实体（如果存在）
         DifyApiKey difyApiKey = null;
         QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("user_id", userId)
-
+        queryWrapper
                 .eq("key_type", "dataset")
                 .eq("is_active", true)
                 .last("LIMIT 1");
@@ -129,11 +128,9 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         String resourceId = (difyApiKey != null && difyApiKey.getResourceId() != null)
                 ? difyApiKey.getResourceId()
                 : defaultResourceId;
-
         // 7. 调用 Dify API 创建数据集
         ResponseEntity<String> response = difyApiService.createDataset(
                 difyRequest, userId, resourceId, "dataset");
-
         // 8. 检查响应状态
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
             log.error(String.format("Dify API调用失败: status=%s, body=%s",
@@ -142,7 +139,6 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                     "创建知识库失败: Dify API调用失败" + String.format("Dify API调用失败: status=%s, body=%s",
                             response.getStatusCode(), response.getBody()));
         }
-
         // 9. 解析返回的JSON
         JsonNode responseJson;
         try {
@@ -273,36 +269,30 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (files == null || files.isEmpty()) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "文件列表不能为空");
         }
-
-        // 1. 获取当前登录用户ID
-        Long userId = StpUtil.getLoginIdAsLong();
+        // 1. 获取当前登录用户ID  固定用管理员的id
+        Long userId = 1L;
         log.info(String.format("上传多个文件到知识库: userId=%s, knowledgeId=%s, fileCount=%s, folderId=%s",
                 userId, knowledgeId, files.size(), folderId));
-
         // 2. 根据Dify知识库ID查询知识库信息
         SysKnowledgeBase knowledgeBase = knowledgeBaseRepo.findByDifyKnowdataId(knowledgeId);
         if (knowledgeBase == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND, "知识库不存在");
         }
-
         // 3. 使用传入的 knowledgeId 作为 Dify 数据集ID
         String datasetId = knowledgeBase.getDifyKbId();
-
         // 4. 查询用户信息
         SysUser user = userRepo.findById(userId);
         if (user == null) {
             throw new BusinessException(ResultCode.USER_NOT_FOUND);
         }
-
-        // 5. 获取用户的 Dify API Key
+        // 5. 获取用户的 data  Dify API Key
         DifyApiKey difyApiKey = null;
         QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("user_id", userId)
+        queryWrapper
                 .eq("key_type", "dataset")
                 .eq("is_active", true)
                 .last("LIMIT 1");
         difyApiKey = difyApiKeyService.getOne(queryWrapper);
-
         // 6. 确定 resourceId
         String resourceId = Optional.ofNullable(difyApiKey)
                 .map(DifyApiKey::getResourceId)
@@ -381,7 +371,6 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                         String.format("MinIO上传失败: %s - %s", file.getOriginalFilename(), e.getMessage()));
             }
         }
-
         if (minioResults.size() != files.size()) {
             log.error(String.format("MinIO上传结果数量不匹配: expected=%d, actual=%d", 
                     files.size(), minioResults.size()));
@@ -407,16 +396,13 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                     files.size(), difyResponses != null ? difyResponses.size() : 0));
             throw new BusinessException(ResultCode.SERVER_ERROR, "Dify上传失败: 结果数量不匹配");
         }
-
         // 12. 处理每个文件的上传结果
         List<String> successFiles = new ArrayList<>();
         List<String> failedFiles = new ArrayList<>();
-
         for (int i = 0; i < files.size(); i++) {
             MultipartFile file = files.get(i);
             FileInfoResp minioResult = minioResults.get(i);
             ResponseEntity<String> difyResponse = difyResponses.get(i);
-
             try {
                 processSingleFileUpload(knowledgeId, file, folderId, difyResponse, userId, knowledgeBase, minioResult);
                 successFiles.add(file.getOriginalFilename());
@@ -427,21 +413,14 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                         file.getOriginalFilename(), e.getMessage()), e);
             }
         }
-
         log.info(String.format("批量上传完成: knowledgeId=%s, total=%d, success=%d, failed=%d",
                 knowledgeId, files.size(), successFiles.size(), failedFiles.size()));
-
         // 10. 如果有文件上传失败，抛出异常
         if (!failedFiles.isEmpty()) {
             throw new BusinessException(ResultCode.SERVER_ERROR, 
                     String.format("部分文件上传失败: %s", String.join(", ", failedFiles)));
         }
-
-
     }
-
-
-
     /**
      * 处理单个文件的上传结果
      */
@@ -729,13 +708,11 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 // 即使 Dify API 调用异常，也继续删除本地数据（避免数据不一致）
             }
         }
-
         // 4. 软删除本地知识库
         boolean success = knowledgeBaseRepo.deleteById(id);
         if (!success) {
             throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
         }
-
         log.info(String.format("删除知识库成功: id=%s", id));
     }
 }

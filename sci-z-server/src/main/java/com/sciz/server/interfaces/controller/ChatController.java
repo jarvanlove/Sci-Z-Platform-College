@@ -82,7 +82,7 @@ public class ChatController {
         req.setWorkflowId(workflowId);
         req.setFiles(files);
         req.setConversationId(conversationId);
-        req.setUser(user);
+        req.setUser(String.valueOf(userId));
         
         // 3. 调用 Service 处理业务逻辑
         return chatService.runWorkflow(req, userId);

@@ -2298,8 +2298,7 @@ public class ProjectServiceImpl implements ProjectService {
         } else {
             attachmentMap = Map.of();
         }
-
-        // 4. 组装数据并返回（使用 Stream API，避免 fori 循环）
+        // 4. 组装数据并返回
         return projects.stream()
                 .map(project -> {
                     // 5.1. 获取知识库信息
@@ -2307,7 +2306,6 @@ public class ProjectServiceImpl implements ProjectService {
                     var documentCount = knowledgeBase != null && knowledgeBase.getFileCount() != null
                             ? knowledgeBase.getFileCount()
                             : 0;
-
                     // 5.2. 计算文档总字数和下载总次数
                     Long totalWords = 0L;
                     Long totalDownloadCount = 0L;
@@ -2342,7 +2340,9 @@ public class ProjectServiceImpl implements ProjectService {
                             documentCount,
                             totalWords,
                             totalDownloadCount,
-                            project.getProgress());
+                            project.getProgress(),
+                            project.getDifyKnowledgeId()
+                            );
                 })
                 .toList();
     }

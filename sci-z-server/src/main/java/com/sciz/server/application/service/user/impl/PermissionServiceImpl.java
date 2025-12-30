@@ -109,24 +109,20 @@ public class PermissionServiceImpl implements PermissionService {
         if (cachedList.isPresent()) {
             return cachedList.get();
         }
-
         // 2. 查询用户角色ID列表
         var roleIds = findUserRoleIds(userId);
         if (CollectionUtils.isEmpty(roleIds)) {
             cacheEmptyResult(cacheKey);
             return Collections.emptyList();
         }
-
         // 3. 查询角色权限ID列表
         var permIds = findRolePermissionIds(roleIds);
         if (CollectionUtils.isEmpty(permIds)) {
             return Collections.emptyList();
         }
-
         // 4. 查询权限并过滤
         var perms = permissionRepo.findByIds(permIds);
         var permissionCodes = filterAndMapPermissionCodes(perms, industryType);
-
         // 5. 缓存结果
         cacheResult(cacheKey, toCsv(permissionCodes));
         return permissionCodes;
@@ -148,7 +144,6 @@ public class PermissionServiceImpl implements PermissionService {
         if (cachedMenus.isPresent()) {
             return cachedMenus.get();
         }
-
         // 2. 查询用户角色ID列表
         var roleIds = findUserRoleIds(userId);
         if (CollectionUtils.isEmpty(roleIds)) {
@@ -157,13 +152,11 @@ public class PermissionServiceImpl implements PermissionService {
                     Duration.ofSeconds(CacheConstant.PERMISSION_CACHE_EXPIRE));
             return emptyMenus;
         }
-
         // 3. 查询角色权限ID列表
         var permIds = findRolePermissionIds(roleIds);
         if (CollectionUtils.isEmpty(permIds)) {
             return Collections.emptyList();
         }
-
         // 4. 查询菜单类型的权限
         var perms = permissionRepo.findByIds(permIds);
         var menuPerms = filterMenuPermissions(perms, industryType);
@@ -187,7 +180,6 @@ public class PermissionServiceImpl implements PermissionService {
         var roleCodes = findRoleCodes(userId, industryType);
         return roleCodes.isEmpty() ? null : roleCodes.get(0);
     }
-
     /**
      * 刷新指定用户在指定行业下的权限聚合缓存（角色/权限/菜单）
      *
