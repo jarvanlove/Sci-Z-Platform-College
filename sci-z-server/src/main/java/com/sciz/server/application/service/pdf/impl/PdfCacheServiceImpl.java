@@ -302,7 +302,7 @@ public class PdfCacheServiceImpl implements PdfCacheService {
                         return Mono.error(BusinessException.of(
                                 ResultCode.FORBIDDEN, 
                                 "该PDF需要授权访问，请前往官网下载后手动导入知识库"));
-                    }
+                    }   
                     return Mono.error(BusinessException.of(
                             ResultCode.FILE_DOWNLOAD_FAILED, 
                             "PDF下载失败: HTTP " + response.statusCode().value()));

@@ -1,9 +1,9 @@
 export default {
   // 应用信息
   app: {
-    title: '辅助高校科研管理平台',
-    description: '基于AIGC辅助高校科研管理平台',
-    htmlTitle: '辅助高校科研管理平台'
+    title: 'AI.科研管理平台',
+    description: '基于AIGC科研管理平台',
+    htmlTitle: 'AI.科研管理平台'
   },
 
   // 通用

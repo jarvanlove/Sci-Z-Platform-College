@@ -11,6 +11,7 @@ import com.sciz.server.domain.pojo.mapper.project.ProjectMapper;
 import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import com.sciz.server.infrastructure.shared.enums.ProjectStatus;
+import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 import java.util.List;
@@ -39,10 +40,17 @@ public class ProjectRepoImpl implements ProjectRepo {
 
     @Override
     public Project findById(Long id) {
-        return new LambdaQueryChainWrapper<>(mapper)
+        var queryWrapper = new LambdaQueryChainWrapper<>(mapper)
                 .eq(Project::getId, id)
-                .eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
-                .one();
+                .eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(Project::getCreatedBy, userId);
+        }
+
+        return queryWrapper.one();
     }
 
     @Override
@@ -50,6 +58,12 @@ public class ProjectRepoImpl implements ProjectRepo {
             List<Long> declarationIds) {
         var queryWrapper = new LambdaQueryWrapper<Project>();
         queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(Project::getCreatedBy, userId);
+        }
 
         // 关键字搜索（项目编号/项目名称）
         if (StringUtils.hasText(keyword)) {
@@ -123,6 +137,12 @@ public class ProjectRepoImpl implements ProjectRepo {
         var queryWrapper = new LambdaQueryWrapper<Project>();
         queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(Project::getCreatedBy, userId);
+        }
+
         // 如果指定了状态，则按状态筛选
         if (StringUtils.hasText(status)) {
             queryWrapper.eq(Project::getStatus, status);
@@ -139,6 +159,12 @@ public class ProjectRepoImpl implements ProjectRepo {
         // 排除已取消的项目（已取消的项目不需要自动更新）
         queryWrapper.ne(Project::getStatus, ProjectStatus.CANCELLED.getCode().toString());
 
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(Project::getCreatedBy, userId);
+        }
+
         return mapper.selectList(queryWrapper);
     }
 
@@ -147,6 +173,13 @@ public class ProjectRepoImpl implements ProjectRepo {
         var queryWrapper = new LambdaQueryWrapper<Project>();
         // 排除已删除的项目
         queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(Project::getCreatedBy, userId);
+        }
+
         // 按创建时间倒序
         queryWrapper.orderByDesc(Project::getCreatedTime);
 

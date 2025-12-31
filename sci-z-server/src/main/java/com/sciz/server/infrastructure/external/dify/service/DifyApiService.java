@@ -94,7 +94,6 @@ public class DifyApiService {
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
         }
     }
-
     /**
      * 发送 Chatbot 对话（支持阻塞与流式）
      */
@@ -120,7 +119,6 @@ public class DifyApiService {
         try {
             log.info(String.format("发送 Chatbot 流式对话请求（实时）: userId=%s, resourceId=%s, query=%s, responseMode=%s",
                     request.getUserId(), request.getResourceId(), request.getQuery(), request.getResponseMode()));
-
             // 调用真正的流式请求方法，实时回调
             difyApiClient.requestStreamWithCallback("POST", "/chat-messages", request,
                     request.getUserId(), request.getResourceId(), request.getKeyType(), onData);
@@ -132,7 +130,6 @@ public class DifyApiService {
             throw e;
         }
     }
-
     private DifyChatbotAppApiKeyResponse createChatbotAppApiKey(DifyChatbotAppRequest request,
             DifyChatbotAppResponse appResponse) throws JsonProcessingException {
         Map<String, Object> payload = new HashMap<>();

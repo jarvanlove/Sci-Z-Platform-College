@@ -42,6 +42,7 @@ public class SecurityConfig {
                .addExclude("/api/dify/**")
                .addExclude("/api/literature/**")
                .addExclude("/api/proxy/**")
+               .addExclude("/api/chat/**")
                // 其他所有接口都需要登录
                .setAuth(obj -> SaRouter.match("/**").check(r -> StpUtil.checkLogin()))
                .setError(e -> {

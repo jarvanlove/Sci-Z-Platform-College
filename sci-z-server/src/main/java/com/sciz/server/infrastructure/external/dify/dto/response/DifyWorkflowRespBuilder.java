@@ -112,7 +112,7 @@ public final class DifyWorkflowRespBuilder {
     /**
      * 检查工作流响应状态
      * <p>
-     * 检查 data 节点是否存在，以及工作流执行状态是否为 "succeeded"
+     * 检查 data 节点是否存在，以及工作流执行状态是否为 "succeeded" 或 "partial-succeeded"
      *
      * @param response       DifyWorkflowResponse 工作流响应
      * @param workflowResult String 工作流执行结果（JSON字符串，用于错误日志）
@@ -125,13 +125,13 @@ public final class DifyWorkflowRespBuilder {
             throw new BusinessException(ResultCode.SERVER_ERROR, "工作流响应格式错误：缺少 data 节点");
         }
 
-        // 检查工作流执行状态
-        if (!"succeeded".equals(response.getData().getStatus())) {
+        // 检查工作流执行状态（支持 succeeded 或 partial-succeeded）
+        String status = response.getData().getStatus();
+        if (!"succeeded".equals(status) && !"partial-succeeded".equals(status)) {
             String errorMsg = response.getData().getError();
-            log.error(String.format("工作流执行失败: status=%s, error=%s",
-                    response.getData().getStatus(), errorMsg));
+            log.error(String.format("工作流执行失败: status=%s, error=%s", status, errorMsg));
             throw BusinessException.of(ResultCode.SERVER_ERROR,
-                    "工作流执行失败: %s", errorMsg != null ? errorMsg : response.getData().getStatus());
+                    "工作流执行失败: %s", errorMsg != null ? errorMsg : status);
         }
     }
 }

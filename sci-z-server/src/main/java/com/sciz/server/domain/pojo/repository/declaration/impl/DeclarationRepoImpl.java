@@ -12,6 +12,7 @@ import com.sciz.server.domain.pojo.repository.declaration.DeclarationRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
+import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
 import org.postgresql.util.PGobject;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.CollectionUtils;
@@ -46,10 +47,17 @@ public class DeclarationRepoImpl implements DeclarationRepo {
 
     @Override
     public Declaration findById(Long id) {
-        return new LambdaQueryChainWrapper<>(mapper)
+        var queryWrapper = new LambdaQueryChainWrapper<>(mapper)
                 .eq(Declaration::getId, id)
-                .eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
-                .one();
+                .eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(Declaration::getCreatedBy, userId);
+        }
+
+        return queryWrapper.one();
     }
 
     /**
@@ -66,6 +74,12 @@ public class DeclarationRepoImpl implements DeclarationRepo {
     public IPage<Declaration> page(Page<Declaration> page, String keyword, Integer status, String sortBy, boolean asc) {
         var queryWrapper = new LambdaQueryWrapper<Declaration>();
         queryWrapper.eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(Declaration::getCreatedBy, userId);
+        }
 
         // 关键字搜索（申报编号/申报人/研究方向）
         if (StringUtils.hasText(keyword)) {
@@ -167,6 +181,12 @@ public class DeclarationRepoImpl implements DeclarationRepo {
                 .in(Declaration::getId, declarationIds)
                 .eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(Declaration::getCreatedBy, userId);
+        }
+
         return mapper.selectList(queryWrapper).stream()
                 .collect(Collectors.toMap(Declaration::getId, declaration -> declaration));
     }
@@ -175,6 +195,12 @@ public class DeclarationRepoImpl implements DeclarationRepo {
     public List<Long> findIdsByTimeRange(LocalDate startTime, LocalDate endTime) {
         var queryWrapper = new LambdaQueryWrapper<Declaration>();
         queryWrapper.eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(Declaration::getCreatedBy, userId);
+        }
 
         // 项目开始时间筛选：project_start_time >= startTime
         if (startTime != null) {

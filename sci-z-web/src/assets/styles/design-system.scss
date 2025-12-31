@@ -1073,6 +1073,7 @@ body {
       }
       
       /* 条纹样式 - 使用深灰色背景（暗色主题下） */
+      /* 🔥 修复：只设置背景色，其他样式完全继承普通行的设置 */
       tr.el-table__row--striped {
         background-color: rgba(15, 23, 42, 0.5) !important;
         color: var(--text) !important;
@@ -1080,9 +1081,6 @@ body {
         td {
           background-color: rgba(15, 23, 42, 0.5) !important;
           color: var(--text) !important;
-          /* 确保 stripe 行的内容可以被滚动隐藏 - 强制设置 */
-          overflow: visible !important;
-          position: relative !important;
         }
       }
       
@@ -1094,9 +1092,6 @@ body {
           
           td {
             background-color: var(--hover-light) !important;
-            /* 确保 stripe 行的内容可以被滚动隐藏 - 强制设置 */
-            overflow: visible !important;
-            position: relative !important;
           }
         }
       }

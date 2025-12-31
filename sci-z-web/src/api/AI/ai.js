@@ -21,7 +21,6 @@ export const getConversations = (params) => {
     params
   })
 }
-
 /**
  * 创建新对话
  * @param {Object} data - 对话数据
@@ -495,7 +494,9 @@ export const runWorkflowStream = async (params) => {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        // 明确要求流式响应，避免打包后被缓冲
+        'Accept': 'text/event-stream'
       },
       body: formData,
       signal: abortController.signal
@@ -526,17 +527,31 @@ export const runWorkflowStream = async (params) => {
       throw error
     }
 
+    // 检查响应类型，确保是流式响应
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.includes('text/event-stream') && !contentType.includes('text/plain')) {
+      logger.warn('响应类型可能不是流式', { contentType, url })
+      // 不抛出错误，继续处理，因为某些服务器可能不设置正确的 Content-Type
+    }
+
     const reader = response.body.getReader()
     const decoder = new TextDecoder('utf-8')
     let buffer = ''
     let conversationIdFromResponse = null
     let messageIdFromResponse = null
     let documentsFromResponse = []
+    let messageCount = 0 // 用于调试
+
+    logger.info('开始读取流式响应', { contentType: response.headers.get('content-type') })
 
     while (true) {
       const { value, done } = await reader.read()
-      if (done) break
+      if (done) {
+        logger.info('流式响应读取完成', { messageCount })
+        break
+      }
 
+      // 确保使用 stream: true 参数，避免等待完整数据
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
       buffer = lines.pop() || '' // 保留最后不完整的行
@@ -559,7 +574,15 @@ export const runWorkflowStream = async (params) => {
             
             if (data.event === 'message' || data.answer) {
               // 消息片段
-              onMessage?.(data.answer || '')
+              messageCount++
+              const answer = data.answer || ''
+              if (answer) {
+                onMessage?.(answer)
+                // 每10条消息记录一次日志（避免日志过多）
+                if (messageCount % 10 === 0) {
+                  logger.debug('流式消息更新', { messageCount, answerLength: answer.length })
+                }
+              }
             } else if (data.event === 'message_end') {
               // 消息结束
               onEnd?.({

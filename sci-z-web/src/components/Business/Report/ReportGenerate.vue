@@ -320,8 +320,9 @@ const handleProjectChange = (projectId) => {
   if (project) {
     formData.projectName = project.name || ''
     formData.projectCode = project.number || ''
-    formData.projectKnowledgeId = project.knowledgeId || ''
-    logger.info(`选择项目: ${project.name} (ID: ${projectId})`)
+    // 修复：使用正确的字段名 dify_knowledge_id（后端返回的字段名）
+    formData.projectKnowledgeId = project.dify_knowledge_id || project.difyKnowledgeId || ''
+    logger.info(`选择项目: ${project.name} (ID: ${projectId}), knowledgeId: ${formData.projectKnowledgeId}`)
   } else {
     formData.projectName = ''
     formData.projectCode = ''

@@ -10,6 +10,7 @@ import com.sciz.server.domain.pojo.entity.report.ReportManagement;
 import com.sciz.server.domain.pojo.mapper.report.ReportManagementMapper;
 import com.sciz.server.domain.pojo.repository.report.ReportManagementRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
+import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
@@ -37,16 +38,30 @@ public class ReportManagementRepoImpl implements ReportManagementRepo {
 
     @Override
     public ReportManagement findById(Long id) {
-        return new LambdaQueryChainWrapper<>(mapper)
+        var queryWrapper = new LambdaQueryChainWrapper<>(mapper)
                 .eq(ReportManagement::getId, id)
-                .eq(ReportManagement::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
-                .one();
+                .eq(ReportManagement::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(ReportManagement::getCreatedBy, userId);
+        }
+
+        return queryWrapper.one();
     }
 
     @Override
-    public IPage<ReportManagement> page(Page<ReportManagement> page, String keyword, String status, String reportType, String sortBy, boolean asc) {
+    public IPage<ReportManagement> page(Page<ReportManagement> page, String keyword, String status, String reportType,
+            String sortBy, boolean asc) {
         var queryWrapper = new LambdaQueryWrapper<ReportManagement>();
         queryWrapper.eq(ReportManagement::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(ReportManagement::getCreatedBy, userId);
+        }
 
         // 关键字搜索（报告编号/项目名称/创建人）
         if (StringUtils.hasText(keyword)) {

@@ -9,6 +9,7 @@ import com.sciz.server.domain.pojo.entity.ai.AiConversation;
 import com.sciz.server.domain.pojo.mapper.ai.AiConversationMapper;
 import com.sciz.server.domain.pojo.repository.ai.AiConversationRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
+import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.CollectionUtils;
 
@@ -38,10 +39,18 @@ public class AiConversationRepoImpl implements AiConversationRepo {
 
     @Override
     public AiConversation findById(Long id) {
-        return new LambdaQueryChainWrapper<>(mapper)
+        var queryWrapper = new LambdaQueryChainWrapper<>(mapper)
                 .eq(AiConversation::getId, id)
-                .eq(AiConversation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
-                .one();
+                .eq(AiConversation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 注意：AI 对话表使用 user_id 字段，而不是 created_by
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(AiConversation::getUserId, userId);
+        }
+
+        return queryWrapper.one();
     }
 
     @Override

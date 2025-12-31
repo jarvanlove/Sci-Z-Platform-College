@@ -2,13 +2,16 @@ package com.sciz.server.application.service.report.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.sciz.server.application.service.knowledge.KnowledgeService;
 import com.sciz.server.application.service.report.ReportManagementService;
 import com.sciz.server.domain.pojo.dto.request.report.ReportManagementCreateReq;
 import com.sciz.server.domain.pojo.dto.request.report.ReportManagementListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.report.ReportManagementUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.report.ReportManagementDetailResp;
 import com.sciz.server.domain.pojo.dto.response.report.ReportManagementListResp;
+import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
 import com.sciz.server.domain.pojo.entity.report.ReportManagement;
+import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
 import com.sciz.server.domain.pojo.repository.report.ReportManagementRepo;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -85,6 +88,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
     private final MinioClient minioClient;
     private final SysAttachmentRepo sysAttachmentRepo;
     private final SysAttachmentRelationRepo sysAttachmentRelationRepo;
+    private final SysKnowledgeBaseRepo knowledgeBaseRepo;
     
     private static final DateTimeFormatter DATE_FOLDER_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     
@@ -103,7 +107,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             @Qualifier("globalTaskExecutor") Executor globalTaskExecutor,
             MinioClient minioClient,
             SysAttachmentRepo sysAttachmentRepo,
-            SysAttachmentRelationRepo sysAttachmentRelationRepo) {
+            SysAttachmentRelationRepo sysAttachmentRelationRepo, KnowledgeService knowledgeService, SysKnowledgeBaseRepo knowledgeBaseRepo) {
         this.reportManagementRepo = reportManagementRepo;
         this.reportManagementConverter = reportManagementConverter;
         this.difyApiKeyService = difyApiKeyService;
@@ -116,6 +120,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
         this.minioClient = minioClient;
         this.sysAttachmentRepo = sysAttachmentRepo;
         this.sysAttachmentRelationRepo = sysAttachmentRelationRepo;
+        this.knowledgeBaseRepo = knowledgeBaseRepo;
     }
     /**
      * 报告编号前缀
@@ -136,11 +141,11 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             var userId = currentUser.userId();
             var realName = currentUser.realName();
 
+            String s = req.projectKnowledgeId();
             // 2. 转换为实体
             var entity = reportManagementConverter.toEntity(req);
 
-            // 3. 设置固定值：difyApiKeysId = "9"
-            entity.setDifyApiKeysId("9");
+
             log.info(String.format("设置 Dify API Keys ID 为固定值: difyApiKeysId=9"));
 
             // 4. 设置报告基本信息
@@ -157,13 +162,13 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             // 注意：在异步线程中无法获取 Web 上下文，所以需要在调用前获取用户信息
             CompletableFuture.runAsync(() -> {
                 try {
-                    triggerDifyWorkflowAsync(reportId, userId, realName);
+                    Async(reportId, userId, realName);
                 } catch (Exception e) {
                     log.error(String.format("异步执行 Dify 工作流失败: reportId=%s, err=%s", 
                             entity.getId(), e.getMessage()), e);
                 }
             }, globalTaskExecutor);
-            
+//
             log.info(String.format("已提交异步任务: reportId=%s", reportId));
             return reportId;
         } catch (BusinessException e) {
@@ -318,10 +323,11 @@ public class ReportManagementServiceImpl implements ReportManagementService {
      * @param userId 用户ID
      * @param realName 用户姓名
      */
-    private void triggerDifyWorkflowAsync(Long reportId, Long userId, String realName) {
+    private void Async(Long reportId, Long userId, String realName) {
         try {
             // 1. 查询报告实体
             var entity = reportManagementRepo.findById(reportId);
+
             if (entity == null) {
                 log.error(String.format("报告不存在，无法触发工作流: reportId=%s", reportId));
                 return;
@@ -369,6 +375,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                 entity.getId(), entity.getDifyApiKeysId()));
 
         // 1. 根据 difyApiKeysId 获取 DifyApiKey
+        entity.setDifyApiKeysId("7");
         if (entity.getDifyApiKeysId() == null || entity.getDifyApiKeysId().trim().isEmpty()) {
             log.warn(String.format("Dify API Keys ID 为空，跳过工作流调用: reportId=%s", entity.getId()));
             return;
@@ -403,10 +410,10 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             try {
                 log.info(String.format("开始更新工作流配置: workflowId=%s, projectKnowledgeId=%s", 
                         workflowId, entity.getProjectKnowledgeId()));
-                
                 // 将 projectKnowledgeId 转换为 List
-                List<String> projectKnowledgeIds = List.of(entity.getProjectKnowledgeId());
-                
+                Long id = Long.valueOf(entity.getProjectKnowledgeId());
+                SysKnowledgeBase byId = knowledgeBaseRepo.findById(id);
+                List<String> projectKnowledgeIds = List.of(byId.getDifyKbId());
                 // 调用综合接口更新并发布工作流
                 difyWorkflowService.updateAndPublishWorkflow(
                         workflowId,  // appId 就是 workflowId
@@ -414,7 +421,6 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                         "",  // markedName 为空
                         ""   // markedComment 为空
                 );
-                
                 log.info(String.format("工作流配置更新并发布成功: workflowId=%s, projectKnowledgeId=%s", 
                         workflowId, entity.getProjectKnowledgeId()));
             } catch (Exception e) {
@@ -428,111 +434,142 @@ public class ReportManagementServiceImpl implements ReportManagementService {
 
         // 3. 构建工作流请求参数
         Map<String, Object> inputs = new HashMap<>();
-        inputs.put("technology_report", "南极无人观测站智能照明技术目标可行性及路径研究科技报告");
+        inputs.put("technology_report", entity.getProjectName());
         inputs.put("SetCongfig", entity.getProjectName());
 
-        // 4. 构建工作流请求（使用流式模式）
-        var workflowRequest = new DifyWorkflowRequest();
-        workflowRequest.setInputs(inputs);
-        workflowRequest.setResponseMode("streaming"); // 使用流式模式
-        workflowRequest.setUser(String.valueOf(userId));
-
+        // 4. 构建工作流请求（使用阻塞模式）
         // 5. 构建请求体
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("inputs", inputs);
-        requestBody.put("response_mode", "streaming");
+        requestBody.put("response_mode", "blocking");
         requestBody.put("user", String.valueOf(userId));
-
-        // 6. 使用流式方式调用工作流
-        log.info(String.format("调用 Dify 工作流（流式）: workflowId=%s, userId=%s", workflowId, userId));
-        ResponseEntity<String> response = difyApiClient.requestStream(
-                "POST", "/workflows/run", requestBody, userId, workflowId, DifyApiKey.KeyType.WORKFLOW.getCode());
-
+        
+        // 6. 使用阻塞方式调用工作流
+        // 注意：必须显式调用带 body 参数的重载方法，避免 Map 类型匹配到 params 参数的重载方法
+        log.info(String.format("调用 Dify 工作流（阻塞模式）: workflowId=%s, userId=%s", workflowId, userId));
+        ResponseEntity<String> response = difyApiClient.request(
+                "POST", "/workflows/run", (Object) requestBody, userId, workflowId, DifyApiKey.KeyType.WORKFLOW.getCode());
         if (!response.getStatusCode().is2xxSuccessful()) {
             log.error(String.format("Dify 工作流执行失败: statusCode=%s, body=%s", 
                     response.getStatusCode(), response.getBody()));
             throw new BusinessException(ResultCode.SERVER_ERROR, 
                     "工作流执行失败: " + (response.getBody() != null ? response.getBody() : response.getStatusCode()));
         }
-
-        // 6. 解析流式响应，提取 body 中的参数
+        // 7. 解析阻塞模式响应，提取 body 中的参数
         String responseBody = response.getBody();
         if (responseBody != null && !responseBody.trim().isEmpty()) {
-            parseStreamingResponse(responseBody, entity.getId(), userId, realName);
+            parseBlockingResponse(responseBody, entity.getId(), userId, realName);
         }
 
         log.info(String.format("Dify 工作流执行成功: reportId=%s, workflowId=%s", entity.getId(), workflowId));
     }
 
     /**
-     * 解析流式响应，提取 body 中的参数
+     * 解析阻塞模式响应，提取 body 中的参数
      *
-     * @param responseBody 流式响应体（每行一个 JSON 对象）
+     * @param responseBody 阻塞模式响应体（完整的 JSON 对象）
      * @param reportId 报告ID（用于日志）
      * @param userId 用户ID（用于更新状态）
      * @param realName 用户姓名（用于文件上传）
      */
-    private void parseStreamingResponse(String responseBody, Long reportId, Long userId, String realName) {
+    private void parseBlockingResponse(String responseBody, Long reportId, Long userId, String realName) {
         try {
-            log.info(String.format("开始解析流式响应: reportId=%s, bodyLength=%d", reportId, responseBody.length()));
+            log.info(String.format("开始解析阻塞模式响应: reportId=%s, bodyLength=%d", reportId, responseBody.length()));
 
-            // 按行分割响应体（每行是一个 JSON 对象）
-            String[] lines = responseBody.split("\n");
-            String workflowFinishedData = null;
-
-            // 遍历所有行，找到 workflow_finished 事件
-            for (String line : lines) {
-                String trimmedLine = line.trim();
-                if (trimmedLine.isEmpty()) {
-                    continue;
-                }
-                try {
-                    // 解析 JSON，检查是否是 workflow_finished 事件
-                    JsonNode rootNode = objectMapper.readTree(trimmedLine);
-                    if (rootNode.has("event") && "workflow_finished".equals(rootNode.get("event").asText())) {
-                        workflowFinishedData = trimmedLine;
-                        log.info(String.format("找到 workflow_finished 事件: reportId=%s", reportId));
-                        break; // 找到后退出循环
-                    }
-                } catch (Exception e) {
-                    // 忽略解析失败的行，继续处理下一行
-                    log.debug(String.format("解析行失败（跳过）: line=%s, err=%s", trimmedLine.substring(0, Math.min(50, trimmedLine.length())), e.getMessage()));
-                }
-            }
-            // 如果找到 workflow_finished 事件，提取文件 URL 并下载
-            if (workflowFinishedData != null) {
-                log.info(String.format("流式响应解析完成: reportId=%s, workflowFinishedDataLength=%d", reportId, workflowFinishedData.length()));
-                
-                // 提取文件 URL 并下载保存
-                try {
-                    String fileUrl = extractFileUrlFromLastData(workflowFinishedData);
-                    if (StringUtils.hasText(fileUrl)) {
-                        downloadAndSaveFile(fileUrl, reportId, userId, realName);
-                        // downloadAndSaveFile 中已更新状态为 "generated"
-                    } else {
-                        log.warn(String.format("未找到文件URL: reportId=%s", reportId));
-                        // 未找到文件URL，更新状态为失败
-                        updateReportStatusToFailed(reportId, userId);
-                    }
-                } catch (Exception e) {
-                    log.error(String.format("处理文件下载失败: reportId=%s, err=%s", reportId, e.getMessage()), e);
-                    // 文件下载失败，更新状态为失败
-                    updateReportStatusToFailed(reportId, userId);
-                    throw e; // 重新抛出异常，让上层捕获
-                }
-            } else {
-                log.warn(String.format("流式响应中未找到 workflow_finished 事件: reportId=%s", reportId));
-                // 未找到 workflow_finished 事件，更新状态为失败
+            // 解析完整的 JSON 响应
+            JsonNode rootNode = objectMapper.readTree(responseBody);
+            
+            // 阻塞模式的响应格式：{ "data": { "outputs": { "files": [...] } } }
+            if (!rootNode.has("data")) {
+                log.warn(String.format("阻塞模式响应中未找到 data 字段: reportId=%s", reportId));
                 updateReportStatusToFailed(reportId, userId);
+                return;
+            }
+            
+            JsonNode dataNode = rootNode.get("data");
+            if (!dataNode.has("outputs")) {
+                log.warn(String.format("阻塞模式响应中未找到 outputs 字段: reportId=%s", reportId));
+                updateReportStatusToFailed(reportId, userId);
+                return;
+            }
+            
+            JsonNode outputsNode = dataNode.get("outputs");
+            
+            // 提取文件 URL 并下载保存
+            try {
+                String fileUrl = extractFileUrlFromBlockingResponse(outputsNode);
+                if (StringUtils.hasText(fileUrl)) {
+                    downloadAndSaveFile(fileUrl, reportId, userId, realName);
+                    // downloadAndSaveFile 中已更新状态为 "generated"
+                    log.info(String.format("阻塞模式响应解析完成: reportId=%s", reportId));
+                } else {
+                    log.warn(String.format("未找到文件URL: reportId=%s", reportId));
+                    // 未找到文件URL，更新状态为失败
+                    updateReportStatusToFailed(reportId, userId);
+                }
+            } catch (Exception e) {
+                log.error(String.format("处理文件下载失败: reportId=%s, err=%s", reportId, e.getMessage()), e);
+                // 文件下载失败，更新状态为失败
+                updateReportStatusToFailed(reportId, userId);
+                throw e; // 重新抛出异常，让上层捕获
             }
 
         } catch (Exception e) {
-            log.error(String.format("解析流式响应失败: reportId=%s, err=%s", reportId, e.getMessage()), e);
+            log.error(String.format("解析阻塞模式响应失败: reportId=%s, err=%s", reportId, e.getMessage()), e);
+            updateReportStatusToFailed(reportId, userId);
         }
     }
 
     /**
-     * 从响应数据中提取文件 URL
+     * 从阻塞模式响应中提取文件 URL
+     *
+     * @param outputsNode outputs 节点（JsonNode）
+     * @return 文件 URL，如果不存在则返回 null
+     */
+    private String extractFileUrlFromBlockingResponse(JsonNode outputsNode) {
+        try {
+            // 从 outputs.files 中提取 URL
+            if (outputsNode.has("files") && outputsNode.get("files").isArray()) {
+                JsonNode filesNode = outputsNode.get("files");
+                if (filesNode.size() > 0) {
+                    JsonNode firstFile = filesNode.get(0);
+                    if (firstFile.has("url")) {
+                        String url = firstFile.get("url").asText();
+                        log.info(String.format("提取到文件URL: url=%s", url));
+                        
+                        // 拼接 private-url + url + true
+                        String privateUrl = difyConfig.getPrivateUrl();
+                        if (!StringUtils.hasText(privateUrl)) {
+                            log.error("Dify private-url 配置为空");
+                            throw new BusinessException(ResultCode.SERVER_ERROR, "Dify private-url 配置为空");
+                        }
+                        
+                        // 确保 privateUrl 不以 / 结尾，url 不以 / 开头
+                        if (privateUrl.endsWith("/")) {
+                            privateUrl = privateUrl.substring(0, privateUrl.length() - 1);
+                        }
+                        if (url.startsWith("/")) {
+                            url = url.substring(1);
+                        }
+                        
+                        // 拼接完整 URL
+                        String fullUrl = privateUrl + "/" + url + "&as_attachment=true";
+                        
+                        log.info(String.format("拼接后的完整URL: fullUrl=%s", fullUrl));
+                        return fullUrl;
+                    }
+                }
+            }
+            
+            return null;
+        } catch (Exception e) {
+            log.error(String.format("提取文件URL失败: err=%s", e.getMessage()), e);
+            return null;
+        }
+    }
+
+    /**
+     * 从响应数据中提取文件 URL（流式模式使用）
      *
      * @param jsonData JSON 数据字符串
      * @return 文件 URL，如果不存在则返回 null

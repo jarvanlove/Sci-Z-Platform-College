@@ -104,7 +104,7 @@ public class KnowledgeController {
      * @param req 流式对话请求
      * @return 流式响应（SSE格式）
      */
-    @Operation(summary = "知识库Chatbot流式对话", description = "基于知识库的Chatbot流式问答，如果用户未创建Chatbot则返回提示")
+    @Operation(summary = "知识库Chatbot流式对话", description = "基于知识库的Chatbot流式问答，如果用户未则返回提示")
     @PostMapping(value = "/chatbot/stream", produces = "text/event-stream")
     public SseEmitter chatbotStream(@Valid @RequestBody KnowledgeChatbotStreamReq req) {
         return knowledgeService.chatbotStream(req);
