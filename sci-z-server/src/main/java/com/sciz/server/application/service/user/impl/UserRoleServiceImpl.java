@@ -22,6 +22,7 @@ import com.sciz.server.infrastructure.config.cache.IndustryConfigCache;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import com.sciz.server.infrastructure.shared.enums.EnableStatus;
 import com.sciz.server.infrastructure.shared.enums.OperationLogRecorderStatus;
+import com.sciz.server.infrastructure.shared.enums.UserStatus;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -305,13 +306,26 @@ public class UserRoleServiceImpl implements UserRoleService {
                                 .orElseGet(List::of);
                 log.info(String.format("查询角色列表: industryType=%s, size=%s", industryType, roles.size()));
 
-                // 批量统计每个角色的用户数量
+                // 批量统计每个角色的用户数量（只统计未删除且正常状态的用户）
                 Map<Long, Integer> userCountMap = new HashMap<>();
                 if (!roles.isEmpty()) {
                         var roleIds = roles.stream().map(SysRole::getId).toList();
                         roleIds.forEach(roleId -> {
+                                // 1. 查询角色关联的用户ID列表
                                 var userIds = userRoleRepo.findUserIdsByRoleId(roleId);
-                                userCountMap.put(roleId, userIds != null ? userIds.size() : 0);
+                                if (CollectionUtils.isEmpty(userIds)) {
+                                        userCountMap.put(roleId, 0);
+                                        return;
+                                }
+
+                                // 2. 批量查询用户实体（findByIds 已过滤已删除的用户），再过滤掉禁用的用户
+                                var users = sysUserRepo.findByIds(userIds);
+                                var validUserCount = (int) users.stream()
+                                                .filter(user -> UserStatus.NORMAL.getCode()
+                                                                .equals(user.getStatus()))
+                                                .count();
+
+                                userCountMap.put(roleId, validUserCount);
                         });
                 }
 
@@ -354,13 +368,26 @@ public class UserRoleServiceImpl implements UserRoleService {
                 // 4. 调用仓储查询
                 var rolePage = roleRepo.page(page, industryType, req.keyword(), req.status(), sortBy, asc);
 
-                // 5. 批量统计每个角色的用户数量
+                // 5. 批量统计每个角色的用户数量（只统计未删除且正常状态的用户）
                 Map<Long, Integer> userCountMap = new HashMap<>();
                 if (!rolePage.getRecords().isEmpty()) {
                         var roleIds = rolePage.getRecords().stream().map(SysRole::getId).toList();
                         roleIds.forEach(roleId -> {
+                                // 1. 查询角色关联的用户ID列表
                                 var userIds = userRoleRepo.findUserIdsByRoleId(roleId);
-                                userCountMap.put(roleId, userIds != null ? userIds.size() : 0);
+                                if (CollectionUtils.isEmpty(userIds)) {
+                                        userCountMap.put(roleId, 0);
+                                        return;
+                                }
+
+                                // 2. 批量查询用户实体（findByIds 已过滤已删除的用户），再过滤掉禁用的用户
+                                var users = sysUserRepo.findByIds(userIds);
+                                var validUserCount = (int) users.stream()
+                                                .filter(user -> UserStatus.NORMAL.getCode()
+                                                                .equals(user.getStatus()))
+                                                .count();
+
+                                userCountMap.put(roleId, validUserCount);
                         });
                 }
 

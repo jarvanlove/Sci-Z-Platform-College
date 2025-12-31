@@ -38,10 +38,18 @@ public class AiMessageRepoImpl implements AiMessageRepo {
 
     @Override
     public AiMessage findById(Long id) {
-        return new LambdaQueryChainWrapper<>(mapper)
+        var queryWrapper = new LambdaQueryChainWrapper<>(mapper)
                 .eq(AiMessage::getId, id)
-                .eq(AiMessage::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
-                .one();
+                .eq(AiMessage::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 注意：AI 消息表没有直接的用户字段，需要通过会话表来检查权限
+        // 由于在 Repository 层进行关联查询会影响性能，这里只做基础过滤
+        // Service 层会通过会话表进行完整的权限检查
+        // 如果需要在 Repository 层进行完整过滤，需要通过子查询或关联查询实现
+        // 为了性能考虑，这里暂时不添加关联查询，由 Service 层负责权限检查
+
+        return queryWrapper.one();
     }
 
     @Override

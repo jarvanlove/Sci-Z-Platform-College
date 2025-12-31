@@ -725,7 +725,7 @@ onMounted(() => {
     .apikey-table {
       width: 100%;
       border-radius: 8px;
-      overflow: visible;
+      overflow: hidden; // 🔥 修复：改为 hidden，确保内容被正确裁剪
       border: 1px solid var(--border);
       
       // 🔥 确保表格自适应，参考 DeclarationList.vue
@@ -733,13 +733,13 @@ onMounted(() => {
         width: 100%;
         display: flex;
         flex-direction: column;
-        overflow: visible;
+        overflow: hidden; // 🔥 修复：改为 hidden，确保内容被正确裁剪
       }
       
       :deep(.base-table__table) {
         width: 100% !important;
         flex: 1;
-        overflow: visible;
+        overflow: hidden; // 🔥 修复：改为 hidden，确保内容被正确裁剪
       }
       
       // 🔥 确保表格自适应，不出现横向滚动条
@@ -789,6 +789,26 @@ onMounted(() => {
               display: flex !important;
               justify-content: center !important;
               align-items: center !important;
+              // 🔥 关键修复：确保 flex 容器内容被正确裁剪
+              overflow: hidden !important;
+              min-width: 0 !important; // 允许 flex 子元素收缩
+            }
+          }
+          
+          // 🔥 关键修复：确保 stripe 行的居中对齐样式也正确应用
+          tr.el-table__row--striped {
+            td.is-center {
+              text-align: center !important;
+              
+              .cell {
+                text-align: center !important;
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+                // 🔥 关键修复：确保 flex 容器内容被正确裁剪
+                overflow: hidden !important;
+                min-width: 0 !important; // 允许 flex 子元素收缩
+              }
             }
           }
           

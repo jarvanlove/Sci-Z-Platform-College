@@ -589,15 +589,13 @@ defineExpose({
       }
       
       // stripe 行（灰色背景）也要保持固定
+      // 🔥 修复：确保 stripe 行与普通行使用完全相同的样式，不添加任何特殊处理
       tr.el-table__row--striped {
         td {
+          // 与普通行完全一致，不添加任何特殊样式
           position: relative !important;
-          overflow: visible !important;
-          
-          .cell {
-            overflow: visible !important;
-            position: relative !important;
-          }
+          white-space: nowrap;
+          overflow: visible !important; // 与普通行保持一致（第587行）
         }
       }
     }
@@ -710,11 +708,10 @@ defineExpose({
       &.el-table__row--striped {
         background-color: var(--hover-light) !important;
         
-        // 确保 stripe 行的内容可以被滚动隐藏 - 强制设置
+        // 🔥 修复：确保 stripe 行与普通行使用完全相同的样式，只保留背景色差异
         td {
-          overflow: visible !important;
-          position: relative !important;
-          background-color: var(--hover-light) !important; // 确保 stripe 行背景色正确
+          // 只设置背景色，其他样式完全继承普通行的设置（第734-760行）
+          background-color: var(--hover-light) !important;
         }
         
         // 🔥 修复暗色主题下 stripe 行悬浮时的背景色
@@ -807,9 +804,8 @@ defineExpose({
         background-color: var(--hover-light) !important;
         
         td {
+          // 只设置背景色，其他样式完全继承普通行的设置（第828-834行）
           background-color: var(--hover-light) !important;
-          position: relative !important;
-          overflow: visible !important;
         }
       }
       
@@ -817,7 +813,8 @@ defineExpose({
         td {
           position: relative !important;
           white-space: nowrap;
-          overflow: visible !important;
+          // 🔥 修复：移除 overflow: visible，让固定列的滚动容器控制内容裁剪
+          box-sizing: border-box !important;
         }
       }
     }

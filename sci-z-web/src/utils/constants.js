@@ -2,7 +2,7 @@
 
 // 应用配置
 export const APP_CONFIG = {
-  TITLE: import.meta.env.VITE_APP_TITLE || '辅助高校科研管理平台',
+  TITLE: import.meta.env.VITE_APP_TITLE || 'AI.科研管理平台',
   VERSION: import.meta.env.VITE_APP_VERSION || '1.0.0',
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
   DIFY_API_URL: import.meta.env.VITE_DIFY_API_URL,

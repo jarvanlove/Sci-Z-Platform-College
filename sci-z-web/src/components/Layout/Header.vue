@@ -10,7 +10,7 @@
         <!-- 折叠时显示“菜单”图标（表示可展开）；展开时显示“折叠”图标（表示可收起） -->
         <el-icon><Menu v-if="sidebarCollapsed" /><Fold v-else /></el-icon>
       </el-button>
-      <h1>{{ currentMenuTitle }}</h1>
+      <img src="@/assets/images/logo.svg" alt="Sci-Z Platform" class="header-logo" />
     </div>
     <div class="header-right">
       <!-- 语言切换 -->
@@ -265,11 +265,11 @@ const handleLogout = async () => {
       }
     }
 
-    h1 {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--color-primary);
-      margin: 0;
+    .header-logo {
+      height: 30px;
+      width: auto;
+      display: block;
+      object-fit: contain;
     }
   }
 

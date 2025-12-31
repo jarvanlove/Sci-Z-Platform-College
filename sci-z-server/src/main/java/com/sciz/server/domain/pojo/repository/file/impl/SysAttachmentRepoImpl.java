@@ -8,6 +8,7 @@ import com.sciz.server.domain.pojo.entity.file.SysAttachment;
 import com.sciz.server.domain.pojo.mapper.file.SysAttachmentMapper;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
+import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -41,7 +42,18 @@ public class SysAttachmentRepoImpl implements SysAttachmentRepo {
         if (id == null) {
             return null;
         }
-        return mapper.selectById(id);
+        var queryWrapper = new LambdaQueryWrapper<SysAttachment>()
+                .eq(SysAttachment::getId, id)
+                .eq(SysAttachment::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 注意：文件表使用 uploader_id 字段，而不是 created_by
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(SysAttachment::getUploaderId, userId);
+        }
+
+        return mapper.selectOne(queryWrapper);
     }
 
     @Override
@@ -101,13 +113,33 @@ public class SysAttachmentRepoImpl implements SysAttachmentRepo {
             boolean asc) {
         LambdaQueryWrapper<SysAttachment> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysAttachment::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 注意：文件表使用 uploader_id 字段，而不是 created_by
+        // 如果传入了 uploaderId 参数，则使用传入的值；否则根据数据权限过滤
+        Long dataPermissionUserId = DataPermissionUtil.getDataPermissionFilter();
+        if (dataPermissionUserId != null) {
+            // 如果传入了 uploaderId，则必须与当前用户ID一致（防止越权）
+            if (uploaderId != null && !uploaderId.equals(dataPermissionUserId)) {
+                // 非 admin 用户不能查询其他用户的上传文件
+                page.setRecords(List.of());
+                page.setTotal(0);
+                return page;
+            }
+            // 如果没有传入 uploaderId，则使用当前用户ID过滤
+            if (uploaderId == null) {
+                wrapper.eq(SysAttachment::getUploaderId, dataPermissionUserId);
+            }
+        }
+        // 如果传入了 uploaderId 且是 admin 用户，则使用传入的值
+        Optional.ofNullable(uploaderId)
+                .ifPresent(value -> wrapper.eq(SysAttachment::getUploaderId, value));
+
         Optional.ofNullable(attachmentType)
                 .filter(StringUtils::hasText)
                 .ifPresent(value -> wrapper.eq(SysAttachment::getFileType, value));
         Optional.ofNullable(isPublic)
                 .ifPresent(value -> wrapper.eq(SysAttachment::getIsPublic, value));
-        Optional.ofNullable(uploaderId)
-                .ifPresent(value -> wrapper.eq(SysAttachment::getUploaderId, value));
         Optional.ofNullable(keyword)
                 .filter(StringUtils::hasText)
                 .ifPresent(value -> wrapper.like(SysAttachment::getOriginalName, value));
@@ -140,9 +172,18 @@ public class SysAttachmentRepoImpl implements SysAttachmentRepo {
         if (attachmentIds == null || attachmentIds.isEmpty()) {
             return List.of();
         }
-        return mapper.selectList(new LambdaQueryWrapper<SysAttachment>()
+        var queryWrapper = new LambdaQueryWrapper<SysAttachment>()
                 .in(SysAttachment::getId, attachmentIds)
-                .eq(SysAttachment::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
-                .orderByDesc(SysAttachment::getUploadTime));
+                .eq(SysAttachment::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 注意：文件表使用 uploader_id 字段，而不是 created_by
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(SysAttachment::getUploaderId, userId);
+        }
+
+        queryWrapper.orderByDesc(SysAttachment::getUploadTime);
+        return mapper.selectList(queryWrapper);
     }
 }

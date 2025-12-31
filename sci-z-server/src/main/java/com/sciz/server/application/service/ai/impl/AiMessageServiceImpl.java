@@ -14,6 +14,7 @@ import com.sciz.server.domain.pojo.repository.ai.AiMessageRepo;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
+import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
 import com.sciz.server.interfaces.converter.AiMessageConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +51,7 @@ public class AiMessageServiceImpl implements AiMessageService {
     @Transactional(rollbackFor = Exception.class)
     public AiMessageResp create(AiMessageCreateReq req) {
         Long userId = StpUtil.getLoginIdAsLong();
-        log.info(String.format("创建AI消息: userId=%s, conversationId=%s, role=%s", 
+        log.info(String.format("创建AI消息: userId=%s, conversationId=%s, role=%s",
                 userId, req.getConversationId(), req.getRole()));
 
         // 1. 验证会话是否存在且属于当前用户
@@ -91,7 +92,7 @@ public class AiMessageServiceImpl implements AiMessageService {
         }
 
         // 5. 如果是第一条用户消息且会话标题为"新建对话"，则更新会话标题为消息内容
-        if (isFirstUserMessage && StringUtils.hasText(req.getContent()) 
+        if (isFirstUserMessage && StringUtils.hasText(req.getContent())
                 && "新建对话".equals(conversation.getTitle())) {
             String newTitle = req.getContent();
             // 如果内容超过20个字符，截取前20个字符并加上省略号
@@ -102,7 +103,7 @@ public class AiMessageServiceImpl implements AiMessageService {
             conversation.setUpdatedBy(userId);
             boolean updateSuccess = conversationRepo.updateById(conversation);
             if (updateSuccess) {
-                log.info(String.format("首次用户消息，更新会话标题: conversationId=%s, newTitle=%s", 
+                log.info(String.format("首次用户消息，更新会话标题: conversationId=%s, newTitle=%s",
                         conversationId, newTitle));
             } else {
                 log.warn(String.format("更新会话标题失败: conversationId=%s", conversationId));
@@ -231,9 +232,13 @@ public class AiMessageServiceImpl implements AiMessageService {
             throw new BusinessException(ResultCode.AI_MESSAGE_NOT_FOUND);
         }
 
-        // 3. 权限检查：验证会话是否属于当前用户
+        // 3. 权限检查：admin 用户可以看到所有消息，普通用户只能看到自己的消息
         AiConversation conversation = conversationRepo.findById(entity.getConversationId());
-        if (conversation == null || !conversation.getUserId().equals(userId)) {
+        if (conversation == null) {
+            throw new BusinessException(ResultCode.AI_CONVERSATION_NOT_FOUND);
+        }
+        // 如果不是 admin 且会话不属于当前用户，则拒绝访问
+        if (!DataPermissionUtil.isAdmin() && !conversation.getUserId().equals(userId)) {
             throw new BusinessException(ResultCode.FORBIDDEN, "无权查看此消息");
         }
 
@@ -255,7 +260,7 @@ public class AiMessageServiceImpl implements AiMessageService {
     @Override
     public PageResult<AiMessageResp> pageByConversationId(AiMessageQueryReq req) {
         Long userId = StpUtil.getLoginIdAsLong();
-        log.info(String.format("分页查询AI消息: userId=%s, conversationId=%s, pageNo=%s, pageSize=%s", 
+        log.info(String.format("分页查询AI消息: userId=%s, conversationId=%s, pageNo=%s, pageSize=%s",
                 userId, req.conversationId(), req.pageNo(), req.pageSize()));
 
         // 1. 转换会话ID
@@ -266,12 +271,13 @@ public class AiMessageServiceImpl implements AiMessageService {
             throw new BusinessException(ResultCode.BAD_REQUEST, "无效的会话ID格式");
         }
 
-        // 2. 权限检查：验证会话是否属于当前用户
+        // 2. 权限检查：admin 用户可以看到所有消息，普通用户只能看到自己的消息
         AiConversation conversation = conversationRepo.findById(conversationId);
         if (conversation == null) {
             throw new BusinessException(ResultCode.AI_CONVERSATION_NOT_FOUND);
         }
-        if (!conversation.getUserId().equals(userId)) {
+        // 如果不是 admin 且会话不属于当前用户，则拒绝访问
+        if (!DataPermissionUtil.isAdmin() && !conversation.getUserId().equals(userId)) {
             throw new BusinessException(ResultCode.FORBIDDEN, "无权查看此会话的消息");
         }
 
@@ -290,10 +296,9 @@ public class AiMessageServiceImpl implements AiMessageService {
                 respList,
                 pageResult.getTotal(),
                 pageResult.getCurrent(),
-                pageResult.getSize()
-        );
+                pageResult.getSize());
 
-        log.info(String.format("分页查询AI消息成功: total=%s, current=%s, size=%s", 
+        log.info(String.format("分页查询AI消息成功: total=%s, current=%s, size=%s",
                 result.getTotal(), result.getCurrent(), result.getSize()));
         return result;
     }
@@ -317,12 +322,13 @@ public class AiMessageServiceImpl implements AiMessageService {
             throw new BusinessException(ResultCode.BAD_REQUEST, "无效的会话ID格式");
         }
 
-        // 2. 权限检查：验证会话是否属于当前用户
+        // 2. 权限检查：admin 用户可以看到所有消息，普通用户只能看到自己的消息
         AiConversation conversation = conversationRepo.findById(convId);
         if (conversation == null) {
             throw new BusinessException(ResultCode.AI_CONVERSATION_NOT_FOUND);
         }
-        if (!conversation.getUserId().equals(userId)) {
+        // 如果不是 admin 且会话不属于当前用户，则拒绝访问
+        if (!DataPermissionUtil.isAdmin() && !conversation.getUserId().equals(userId)) {
             throw new BusinessException(ResultCode.FORBIDDEN, "无权查看此会话的消息");
         }
 
@@ -358,9 +364,13 @@ public class AiMessageServiceImpl implements AiMessageService {
             throw new BusinessException(ResultCode.AI_MESSAGE_NOT_FOUND);
         }
 
-        // 3. 权限检查：验证会话是否属于当前用户
+        // 3. 权限检查：admin 用户可以删除所有消息，普通用户只能删除自己的消息
         AiConversation conversation = conversationRepo.findById(entity.getConversationId());
-        if (conversation == null || !conversation.getUserId().equals(userId)) {
+        if (conversation == null) {
+            throw new BusinessException(ResultCode.AI_CONVERSATION_NOT_FOUND);
+        }
+        // 如果不是 admin 且会话不属于当前用户，则拒绝删除
+        if (!DataPermissionUtil.isAdmin() && !conversation.getUserId().equals(userId)) {
             throw new BusinessException(ResultCode.FORBIDDEN, "无权删除此消息");
         }
 
@@ -406,12 +416,16 @@ public class AiMessageServiceImpl implements AiMessageService {
                 })
                 .collect(Collectors.toList());
 
-        // 2. 权限检查：验证所有消息的会话是否属于当前用户
+        // 2. 权限检查：admin 用户可以删除所有消息，普通用户只能删除自己的消息
         for (Long messageId : messageIds) {
             AiMessage entity = messageRepo.findById(messageId);
             if (entity != null) {
                 AiConversation conversation = conversationRepo.findById(entity.getConversationId());
-                if (conversation == null || !conversation.getUserId().equals(userId)) {
+                if (conversation == null) {
+                    throw new BusinessException(ResultCode.AI_CONVERSATION_NOT_FOUND, "消息关联的会话不存在: " + messageId);
+                }
+                // 如果不是 admin 且会话不属于当前用户，则拒绝删除
+                if (!DataPermissionUtil.isAdmin() && !conversation.getUserId().equals(userId)) {
                     throw new BusinessException(ResultCode.FORBIDDEN, "无权删除消息: " + messageId);
                 }
             }
@@ -463,4 +477,3 @@ public class AiMessageServiceImpl implements AiMessageService {
         log.info(String.format("删除会话所有消息成功: conversationId=%s", convId));
     }
 }
-

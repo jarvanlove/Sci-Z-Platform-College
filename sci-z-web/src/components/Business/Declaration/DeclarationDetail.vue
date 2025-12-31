@@ -388,11 +388,33 @@ const loadWorkflowStatus = async (declarationId) => {
     logger.info('Loading workflow status from polling API', { id: declarationId })
     
     const response = await getDeclarationWorkflowStatus(declarationId)
-    const responseData = response?.data || response
-    const workflowData = responseData?.data || {}
+    
+    // 🔥 修复数据解析逻辑：接口返回格式为 { code: 200, data: { workflowStatus, steps, ... } }
+    // 如果 response.data 存在且是对象，直接使用；否则尝试 response.data.data
+    let workflowData = {}
+    if (response?.data) {
+      // 检查 response.data 是否包含 workflowStatus 或 steps（说明它就是工作流数据）
+      if (response.data.workflowStatus !== undefined || response.data.steps !== undefined) {
+        workflowData = response.data
+      } else if (response.data.data) {
+        // 如果 response.data.data 存在，使用它（嵌套结构）
+        workflowData = response.data.data
+      } else {
+        workflowData = response.data
+      }
+    } else {
+      workflowData = response || {}
+    }
+    
+    logger.info('Parsed workflow data from API', { 
+      workflowData,
+      hasWorkflowStatus: 'workflowStatus' in workflowData,
+      workflowStatus: workflowData.workflowStatus,
+      stepsCount: Array.isArray(workflowData.steps) ? workflowData.steps.length : 0
+    })
 
-    // 优先使用轮询接口返回的 workflowStatus（如果存在）
-    if (workflowData.workflowStatus) {
+    // 🔥 优先使用轮询接口返回的 workflowStatus（如果存在），立即更新状态
+    if (workflowData.workflowStatus !== undefined) {
       declaration.value.workflowStatus = workflowData.workflowStatus
       logger.info('Workflow status updated from polling API', { 
         workflowStatus: workflowData.workflowStatus 
@@ -451,41 +473,52 @@ const loadWorkflowStatus = async (declarationId) => {
           errorDetails: workflowData.errorDetails
         }
       }
-      
-      // 检查工作流状态，决定是否停止轮询
-      // 1. 如果 workflowStatus === 'completed'，停止轮询
-      if (declaration.value.workflowStatus === 'completed') {
-        logger.info('Workflow completed, stopping polling')
-        stopWorkflowPolling()
-        return
-      }
-      
-      // 2. 如果 workflowStatus === 'failed'，停止轮询
-      if (declaration.value.workflowStatus === 'failed') {
-        logger.info('Workflow failed, stopping polling')
-        stopWorkflowPolling()
-        return
-      }
-      
-      // 3. 如果没有 workflowStatus，根据 steps 判断
+    } else {
+      // 工作流未开始时，steps 为空数组或 null
+      workflowTimeline.value = []
+    }
+    
+    // 🔥 检查工作流状态，决定是否停止轮询（必须在更新状态后立即检查）
+    const currentStatus = declaration.value.workflowStatus
+    
+    // 1. 如果 workflowStatus === 'completed'，立即停止轮询
+    if (currentStatus === 'completed') {
+      logger.info('Workflow completed, stopping polling immediately', { 
+        workflowStatus: currentStatus,
+        stepsCount: steps.length 
+      })
+      stopWorkflowPolling()
+      return
+    }
+    
+    // 2. 如果 workflowStatus === 'failed'，立即停止轮询
+    if (currentStatus === 'failed') {
+      logger.info('Workflow failed, stopping polling immediately', { 
+        workflowStatus: currentStatus 
+      })
+      stopWorkflowPolling()
+      return
+    }
+    
+    // 3. 如果没有 workflowStatus，根据 steps 判断
+    if (Array.isArray(steps) && steps.length > 0) {
       // 检查是否有失败的步骤
       const hasFailedStep = steps.some(step => step.status === 'failed')
       if (hasFailedStep) {
         declaration.value.workflowStatus = 'failed'
+        logger.info('Workflow has failed step, stopping polling', { steps })
         stopWorkflowPolling()
         return
       }
       
       // 检查是否所有步骤都完成
-      const allCompleted = steps.length > 0 && steps.every(step => step.status === 'success')
-      if (allCompleted) {
+      const allCompleted = steps.every(step => step.status === 'success')
+      if (allCompleted && currentStatus !== 'completed') {
         declaration.value.workflowStatus = 'completed'
+        logger.info('All steps completed, stopping polling', { steps })
         stopWorkflowPolling()
         return
       }
-    } else {
-      // 工作流未开始时，steps 为空数组或 null
-      workflowTimeline.value = []
     }
 
     logger.info('Workflow status loaded successfully from polling API', { 
@@ -513,15 +546,19 @@ const startWorkflowPolling = (declarationId) => {
   
   // 设置轮询定时器（每4秒轮询一次，在3-5秒之间）
   workflowPollingTimer = setInterval(() => {
-    // 检查当前工作流状态
+    // 🔥 检查当前工作流状态（使用最新的响应式值）
     const workflowStatus = declaration.value.workflowStatus
     
-    // 只在工作流运行中或待处理时继续轮询
-    if (workflowStatus === 'running' || workflowStatus === 'pending') {
+    logger.debug('Polling timer triggered', { workflowStatus, declarationId })
+    
+    // 🔥 只在工作流运行中或待处理时继续轮询
+    // 如果状态是 completed 或 failed，loadWorkflowStatus 中已经会停止轮询
+    // 但这里也做一次检查，确保不会继续轮询
+    if (workflowStatus === 'running' || workflowStatus === 'pending' || !workflowStatus) {
       loadWorkflowStatus(declarationId)
     } else {
       // 已完成或失败，停止轮询
-      logger.info('Workflow status is completed or failed, stopping polling', { workflowStatus })
+      logger.info('Workflow status is completed or failed, stopping polling in timer', { workflowStatus })
       stopWorkflowPolling()
     }
   }, POLLING_INTERVAL)

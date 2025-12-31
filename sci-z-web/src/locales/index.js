@@ -85,7 +85,7 @@ export const setLocale = (locale) => {
 // 更新页面标题
 export const updatePageTitle = (locale) => {
   const messages = i18n.global.messages.value[locale] || i18n.global.messages.value['zh-CN']
-  const title = messages?.app?.htmlTitle || '辅助高校科研管理平台'
+  const title = messages?.app?.htmlTitle || 'AI.科研管理平台'
   document.title = title
 }
 
