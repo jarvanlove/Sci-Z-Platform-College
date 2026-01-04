@@ -252,9 +252,9 @@ const getStatusTagType = (statusType) => {
 
 // 状态数字到字符串的映射
 const STATUS_MAP = {
-  1: { type: 'submitting', label: '申报中' },
+  1: { type: 'submitting', label: '申报已提交' },
   2: { type: 'success', label: '申报成功' },
-  3: { type: 'failed', label: '申报失败' }
+  3: { type: 'failed', label: '申报未通过' }
 }
 
 // 将后端状态数字转换为前端状态类型

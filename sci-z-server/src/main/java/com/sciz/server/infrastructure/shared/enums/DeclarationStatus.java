@@ -15,7 +15,7 @@ public enum DeclarationStatus {
     /**
      * 申报中
      */
-    IN_PROGRESS(1, "申报中"),
+    IN_PROGRESS(1, "申报已提交"),
 
     /**
      * 申报成功
@@ -25,7 +25,7 @@ public enum DeclarationStatus {
     /**
      * 申报失败
      */
-    FAILED(3, "申报失败");
+    FAILED(3, "申报未通过");
 
     private final Integer code;
     private final String description;

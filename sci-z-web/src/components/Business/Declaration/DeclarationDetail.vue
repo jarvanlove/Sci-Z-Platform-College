@@ -137,9 +137,9 @@ const logger = createLogger('DeclarationDetail')
 
 // 状态数字到字符串的映射（与列表页保持一致）
 const STATUS_MAP = {
-  1: { type: 'submitting', label: '申报中' },
+  1: { type: 'submitting', label: '申报已提交' },
   2: { type: 'success', label: '申报成功' },
-  3: { type: 'failed', label: '申报失败' }
+  3: { type: 'failed', label: '申报未通过' }
 }
 
 // 申报数据
