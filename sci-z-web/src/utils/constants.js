@@ -31,9 +31,9 @@ export const STATUS_CONFIG = {
 
 // 申报状态配置
 export const DECLARATION_STATUS_CONFIG = {
-  submitting: { text: '申报中', type: 'warning' },
+  submitting: { text: '申报已提交', type: 'warning' },
   success: { text: '申报成功', type: 'success' },
-  failed: { text: '申报失败', type: 'danger' }
+  failed: { text: '申报未通过', type: 'danger' }
 }
 
 // 申报部门选项

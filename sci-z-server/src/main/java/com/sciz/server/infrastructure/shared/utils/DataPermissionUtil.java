@@ -17,12 +17,20 @@ import java.util.List;
  * <p>
  * 使用场景：
  * - Repository 层查询时，根据返回值决定是否添加 created_by 过滤条件
+ * - 支持在异步线程中使用（通过 AsyncUserContext 传递用户信息）
  * <p>
  * 工作原理：
  * - 使用 ApplicationContextAware 获取 Spring Bean（PermissionService）
+ * - 通过 LoginUserUtil 获取当前登录用户信息（支持 Web 请求线程和异步线程）
  * - 查询当前用户的角色列表，判断是否包含 role_code = 'admin' 的角色
  * - 如果是 admin，返回 null（不过滤，可以看到所有数据）
  * - 如果不是 admin，返回当前用户ID（需要过滤，只能看到自己的数据）
+ * <p>
+ * 异步线程使用说明：
+ * - 在异步方法开始时，需要先设置 AsyncUserContext.set(currentUser)
+ * - 在异步方法结束时，需要调用 AsyncUserContext.clear() 清理上下文
+ * - LoginUserUtil 会优先从 AsyncUserContext（ThreadLocal）获取用户信息
+ * - 如果没有设置 AsyncUserContext，则会尝试从 Sa-Token Session 获取（仅在 Web 请求线程中可用）
  *
  * @author JiaWen.Wu
  * @className DataPermissionUtil

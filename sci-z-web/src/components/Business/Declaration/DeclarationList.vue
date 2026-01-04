@@ -62,7 +62,7 @@
         :columns="tableColumns"
         :loading="loading"
         :pagination="pagination"
-        :action-width="200"
+        :action-width="240"
         action-fixed="right"
         :empty-text="$t('declaration.noData')"
         stripe
@@ -102,10 +102,23 @@
           <div class="topic-cell base-table__cell-wrap">{{ row.topic || $t('declaration.noTopic') }}</div>
         </template>
 
-        <!-- 申报状态列自定义 -->
+        <!-- 申报状态列自定义 - 只显示状态标签，不提供点击交互 -->
+        <template #declarationStatus="{ row }">
+          <div class="status-cell-wrapper">
+            <!-- 只显示状态标签，不提供点击交互 -->
+            <span
+              class="status-tag"
+              :class="`status-${row.statusType}`"
+            >
+              {{ row.status }}
+            </span>
+          </div>
+        </template>
+
+        <!-- ========== 旧的申报状态列交互代码（已注释，保留备用） ========== -->
+        <!--
         <template #declarationStatus="{ row }">
           <div class="status-cell-wrapper" @click.stop.prevent>
-            <!-- 只有处理状态为已完成时才能操作申报状态 -->
             <el-dropdown
               v-if="row.workflowStatus === 'completed'"
               @command="(command) => handleStatusEdit(row.id, command)"
@@ -137,7 +150,6 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <!-- 处理状态未完成时，显示不可点击的状态标签 -->
             <BaseTooltip
               v-else
               :content="$t('declaration.workflowNotCompletedHint')"
@@ -152,6 +164,7 @@
             </BaseTooltip>
           </div>
         </template>
+        -->
 
         <!-- 工作流状态列自定义 -->
         <template #workflowStatus="{ row }">
@@ -168,6 +181,43 @@
         <!-- 操作列 -->
         <template #actions="{ row }">
           <div class="action-buttons">
+            <!-- 更新申报状态按钮（只有工作流已完成时才显示） -->
+            <BaseTooltip
+              v-if="row.workflowStatus === 'completed'"
+              :content="$t('declaration.updateStatus') || '更新申报状态'"
+              placement="top"
+            >
+              <el-dropdown
+                @command="(command) => handleStatusEdit(row.id, command)"
+                trigger="click"
+                @click.stop.prevent
+              >
+                <span 
+                  class="action-btn btn-warning" 
+                  style="cursor: pointer;"
+                  @click.stop.prevent
+                >
+                  <el-icon><Edit /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu class="status-dropdown-menu">
+                    <el-dropdown-item
+                      v-for="option in statusUpdateOptions"
+                      :key="option.value"
+                      :command="option.value"
+                      :disabled="option.value === row.statusType"
+                    >
+                      <span
+                        class="status-tag"
+                        :class="`status-${option.value}`"
+                      >
+                        {{ option.label }}
+                      </span>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </BaseTooltip>
             <!-- 查看详情按钮 -->
             <BaseTooltip :content="$t('common.view')" placement="top">
               <button
@@ -294,11 +344,18 @@ const statusOptions = computed(() => [
   { label: t('declaration.statusFailed'), value: '3' }
 ])
 
-// 可编辑状态选项
+// 可编辑状态选项（用于申报状态列的下拉菜单）
 const editableStatusOptions = computed(() => [
   { label: t('declaration.statusSubmitting'), value: 'submitting' },
   { label: t('declaration.statusSuccess'), value: 'success' },
   { label: t('declaration.statusFailed'), value: 'failed' }
+])
+
+// 状态更新选项（用于操作列按钮的下拉菜单，文字已修改，不包含"申报中"）
+const statusUpdateOptions = computed(() => [
+  // 移除"申报中"选项，只保留"申报已提交"和"申报未通过"
+  { label: t('declaration.statusSubmitted') || '申报已提交', value: 'success' }, // 申报成功 → 申报已提交
+  { label: t('declaration.statusRejected') || '申报未通过', value: 'failed' } // 申报失败 → 申报未通过
 ])
 
 // 获取工作流状态标签（使用后端返回的 workflowStatusDescription，如果没有则使用默认标签）
@@ -376,9 +433,9 @@ const tableColumns = computed(() => [
 
 // 状态数字到字符串的映射
 const STATUS_MAP = {
-  1: { type: 'submitting', label: '申报中' },
+  1: { type: 'submitting', label: '申报已提交' },
   2: { type: 'success', label: '申报成功' },
-  3: { type: 'failed', label: '申报失败' }
+  3: { type: 'failed', label: '申报未通过' }
 }
 
 // 将后端状态数字转换为前端状态类型
@@ -650,8 +707,9 @@ const STATUS_TYPE_TO_NUMBER = {
   failed: 3
 }
 
-// 状态编辑处理
+// 状态编辑处理（用于操作列按钮的下拉菜单，逻辑与之前申报状态列完全一致）
 const handleStatusEdit = async (id, newStatusType) => {
+  // 状态标签映射（用于显示和确认对话框）
   const statusLabels = {
     submitting: t('declaration.statusSubmitting'),
     success: t('declaration.statusSuccess'),
@@ -666,6 +724,7 @@ const handleStatusEdit = async (id, newStatusType) => {
   if (newStatusType === oldStatusType) return
   
   try {
+    // 确认对话框使用原始状态标签
     await ElMessageBox.confirm(
       t('declaration.confirmStatusChange', { status: statusLabels[newStatusType] }) || 
       `确定要将申报状态修改为"${statusLabels[newStatusType]}"吗？`,
@@ -688,7 +747,7 @@ const handleStatusEdit = async (id, newStatusType) => {
     const statusNumber = STATUS_TYPE_TO_NUMBER[newStatusType]
     await updateDeclarationStatus({ id, status: statusNumber })
     
-    // 更新本地状态
+    // 更新本地状态（使用原始状态标签，因为表格中显示的是原始标签）
     declaration.statusType = newStatusType
     declaration.status = statusLabels[newStatusType]
     
@@ -1083,18 +1142,18 @@ onMounted(() => {
   }
 }
 
-// 操作按钮样式 - 3个图标放在一行
+// 操作按钮样式 - 4个图标放在一行（更新状态、查看详情、下载、预览）
 .action-buttons {
   display: flex;
-  flex-direction: row; // 🔥 改为横向排列，3个图标放在一行
-  gap: 8px;
+  flex-direction: row; // 🔥 改为横向排列，图标放在一行
+  gap: 6px; // 🔥 减小间距，确保4个按钮能在一行显示
   justify-content: center;
   align-items: center;
   flex-wrap: nowrap; // 🔥 确保不换行
 }
 
 .action-btn {
-  padding: 5px 12px;
+  padding: 4px; // 🔥 减小内边距，确保按钮更紧凑
   border: 1px solid transparent;
   border-radius: 4px;
   font-size: 13px;
@@ -1107,8 +1166,10 @@ onMounted(() => {
   justify-content: center; // 🔥 图标居中显示
   gap: 0; // 🔥 只有图标，不需要 gap
   user-select: none;
-  min-width: 32px; // 🔥 确保图标按钮有最小宽度，保持美观
+  min-width: 28px; // 🔥 减小最小宽度，确保4个按钮能在一行显示
+  width: 28px; // 🔥 固定宽度，确保按钮大小一致
   height: 28px; // 🔥 统一高度
+  flex-shrink: 0; // 🔥 防止按钮被压缩
   
   // 🔥 图标样式
   .el-icon {
@@ -1146,6 +1207,16 @@ onMounted(() => {
     
     &:hover:not(:disabled) {
       background: #16a34a;
+      color: var(--surface);
+    }
+  }
+  
+  &.btn-warning {
+    color: #f59e0b;
+    border-color: #f59e0b;
+    
+    &:hover:not(:disabled) {
+      background: #f59e0b;
       color: var(--surface);
     }
   }
