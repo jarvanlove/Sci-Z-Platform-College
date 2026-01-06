@@ -66,6 +66,7 @@ import com.sciz.server.infrastructure.shared.event.project.ProjectUpdatedEvent;
 import com.sciz.server.infrastructure.shared.utils.DateUtil;
 import com.sciz.server.infrastructure.shared.utils.LoginUserUtil;
 import com.sciz.server.infrastructure.shared.utils.OperationLogRecorderUtil;
+import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
 import com.sciz.server.interfaces.converter.ProjectConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -1371,6 +1372,9 @@ public class ProjectServiceImpl implements ProjectService {
             final var finalFileDataList = fileDataList; // 用于 lambda 表达式
             CompletableFuture.runAsync(() -> {
                 try {
+                    // 设置异步用户上下文，使 LoginUserUtil 和 DataPermissionUtil 在异步线程中也能正常工作
+                    AsyncUserContext.set(currentUser);
+
                     if (finalFileDataList.isEmpty()) {
                         log.warn(String.format("文件数据列表为空，跳过 Dify 上传: projectId=%s", asyncProjectId));
                         return;
@@ -1394,6 +1398,9 @@ public class ProjectServiceImpl implements ProjectService {
                     log.error(String.format("异步上传文件到 Dify 知识库失败: projectId=%s, err=%s", asyncProjectId, e.getMessage()),
                             e);
                     // 不抛出异常，避免影响主流程
+                } finally {
+                    // 清理异步用户上下文（防止内存泄漏）
+                    AsyncUserContext.clear();
                 }
             }, globalTaskExecutor);
 
@@ -2341,8 +2348,7 @@ public class ProjectServiceImpl implements ProjectService {
                             totalWords,
                             totalDownloadCount,
                             project.getProgress(),
-                            project.getDifyKnowledgeId()
-                            );
+                            project.getDifyKnowledgeId());
                 })
                 .toList();
     }

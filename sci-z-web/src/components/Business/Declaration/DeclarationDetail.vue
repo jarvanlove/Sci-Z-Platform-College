@@ -695,18 +695,32 @@ const loadDeclarationDetail = async () => {
       await loadWorkflowStatus(declarationId)
     }
     
-    // 如果工作流状态是进行中（running）或待处理（pending），启动轮询
-    // 轮询启动后，使用轮询接口的数据更新状态和进度
-    if (declaration.value.workflowStatus === 'running' || declaration.value.workflowStatus === 'pending') {
-      logger.info('Workflow is running or pending, starting polling', { 
-        workflowStatus: declaration.value.workflowStatus 
+    // 🔥 修复：无论详情接口返回什么状态，只要有 workflowId 且状态不是明确的 completed 或 failed，都应该启动轮询
+    // 这样可以确保即使详情接口返回的状态不准确，也能通过轮询获取最新状态
+    const currentWorkflowStatus = declaration.value.workflowStatus
+    const hasWorkflowId = declaration.value.workflowId
+    
+    // 判断是否需要启动轮询：
+    // 1. 状态是 running 或 pending（明确需要轮询）
+    // 2. 或者有 workflowId 且状态不是明确的 completed 或 failed（可能还在运行中，需要轮询确认）
+    const shouldStartPolling = 
+      currentWorkflowStatus === 'running' || 
+      currentWorkflowStatus === 'pending' ||
+      (hasWorkflowId && currentWorkflowStatus !== 'completed' && currentWorkflowStatus !== 'failed')
+    
+    if (shouldStartPolling) {
+      logger.info('Starting workflow polling', { 
+        workflowStatus: currentWorkflowStatus,
+        hasWorkflowId: hasWorkflowId,
+        workflowId: declaration.value.workflowId
       })
       // 工作流运行中，启动轮询监控工作流进度
       // 轮询启动后，loadWorkflowStatus 会使用轮询接口的数据更新状态和进度
       startWorkflowPolling(declarationId)
     } else {
       logger.info('Workflow is completed or failed, no polling needed', { 
-        workflowStatus: declaration.value.workflowStatus 
+        workflowStatus: currentWorkflowStatus,
+        hasWorkflowId: hasWorkflowId
       })
     }
 

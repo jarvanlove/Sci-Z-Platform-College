@@ -500,6 +500,8 @@ export default {
     fileFormatError: 'Red header documents only support PDF, WORD formats, please select another file',
     fileTypeError: 'File format is incorrect, please ensure you are uploading a PDF or WORD format file',
     analyzing: 'AI is analyzing the document...',
+    analyzingHint: 'Document analysis may take some time, please wait patiently',
+    uploadingAndAnalyzing: 'Uploading and analyzing document, this may take some time, please wait patiently...',
     analysisComplete: 'Document analysis complete',
     analysisFailed: 'Document analysis failed',
     aiAnalysisResult: 'AI Analysis Result',
@@ -876,6 +878,7 @@ export default {
     newDeclaration: 'New Declaration',
     projectList: 'Project List',
     applyAcceptance: 'Apply Acceptance',
+    academicSearch: 'Academic Search',
     knowledgeSearch: 'Knowledge Base Search',
     declarationNumber: 'Declaration Number',
     researchDirection: 'Research Direction',
@@ -889,6 +892,7 @@ export default {
     executingAction: 'Executing Action: {action}',
     actionNewDeclaration: 'New Declaration',
     actionApplyAcceptance: 'Apply Acceptance',
+    actionAcademicSearch: 'Academic Search',
     actionKnowledgeSearch: 'Knowledge Base Search'
   },
 
@@ -1472,5 +1476,125 @@ export default {
     pptViewerErrorMessage: 'Office Online Viewer service may have reached usage limit. If you need to upgrade to Pro+ version for better preview experience, please contact system administrator.',
     pptViewerFailed: 'PPT online preview service is temporarily unavailable, possibly due to service limit or network issues. Please try downloading the file and opening it with local application, or contact administrator to upgrade service. If you need to upgrade to Pro+ version for better preview experience, please contact system administrator.',
     iframeLoadFailed: 'Preview load failed'
+  },
+
+  // Operation Manual
+  manual: {
+    title: 'Operation Manual',
+    systemIntroduction: {
+      title: 'System Introduction',
+      content: 'Sci-Z Platform is an intelligent research management platform based on AIGC, designed to provide comprehensive research project management, literature search, knowledge management, and intelligent assistant services for university researchers.',
+      feature1: 'Intelligent Research Project Management: Supports full lifecycle management from declaration to acceptance',
+      feature2: 'AI-driven Literature Search: Quickly search and organize relevant academic literature',
+      feature3: 'Knowledge Base Management: Build personal or team knowledge bases with multi-level folder structure support',
+      feature4: 'Intelligent AI Assistant: Smart Q&A and knowledge retrieval',
+      feature5: 'Multi-language Support: Supports Chinese, English, Japanese, Korean and other languages'
+    },
+    quickStart: {
+      title: 'Quick Start',
+      step1: {
+        title: 'Login to System',
+        description: 'Log in to the system using your username and password. If this is your first time, please register an account first.'
+      },
+      step2: {
+        title: 'Complete Personal Information',
+        description: 'After logging in, it is recommended to complete your personal information first, including avatar, contact information and other basic information.'
+      },
+      step3: {
+        title: 'Create Declaration',
+        description: 'Create a new research project declaration in the declaration management module. You can upload an official government-issued document (optional), and the system will assist in parsing and automatically filling in research direction, research topic, research fields, etc. You can modify these fields according to your actual situation or write your own definitions.'
+      },
+      step4: {
+        title: 'Create Project',
+        description: 'When the declaration processing status is "Completed", click the "Update Declaration Status" button in the operations column, select "Declaration Submitted", and the system will automatically create a project and generate the corresponding project knowledge base.'
+      },
+      step5: {
+        title: 'Edit Project',
+        description: 'In the project details page, update basic project information, add project members (optional based on actual needs), add project milestones and upload corresponding milestone documents, then save and update the project.'
+      },
+      step6: {
+        title: 'Generate Report',
+        description: 'In the acceptance management module, select a project and generate acceptance reports. The system will intelligently generate technology reports and self-evaluation reports based on the project knowledge base content.'
+      },
+      step7: {
+        title: 'Start Using',
+        description: 'Explore various features of the system, including literature search, AI assistant, knowledge base management, etc.'
+      }
+    },
+    modules: {
+      title: 'Functional Modules',
+      dashboard: {
+        title: 'Dashboard',
+        description: 'View system overview, project statistics, to-do items and other key information'
+      },
+      literature: {
+        title: 'Literature Search',
+        description: 'Quickly search academic literature with support for multiple search conditions and filtering functions'
+      },
+      ai: {
+        title: 'AI Assistant',
+        description: 'Intelligent conversation assistant, providing project-related intelligent Q&A services and knowledge base management'
+      },
+      declaration: {
+        title: 'Declaration Management',
+        description: 'Manage research project declarations, including declaration creation, submission, review and other processes'
+      },
+      project: {
+        title: 'Project Management',
+        description: 'Manage the full lifecycle of research projects, including project creation, progress tracking, milestone management, etc.'
+      },
+      acceptance: {
+        title: 'Acceptance Management',
+        description: 'Manage research project acceptance processes, including report generation, acceptance applications, acceptance review and other functions'
+      },
+      system: {
+        title: 'System Management',
+        description: 'Manage system configuration, user management, role permissions, log management and other system-level functions'
+      },
+      user: {
+        title: 'User Center',
+        description: 'Manage personal information, security settings, login logs and other personal account-related functions'
+      }
+    },
+    guide: {
+      title: 'User Guide',
+      item1: {
+        title: 'How to Create and Manage Projects',
+        content1: 'In the project management module, click the "New Project" button and fill in the basic project information.',
+        content2: 'After the project is created, you can view and manage the detailed information of the project on the project details page.',
+        content3: 'Supports setting project milestones, tracking project progress, uploading project documents and other operations.'
+      },
+      item2: {
+        title: 'How to Use AI Assistant',
+        content1: 'On the AI Assistant page, you can create a new conversation session and have intelligent Q&A with AI.',
+        content2: 'AI Assistant can answer questions related to projects, literature, knowledge bases, etc.',
+        content3: 'Supports conversation history, you can view previous conversation content at any time.'
+      },
+      item3: {
+        title: 'How to Manage Knowledge Base',
+        content1: 'In the knowledge base module, you can create knowledge bases and set up folder structures.',
+        content2: 'Supports uploading various types of files, including documents, images, videos, etc.',
+        content3: 'You can perform AI Q&A based on knowledge base content and quickly retrieve related knowledge.'
+      }
+    },
+    faq: {
+      title: 'Frequently Asked Questions',
+      item1: {
+        question: 'How to reset password?',
+        answer: 'If you have forgotten your password, you can click "Forgot Password" on the login page, then follow the prompts to complete the password reset. You need to provide the email address used during registration, and the system will send a verification code to your email.'
+      },
+      item2: {
+        question: 'How to upload files?',
+        answer: 'On the project details page or knowledge base page, click the "Upload" button and select the file you want to upload. The system supports various file formats, including documents, images, videos, etc.'
+      },
+      item3: {
+        question: 'How to use AI Assistant?',
+        answer: 'On the AI Assistant page, create a new conversation session, then enter your question. AI Assistant will provide intelligent answers based on the system knowledge base and Dify platform.'
+      },
+      item4: {
+        question: 'How to contact technical support?',
+        answer: 'If you encounter problems during use, you can contact technical support through the feedback function in the system, or send an email to the technical support email address.'
+      }
+    }
   }
 }
