@@ -34,6 +34,7 @@ import com.sciz.server.domain.pojo.entity.file.SysAttachmentRelation;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRepo;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRelationRepo;
 import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
+import com.sciz.server.infrastructure.shared.utils.AsyncTaskUtil;
 import com.sciz.server.infrastructure.shared.utils.FileUtil;
 import com.sciz.server.infrastructure.shared.utils.LoginUserUtil;
 import com.sciz.server.infrastructure.shared.utils.MinioUtil;
@@ -162,18 +163,13 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             }
             log.info(String.format("报告保存成功: reportId=%s, number=%s", reportId, entity.getNumber()));
 
-            // 6. 异步调用 Dify 工作流生成报告（使用 CompletableFuture 实现真正的异步）
+            // 6. 异步调用 Dify 工作流生成报告（在事务提交后执行，确保数据已提交到数据库）
+            // 注意：使用 AsyncTaskUtil 确保在事务提交后执行，避免查询不到刚插入的数据
             // 注意：在异步线程中无法获取 Web 上下文，所以需要传递完整的用户上下文
-            CompletableFuture.runAsync(() -> {
-                try {
-                    Async(reportId, currentUser);
-                } catch (Exception e) {
-                    log.error(String.format("异步执行 Dify 工作流失败: reportId=%s, err=%s",
-                            entity.getId(), e.getMessage()), e);
-                }
-            }, globalTaskExecutor);
-            //
-            log.info(String.format("已提交异步任务: reportId=%s", reportId));
+            AsyncTaskUtil.executeAfterCommit(() -> {
+                Async(reportId, currentUser);
+            }, currentUser, globalTaskExecutor);
+
             return reportId;
         } catch (BusinessException e) {
             throw e;

@@ -53,6 +53,7 @@
             v-else
             :data="recentDeclarations"
             :empty-text="$t('common.noData')"
+            :show-header="true"
             stripe
             class="declaration-table"
           >
@@ -200,7 +201,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Document, Folder, Check, Search, TopRight } from '@element-plus/icons-vue'
+import { Document, Folder, Check, Search, TopRight, Reading } from '@element-plus/icons-vue'
 import { BaseCard, ProjectProgressBar, BaseScrollbar, BaseTooltip } from '@/components/Common'
 import { formatDate } from '@/utils/date'
 import { DECLARATION_STATUS_CONFIG } from '@/utils/constants'
@@ -214,20 +215,32 @@ const logger = createLogger('Dashboard')
 
 // 响应式数据
 const loading = ref(false)
-const stats = ref([
-  { key: 'total', icon: '📁', value: 0, label: t('dashboard.totalProjects'), valueClass: 'stat-total' },
-  { key: 'progress', icon: '⏰', value: 0, label: t('dashboard.inProgress'), valueClass: 'stat-progress' },
-  { key: 'pending', icon: '⏳', value: 0, label: t('dashboard.delayedProjects'), valueClass: 'stat-pending' },
-  { key: 'completed', icon: '✅', value: 0, label: t('dashboard.completed'), valueClass: 'stat-completed' }
+
+// 统计数据 - 使用 computed 使标签响应语言切换
+const stats = computed(() => [
+  { key: 'total', icon: '📁', value: statsValues.value.total, label: t('dashboard.totalProjects'), valueClass: 'stat-total' },
+  { key: 'progress', icon: '⏰', value: statsValues.value.progress, label: t('dashboard.inProgress'), valueClass: 'stat-progress' },
+  { key: 'pending', icon: '⏳', value: statsValues.value.pending, label: t('dashboard.delayedProjects'), valueClass: 'stat-pending' },
+  { key: 'completed', icon: '✅', value: statsValues.value.completed, label: t('dashboard.completed'), valueClass: 'stat-completed' }
 ])
+
+// 统计数据值
+const statsValues = ref({
+  total: 0,
+  progress: 0,
+  pending: 0,
+  completed: 0
+})
 
 const recentDeclarations = ref([])
 const projectProgress = ref([])
 
-const quickActions = ref([
+// 快捷操作 - 使用 computed 使标签响应语言切换
+const quickActions = computed(() => [
   { key: 'newDeclaration', icon: Document, buttonClass: 'primary', label: t('dashboard.newDeclaration') },
   { key: 'projectList', icon: Folder, buttonClass: 'secondary', label: t('dashboard.projectList') },
   { key: 'applyAcceptance', icon: Check, buttonClass: 'secondary', label: t('dashboard.applyAcceptance') },
+  { key: 'academicSearch', icon: Reading, buttonClass: 'secondary', label: t('dashboard.academicSearch') },
   { key: 'knowledgeSearch', icon: Search, buttonClass: 'text', label: t('dashboard.knowledgeSearch') }
 ])
 
@@ -286,10 +299,10 @@ const loadDashboardData = async () => {
     try {
       const statsResponse = await getProjectStatistics()
       if (statsResponse.code === 200 && statsResponse.data) {
-        stats.value[0].value = statsResponse.data.totalProjects || 0
-        stats.value[1].value = statsResponse.data.inProgressCount || 0
-        stats.value[2].value = statsResponse.data.delayedCount || 0
-        stats.value[3].value = statsResponse.data.completedCount || 0
+        statsValues.value.total = statsResponse.data.totalProjects || 0
+        statsValues.value.progress = statsResponse.data.inProgressCount || 0
+        statsValues.value.pending = statsResponse.data.delayedCount || 0
+        statsValues.value.completed = statsResponse.data.completedCount || 0
         logger.info('Project statistics loaded successfully', statsResponse.data)
       }
     } catch (error) {
@@ -375,6 +388,7 @@ const handleQuickAction = (action) => {
     newDeclaration: '/declaration/create',
     projectList: '/project/list',
     applyAcceptance: '/report/list',
+    academicSearch: '/literature/search',
     knowledgeSearch: '/knowledge/list'
   }
   
@@ -529,6 +543,16 @@ onMounted(() => {
   grid-template-columns: 2fr 1fr;
   gap: 24px;
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  
+  // 🔥 确保两个卡片都不会溢出
+  > * {
+    min-width: 0; // 🔥 关键：允许 grid 项目收缩
+    max-width: 100%;
+    box-sizing: border-box;
+  }
 }
 
 .content-card {
@@ -540,15 +564,9 @@ onMounted(() => {
   // BaseCard 组件本身已经有 background、border-radius、border、box-shadow
   // 这里只需要确保样式一致性
   width: 100%;
+  max-width: 100%;
+  min-width: 0; // 🔥 关键：允许在 grid 中收缩
   box-sizing: border-box;
-  
-  // 🔥 如果需要在 BaseCard 外层添加 padding，应该覆盖 __content 的 padding
-  :deep(.base-card__content) {
-    padding: 0;
-    width: 100%;
-    max-width: 100%;
-    overflow: visible;
-  }
   
   // 🔥 确保 header 样式正确
   :deep(.base-card__header) {
@@ -595,21 +613,37 @@ onMounted(() => {
   min-height: auto;
   height: fit-content;
   width: 100%;
+  max-width: 100%;
+  min-width: 0; // 🔥 关键：允许在 grid 中收缩
   box-sizing: border-box;
   
-  // 🔥 表格不需要外层 padding，表格本身已经有单元格 padding
-  // content-card 已经设置了 __content padding: 0，这里不需要再设置
+  // 🔥 表格容器需要限制宽度，防止挤压右侧
+  :deep(.base-card__content) {
+    padding: 0;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto; // 🔥 允许表格横向滚动
+    overflow-y: visible;
+    box-sizing: border-box;
+  }
 }
 
 .quick-actions-card {
   min-height: auto;
   height: fit-content;
   width: 100%;
+  max-width: 100%;
+  min-width: 0; // 🔥 关键：允许在 grid 中收缩
   box-sizing: border-box;
+  overflow: hidden; // 🔥 防止内容溢出
   
   // 🔥 快捷操作区域需要 padding
   :deep(.base-card__content) {
     padding: var(--gap-lg);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 }
 
@@ -629,16 +663,25 @@ onMounted(() => {
 // Element Plus 表格样式 - 与 DeclarationList.vue 保持一致
 .declaration-table {
   width: 100%;
+  max-width: 100%; // 🔥 限制最大宽度，防止溢出
   border-radius: 8px;
-  overflow: visible;
+  overflow: hidden; // 🔥 改为 hidden，防止内容溢出
   border: 1px solid var(--border);
+  box-sizing: border-box; // 🔥 确保盒模型正确
 
   // 🔥 使用最强的选择器优先级，确保覆盖所有全局样式
   // 关键：使用 .declaration-table 类名 + 完整的选择器路径 + 多重选择器
   :deep(.el-table) {
+    width: 100%;
+    max-width: 100%;
+    
     // 表头样式 - 使用最高优先级覆盖全局样式
     .el-table__header-wrapper {
+      width: 100%;
+      
       .el-table__header {
+        width: 100% !important;
+        
         th {
           padding: 14px 16px !important;
           font-size: 14px !important;
@@ -660,6 +703,12 @@ onMounted(() => {
         }
       }
     }
+    
+    // 🔥 确保表体容器宽度正确
+    .el-table__body-wrapper {
+      width: 100%;
+      max-width: 100%;
+    }
   }
   
   // 🔥 额外的样式规则，使用更直接的选择器确保覆盖
@@ -674,6 +723,8 @@ onMounted(() => {
   // 表体样式
   :deep(.el-table) {
     .el-table__body {
+      width: 100%;
+      
       tr {
         cursor: pointer;
         transition: background-color 0.2s;

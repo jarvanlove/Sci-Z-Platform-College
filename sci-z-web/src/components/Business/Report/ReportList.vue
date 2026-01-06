@@ -212,9 +212,6 @@
         <div class="empty-icon">📄</div>
         <div class="empty-title">{{ $t('report.listPage.noReports') }}</div>
         <div class="empty-description">{{ $t('report.listPage.noReportsHint') }}</div>
-        <BaseButton type="primary" @click="handleGenerateReport">
-          {{ $t('report.listPage.generateNewReport') }}
-        </BaseButton>
       </div>
 
       <!-- 分页 -->

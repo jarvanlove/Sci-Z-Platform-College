@@ -21,6 +21,12 @@
         <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
       </el-button>
       
+      <!-- 操作手册 -->
+      <el-button type="text" @click="goToManual" class="manual-toggle" :title="$t('manual.title')">
+        <el-icon><Reading /></el-icon>
+        <span class="manual-text">{{ $t('manual.title') }}</span>
+      </el-button>
+      
       <!-- 用户信息 -->
       <el-dropdown @command="handleUserCommand" trigger="click">
         <div class="user-info">
@@ -170,6 +176,11 @@ const toggleTheme = () => {
   appStore.toggleTheme()
 }
 
+// 跳转到操作手册
+const goToManual = () => {
+  router.push('/manual')
+}
+
 // 监听主题变化，确保 DOM 更新
 watch(() => appStore.theme, (newTheme) => {
   const html = document.documentElement
@@ -285,6 +296,24 @@ const handleLogout = async () => {
       &:hover {
         color: var(--color-primary);
         background-color: var(--hover);
+      }
+    }
+
+    .manual-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      color: var(--text);
+      
+      &:hover {
+        color: var(--color-primary);
+        background-color: var(--hover);
+      }
+
+      .manual-text {
+        font-size: 14px;
+        font-weight: 400;
       }
     }
 

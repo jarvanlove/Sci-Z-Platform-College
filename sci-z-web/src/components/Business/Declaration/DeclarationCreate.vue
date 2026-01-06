@@ -56,7 +56,10 @@
               <!-- 分析状态 -->
               <div v-if="uploadStatus === 'analyzing'" class="upload-status analyzing">
                 <el-icon class="is-loading"><Loading /></el-icon>
-                <span>{{ $t('declaration.analyzing') }}</span>
+                <div class="analyzing-content">
+                  <span class="analyzing-text">{{ $t('declaration.analyzing') }}</span>
+                  <span class="analyzing-hint">{{ $t('declaration.analyzingHint') }}</span>
+                </div>
               </div>
   
               <div v-if="uploadStatus === 'success'" class="upload-status success">
@@ -480,15 +483,50 @@
       return
     }
   
+    // 🔥 改进用户体验：先显示上传状态
+    uploadStatus.value = 'uploading'
+    uploadProgress.value = 30 // 初始进度
+    
+    // 显示提示消息
+    let loadingMessage = null
+    let progressInterval = null
+    
     try {
-      // 接口同时处理上传和分析，直接显示分析状态
-      uploadStatus.value = 'analyzing'
-      uploadProgress.value = 0
+      // 显示提示消息
+      loadingMessage = ElMessage({
+        message: t('declaration.uploadingAndAnalyzing'),
+        type: 'info',
+        duration: 0, // 不自动关闭
+        showClose: false
+      })
   
       logger.info('Starting file upload and analysis', { fileName: file.name, fileSize: file.size })
   
+      // 模拟上传进度（实际进度由接口控制）
+      progressInterval = setInterval(() => {
+        if (uploadProgress.value < 80) {
+          uploadProgress.value += 10
+        }
+      }, 500)
+  
+      // 切换到分析状态
+      uploadStatus.value = 'analyzing'
+      uploadProgress.value = 80
+  
       // 调用红头文件上传接口（上传和分析合并在一个接口中，只需要传 file 对象）
       const response = await uploadRedHeaderFile(file)
+      
+      // 清除进度模拟
+      if (progressInterval) {
+        clearInterval(progressInterval)
+        progressInterval = null
+      }
+      
+      // 关闭提示消息
+      if (loadingMessage) {
+        loadingMessage.close()
+        loadingMessage = null
+      }
       
       // 处理响应数据
       const analysisData = response?.data || {}
@@ -553,11 +591,23 @@
       }
       
       uploadStatus.value = 'success'
+      uploadProgress.value = 100
       ElMessage.success(t('declaration.analysisSuccess'))
       logger.info('File upload and analysis completed successfully', { analysisData })
     } catch (error) {
+      // 清除进度模拟（如果还在运行）
+      if (progressInterval) {
+        clearInterval(progressInterval)
+      }
+      
+      // 关闭提示消息（如果还在显示）
+      if (loadingMessage) {
+        loadingMessage.close()
+      }
+      
       logger.error('File upload or analysis failed', error)
       uploadStatus.value = 'error'
+      uploadProgress.value = 0
       ElMessage.error(t('declaration.analysisError'))
     }
   }
@@ -934,6 +984,22 @@
         background: #fffbeb;
         color: #92400e;
         border: 1px solid #fde68a;
+        
+        .analyzing-content {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          
+          .analyzing-text {
+            font-weight: 500;
+          }
+          
+          .analyzing-hint {
+            font-size: 12px;
+            color: #a16207;
+            opacity: 0.8;
+          }
+        }
       }
   
       &.error {

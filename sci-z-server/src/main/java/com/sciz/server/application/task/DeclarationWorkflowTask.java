@@ -17,6 +17,8 @@ import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.infrastructure.shared.utils.DateUtil;
 import com.sciz.server.infrastructure.shared.utils.JsonUtil;
+import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
+import com.sciz.server.domain.pojo.dto.response.user.LoginUserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -168,6 +170,25 @@ public class DeclarationWorkflowTask {
         log.info(String.format("开始异步处理申报工作流: declarationId=%s, resourceId=%s, keyType=%s",
                 declarationId, resourceId, keyType));
 
+        // 设置异步用户上下文，使 LoginUserUtil 和 DataPermissionUtil 在异步线程中也能正常工作
+        LoginUserContext userContext = null;
+        try {
+            // 从 userId 获取用户信息并构建 LoginUserContext
+            var user = sysUserRepo.findById(userId);
+            if (user != null) {
+                userContext = LoginUserContext.of(
+                        user.getId(),
+                        user.getUsername(),
+                        user.getRealName() != null ? user.getRealName() : user.getUsername(),
+                        null, null, null, null, null);
+                AsyncUserContext.set(userContext);
+            } else {
+                log.warn(String.format("用户不存在，无法设置异步用户上下文: userId=%s", userId));
+            }
+        } catch (Exception e) {
+            log.warn(String.format("设置异步用户上下文失败: userId=%s, err=%s", userId, e.getMessage()), e);
+        }
+
         try {
             // 1. 更新工作流状态为"处理中"
             updateWorkflowStatus(declarationId, WorkflowStatus.RUNNING, null);
@@ -255,30 +276,65 @@ public class DeclarationWorkflowTask {
      * 更新工作流状态
      */
     private void updateWorkflowStatus(Long declarationId, WorkflowStatus status, String fileUrl) {
-        try {
-            var declaration = declarationRepo.findById(declarationId);
-            if (declaration == null) {
-                log.error(String.format("申报不存在: declarationId=%s", declarationId));
-                return;
+        // 重试机制：如果查询不到申报，可能是事务还没提交，等待后重试
+        int maxRetries = 5;
+        int retryDelayMs = 200; // 每次重试等待 200ms
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                var declaration = declarationRepo.findById(declarationId);
+                if (declaration == null) {
+                    if (attempt < maxRetries) {
+                        log.warn(String.format("申报不存在，等待事务提交后重试: declarationId=%s, attempt=%d/%d",
+                                declarationId, attempt, maxRetries));
+                        try {
+                            Thread.sleep(retryDelayMs);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            log.error(String.format("等待重试被中断: declarationId=%s", declarationId), e);
+                            return;
+                        }
+                        continue; // 重试
+                    } else {
+                        log.error(String.format("申报不存在（重试%d次后仍失败）: declarationId=%s", maxRetries, declarationId));
+                        return;
+                    }
+                }
+
+                // 获取当前工作流结果
+                var workflowResult = getWorkflowResult(declaration);
+
+                // 如果有文件URL，更新到工作流结果中
+                if (fileUrl != null && !fileUrl.isEmpty()) {
+                    workflowResult.put("fileUrl", fileUrl);
+                    // 从文件URL中提取文件格式
+                    var fileFormat = extractFileFormat(fileUrl);
+                    workflowResult.put("fileFormat", fileFormat);
+                }
+
+                // 更新工作流状态和工作流结果
+                declarationRepo.updateWorkflowStatus(declarationId, status.getCode(), JsonUtil.toJson(workflowResult));
+
+                log.info(String.format("更新工作流状态成功: declarationId=%s, status=%s", declarationId, status.getCode()));
+                break; // 成功执行后退出循环
+            } catch (Exception e) {
+                if (attempt < maxRetries) {
+                    log.warn(String.format("更新工作流状态失败，等待后重试: declarationId=%s, attempt=%d/%d, err=%s",
+                            declarationId, attempt, maxRetries, e.getMessage()));
+                    try {
+                        Thread.sleep(retryDelayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.error(String.format("等待重试被中断: declarationId=%s", declarationId), ie);
+                        return;
+                    }
+                    continue; // 重试
+                } else {
+                    log.error(String.format("更新工作流状态失败（重试%d次后仍失败）: declarationId=%s, err=%s",
+                            maxRetries, declarationId, e.getMessage()), e);
+                    return;
+                }
             }
-
-            // 获取当前工作流结果
-            var workflowResult = getWorkflowResult(declaration);
-
-            // 如果有文件URL，更新到工作流结果中
-            if (fileUrl != null && !fileUrl.isEmpty()) {
-                workflowResult.put("fileUrl", fileUrl);
-                // 从文件URL中提取文件格式
-                var fileFormat = extractFileFormat(fileUrl);
-                workflowResult.put("fileFormat", fileFormat);
-            }
-
-            // 更新工作流状态和工作流结果
-            declarationRepo.updateWorkflowStatus(declarationId, status.getCode(), JsonUtil.toJson(workflowResult));
-
-            log.info(String.format("更新工作流状态成功: declarationId=%s, status=%s", declarationId, status.getCode()));
-        } catch (Exception e) {
-            log.error(String.format("更新工作流状态失败: declarationId=%s, err=%s", declarationId, e.getMessage()), e);
         }
     }
 
@@ -286,36 +342,73 @@ public class DeclarationWorkflowTask {
      * 添加工作流步骤
      */
     private void addWorkflowStep(Long declarationId, String stepName, String stepStatus) {
-        try {
-            var declaration = declarationRepo.findById(declarationId);
-            if (declaration == null) {
-                log.error(String.format("申报不存在: declarationId=%s", declarationId));
-                return;
+        // 重试机制：如果查询不到申报，可能是事务还没提交，等待后重试
+        int maxRetries = 5;
+        int retryDelayMs = 200; // 每次重试等待 200ms
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                var declaration = declarationRepo.findById(declarationId);
+                if (declaration == null) {
+                    if (attempt < maxRetries) {
+                        log.warn(String.format("申报不存在，等待事务提交后重试: declarationId=%s, stepName=%s, attempt=%d/%d",
+                                declarationId, stepName, attempt, maxRetries));
+                        try {
+                            Thread.sleep(retryDelayMs);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            log.error(String.format("等待重试被中断: declarationId=%s, stepName=%s", declarationId, stepName),
+                                    e);
+                            return;
+                        }
+                        continue; // 重试
+                    } else {
+                        log.error(String.format("申报不存在（重试%d次后仍失败）: declarationId=%s, stepName=%s",
+                                maxRetries, declarationId, stepName));
+                        return;
+                    }
+                }
+
+                // 获取当前工作流结果
+                var workflowResult = getWorkflowResult(declaration);
+
+                // 获取步骤列表
+                @SuppressWarnings("unchecked")
+                var steps = (List<Map<String, Object>>) workflowResult.getOrDefault("steps", new ArrayList<>());
+
+                // 添加新步骤
+                var step = new HashMap<String, Object>();
+                step.put("name", stepName);
+                step.put("status", stepStatus);
+                step.put("timestamp", DateUtil.formatDateTime(LocalDateTime.now()));
+                steps.add(step);
+
+                // 更新工作流结果
+                workflowResult.put("steps", steps);
+                declarationRepo.updateWorkflowStatus(declarationId,
+                        declaration.getWorkflowStatus(), JsonUtil.toJson(workflowResult));
+
+                log.info(String.format("添加工作流步骤成功: declarationId=%s, stepName=%s, stepStatus=%s",
+                        declarationId, stepName, stepStatus));
+                break; // 成功执行后退出循环
+            } catch (Exception e) {
+                if (attempt < maxRetries) {
+                    log.warn(String.format("添加工作流步骤失败，等待后重试: declarationId=%s, stepName=%s, attempt=%d/%d, err=%s",
+                            declarationId, stepName, attempt, maxRetries, e.getMessage()));
+                    try {
+                        Thread.sleep(retryDelayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.error(String.format("等待重试被中断: declarationId=%s, stepName=%s", declarationId, stepName), ie);
+                        return;
+                    }
+                    continue; // 重试
+                } else {
+                    log.error(String.format("添加工作流步骤失败（重试%d次后仍失败）: declarationId=%s, stepName=%s, err=%s",
+                            maxRetries, declarationId, stepName, e.getMessage()), e);
+                    return;
+                }
             }
-
-            // 获取当前工作流结果
-            var workflowResult = getWorkflowResult(declaration);
-
-            // 获取步骤列表
-            @SuppressWarnings("unchecked")
-            var steps = (List<Map<String, Object>>) workflowResult.getOrDefault("steps", new ArrayList<>());
-
-            // 添加新步骤
-            var step = new HashMap<String, Object>();
-            step.put("name", stepName);
-            step.put("status", stepStatus);
-            step.put("timestamp", DateUtil.formatDateTime(LocalDateTime.now()));
-            steps.add(step);
-
-            // 更新工作流结果
-            workflowResult.put("steps", steps);
-            declarationRepo.updateWorkflowStatus(declarationId,
-                    declaration.getWorkflowStatus(), JsonUtil.toJson(workflowResult));
-
-            log.info(String.format("添加工作流步骤成功: declarationId=%s, stepName=%s, stepStatus=%s",
-                    declarationId, stepName, stepStatus));
-        } catch (Exception e) {
-            log.error(String.format("添加工作流步骤失败: declarationId=%s, err=%s", declarationId, e.getMessage()), e);
         }
     }
 
