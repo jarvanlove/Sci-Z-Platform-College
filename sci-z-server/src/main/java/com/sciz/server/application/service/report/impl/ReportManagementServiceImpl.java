@@ -9,6 +9,7 @@ import com.sciz.server.domain.pojo.dto.request.report.ReportManagementListQueryR
 import com.sciz.server.domain.pojo.dto.request.report.ReportManagementUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.report.ReportManagementDetailResp;
 import com.sciz.server.domain.pojo.dto.response.report.ReportManagementListResp;
+import com.sciz.server.domain.pojo.dto.response.user.LoginUserContext;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
 import com.sciz.server.domain.pojo.entity.report.ReportManagement;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
@@ -32,6 +33,8 @@ import com.sciz.server.domain.pojo.entity.file.SysAttachment;
 import com.sciz.server.domain.pojo.entity.file.SysAttachmentRelation;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRepo;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRelationRepo;
+import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
+import com.sciz.server.infrastructure.shared.utils.AsyncTaskUtil;
 import com.sciz.server.infrastructure.shared.utils.FileUtil;
 import com.sciz.server.infrastructure.shared.utils.LoginUserUtil;
 import com.sciz.server.infrastructure.shared.utils.MinioUtil;
@@ -89,9 +92,9 @@ public class ReportManagementServiceImpl implements ReportManagementService {
     private final SysAttachmentRepo sysAttachmentRepo;
     private final SysAttachmentRelationRepo sysAttachmentRelationRepo;
     private final SysKnowledgeBaseRepo knowledgeBaseRepo;
-    
+
     private static final DateTimeFormatter DATE_FOLDER_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
-    
+
     @Value("${minio.bucket:sciz-files}")
     private String bucketName;
 
@@ -107,7 +110,8 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             @Qualifier("globalTaskExecutor") Executor globalTaskExecutor,
             MinioClient minioClient,
             SysAttachmentRepo sysAttachmentRepo,
-            SysAttachmentRelationRepo sysAttachmentRelationRepo, KnowledgeService knowledgeService, SysKnowledgeBaseRepo knowledgeBaseRepo) {
+            SysAttachmentRelationRepo sysAttachmentRelationRepo, KnowledgeService knowledgeService,
+            SysKnowledgeBaseRepo knowledgeBaseRepo) {
         this.reportManagementRepo = reportManagementRepo;
         this.reportManagementConverter = reportManagementConverter;
         this.difyApiKeyService = difyApiKeyService;
@@ -122,6 +126,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
         this.sysAttachmentRelationRepo = sysAttachmentRelationRepo;
         this.knowledgeBaseRepo = knowledgeBaseRepo;
     }
+
     /**
      * 报告编号前缀
      */
@@ -130,6 +135,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
      * 时间戳格式化器（年月日时分秒）
      */
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long create(ReportManagementCreateReq req) {
@@ -145,7 +151,6 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             // 2. 转换为实体
             var entity = reportManagementConverter.toEntity(req);
 
-
             log.info(String.format("设置 Dify API Keys ID 为固定值: difyApiKeysId=9"));
 
             // 4. 设置报告基本信息
@@ -158,18 +163,13 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             }
             log.info(String.format("报告保存成功: reportId=%s, number=%s", reportId, entity.getNumber()));
 
-            // 6. 异步调用 Dify 工作流生成报告（使用 CompletableFuture 实现真正的异步）
-            // 注意：在异步线程中无法获取 Web 上下文，所以需要在调用前获取用户信息
-            CompletableFuture.runAsync(() -> {
-                try {
-                    Async(reportId, userId, realName);
-                } catch (Exception e) {
-                    log.error(String.format("异步执行 Dify 工作流失败: reportId=%s, err=%s", 
-                            entity.getId(), e.getMessage()), e);
-                }
-            }, globalTaskExecutor);
-//
-            log.info(String.format("已提交异步任务: reportId=%s", reportId));
+            // 6. 异步调用 Dify 工作流生成报告（在事务提交后执行，确保数据已提交到数据库）
+            // 注意：使用 AsyncTaskUtil 确保在事务提交后执行，避免查询不到刚插入的数据
+            // 注意：在异步线程中无法获取 Web 上下文，所以需要传递完整的用户上下文
+            AsyncTaskUtil.executeAfterCommit(() -> {
+                Async(reportId, currentUser);
+            }, currentUser, globalTaskExecutor);
+
             return reportId;
         } catch (BusinessException e) {
             throw e;
@@ -178,9 +178,10 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             throw new BusinessException(ResultCode.SERVER_ERROR, "报告创建失败: " + e.getMessage());
         }
     }
+
     @Override
     public PageResult<ReportManagementListResp> page(ReportManagementListQueryReq req) {
-        log.info(String.format("分页查询报告列表: pageNo=%s, pageSize=%s, keyword=%s", 
+        log.info(String.format("分页查询报告列表: pageNo=%s, pageSize=%s, keyword=%s",
                 req.pageNo(), req.pageSize(), req.keyword()));
 
         var baseQuery = req.toBaseQuery();
@@ -319,11 +320,16 @@ public class ReportManagementServiceImpl implements ReportManagementService {
     /**
      * 异步触发 Dify 工作流生成报告（内部方法，由 CompletableFuture 调用）
      *
-     * @param reportId 报告ID
-     * @param userId 用户ID
-     * @param realName 用户姓名
+     * @param reportId    报告ID
+     * @param currentUser 当前登录用户上下文
      */
-    private void Async(Long reportId, Long userId, String realName) {
+    private void Async(Long reportId, LoginUserContext currentUser) {
+        // 设置异步用户上下文，使 LoginUserUtil 和 DataPermissionUtil 在异步线程中也能正常工作
+        AsyncUserContext.set(currentUser);
+
+        var userId = currentUser.userId();
+        var realName = currentUser.realName();
+
         try {
             // 1. 查询报告实体
             var entity = reportManagementRepo.findById(reportId);
@@ -332,7 +338,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                 log.error(String.format("报告不存在，无法触发工作流: reportId=%s", reportId));
                 return;
             }
-            
+
             // 2. 更新报告状态为"生成中"
             entity.setStatus("generating");
             entity.setUpdatedBy(userId);
@@ -343,7 +349,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             triggerDifyWorkflow(entity, userId, realName);
             // 4. 工作流执行成功，状态已在 downloadAndSaveFile 中更新为 "generated"
             log.info(String.format("Dify 工作流异步执行完成: reportId=%s", reportId));
-            
+
         } catch (Exception e) {
             log.error(String.format("Dify 工作流异步执行失败: reportId=%s, err=%s", reportId, e.getMessage()), e);
             // 5. 更新报告状态为"失败"
@@ -357,21 +363,24 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                     log.info(String.format("报告状态已更新为失败: reportId=%s", reportId));
                 }
             } catch (Exception updateException) {
-                log.error(String.format("更新报告状态为失败时出错: reportId=%s, err=%s", 
+                log.error(String.format("更新报告状态为失败时出错: reportId=%s, err=%s",
                         reportId, updateException.getMessage()), updateException);
             }
+        } finally {
+            // 清理异步用户上下文（防止内存泄漏）
+            AsyncUserContext.clear();
         }
     }
 
     /**
      * 触发 Dify 工作流生成报告（内部方法，由异步方法调用）
      *
-     * @param entity 报告实体
-     * @param userId 用户ID
+     * @param entity   报告实体
+     * @param userId   用户ID
      * @param realName 用户姓名
      */
     private void triggerDifyWorkflow(ReportManagement entity, Long userId, String realName) {
-        log.info(String.format("开始触发 Dify 工作流: reportId=%s, difyApiKeysId=%s", 
+        log.info(String.format("开始触发 Dify 工作流: reportId=%s, difyApiKeysId=%s",
                 entity.getId(), entity.getDifyApiKeysId()));
 
         // 1. 根据 difyApiKeysId 获取 DifyApiKey
@@ -381,12 +390,11 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             return;
         }
 
-
         Long difyApiKeysId;
         try {
             difyApiKeysId = Long.parseLong(entity.getDifyApiKeysId());
         } catch (NumberFormatException e) {
-            log.error(String.format("Dify API Keys ID 格式错误: difyApiKeysId=%s, err=%s", 
+            log.error(String.format("Dify API Keys ID 格式错误: difyApiKeysId=%s, err=%s",
                     entity.getDifyApiKeysId(), e.getMessage()));
             throw new BusinessException(ResultCode.VALIDATION_ERROR, "Dify API Keys ID 格式错误");
         }
@@ -401,14 +409,16 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND, "工作流ID不存在");
         }
 
-        log.info(String.format("获取到工作流ID: workflowId=%s, keyName=%s, apiKey=%s", 
-                workflowId, difyApiKey.getKeyName(), 
-                difyApiKey.getApiKey() != null ? "***" + difyApiKey.getApiKey().substring(Math.max(0, difyApiKey.getApiKey().length() - 4)) : "null"));
+        log.info(String.format("获取到工作流ID: workflowId=%s, keyName=%s, apiKey=%s",
+                workflowId, difyApiKey.getKeyName(),
+                difyApiKey.getApiKey() != null
+                        ? "***" + difyApiKey.getApiKey().substring(Math.max(0, difyApiKey.getApiKey().length() - 4))
+                        : "null"));
 
         // 2. 如果存在项目知识库ID，先更新工作流配置（更新 knowledge-retrieval 节点的 dataset_ids）
         if (StringUtils.hasText(entity.getProjectKnowledgeId())) {
             try {
-                log.info(String.format("开始更新工作流配置: workflowId=%s, projectKnowledgeId=%s", 
+                log.info(String.format("开始更新工作流配置: workflowId=%s, projectKnowledgeId=%s",
                         workflowId, entity.getProjectKnowledgeId()));
                 // 将 projectKnowledgeId 转换为 List
                 Long id = Long.valueOf(entity.getProjectKnowledgeId());
@@ -416,15 +426,15 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                 List<String> projectKnowledgeIds = List.of(byId.getDifyKbId());
                 // 调用综合接口更新并发布工作流
                 difyWorkflowService.updateAndPublishWorkflow(
-                        workflowId,  // appId 就是 workflowId
-                        projectKnowledgeIds,  // 知识库ID列表
-                        "",  // markedName 为空
-                        ""   // markedComment 为空
+                        workflowId, // appId 就是 workflowId
+                        projectKnowledgeIds, // 知识库ID列表
+                        "", // markedName 为空
+                        "" // markedComment 为空
                 );
-                log.info(String.format("工作流配置更新并发布成功: workflowId=%s, projectKnowledgeId=%s", 
+                log.info(String.format("工作流配置更新并发布成功: workflowId=%s, projectKnowledgeId=%s",
                         workflowId, entity.getProjectKnowledgeId()));
             } catch (Exception e) {
-                log.error(String.format("更新工作流配置失败: workflowId=%s, projectKnowledgeId=%s, err=%s", 
+                log.error(String.format("更新工作流配置失败: workflowId=%s, projectKnowledgeId=%s, err=%s",
                         workflowId, entity.getProjectKnowledgeId(), e.getMessage()), e);
                 // 更新失败不影响后续工作流执行，只记录日志
             }
@@ -443,16 +453,17 @@ public class ReportManagementServiceImpl implements ReportManagementService {
         requestBody.put("inputs", inputs);
         requestBody.put("response_mode", "blocking");
         requestBody.put("user", String.valueOf(userId));
-        
+
         // 6. 使用阻塞方式调用工作流
         // 注意：必须显式调用带 body 参数的重载方法，避免 Map 类型匹配到 params 参数的重载方法
         log.info(String.format("调用 Dify 工作流（阻塞模式）: workflowId=%s, userId=%s", workflowId, userId));
         ResponseEntity<String> response = difyApiClient.request(
-                "POST", "/workflows/run", (Object) requestBody, userId, workflowId, DifyApiKey.KeyType.WORKFLOW.getCode());
+                "POST", "/workflows/run", (Object) requestBody, userId, workflowId,
+                DifyApiKey.KeyType.WORKFLOW.getCode());
         if (!response.getStatusCode().is2xxSuccessful()) {
-            log.error(String.format("Dify 工作流执行失败: statusCode=%s, body=%s", 
+            log.error(String.format("Dify 工作流执行失败: statusCode=%s, body=%s",
                     response.getStatusCode(), response.getBody()));
-            throw new BusinessException(ResultCode.SERVER_ERROR, 
+            throw new BusinessException(ResultCode.SERVER_ERROR,
                     "工作流执行失败: " + (response.getBody() != null ? response.getBody() : response.getStatusCode()));
         }
         // 7. 解析阻塞模式响应，提取 body 中的参数
@@ -468,9 +479,9 @@ public class ReportManagementServiceImpl implements ReportManagementService {
      * 解析阻塞模式响应，提取 body 中的参数
      *
      * @param responseBody 阻塞模式响应体（完整的 JSON 对象）
-     * @param reportId 报告ID（用于日志）
-     * @param userId 用户ID（用于更新状态）
-     * @param realName 用户姓名（用于文件上传）
+     * @param reportId     报告ID（用于日志）
+     * @param userId       用户ID（用于更新状态）
+     * @param realName     用户姓名（用于文件上传）
      */
     private void parseBlockingResponse(String responseBody, Long reportId, Long userId, String realName) {
         try {
@@ -478,23 +489,23 @@ public class ReportManagementServiceImpl implements ReportManagementService {
 
             // 解析完整的 JSON 响应
             JsonNode rootNode = objectMapper.readTree(responseBody);
-            
+
             // 阻塞模式的响应格式：{ "data": { "outputs": { "files": [...] } } }
             if (!rootNode.has("data")) {
                 log.warn(String.format("阻塞模式响应中未找到 data 字段: reportId=%s", reportId));
                 updateReportStatusToFailed(reportId, userId);
                 return;
             }
-            
+
             JsonNode dataNode = rootNode.get("data");
             if (!dataNode.has("outputs")) {
                 log.warn(String.format("阻塞模式响应中未找到 outputs 字段: reportId=%s", reportId));
                 updateReportStatusToFailed(reportId, userId);
                 return;
             }
-            
+
             JsonNode outputsNode = dataNode.get("outputs");
-            
+
             // 提取文件 URL 并下载保存
             try {
                 String fileUrl = extractFileUrlFromBlockingResponse(outputsNode);
@@ -536,14 +547,14 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                     if (firstFile.has("url")) {
                         String url = firstFile.get("url").asText();
                         log.info(String.format("提取到文件URL: url=%s", url));
-                        
+
                         // 拼接 private-url + url + true
                         String privateUrl = difyConfig.getPrivateUrl();
                         if (!StringUtils.hasText(privateUrl)) {
                             log.error("Dify private-url 配置为空");
                             throw new BusinessException(ResultCode.SERVER_ERROR, "Dify private-url 配置为空");
                         }
-                        
+
                         // 确保 privateUrl 不以 / 结尾，url 不以 / 开头
                         if (privateUrl.endsWith("/")) {
                             privateUrl = privateUrl.substring(0, privateUrl.length() - 1);
@@ -551,16 +562,16 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                         if (url.startsWith("/")) {
                             url = url.substring(1);
                         }
-                        
+
                         // 拼接完整 URL
                         String fullUrl = privateUrl + "/" + url + "&as_attachment=true";
-                        
+
                         log.info(String.format("拼接后的完整URL: fullUrl=%s", fullUrl));
                         return fullUrl;
                     }
                 }
             }
-            
+
             return null;
         } catch (Exception e) {
             log.error(String.format("提取文件URL失败: err=%s", e.getMessage()), e);
@@ -582,7 +593,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                 JsonNode dataNode = rootNode.get("data");
                 if (dataNode != null && dataNode.has("outputs")) {
                     JsonNode outputsNode = dataNode.get("outputs");
-                    
+
                     // 从 outputs.files 中提取 URL
                     if (outputsNode.has("files") && outputsNode.get("files").isArray()) {
                         JsonNode filesNode = outputsNode.get("files");
@@ -591,14 +602,14 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                             if (firstFile.has("url")) {
                                 String url = firstFile.get("url").asText();
                                 log.info(String.format("提取到文件URL: url=%s", url));
-                                
+
                                 // 拼接 private-url + url + true
                                 String privateUrl = difyConfig.getPrivateUrl();
                                 if (!StringUtils.hasText(privateUrl)) {
                                     log.error("Dify private-url 配置为空");
                                     throw new BusinessException(ResultCode.SERVER_ERROR, "Dify private-url 配置为空");
                                 }
-                                
+
                                 // 确保 privateUrl 不以 / 结尾，url 不以 / 开头
                                 if (privateUrl.endsWith("/")) {
                                     privateUrl = privateUrl.substring(0, privateUrl.length() - 1);
@@ -606,10 +617,10 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                                 if (url.startsWith("/")) {
                                     url = url.substring(1);
                                 }
-                                
+
                                 // 拼接完整 URL
                                 String fullUrl = privateUrl + "/" + url + "&as_attachment=true";
-                                
+
                                 log.info(String.format("拼接后的完整URL: fullUrl=%s", fullUrl));
                                 return fullUrl;
                             }
@@ -617,10 +628,10 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                     }
                 }
             } else {
-                log.debug(String.format("当前事件不是 workflow_finished: event=%s", 
+                log.debug(String.format("当前事件不是 workflow_finished: event=%s",
                         rootNode.has("event") ? rootNode.get("event").asText() : "null"));
             }
-            
+
             return null;
         } catch (Exception e) {
             log.error(String.format("提取文件URL失败: err=%s", e.getMessage()), e);
@@ -631,39 +642,39 @@ public class ReportManagementServiceImpl implements ReportManagementService {
     /**
      * 下载文件并保存到 MinIO（直接上传，不通过 FileService）
      *
-     * @param fileUrl 文件下载 URL
+     * @param fileUrl  文件下载 URL
      * @param reportId 报告ID
-     * @param userId 用户ID
+     * @param userId   用户ID
      * @param realName 用户姓名
      */
     private void downloadAndSaveFile(String fileUrl, Long reportId, Long userId, String realName) {
         try {
             log.info(String.format("开始下载文件: fileUrl=%s, reportId=%s", fileUrl, reportId));
-            
+
             // 1. 下载文件
             byte[] fileData = downloadFileFromUrl(fileUrl);
             if (fileData == null || fileData.length == 0) {
                 log.warn(String.format("文件数据为空: fileUrl=%s", fileUrl));
                 return;
             }
-            
+
             // 2. 提取文件名和 MIME 类型
             String fileName = extractFileNameFromUrl(fileUrl);
             String contentType = "application/octet-stream"; // 默认类型，实际应从响应头获取
-            
+
             // 3. 创建 MultipartFile
             MultipartFile multipartFile = new ByteArrayMultipartFile(fileName, fileData, contentType);
-            
+
             // 4. 查询报告信息，用于设置 relation_name
             var report = reportManagementRepo.findById(reportId);
             if (report == null) {
                 throw new BusinessException(ResultCode.DATA_NOT_FOUND, "报告不存在: " + reportId);
             }
-            
+
             // 5. 直接上传文件到 MinIO（不通过 FileService，避免在异步线程中获取用户信息）
             Long attachmentId = uploadFileToMinioDirectly(multipartFile, reportId, userId, realName, report);
             log.info(String.format("文件上传成功: reportId=%s, attachmentId=%s", reportId, attachmentId));
-            
+
             // 6. 更新报告状态为已生成，并保存附件 ID
             report.setStatus("generated");
             report.setGenerateTime(LocalDateTime.now());
@@ -671,11 +682,11 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             report.setUpdatedBy(userId);
             report.setUpdatedTime(LocalDateTime.now());
             reportManagementRepo.updateById(report);
-            
+
             log.info(String.format("文件下载并保存完成: reportId=%s, attachmentId=%s", reportId, attachmentId));
-            
+
         } catch (Exception e) {
-            log.error(String.format("下载并保存文件失败: fileUrl=%s, reportId=%s, err=%s", 
+            log.error(String.format("下载并保存文件失败: fileUrl=%s, reportId=%s, err=%s",
                     fileUrl, reportId, e.getMessage()), e);
             throw new BusinessException(ResultCode.SERVER_ERROR, "文件下载并保存失败: " + e.getMessage());
         }
@@ -690,29 +701,29 @@ public class ReportManagementServiceImpl implements ReportManagementService {
     private byte[] downloadFileFromUrl(String fileUrl) {
         try {
             log.info(String.format("开始下载文件: fileUrl=%s", fileUrl));
-            
+
             var client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(30))
                     .build();
-            
+
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(fileUrl))
                     .timeout(Duration.ofMinutes(10))
                     .GET()
                     .build();
-            
+
             var response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
-            
+
             if (response.statusCode() != 200) {
                 log.error(String.format("文件下载失败: fileUrl=%s, statusCode=%s", fileUrl, response.statusCode()));
-                throw new BusinessException(ResultCode.SERVER_ERROR, 
+                throw new BusinessException(ResultCode.SERVER_ERROR,
                         "文件下载失败: HTTP " + response.statusCode());
             }
-            
+
             byte[] fileData = response.body();
             log.info(String.format("文件下载成功: fileUrl=%s, size=%d", fileUrl, fileData.length));
             return fileData;
-            
+
         } catch (Exception e) {
             log.error(String.format("文件下载失败: fileUrl=%s, err=%s", fileUrl, e.getMessage()), e);
             throw new BusinessException(ResultCode.SERVER_ERROR, "文件下载失败: " + e.getMessage());
@@ -723,7 +734,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
      * 更新报告状态为失败
      *
      * @param reportId 报告ID
-     * @param userId 用户ID
+     * @param userId   用户ID
      */
     private void updateReportStatusToFailed(Long reportId, Long userId) {
         try {
@@ -736,7 +747,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                 log.info(String.format("报告状态已更新为失败: reportId=%s", reportId));
             }
         } catch (Exception e) {
-            log.error(String.format("更新报告状态为失败时出错: reportId=%s, err=%s", 
+            log.error(String.format("更新报告状态为失败时出错: reportId=%s, err=%s",
                     reportId, e.getMessage()), e);
         }
     }
@@ -782,13 +793,13 @@ public class ReportManagementServiceImpl implements ReportManagementService {
      * 直接上传文件到 MinIO（不通过 FileService，避免在异步线程中获取用户信息）
      *
      * @param multipartFile 文件
-     * @param reportId 报告ID
-     * @param userId 用户ID
-     * @param realName 用户姓名
-     * @param report 报告实体
+     * @param reportId      报告ID
+     * @param userId        用户ID
+     * @param realName      用户姓名
+     * @param report        报告实体
      * @return 附件ID
      */
-    private Long uploadFileToMinioDirectly(MultipartFile multipartFile, Long reportId, Long userId, 
+    private Long uploadFileToMinioDirectly(MultipartFile multipartFile, Long reportId, Long userId,
             String realName, ReportManagement report) {
         try {
             // 1. 解析文件名和扩展名
@@ -796,12 +807,12 @@ public class ReportManagementServiceImpl implements ReportManagementService {
                     ? multipartFile.getOriginalFilename()
                     : multipartFile.getName();
             String extension = FileUtil.getFileExtension(originalName);
-            
+
             // 2. 构建对象名称（存储路径）
             String folder = LocalDate.now().format(DATE_FOLDER_FORMAT);
             String uniqueName = FileUtil.generateUniqueFileName(originalName);
             String objectName = String.format("%s/%s", folder, uniqueName);
-            
+
             // 3. 解析 MIME 类型
             String mimeType = multipartFile.getContentType();
             if (!StringUtils.hasText(mimeType)) {
@@ -810,26 +821,26 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             if (!StringUtils.hasText(mimeType)) {
                 mimeType = "application/octet-stream";
             }
-            
+
             // 4. 计算 MD5
             String md5;
             try (InputStream inputStream = multipartFile.getInputStream()) {
                 md5 = DigestUtils.md5DigestAsHex(inputStream);
             }
-            
+
             // 5. 确保存储桶存在
             try {
                 MinioUtil.makeBucketIfAbsent(minioClient, bucketName);
             } catch (Exception e) {
                 log.warn(String.format("存储桶检查失败（可能已存在）: bucket=%s", bucketName), e);
             }
-            
+
             // 6. 上传到 MinIO
             try (InputStream inputStream = multipartFile.getInputStream()) {
-                MinioUtil.upload(minioClient, bucketName, objectName, inputStream, 
+                MinioUtil.upload(minioClient, bucketName, objectName, inputStream,
                         multipartFile.getSize(), mimeType);
             }
-            
+
             // 7. 构建附件实体
             var now = LocalDateTime.now();
             var attachment = new SysAttachment();
@@ -852,7 +863,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             attachment.setUpdatedBy(userId);
             attachment.setCreatedTime(now);
             attachment.setUpdatedTime(now);
-            
+
             // 8. 保存附件记录
             Long attachmentId = sysAttachmentRepo.save(attachment);
             if (attachmentId == null) {
@@ -873,12 +884,12 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             relation.setCreatedTime(now);
             relation.setUpdatedTime(now);
             sysAttachmentRelationRepo.save(relation);
-            
-            log.info(String.format("文件直接上传到 MinIO 成功: reportId=%s, attachmentId=%s, objectName=%s", 
+
+            log.info(String.format("文件直接上传到 MinIO 成功: reportId=%s, attachmentId=%s, objectName=%s",
                     reportId, attachmentId, objectName));
-            
+
             return attachmentId;
-            
+
         } catch (IOException e) {
             log.error(String.format("文件上传到 MinIO 失败（IO异常）: reportId=%s, err=%s", reportId, e.getMessage()), e);
             throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED, "文件上传失败: " + e.getMessage());
@@ -887,6 +898,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
             throw new BusinessException(ResultCode.FILE_UPLOAD_FAILED, "文件上传失败: " + e.getMessage());
         }
     }
+
     /**
      * 字节数组 MultipartFile 实现
      */
@@ -894,35 +906,43 @@ public class ReportManagementServiceImpl implements ReportManagementService {
         private final String fileName;
         private final byte[] content;
         private final String contentType;
+
         public ByteArrayMultipartFile(String fileName, byte[] content, String contentType) {
             this.fileName = fileName;
             this.content = content;
             this.contentType = contentType;
         }
+
         @Override
         public String getName() {
             return "file";
         }
+
         @Override
         public String getOriginalFilename() {
             return fileName;
         }
+
         @Override
         public String getContentType() {
             return contentType;
         }
+
         @Override
         public boolean isEmpty() {
             return content == null || content.length == 0;
         }
+
         @Override
         public long getSize() {
             return content != null ? content.length : 0;
         }
+
         @Override
         public byte[] getBytes() {
             return content;
         }
+
         @Override
         public InputStream getInputStream() {
             return new ByteArrayInputStream(content);

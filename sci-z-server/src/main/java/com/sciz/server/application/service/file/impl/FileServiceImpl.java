@@ -29,6 +29,7 @@ import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.infrastructure.shared.utils.FileUtil;
 import com.sciz.server.infrastructure.shared.utils.LoginUserUtil;
 import com.sciz.server.infrastructure.shared.utils.MinioUtil;
+import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
 import com.sciz.server.interfaces.converter.FileConverter;
 import io.minio.GetObjectResponse;
 import io.minio.MinioClient;
@@ -206,6 +207,9 @@ public class FileServiceImpl implements FileService {
             var uploadFutures = Arrays.stream(req.files())
                     .map(multipartFile -> CompletableFuture.supplyAsync(() -> {
                         try {
+                            // 设置异步用户上下文，使 LoginUserUtil 和 DataPermissionUtil 在异步线程中也能正常工作
+                            AsyncUserContext.set(currentUser);
+
                             // 构建单文件上传请求
                             var singleReq = buildSingleUploadReq(req, multipartFile);
 
@@ -232,6 +236,9 @@ public class FileServiceImpl implements FileService {
                             log.error(String.format("并行上传文件失败: fileName=%s, err=%s",
                                     multipartFile.getOriginalFilename(), e.getMessage()), e);
                             throw new RuntimeException("文件上传失败: " + e.getMessage(), e);
+                        } finally {
+                            // 清理异步用户上下文（防止内存泄漏）
+                            AsyncUserContext.clear();
                         }
                     }, executor))
                     .toList();

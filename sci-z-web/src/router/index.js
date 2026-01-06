@@ -244,6 +244,16 @@ const routes = [
     ]
   },
   {
+    path: '/manual',
+    name: 'Manual',
+    component: () => import('@/views/Manual/index.vue'),
+    meta: { 
+      title: '操作手册', 
+      requiresAuth: true,
+      layout: 'main'
+    }
+  },
+  {
     path: '/system',
     component: RouterView,
     children: [

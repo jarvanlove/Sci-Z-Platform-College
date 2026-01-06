@@ -411,9 +411,9 @@ export default {
     topic: '研究课题',
     noTopic: '暂无',
     declarationStatus: '申报状态',
-    statusSubmitting: '申报中',
+    statusSubmitting: '申报已提交',
     statusSuccess: '申报成功',
-    statusFailed: '申报失败',
+    statusFailed: '申报未通过',
     keywordPlaceholder: '请输入申报编号/申报人/研究方向',
     statusFilter: '状态筛选',
     declarationStatusPlaceholder: '请选择申报状态',
@@ -444,7 +444,9 @@ export default {
     researchField: '研究领域',
     statusPending: '待审核',
     statusApproved: '已通过',
-    statusRejected: '已拒绝',
+    statusRejected: '申报未通过',
+    statusSubmitted: '申报已提交',
+    updateStatus: '更新申报状态',
     workflowStatus: '处理状态',
     workflowStatusPending: '待处理',
     workflowStatusPendingDesc: '等待工作流启动',
@@ -498,6 +500,8 @@ export default {
     fileFormatError: '红头文件仅支持 PDF、WORD 格式，请重新选择文件',
     fileTypeError: '文件格式不正确，请确保上传的是 PDF 或 WORD 格式文件',
     analyzing: 'AI 正在分析文档...',
+    analyzingHint: '文档分析可能需要一些时间，请耐心等待',
+    uploadingAndAnalyzing: '正在上传并分析文档，这可能需要一些时间，请耐心等待...',
     analysisComplete: '文档分析完成',
     analysisFailed: '文档分析失败',
     aiAnalysisResult: 'AI 分析结果',
@@ -886,6 +890,7 @@ export default {
     newDeclaration: '新建申报',
     projectList: '项目列表',
     applyAcceptance: '申请验收',
+    academicSearch: '学术搜索',
     knowledgeSearch: '知识库搜索',
     declarationNumber: '申报编号',
     researchDirection: '研究方向',
@@ -1484,5 +1489,125 @@ export default {
     pptViewerErrorMessage: 'Office Online Viewer 服务可能已达到使用限额。如需升级 Pro+ 版本以获得更好的预览体验，请联系系统管理员。',
     pptViewerFailed: 'PPT 在线预览服务暂时不可用，可能是由于服务限额或网络问题。请尝试下载文件后使用本地应用打开查看，或联系管理员升级服务。如需升级 Pro+ 版本以获得更好的预览体验，请联系系统管理员。',
     iframeLoadFailed: '预览加载失败'
+  },
+
+  // 操作手册
+  manual: {
+    title: '操作手册',
+    systemIntroduction: {
+      title: '系统介绍',
+      content: 'Sci-Z Platform 是一个基于 AIGC 的智能科研管理平台，旨在为高校科研人员提供全方位的科研项目管理、文献检索、知识管理和智能助手服务。',
+      feature1: '智能科研项目管理：支持项目全生命周期管理，从申报到验收',
+      feature2: 'AI 驱动的文献检索：快速检索和整理相关学术文献',
+      feature3: '知识库管理：构建个人或团队知识库，支持多层级文件夹结构',
+      feature4: '智能 AI 助手：智能问答和知识检索',
+      feature5: '多语言支持：支持中文、英文、日文、韩文等多种语言'
+    },
+    quickStart: {
+      title: '快速开始',
+      step1: {
+        title: '登录系统',
+        description: '使用您的用户名和密码登录系统。如果是首次使用，请先注册账号。'
+      },
+      step2: {
+        title: '完善个人信息',
+        description: '登录后，建议先完善个人信息，包括头像、联系方式等基本信息。'
+      },
+      step3: {
+        title: '新建申报',
+        description: '在申报管理模块中创建新的科研项目申报。可上传真实政府发布的红头文件（若没有也可不上传），系统将辅助解析并自动填充研究方向、研究课题、研究领域等信息，您可根据实际情况进行修改或自行编写定义。'
+      },
+      step4: {
+        title: '创建项目',
+        description: '当申报的处理状态为"已完成"时，在操作列点击"更新申报状态"按钮，选择"申报已提交"，系统将自动创建项目并生成对应的项目知识库。'
+      },
+      step5: {
+        title: '编辑项目',
+        description: '在项目详情页面中更新项目基本信息、添加项目成员（根据实际情况可选择不添加）、添加项目里程碑并上传相应的里程碑文档，最后保存更新项目。'
+      },
+      step6: {
+        title: '生成报告',
+        description: '在验收管理模块中选择项目并生成验收报告，系统将基于项目知识库内容智能生成科技报告和自评报告。'
+      },
+      step7: {
+        title: '开始使用',
+        description: '探索系统的各项功能，包括文献检索、AI 助手、知识库管理等。'
+      }
+    },
+    modules: {
+      title: '功能模块',
+      dashboard: {
+        title: '仪表板',
+        description: '查看系统概览、项目统计、待办事项等关键信息'
+      },
+      literature: {
+        title: '文献搜索',
+        description: '快速检索学术文献，支持多种检索条件和筛选功能'
+      },
+      ai: {
+        title: 'AI 助手',
+        description: '智能对话助手，提供项目相关的智能问答服务和知识库管理功能'
+      },
+      declaration: {
+        title: '申报管理',
+        description: '管理科研项目申报，包括申报创建、提交、审核等流程'
+      },
+      project: {
+        title: '项目管理',
+        description: '管理科研项目的全生命周期，包括项目创建、进度跟踪、里程碑管理等'
+      },
+      acceptance: {
+        title: '验收管理',
+        description: '管理科研项目验收流程，包括报告生成、验收申请、验收审核等功能'
+      },
+      system: {
+        title: '系统管理',
+        description: '管理系统配置、用户管理、角色权限、日志管理等系统级功能'
+      },
+      user: {
+        title: '用户中心',
+        description: '管理个人信息、安全设置、登录日志等个人账户相关功能'
+      }
+    },
+    guide: {
+      title: '使用指南',
+      item1: {
+        title: '如何创建和管理项目',
+        content1: '在项目管理模块中，点击"新建项目"按钮，填写项目基本信息。',
+        content2: '项目创建后，可以在项目详情页面查看和管理项目的详细信息。',
+        content3: '支持设置项目里程碑，跟踪项目进度，上传项目文档等操作。'
+      },
+      item2: {
+        title: '如何使用 AI 助手',
+        content1: '在 AI 助手页面，您可以创建新的对话会话，与 AI 进行智能问答。',
+        content2: 'AI 助手可以回答关于项目、文献、知识库等相关问题。',
+        content3: '支持会话历史记录，可以随时查看之前的对话内容。'
+      },
+      item3: {
+        title: '如何管理知识库',
+        content1: '在知识库模块中，可以创建知识库并设置文件夹结构。',
+        content2: '支持上传各种类型的文件，包括文档、图片、视频等。',
+        content3: '可以基于知识库内容进行 AI 问答，快速检索相关知识。'
+      }
+    },
+    faq: {
+      title: '常见问题',
+      item1: {
+        question: '如何重置密码？',
+        answer: '如果您忘记了密码，可以在登录页面点击"忘记密码"，然后按照提示完成密码重置。需要提供注册时使用的邮箱，系统会发送验证码到您的邮箱。'
+      },
+      item2: {
+        question: '如何上传文件？',
+        answer: '在项目详情页面或知识库页面，点击"上传"按钮，选择要上传的文件即可。系统支持多种文件格式，包括文档、图片、视频等。'
+      },
+      item3: {
+        question: 'AI 助手如何使用？',
+        answer: '在 AI 助手页面，创建新的对话会话，然后输入您的问题。AI 助手会基于系统知识库和 Dify 平台为您提供智能回答。'
+      },
+      item4: {
+        question: '如何联系技术支持？',
+        answer: '如果您在使用过程中遇到问题，可以通过系统内的反馈功能联系技术支持，或发送邮件至技术支持邮箱。'
+      }
+    }
   }
 }
