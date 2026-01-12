@@ -95,10 +95,8 @@ public class ChatServiceImpl implements ChatService {
                 if (attachment == null) {
                     throw new BusinessException(ResultCode.DATA_NOT_FOUND, "附件不存在: " + attachmentId);
                 }
-                
                 // 1.2 从 MinIO 下载文件
                 GetObjectResponse fileResponse = MinioUtil.download(minioClient, bucketName, attachment.getFilePath());
-                
                 // 1.3 读取文件内容并转换为 MultipartFile
                 byte[] fileBytes;
                 try (InputStream inputStream = fileResponse) {
@@ -109,7 +107,6 @@ public class ChatServiceImpl implements ChatService {
                         fileBytes,
                         attachment.getMimeType()
                 );
-                
                 // 1.4 上传文件到 Dify（使用 file key）
                 String fileResourceId = workflowId != null ? workflowId : "work_file"; // 如果没有 workflowId，使用默认值
                 FileSyncDifyReq syncReq = new FileSyncDifyReq(multipartFile, fileResourceId, "file");
