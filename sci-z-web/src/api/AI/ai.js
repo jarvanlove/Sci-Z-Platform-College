@@ -491,10 +491,10 @@ export const runWorkflowStream = async (params) => {
         formData.append('files', file)
       })
     }
-    // 添加知识库文件 attachmentId 参数（支持多个）
+    // 添加知识库文件 attachmentIds 参数（支持多个，使用数组形式）
     if (attachmentIds && attachmentIds.length > 0) {
       attachmentIds.forEach(attachmentId => {
-        formData.append('attachmentId', attachmentId)
+        formData.append('attachmentIds', String(attachmentId))
       })
     }
     if (conversationId) {
