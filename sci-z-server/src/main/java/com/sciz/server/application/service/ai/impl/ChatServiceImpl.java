@@ -84,52 +84,88 @@ public class ChatServiceImpl implements ChatService {
         List<org.springframework.web.multipart.MultipartFile> files = req.getFiles();
         String conversationId = req.getConversationId();
         String user = req.getUser();
-        Long attachmentId = req.getAttachmentId();
+        List<Long> attachmentIds = req.getAttachmentIds();
         
-        // 1. 如果提供了 attachmentId，从 MinIO 获取文件并解析
-        if (attachmentId != null) {
-            log.info(String.format("检测到 attachmentId，开始处理文件解析: attachmentId=%s, userId=%s", attachmentId, userId));
-            try {
-                // 1.1 查询附件信息
-                SysAttachment attachment = sysAttachmentRepo.findById(attachmentId);
-                if (attachment == null) {
-                    throw new BusinessException(ResultCode.DATA_NOT_FOUND, "附件不存在: " + attachmentId);
+        // 1. 如果提供了 attachmentIds，从 MinIO 获取文件并解析（最多处理3个，防止上下文太长）
+        if (attachmentIds != null && !attachmentIds.isEmpty()) {
+            // 限制最多处理3个附件
+            int maxAttachmentCount = 3;
+            List<Long> validAttachmentIds = attachmentIds.stream()
+                    .filter(id -> id != null)
+                    .limit(maxAttachmentCount)
+                    .toList();
+            
+            if (validAttachmentIds.size() < attachmentIds.size()) {
+                log.warn(String.format("附件数量超过限制，仅处理前 %d 个: total=%d, processing=%d", 
+                        maxAttachmentCount, attachmentIds.size(), validAttachmentIds.size()));
+            }
+            
+            log.info(String.format("检测到 attachmentIds，开始处理文件解析: attachmentIds=%s, userId=%s, processing=%d", 
+                    attachmentIds, userId, validAttachmentIds.size()));
+            
+            List<String> parsedTexts = new ArrayList<>();
+            
+            for (int i = 0; i < validAttachmentIds.size(); i++) {
+                Long attachmentId = validAttachmentIds.get(i);
+                try {
+                    // 1.1 查询附件信息
+                    SysAttachment attachment = sysAttachmentRepo.findById(attachmentId);
+                    if (attachment == null) {
+                        log.warn(String.format("附件不存在，跳过: attachmentId=%s", attachmentId));
+                        continue;
+                    }
+                    
+                    // 1.2 从 MinIO 下载文件
+                    GetObjectResponse fileResponse = MinioUtil.download(minioClient, bucketName, attachment.getFilePath());
+                    
+                    // 1.3 读取文件内容并转换为 MultipartFile
+                    byte[] fileBytes;
+                    try (InputStream inputStream = fileResponse) {
+                        fileBytes = inputStream.readAllBytes();
+                    }
+                    MultipartFile multipartFile = new ByteArrayMultipartFile(
+                            attachment.getOriginalName(),
+                            fileBytes,
+                            attachment.getMimeType()
+                    );
+                    
+                    // 1.4 上传文件到 Dify（使用 file key）
+                    String fileResourceId = workflowId != null ? workflowId : "work_file";
+                    FileSyncDifyReq syncReq = new FileSyncDifyReq(multipartFile, fileResourceId, "file");
+                    var syncResp = difyWorkflowService.syncFileToDify(syncReq);
+                    String difyFileId = syncResp.difyFileId();
+                    
+                    log.info(String.format("文件已上传到 Dify: difyFileId=%s, attachmentId=%s, index=%d/%d", 
+                            difyFileId, attachmentId, i + 1, validAttachmentIds.size()));
+                    
+                    // 1.5 调用 Dify 文件解析工作流（使用传入的 workflowId 或默认值）
+                    String parseWorkflowId = workflowId != null ? workflowId : fileResourceId;
+                    String parsedText = executeFileParseWorkflow(difyFileId, userId, parseWorkflowId, "file");
+                    
+                    // 1.6 如果解析结果不为空，添加到列表中
+                    if (StringUtils.hasText(parsedText)) {
+                        parsedTexts.add(parsedText);
+                        log.info(String.format("文件解析成功: attachmentId=%s, index=%d/%d, 解析文本长度=%d 字符", 
+                                attachmentId, i + 1, validAttachmentIds.size(), parsedText.length()));
+                    } else {
+                        log.warn(String.format("文件解析结果为空: attachmentId=%s, difyFileId=%s", attachmentId, difyFileId));
+                    }
+                    
+                } catch (Exception e) {
+                    log.error(String.format("处理 attachmentId 失败: attachmentId=%s, index=%d/%d, err=%s", 
+                            attachmentId, i + 1, validAttachmentIds.size(), e.getMessage()), e);
+                    // 单个附件处理失败不影响其他附件，继续处理下一个
                 }
-                // 1.2 从 MinIO 下载文件
-                GetObjectResponse fileResponse = MinioUtil.download(minioClient, bucketName, attachment.getFilePath());
-                // 1.3 读取文件内容并转换为 MultipartFile
-                byte[] fileBytes;
-                try (InputStream inputStream = fileResponse) {
-                    fileBytes = inputStream.readAllBytes();
-                }
-                MultipartFile multipartFile = new ByteArrayMultipartFile(
-                        attachment.getOriginalName(),
-                        fileBytes,
-                        attachment.getMimeType()
-                );
-                // 1.4 上传文件到 Dify（使用 file key）
-                String fileResourceId = workflowId != null ? workflowId : "work_file"; // 如果没有 workflowId，使用默认值
-                FileSyncDifyReq syncReq = new FileSyncDifyReq(multipartFile, fileResourceId, "file");
-                var syncResp = difyWorkflowService.syncFileToDify(syncReq);
-                String difyFileId = syncResp.difyFileId();
-                
-                log.info(String.format("文件已上传到 Dify: difyFileId=%s, attachmentId=%s", difyFileId, attachmentId));
-                
-                // 1.5 调用 Dify 文件解析工作流（使用传入的 workflowId 或默认值）
-                String parseWorkflowId = workflowId != null ? workflowId : fileResourceId;
-                String parsedText = executeFileParseWorkflow(difyFileId, userId, parseWorkflowId, "file");
-                
-                // 1.6 如果解析结果不为空，拼接到 query 中
-                if (StringUtils.hasText(parsedText)) {
-                    query = query + "\n\n" + parsedText;
-                    log.info(String.format("文件解析结果已拼接到 query，长度: %d 字符", parsedText.length()));
-                } else {
-                    log.warn(String.format("文件解析结果为空: attachmentId=%s, difyFileId=%s", attachmentId, difyFileId));
-                }
-                
-            } catch (Exception e) {
-                log.error(String.format("处理 attachmentId 失败: attachmentId=%s, err=%s", attachmentId, e.getMessage()), e);
-                throw new BusinessException(ResultCode.SERVER_ERROR, "处理附件文件失败: " + e.getMessage());
+            }
+            
+            // 1.7 将所有解析结果拼接到 query 中
+            if (!parsedTexts.isEmpty()) {
+                String allParsedText = String.join("\n\n", parsedTexts);
+                query = query + "\n\n" + allParsedText;
+                log.info(String.format("所有文件解析结果已拼接到 query，文件数量=%d, 总长度=%d 字符", 
+                        parsedTexts.size(), allParsedText.length()));
+            } else {
+                log.warn(String.format("所有附件解析结果均为空: attachmentIds=%s", attachmentIds));
             }
         }
 

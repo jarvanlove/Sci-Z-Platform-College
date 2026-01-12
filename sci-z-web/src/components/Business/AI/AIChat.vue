@@ -138,7 +138,7 @@
                   </div>
                   <div class="kb-message-meta">
                     <div class="kb-message-actions">
-                      <!-- AI消息的复制和重试按钮 -->
+                      <!-- AI消息的复制按钮 -->
                       <template v-if="msg.type === 'ai'">
                         <button
                           class="kb-copy-btn"
@@ -146,13 +146,6 @@
                         >
                           <el-icon><DocumentCopy /></el-icon>
                           <span>{{ $t('ai.chat.copy') }}</span>
-                        </button>
-                        <button
-                          class="kb-retry-btn"
-                          @click="retryKbMessage(msg)"
-                        >
-                          <el-icon><Refresh /></el-icon>
-                          <span>{{ $t('ai.chat.retry') }}</span>
                         </button>
                       </template>
 
@@ -274,37 +267,51 @@
 
               <div class="kb-right-controls">
                 <!-- 附件按钮 -->
-                <el-dropdown
-                  trigger="click"
-                  @command="handleAttachmentCommand"
-                  placement="top-end"
+                <el-tooltip
+                  placement="top"
+                  effect="light"
+                  :show-after="300"
+                  :hide-after="0"
                 >
-                  <button
-                    class="kb-attachment-btn"
-                    :title="$t('ai.chat.attachmentTitle')"
-                  >
-                    <el-icon><Paperclip /></el-icon>
-                  </button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item command="local">
-                        <el-icon><Folder /></el-icon>
-                        <span style="margin-left: 8px">本地文件</span>
-                      </el-dropdown-item>
-                      <el-dropdown-item command="knowledge">
-                        <el-icon><Document /></el-icon>
-                        <span style="margin-left: 8px">知识库文件</span>
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
+                  <template #content>
+                    <div class="attachment-tooltip-content">
+                      <div class="tooltip-item">• 支持上传个人知识库与本地文件</div>
+                      <div class="tooltip-item">• 文件数量:最多支持10个</div>
+                      <div class="tooltip-item">• 文件类型: 支持pdf、doc、docx、ppt、pptx、xls、xlsx、csv、md, txt</div>
+                      <div class="tooltip-item">• 知识库文件:最多支持3个</div>
+                    </div>
                   </template>
-                </el-dropdown>
+                  <el-dropdown
+                    trigger="click"
+                    @command="handleAttachmentCommand"
+                    placement="top-end"
+                  >
+                    <button
+                      class="kb-attachment-btn"
+                    >
+                      <el-icon><Paperclip /></el-icon>
+                    </button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="local">
+                          <el-icon><Folder /></el-icon>
+                          <span style="margin-left: 8px">本地文件</span>
+                        </el-dropdown-item>
+                        <el-dropdown-item command="knowledge">
+                          <el-icon><Document /></el-icon>
+                          <span style="margin-left: 8px">知识库文件</span>
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </el-tooltip>
 
                 <!-- 隐藏的文件输入 -->
                 <input
                   ref="fileInput"
                   type="file"
                   multiple
-                  accept=".pdf,.doc,.docx,.xlsx,.ppt,.pptx,.txt,.md,.jpg,.jpeg,.png"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.md"
                   style="display: none"
                   @change="handleFileUpload"
                 />
@@ -393,13 +400,17 @@
           <el-empty description="该知识库暂无文档" />
         </div>
         <div v-else class="document-list">
-          <el-checkbox-group v-model="selectedDocuments">
+          <div class="document-limit-hint">
+            <el-icon><InfoFilled /></el-icon>
+            <span>知识库文件最多只能选择3个</span>
+          </div>
+          <el-checkbox-group v-model="selectedDocuments" :max="3">
             <div
               v-for="doc in documentList"
               :key="doc.id"
               class="document-item"
             >
-              <el-checkbox :label="doc.id" class="document-checkbox">
+              <el-checkbox :label="doc.id" class="document-checkbox" :disabled="selectedDocuments.length >= 3 && !selectedDocuments.includes(doc.id)">
                 <div class="document-info">
                   <div class="document-name">{{ doc.fileName || doc.name || '未命名文档' }}</div>
                   <div v-if="doc.fileSize" class="document-size">{{ formatFileSize(doc.fileSize) }}</div>
@@ -411,7 +422,10 @@
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <span class="selected-count">已选择 {{ selectedDocuments.length }} 个文档</span>
+          <span class="selected-count">
+            已选择 {{ selectedDocuments.length }} 个文档
+            <span v-if="selectedDocuments.length >= 3" class="limit-warning">（已达上限）</span>
+          </span>
           <div>
             <el-button @click="showDocumentDialog = false">取消</el-button>
             <el-button
@@ -447,7 +461,8 @@ import {
   ArrowUp,
   Paperclip,
   Folder,
-  Check
+  Check,
+  InfoFilled
 } from '@element-plus/icons-vue'
 import {
   getKnowledgeList,
@@ -1873,11 +1888,21 @@ const confirmDocumentSelection = () => {
     return
   }
   
+  // 检查知识库文件数量限制（最多3个）
+  const currentKnowledgeFileCount = attachments.value.filter(att => att.type === 'knowledge').length
+  const newKnowledgeFileCount = selectedDocuments.value.length
+  
+  if (currentKnowledgeFileCount + newKnowledgeFileCount > 3) {
+    ElMessage.warning(`知识库文件最多只能选择3个，当前已有${currentKnowledgeFileCount}个，本次最多只能选择${3 - currentKnowledgeFileCount}个`)
+    return
+  }
+  
   // 将选中的文档添加到附件列表
   const selectedDocList = documentList.value.filter(doc => 
     selectedDocuments.value.includes(doc.id)
   )
   
+  let addedCount = 0
   selectedDocList.forEach(doc => {
     // 检查是否已添加
     const exists = attachments.value.some(att => 
@@ -1885,9 +1910,16 @@ const confirmDocumentSelection = () => {
     )
     
     if (!exists) {
-      // 检查文件数量限制
+      // 检查总文件数量限制（包括本地文件和知识库文件）
       if (attachments.value.length >= 10) {
-        ElMessage.warning('最多只能添加10个文件')
+        ElMessage.warning('最多只能添加10个文件（包括本地文件和知识库文件）')
+        return
+      }
+      
+      // 再次检查知识库文件数量限制
+      const currentKbCount = attachments.value.filter(att => att.type === 'knowledge').length
+      if (currentKbCount >= 3) {
+        ElMessage.warning('知识库文件最多只能选择3个')
         return
       }
       
@@ -1901,6 +1933,7 @@ const confirmDocumentSelection = () => {
         attachmentId: doc.attachmentId ? Number(doc.attachmentId) : null, // 使用 attachmentId 字段，转换为数字
         file: null // 知识库文件没有 File 对象
       })
+      addedCount++
     }
   })
   
@@ -1908,7 +1941,9 @@ const confirmDocumentSelection = () => {
   selectedDocuments.value = []
   selectedKnowledgeForFile.value = null
   
-  ElMessage.success(`已添加 ${selectedDocList.length} 个文档`)
+  if (addedCount > 0) {
+    ElMessage.success(`已添加 ${addedCount} 个文档`)
+  }
 }
 
 const handleFileUpload = (event) => {
@@ -1928,7 +1963,7 @@ const handleFileUpload = (event) => {
     }
     
     // 检查文件类型
-    const allowedTypes = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.csv', '.jpg', '.jpeg', '.png', '.md', '.txt']
+    const allowedTypes = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.csv', '.md', '.txt']
     const fileExtension = '.' + file.name.split('.').pop().toLowerCase()
     if (!allowedTypes.includes(fileExtension)) {
       ElMessage.warning(`文件 ${file.name} 格式不支持`)
@@ -1972,9 +2007,6 @@ const getFileIcon = (fileType) => {
     '.xls': '📊',
     '.xlsx': '📊',
     '.csv': '📋',
-    '.jpg': '🖼️',
-    '.jpeg': '🖼️',
-    '.png': '🖼️',
     '.md': '📝',
     '.txt': '📄'
   }
@@ -3350,6 +3382,60 @@ onUnmounted(() => {
 .selected-count {
   font-size: 14px;
   color: #6b7280;
+  
+  .limit-warning {
+    color: #f56c6c;
+    font-weight: 500;
+    margin-left: 4px;
+  }
+}
+
+.document-limit-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #d46b08;
+  
+  .el-icon {
+    color: #fa8c16;
+    font-size: 16px;
+  }
+}
+
+// 覆盖 Element Plus tooltip 样式，设置白色背景
+// 注意：tooltip 会被挂载到 body，需要使用深度选择器
+:deep(.el-tooltip__popper) {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  color: #374151 !important;
+  
+  .el-tooltip__arrow::before {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+  }
+}
+
+.attachment-tooltip-content {
+  padding: 4px 0;
+  line-height: 1.8;
+  
+  .tooltip-item {
+    font-size: 12px;
+    color: #374151;
+    white-space: nowrap;
+    
+    &.tooltip-warning {
+      color: #f56c6c;
+      font-weight: 500;
+    }
+  }
 }
 
 // 响应式设计

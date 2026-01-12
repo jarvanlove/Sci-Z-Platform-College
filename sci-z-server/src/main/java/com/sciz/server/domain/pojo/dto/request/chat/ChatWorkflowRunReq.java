@@ -56,10 +56,10 @@ public class ChatWorkflowRunReq {
     private String user;
 
     /**
-     * 附件ID（可选，如果提供则从 MinIO 获取文件并解析）
+     * 附件ID列表（可选，最多3个，如果提供则从 MinIO 获取文件并解析）
      */
-    @Schema(description = "附件ID", example = "123")
-    private Long attachmentId;
+    @Schema(description = "附件ID列表（最多3个）", example = "123,456,789")
+    private List<Long> attachmentIds;
 }
 
 
