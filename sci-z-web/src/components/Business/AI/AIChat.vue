@@ -184,9 +184,15 @@
                 v-for="(attachment, index) in attachments"
                 :key="index"
                 class="attachment-item"
+                :class="{ 'knowledge-file': attachment.type === 'knowledge' }"
               >
                 <span class="attachment-icon">{{ getFileIcon(attachment.type) }}</span>
-                <div class="attachment-name">{{ attachment.name }}</div>
+                <div class="attachment-info">
+                  <div class="attachment-name">{{ attachment.name }}</div>
+                  <div v-if="attachment.type === 'knowledge'" class="attachment-source">
+                    来自：{{ attachment.knowledgeName }}
+                  </div>
+                </div>
                 <div class="attachment-size">{{ attachment.size }}</div>
                 <div
                   class="attachment-remove"
@@ -268,13 +274,30 @@
 
               <div class="kb-right-controls">
                 <!-- 附件按钮 -->
-                <button
-                  class="kb-attachment-btn"
-                  @click="handleAttachmentClick"
-                  :title="$t('ai.chat.attachmentTitle')"
+                <el-dropdown
+                  trigger="click"
+                  @command="handleAttachmentCommand"
+                  placement="top-end"
                 >
-                  <el-icon><Paperclip /></el-icon>
-                </button>
+                  <button
+                    class="kb-attachment-btn"
+                    :title="$t('ai.chat.attachmentTitle')"
+                  >
+                    <el-icon><Paperclip /></el-icon>
+                  </button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="local">
+                        <el-icon><Folder /></el-icon>
+                        <span style="margin-left: 8px">本地文件</span>
+                      </el-dropdown-item>
+                      <el-dropdown-item command="knowledge">
+                        <el-icon><Document /></el-icon>
+                        <span style="margin-left: 8px">知识库文件</span>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
 
                 <!-- 隐藏的文件输入 -->
                 <input
@@ -312,6 +335,96 @@
         </div>
       </template>
     </div>
+
+    <!-- 知识库选择对话框 -->
+    <el-dialog
+      v-model="showKnowledgeDialog"
+      title="选择知识库"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <div v-loading="loadingKnowledgeList" class="knowledge-dialog-content">
+        <div v-if="knowledgeListForSelect.length === 0 && !loadingKnowledgeList" class="empty-state">
+          <el-empty description="暂无知识库" />
+        </div>
+        <div v-else class="knowledge-list">
+          <div
+            v-for="kb in knowledgeListForSelect"
+            :key="kb.id"
+            class="knowledge-item"
+            :class="{ selected: selectedKnowledgeForFile?.id === kb.id }"
+            @click="selectKnowledgeForFile(kb)"
+          >
+            <div class="knowledge-icon">📚</div>
+            <div class="knowledge-info">
+              <div class="knowledge-name">{{ kb.name }}</div>
+              <div v-if="kb.description" class="knowledge-desc">{{ kb.description }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showKnowledgeDialog = false">取消</el-button>
+          <el-button
+            type="primary"
+            @click="confirmKnowledgeSelection"
+            :disabled="!selectedKnowledgeForFile"
+          >
+            确定
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 文档选择对话框 -->
+    <el-dialog
+      v-model="showDocumentDialog"
+      title="选择文档"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div v-loading="loadingDocuments" class="document-dialog-content">
+        <div v-if="selectedKnowledgeForFile" class="selected-knowledge-info">
+          <el-icon><Document /></el-icon>
+          <span>知识库：{{ selectedKnowledgeForFile.name }}</span>
+        </div>
+        <div v-if="documentList.length === 0 && !loadingDocuments" class="empty-state">
+          <el-empty description="该知识库暂无文档" />
+        </div>
+        <div v-else class="document-list">
+          <el-checkbox-group v-model="selectedDocuments">
+            <div
+              v-for="doc in documentList"
+              :key="doc.id"
+              class="document-item"
+            >
+              <el-checkbox :label="doc.id" class="document-checkbox">
+                <div class="document-info">
+                  <div class="document-name">{{ doc.fileName || doc.name || '未命名文档' }}</div>
+                  <div v-if="doc.fileSize" class="document-size">{{ formatFileSize(doc.fileSize) }}</div>
+                </div>
+              </el-checkbox>
+            </div>
+          </el-checkbox-group>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <span class="selected-count">已选择 {{ selectedDocuments.length }} 个文档</span>
+          <div>
+            <el-button @click="showDocumentDialog = false">取消</el-button>
+            <el-button
+              type="primary"
+              @click="confirmDocumentSelection"
+              :disabled="selectedDocuments.length === 0"
+            >
+              确定
+            </el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -332,10 +445,13 @@ import {
   Close,
   ArrowDown,
   ArrowUp,
-  Paperclip
+  Paperclip,
+  Folder,
+  Check
 } from '@element-plus/icons-vue'
 import {
-  getKnowledgeList
+  getKnowledgeList,
+  getKnowledgeFileRelationList
 } from '@/api/Knowledge/knowledge'
 import {
   streamKnowledgeChatbot
@@ -393,6 +509,16 @@ const kbSearchQuery = ref('')
 // 附件功能
 const attachments = ref([])
 const fileInput = ref(null)
+
+// 知识库文件选择功能
+const showKnowledgeDialog = ref(false)
+const showDocumentDialog = ref(false)
+const knowledgeListForSelect = ref([])
+const loadingKnowledgeList = ref(false)
+const selectedKnowledgeForFile = ref(null)
+const documentList = ref([])
+const loadingDocuments = ref(false)
+const selectedDocuments = ref([])
 
 // 模型选择
 const showModelDropdown = ref(false)
@@ -1065,8 +1191,17 @@ const sendKbMessage = async () => {
   }
 
   // 在清空之前先保存文件列表和知识库列表（用于后续接口调用）
-  const filesToUpload = attachments.value.length > 0 ? attachments.value.map(att => att.file) : null
-  const hasFiles = filesToUpload && filesToUpload.length > 0
+  // 区分本地文件和知识库文件
+  const localFiles = attachments.value
+    .filter(att => att.type !== 'knowledge' && att.file)
+    .map(att => att.file)
+  // 提取知识库文件的 attachmentId（Long 类型）
+  const knowledgeFileAttachmentIds = attachments.value
+    .filter(att => att.type === 'knowledge' && att.attachmentId != null)
+    .map(att => att.attachmentId)
+  
+  const filesToUpload = localFiles.length > 0 ? localFiles : null
+  const hasFiles = (filesToUpload && filesToUpload.length > 0) || knowledgeFileAttachmentIds.length > 0
   const knowledgeBasesToUse = [...selectedKnowledgeBases.value] // 保存知识库列表副本
 
   // 清空输入框和附件（但保留副本用于接口调用）
@@ -1107,7 +1242,8 @@ const sendKbMessage = async () => {
     query: text,
     conversationId: currentConversationId.value || conversationId,
     selectedKbCount: knowledgeBasesToUse.length,
-    filesCount: filesToUpload?.length || 0
+    filesCount: filesToUpload?.length || 0,
+    attachmentIdsCount: knowledgeFileAttachmentIds.length
   })
 
   try {
@@ -1116,7 +1252,8 @@ const sendKbMessage = async () => {
       query: text,
       conversationId: currentConversationId.value || conversationId,
       selectedKbCount: knowledgeBasesToUse.length,
-      filesCount: filesToUpload?.length || 0
+      filesCount: filesToUpload?.length || 0,
+      attachmentIdsCount: knowledgeFileAttachmentIds.length
     })
 
     // 调用新的工作流流式接口
@@ -1134,7 +1271,8 @@ const sendKbMessage = async () => {
       query: text, // 必填：用户问题
       knowledgeId: knowledgeIdToSend || undefined, // 可选：知识库ID（支持单个ID或数组，不传则不使用知识库）
       workflowId: undefined, // 可选：工作流ID（暂时不传，由后端决定）
-      files: filesToUpload || undefined, // 可选：文件列表（不传则不执行工作流）
+      files: filesToUpload || undefined, // 可选：本地文件列表（不传则不执行工作流）
+      attachmentIds: knowledgeFileAttachmentIds.length > 0 ? knowledgeFileAttachmentIds : undefined, // 可选：知识库文件 attachmentId 列表
       conversationId: currentConversationId.value || conversationId || undefined, // 可选：会话ID
       onMessage: (answer) => {
         // 追加回答内容
@@ -1647,9 +1785,130 @@ const selectModel = (model) => {
 }
 
 // 附件相关方法
-const handleAttachmentClick = () => {
-  // 现在支持在有知识库的情况下也上传文件
-  fileInput.value && fileInput.value.click()
+const handleAttachmentCommand = (command) => {
+  if (command === 'local') {
+    // 选择本地文件
+    fileInput.value && fileInput.value.click()
+  } else if (command === 'knowledge') {
+    // 选择知识库文件
+    openKnowledgeDialog()
+  }
+}
+
+// 打开知识库选择对话框
+const openKnowledgeDialog = async () => {
+  showKnowledgeDialog.value = true
+  selectedKnowledgeForFile.value = null
+  
+  // 如果知识库列表为空，加载知识库列表
+  if (knowledgeListForSelect.value.length === 0) {
+    await loadKnowledgeListForSelect()
+  }
+}
+
+// 加载知识库列表（用于文件选择）
+const loadKnowledgeListForSelect = async () => {
+  loadingKnowledgeList.value = true
+  try {
+    const response = await getKnowledgeList({ page: 1, size: 100 })
+    if (response.code === 200 && response.data) {
+      knowledgeListForSelect.value = response.data.records || response.data.list || []
+      logger.info('知识库列表加载成功', knowledgeListForSelect.value.length)
+    }
+  } catch (error) {
+    logger.error('加载知识库列表失败', error)
+    ElMessage.error('加载知识库列表失败')
+    knowledgeListForSelect.value = []
+  } finally {
+    loadingKnowledgeList.value = false
+  }
+}
+
+// 选择知识库
+const selectKnowledgeForFile = (kb) => {
+  selectedKnowledgeForFile.value = kb
+}
+
+// 确认知识库选择，打开文档选择对话框
+const confirmKnowledgeSelection = async () => {
+  if (!selectedKnowledgeForFile.value) {
+    ElMessage.warning('请选择知识库')
+    return
+  }
+  
+  showKnowledgeDialog.value = false
+  showDocumentDialog.value = true
+  selectedDocuments.value = []
+  
+  // 加载该知识库的文档列表
+  await loadDocumentsForKnowledge(selectedKnowledgeForFile.value.id)
+}
+
+// 加载知识库的文档列表
+const loadDocumentsForKnowledge = async (knowledgeId) => {
+  loadingDocuments.value = true
+  try {
+    const response = await getKnowledgeFileRelationList({
+      knowledgeId: knowledgeId,
+      page: 1,
+      size: 1000
+    })
+    if (response.code === 200 && response.data) {
+      documentList.value = response.data.records || response.data.list || []
+      logger.info('文档列表加载成功', { knowledgeId, count: documentList.value.length })
+    }
+  } catch (error) {
+    logger.error('加载文档列表失败', error)
+    ElMessage.error('加载文档列表失败')
+    documentList.value = []
+  } finally {
+    loadingDocuments.value = false
+  }
+}
+
+// 确认文档选择
+const confirmDocumentSelection = () => {
+  if (selectedDocuments.value.length === 0) {
+    ElMessage.warning('请至少选择一个文档')
+    return
+  }
+  
+  // 将选中的文档添加到附件列表
+  const selectedDocList = documentList.value.filter(doc => 
+    selectedDocuments.value.includes(doc.id)
+  )
+  
+  selectedDocList.forEach(doc => {
+    // 检查是否已添加
+    const exists = attachments.value.some(att => 
+      att.type === 'knowledge' && att.id === doc.id
+    )
+    
+    if (!exists) {
+      // 检查文件数量限制
+      if (attachments.value.length >= 10) {
+        ElMessage.warning('最多只能添加10个文件')
+        return
+      }
+      
+      attachments.value.push({
+        id: doc.id,
+        name: doc.fileName || doc.name || '未命名文档',
+        size: doc.fileSize ? formatFileSize(doc.fileSize) : '未知大小',
+        type: 'knowledge', // 标记为知识库文件
+        knowledgeId: selectedKnowledgeForFile.value.id,
+        knowledgeName: selectedKnowledgeForFile.value.name,
+        attachmentId: doc.attachmentId ? Number(doc.attachmentId) : null, // 使用 attachmentId 字段，转换为数字
+        file: null // 知识库文件没有 File 对象
+      })
+    }
+  })
+  
+  showDocumentDialog.value = false
+  selectedDocuments.value = []
+  selectedKnowledgeForFile.value = null
+  
+  ElMessage.success(`已添加 ${selectedDocList.length} 个文档`)
 }
 
 const handleFileUpload = (event) => {
@@ -1699,6 +1958,11 @@ const formatFileSize = (bytes) => {
 }
 
 const getFileIcon = (fileType) => {
+  // 知识库文件使用特殊图标
+  if (fileType === 'knowledge') {
+    return '📚'
+  }
+  
   const iconMap = {
     '.pdf': '📕',
     '.doc': '📘',
@@ -2608,6 +2872,11 @@ onUnmounted(() => {
   font-size: 12px;
   color: #374151;
   max-width: 200px;
+
+  &.knowledge-file {
+    border-color: #3b82f6;
+    background: #eff6ff;
+  }
 }
 
 .attachment-icon {
@@ -2615,16 +2884,30 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.attachment-name {
+.attachment-info {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.attachment-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.attachment-source {
+  color: #3b82f6;
+  font-size: 10px;
 }
 
 .attachment-size {
   color: #9ca3af;
   font-size: 11px;
+  flex-shrink: 0;
 }
 
 .attachment-remove {
@@ -2927,6 +3210,146 @@ onUnmounted(() => {
   text-align: center;
   font-size: 12px;
   color: #9ca3af;
+}
+
+// 知识库选择对话框样式
+.knowledge-dialog-content {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.knowledge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.knowledge-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+  }
+
+  &.selected {
+    border-color: #3b82f6;
+    background: #eff6ff;
+  }
+}
+
+.knowledge-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.knowledge-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.knowledge-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.knowledge-desc {
+  font-size: 12px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// 文档选择对话框样式
+.document-dialog-content {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.selected-knowledge-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #1e40af;
+  font-weight: 500;
+}
+
+.document-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.document-item {
+  padding: 12px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+  }
+}
+
+.document-checkbox {
+  width: 100%;
+  margin: 0;
+
+  :deep(.el-checkbox__label) {
+    width: 100%;
+    padding-left: 8px;
+  }
+}
+
+.document-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.document-name {
+  font-size: 14px;
+  color: #111827;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-size {
+  font-size: 12px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selected-count {
+  font-size: 14px;
+  color: #6b7280;
 }
 
 // 响应式设计

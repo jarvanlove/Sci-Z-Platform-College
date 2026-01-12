@@ -70,7 +70,8 @@ public class ChatController {
             @RequestParam(value = "workflowId", required = false) String workflowId,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(value = "conversationId", required = false) String conversationId,
-            @RequestParam(value = "user", required = false) String user) {
+            @RequestParam(value = "user", required = false) String user,
+            @RequestParam(value = "attachmentId", required = false) Long attachmentId) {
         
         // 1. 获取当前登录用户ID
         Long userId = StpUtil.getLoginIdAsLong();
@@ -83,7 +84,7 @@ public class ChatController {
         req.setFiles(files);
         req.setConversationId(conversationId);
         req.setUser(String.valueOf(userId));
-        
+        req.setAttachmentId(attachmentId);
         // 3. 调用 Service 处理业务逻辑
         return chatService.runWorkflow(req, userId);
     }
