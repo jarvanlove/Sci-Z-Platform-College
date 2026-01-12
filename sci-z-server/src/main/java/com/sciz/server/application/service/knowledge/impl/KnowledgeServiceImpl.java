@@ -272,8 +272,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (files == null || files.isEmpty()) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "文件列表不能为空");
         }
-        // 1. 获取当前登录用户ID 固定用管理员的id
-        Long userId = 1L;
+        // 1. 获取当前登录用户ID
+        Long userId = StpUtil.getLoginIdAsLong();
         log.info(String.format("上传多个文件到知识库: userId=%s, knowledgeId=%s, fileCount=%s, folderId=%s",
                 userId, knowledgeId, files.size(), folderId));
         // 2. 根据Dify知识库ID查询知识库信息
