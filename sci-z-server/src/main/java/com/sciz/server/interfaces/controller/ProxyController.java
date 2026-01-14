@@ -1,5 +1,4 @@
 package com.sciz.server.interfaces.controller;
-
 import com.sciz.server.application.service.pdf.PdfCacheService;
 import com.sciz.server.domain.pojo.dto.response.proxy.PdfCacheResp;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
@@ -22,7 +21,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
 /**
  * 代理控制器
  * 用于代理下载外部资源（如PDF文件）
@@ -38,10 +36,8 @@ import java.util.concurrent.TimeoutException;
 @Tag(name = "代理服务", description = "代理下载外部资源相关接口")
 @RequiredArgsConstructor
 public class ProxyController {
-
     private final PdfCacheService pdfCacheService;
     private final ObjectMapper objectMapper;
-
     @Operation(summary = "PDF代理下载并缓存", description = "先查询Redis是否有存储文件key，如果有则直接返回，如果没有则下载并缓存，返回唯一id和presignedUrl")
     @GetMapping("/pdf/cache")
     public Result<PdfCacheResp> cachePdf(@RequestParam String url) {
@@ -81,14 +77,13 @@ public class ProxyController {
                               @RequestParam(required = false) String id,
                               HttpServletResponse response) {
         InputStream inputStream = null;
-        
         try {
             String actualId = id;
             
             // 如果提供了URL但没有id，先缓存（带超时控制）
             if (url != null && !url.isEmpty() && (id == null || id.isEmpty())) {
                 try {
-                    // 使用 CompletableFuture 实现超时控制（10秒）
+                    // 使用 CompletableFuture 实现超时控制（20秒）
                     CompletableFuture<PdfCacheService.PdfCacheResult> future = CompletableFuture.supplyAsync(() -> {
                         try {
                             return pdfCacheService.downloadAndCache(url);
@@ -97,11 +92,11 @@ public class ProxyController {
                         }
                     });
                     
-                    PdfCacheService.PdfCacheResult result = future.get(10, TimeUnit.SECONDS);
+                    PdfCacheService.PdfCacheResult result = future.get(20, TimeUnit.SECONDS);
                     actualId = result.id();
                     log.info("PDF缓存检查完成: url={}, id={}", url, actualId);
                 } catch (TimeoutException e) {
-                    log.warn("PDF下载超时（10秒）: url={}", url);
+                    log.warn("PDF下载超时（20秒）: url={}", url);
                     writeErrorResponse(response, HttpStatus.REQUEST_TIMEOUT.value(), 
                             "当前连接需要认证，请求超时，请手动下载", true);
                     return;
@@ -130,7 +125,7 @@ public class ProxyController {
             // 使用 final 变量供 lambda 使用
             final String finalActualId = actualId;
             try {
-                // 使用 CompletableFuture 实现超时控制（10秒）
+                // 使用 CompletableFuture 实现超时控制（20秒）
                 CompletableFuture<InputStream> inputStreamFuture = CompletableFuture.supplyAsync(() -> {
                     try {
                         return pdfCacheService.getCachedPdf(finalActualId);
@@ -139,9 +134,9 @@ public class ProxyController {
                     }
                 });
                 
-                inputStream = inputStreamFuture.get(10, TimeUnit.SECONDS);
+                inputStream = inputStreamFuture.get(20, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
-                log.warn("获取PDF文件超时（10秒）: id={}", finalActualId);
+                log.warn("获取PDF文件超时（20秒）: id={}", finalActualId);
                 writeErrorResponse(response, HttpStatus.REQUEST_TIMEOUT.value(), 
                         "当前连接需要认证，请求超时，请手动下载", true);
                 return;
@@ -248,4 +243,3 @@ public class ProxyController {
         }
     }
 }
-

@@ -44,7 +44,6 @@
                 </el-tag>
               </div>
             </div>
-
             <!-- 标题 -->
             <div class="literature-title-section">
               <h1 class="literature-title">{{ literature.paperInfo?.title || '' }}</h1>
@@ -59,7 +58,6 @@
                 <el-button :icon="Share" @click="handleShare">分享</el-button>
               </div>
             </div>
-
             <!-- 发表信息 -->
             <div v-if="literature.sourceInfo" class="publication-info">
               <div class="publication-item">
@@ -67,7 +65,6 @@
                 <span class="publication-text">{{ literature.sourceInfo.journalName }}</span>
               </div>
             </div>
-
             <!-- 作者信息 -->
             <div v-if="literature.authorsInfo && literature.authorsInfo.length > 0" class="authors-section">
               <div
@@ -425,16 +422,27 @@
       </el-form>
       <template #footer>
         <el-button @click="showCollectDialog = false">取消</el-button>
+        <el-button :icon="Upload" :loading="manualUploading" @click="handleSelectFileForUpload">手动上传</el-button>
         <el-button type="primary" :loading="collecting" @click="handleConfirmCollect">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 隐藏的文件输入框 -->
+    <input
+      ref="manualUploadFileInput"
+      type="file"
+      accept=".pdf,.doc,.docx,.txt"
+      multiple
+      style="display: none"
+      @change="handleFileSelectedForUpload"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
   Download,
@@ -453,7 +461,7 @@ import {
   View,
   Upload
 } from '@element-plus/icons-vue'
-import { getKnowledgeList, uploadFilesToKnowledge } from '@/api/Knowledge/knowledge'
+import { getKnowledgeList, uploadFilesToKnowledge, getKnowledgeFileRelationList } from '@/api/Knowledge/knowledge'
 import { runWorkflowStream } from '@/api/AI/ai'
 import BaseCard from '@/components/Common/BaseCard.vue'
 import { createLogger } from '@/utils/simpleLogger'
@@ -471,6 +479,10 @@ const knowledgeBases = ref([])
 const collectForm = reactive({
   knowledgeId: ''
 })
+
+// 手动上传相关
+const manualUploading = ref(false)
+const manualUploadFileInput = ref(null)
 
 // AI对话相关
 const chatMessages = ref([])
@@ -599,7 +611,7 @@ const downloadPdfUnified = async () => {
 
     const blob = await response.blob()
     
-    if (blob.size < 100 * 1024) { // 100KB
+    if (blob.size < 10 * 1024) { // 10KB
       throw new Error('PDF文件大小过小，可能不是有效的PDF文件')
     }
 
@@ -664,18 +676,18 @@ const showRequiresAuthMessage = (message) => {
   const landingPage = literature.value?.accessInfo?.landingPage
   if (landingPage) {
     ElMessage.warning({
-      message: `${message}，请前往官方网址手动下载`,
-      duration: 5000,
+      message: '当前文件需要认证无法预览，需要访问官网下载预览。收藏知识库两秒后自动跳转。如无法访问官网检查本地网络vpn。',
+      duration: 2000, // 2秒后消失
       showClose: true
     })
-    // 延迟打开官网，让用户看到提示
+    // 延迟2秒打开官网，让用户看到提示
     setTimeout(() => {
       window.open(landingPage, '_blank')
-    }, 1000)
+    }, 2000)
   } else {
     ElMessage.warning({
-      message: `${message}，请前往官网手动下载后上传`,
-      duration: 5000,
+      message: '当前文件需要认证无法预览，需要访问官网下载预览。如无法访问官网检查本地网络vpn。',
+      duration: 2000, // 2秒后消失
       showClose: true
     })
   }
@@ -735,8 +747,23 @@ const handlePreviewPdf = async () => {
       return
     }
 
-    // 如果没有缓存且没有在下载，提示用户PDF未加载
-    ElMessage.warning('PDF文件尚未加载，无法预览。请等待自动加载完成或手动上传文件。')
+    // 如果没有缓存且没有在下载，提示用户去官网访问
+    const landingPage = literature.value?.accessInfo?.landingPage
+    if (landingPage) {
+      ElMessage.warning({
+        message: '当前文件需要认证无法预览，需要访问官网下载预览。收藏知识库两秒后自动跳转。如无法访问官网检查本地网络vpn。',
+        duration: 2000 // 2秒后消失
+      })
+      // 延迟2秒打开官网，让用户看到提示
+      setTimeout(() => {
+        window.open(landingPage, '_blank')
+      }, 2000)
+    } else {
+      ElMessage.warning({
+        message: '当前文件需要认证无法预览，需要访问官网下载预览。如无法访问官网检查本地网络vpn。',
+        duration: 2000 // 2秒后消失
+      })
+    }
     pdfLoading.value = false
   } catch (error) {
     logger.error('预览PDF失败', error)
@@ -828,6 +855,45 @@ const handleConfirmCollect = async () => {
     const rawFileName = `${literature.value.paperInfo?.title || '文献'}.pdf`
     const fileName = sanitizeFileName(rawFileName)
     
+    // 检查知识库中是否已存在同名文件
+    try {
+      const fileListResponse = await getKnowledgeFileRelationList({
+        knowledgeId: selectedKb.id,
+        folderId: 0, // 根目录
+        page: 1,
+        size: 1000 // 查询足够多的文件以检查重复
+      })
+      
+      if (fileListResponse.code === 200 && fileListResponse.data) {
+        const existingFiles = fileListResponse.data.records || []
+        const duplicateFile = existingFiles.find(file => file.fileName === fileName)
+        
+        if (duplicateFile) {
+          // 发现重复文件，询问用户是否继续
+          collecting.value = false
+          try {
+            await ElMessageBox.confirm(
+              `知识库中已存在同名文件"${fileName}"，是否继续收藏？`,
+              '文件重复提示',
+              {
+                confirmButtonText: '继续收藏',
+                cancelButtonText: '取消',
+                type: 'warning'
+              }
+            )
+            // 用户确认继续，重新设置loading状态
+            collecting.value = true
+          } catch {
+            // 用户取消，直接返回
+            return
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn('检查文件重复失败，继续执行收藏', error)
+      // 检查失败不影响收藏流程，继续执行
+    }
+    
     let pdfFile = null
     
     // 优先使用缓存的PDF，如果没有则尝试下载
@@ -867,6 +933,120 @@ const handleConfirmCollect = async () => {
     ElMessage.error('收藏失败：' + (error.message || '未知错误'))
   } finally {
     collecting.value = false
+  }
+}
+
+// 选择文件进行上传（在收藏对话框中）
+const handleSelectFileForUpload = () => {
+  if (!collectForm.knowledgeId) {
+    ElMessage.warning('请先选择知识库')
+    return
+  }
+  
+  // 触发文件选择器
+  if (manualUploadFileInput.value) {
+    manualUploadFileInput.value.click()
+  }
+}
+
+// 文件选择后的处理
+const handleFileSelectedForUpload = async () => {
+  const fileInput = manualUploadFileInput.value
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    return
+  }
+
+  if (!collectForm.knowledgeId) {
+    ElMessage.warning('请先选择知识库')
+    return
+  }
+
+  const selectedKb = knowledgeBases.value.find(kb => kb.id === collectForm.knowledgeId)
+  if (!selectedKb) {
+    ElMessage.error('选择的知识库不存在')
+    return
+  }
+
+  const files = Array.from(fileInput.files)
+  if (files.length === 0) {
+    return
+  }
+
+  // 检查知识库中是否已存在同名文件
+  try {
+    const fileListResponse = await getKnowledgeFileRelationList({
+      knowledgeId: selectedKb.id,
+      folderId: 0, // 根目录
+      page: 1,
+      size: 1000 // 查询足够多的文件以检查重复
+    })
+    
+    if (fileListResponse.code === 200 && fileListResponse.data) {
+      const existingFiles = fileListResponse.data.records || []
+      const duplicateFiles = []
+      
+      // 检查每个文件是否重复
+      files.forEach(file => {
+        const duplicateFile = existingFiles.find(existing => existing.fileName === file.name)
+        if (duplicateFile) {
+          duplicateFiles.push(file.name)
+        }
+      })
+      
+      if (duplicateFiles.length > 0) {
+        // 发现重复文件，询问用户是否继续
+        try {
+          await ElMessageBox.confirm(
+            `知识库中已存在以下同名文件：\n${duplicateFiles.join('\n')}\n\n是否继续上传？`,
+            '文件重复提示',
+            {
+              confirmButtonText: '继续上传',
+              cancelButtonText: '取消',
+              type: 'warning'
+            }
+          )
+          // 用户确认继续
+        } catch {
+          // 用户取消，清空文件选择并返回
+          if (fileInput) {
+            fileInput.value = ''
+          }
+          return
+        }
+      }
+    }
+  } catch (error) {
+    logger.warn('检查文件重复失败，继续执行上传', error)
+    // 检查失败不影响上传流程，继续执行
+  }
+
+  manualUploading.value = true
+  try {
+    ElMessage.info(`正在上传 ${files.length} 个文件到知识库...`)
+    
+    // 调用批量上传接口
+    const response = await uploadFilesToKnowledge(
+      selectedKb.id, // 使用知识库的数据库主键ID
+      files, // 文件数组
+      0 // folderId，默认根目录
+    )
+    
+    if (response.code === 200) {
+      ElMessage.success(`成功上传 ${files.length} 个文件到知识库`)
+      showCollectDialog.value = false
+      collectForm.knowledgeId = ''
+      // 清空文件选择
+      if (fileInput) {
+        fileInput.value = ''
+      }
+    } else {
+      ElMessage.error(response.message || '上传失败')
+    }
+  } catch (error) {
+    logger.error('手动上传文件到知识库失败', error)
+    ElMessage.error('上传失败：' + (error.message || '未知错误'))
+  } finally {
+    manualUploading.value = false
   }
 }
 
@@ -919,8 +1099,8 @@ const handleChatFileSelect = (event) => {
   const file = event.target.files?.[0]
   if (!file) return
 
-  if (file.size < 100 * 1024) {
-    ElMessage.warning('文件大小过小，文件大小不得小于100KB')
+  if (file.size < 10 * 1024) {
+    ElMessage.warning('文件大小过小，文件大小不得小于10KB')
     return
   }
 
