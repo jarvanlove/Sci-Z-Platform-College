@@ -135,6 +135,22 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 difyRequest, userId, resourceId, "dataset");
         // 8. 检查响应状态
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            // 检查是否是409冲突错误（知识库名称重复）
+            if (response.getStatusCode().value() == 409 && response.getBody() != null) {
+                try {
+                    JsonNode errorBody = objectMapper.readTree(response.getBody());
+                    String errorCode = errorBody.has("code") ? errorBody.get("code").asText() : "";
+                    if ("dataset_name_duplicate".equals(errorCode)) {
+                        log.warn(String.format("知识库名称已存在: name=%s, userId=%s", req.getName(), userId));
+                        throw new BusinessException(ResultCode.KNOWLEDGE_NAME_DUPLICATE, "已存在该知识库");
+                    }
+                } catch (BusinessException e) {
+                    throw e; // 重新抛出业务异常
+                } catch (Exception e) {
+                    // JSON解析失败，继续使用通用错误处理
+                    log.warn(String.format("解析Dify错误响应失败: body=%s", response.getBody()));
+                }
+            }
             log.error(String.format("Dify API调用失败: status=%s, body=%s",
                     response.getStatusCode(), response.getBody()));
             throw new BusinessException(ResultCode.SERVER_ERROR,
@@ -272,8 +288,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (files == null || files.isEmpty()) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "文件列表不能为空");
         }
-        // 1. 获取当前登录用户ID 固定用管理员的id
-        Long userId = 1L;
+        // 1. 获取当前登录用户ID
+        Long userId = StpUtil.getLoginIdAsLong();
         log.info(String.format("上传多个文件到知识库: userId=%s, knowledgeId=%s, fileCount=%s, folderId=%s",
                 userId, knowledgeId, files.size(), folderId));
         // 2. 根据Dify知识库ID查询知识库信息
@@ -391,7 +407,6 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                     files.size(), minioResults.size()));
             throw new BusinessException(ResultCode.SERVER_ERROR, "MinIO上传失败: 结果数量不匹配");
         }
-
         // 10. 异步上传文件到 Dify API
         log.info(String.format("开始异步上传 %d 个文件到 Dify API", files.size()));
         CompletableFuture<List<ResponseEntity<String>>> difyUploadFuture = difyApiService.uploadDocumentsAsync(

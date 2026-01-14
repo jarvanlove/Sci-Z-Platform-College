@@ -438,7 +438,7 @@ export const deleteAiMessagesByConversationId = (conversationId) => {
  * @returns {Promise} 返回AbortController用于取消请求
  */
 export const runWorkflowStream = async (params) => {
-  const { query, knowledgeId, workflowId, files, conversationId, user, onMessage, onEnd, onError } = params
+  const { query, knowledgeId, workflowId, files, attachmentIds, conversationId, user, onMessage, onEnd, onError } = params
   
   // 获取token
   const authStore = await import('@/store/modules/auth').then(m => m.useAuthStore())
@@ -454,7 +454,14 @@ export const runWorkflowStream = async (params) => {
   const url = `${API_BASE_URL}${AI_API.CHAT_WORKFLOW_RUN}`
   
   const logger = (await import('@/utils/simpleLogger')).createLogger('ChatWorkflow')
-  logger.info('工作流流式对话请求', { url, query, knowledgeId, workflowId, filesCount: files?.length || 0 })
+  logger.info('工作流流式对话请求', { 
+    url, 
+    query, 
+    knowledgeId, 
+    workflowId, 
+    filesCount: files?.length || 0,
+    attachmentIdsCount: attachmentIds?.length || 0
+  })
   
   const abortController = new AbortController()
   
@@ -482,6 +489,12 @@ export const runWorkflowStream = async (params) => {
     if (files && files.length > 0) {
       files.forEach(file => {
         formData.append('files', file)
+      })
+    }
+    // 添加知识库文件 attachmentIds 参数（支持多个，使用数组形式）
+    if (attachmentIds && attachmentIds.length > 0) {
+      attachmentIds.forEach(attachmentId => {
+        formData.append('attachmentIds', String(attachmentId))
       })
     }
     if (conversationId) {
