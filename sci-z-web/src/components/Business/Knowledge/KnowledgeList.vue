@@ -1719,7 +1719,7 @@ onMounted(() => {
   display: flex;
   height: 100vh; // 原型图使用 100vh
   width: 100%;
-  background: #f7f9fc;
+  background: var(--bg);
   overflow: visible; // 原型图使用 visible
   position: relative; // 原型图使用 relative
 }
@@ -1727,8 +1727,8 @@ onMounted(() => {
 /* 左侧导航栏 - 共享知识库列表 - 完全按照原型图实现 */
 .kb-list-sidebar {
   width: 280px;
-  background: white;
-  border-right: 1px solid #e5e7eb;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden; // 原型图：容器本身不滚动
@@ -1736,7 +1736,7 @@ onMounted(() => {
 
 .kb-list-header {
   padding: 14px 20px 14px 12px; // 对齐原型图
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1746,7 +1746,7 @@ onMounted(() => {
 .kb-header-title {
   font-size: 16px;
   font-weight: 600;
-  color: #1e3a8a;
+  color: var(--color-primary);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1779,7 +1779,7 @@ onMounted(() => {
 .kb-section-title {
   font-size: 14px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-3);
   margin-bottom: 12px;
   margin-left: 8px;
   display: flex;
@@ -1809,7 +1809,7 @@ onMounted(() => {
 }
 
 .kb-list::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--border-hover);
   border-radius: 3px;
 }
 
@@ -1831,10 +1831,10 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 8px;
   margin-bottom: 8px;
-  background: #fff;
+  background: var(--surface);
   transition: all 0.2s ease;
   width: 100%; // 占满父容器宽度
   box-sizing: border-box; // 包含 padding 和 border
@@ -1848,13 +1848,13 @@ onMounted(() => {
   transform-origin: left center; // 设置缩放原点
 
   &:hover {
-    background: #f9fafb;
-    border-color: #d1d5db;
+    background: var(--hover-light);
+    border-color: var(--border-hover);
   }
 
   &.active {
-    background: #eef2ff;
-    border-color: #1e3a8a;
+    background: var(--hover);
+    border-color: var(--color-primary);
   }
 }
 
@@ -1913,7 +1913,7 @@ onMounted(() => {
 .kb-item-name {
   font-size: 14px;
   font-weight: 500;
-  color: #111827;
+  color: var(--text);
   overflow: hidden; // 防止文本溢出
   text-overflow: ellipsis; // 文本过长显示省略号
   white-space: nowrap; // 单行显示
@@ -1949,7 +1949,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--text-3);
   flex-shrink: 0; // 防止按钮被压缩
   // 固定图标大小
   font-size: 16px;
@@ -1979,14 +1979,14 @@ onMounted(() => {
 /* 中间内容区域 - 知识库详情 - 完全按照原型图实现 */
 .main-content {
   flex: 0 0 calc(100% - 280px - 600px); // 原型图：固定宽度计算
-  background: white;
+  background: var(--surface);
   display: flex;
   flex-direction: column;
 }
 
 .content-header {
   padding: 24px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border);
   background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
   flex-shrink: 0; // 防止被压缩
 }
@@ -1994,7 +1994,7 @@ onMounted(() => {
 .content-title {
   font-size: 24px;
   font-weight: 600;
-  color: #1e3a8a;
+  color: var(--color-primary);
   margin-bottom: 8px;
   display: flex;
   align-items: center;
@@ -2016,13 +2016,13 @@ onMounted(() => {
 
 .content-meta {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-3);
   margin-bottom: 4px;
 }
 
 .content-description {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-3);
 }
 
 .content-body {
@@ -2045,7 +2045,7 @@ onMounted(() => {
 .section-title {
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
 }
 
 .kb-breadcrumb {
@@ -2055,7 +2055,7 @@ onMounted(() => {
 }
 
 .kb-crumb-link {
-  color: #1e3a8a;
+  color: var(--color-primary);
   cursor: pointer;
 
   &:hover {
@@ -2076,7 +2076,7 @@ onMounted(() => {
   min-width: 32px; // 固定最小宽度，防止被压缩
   min-height: 32px; // 固定最小高度，防止被压缩
   background: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 8px;
   cursor: pointer;
   display: flex;
@@ -2096,9 +2096,9 @@ onMounted(() => {
   }
 
   &:hover {
-    background: #eef2ff;
-    color: #1e3a8a;
-    border-color: #1e3a8a;
+    background: var(--hover);
+    color: var(--color-primary);
+    border-color: var(--color-primary);
     box-shadow: 0 2px 6px rgba(30, 58, 138, 0.15);
   }
 }
@@ -2111,8 +2111,8 @@ onMounted(() => {
 
 .content-item {
   padding: 16px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--hover-light);
+  border: 1px solid var(--border);
   border-radius: 8px;
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -2122,7 +2122,7 @@ onMounted(() => {
 
   &:hover {
     background: #f3f4f6;
-    border-color: #d1d5db;
+    border-color: var(--border-hover);
   }
 }
 
@@ -2130,7 +2130,7 @@ onMounted(() => {
   width: 40px;
   height: 40px;
   background: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -2139,7 +2139,7 @@ onMounted(() => {
   font-size: 18px;
 
   &.folder-icon {
-    background: #eef2ff;
+    background: var(--hover);
     border-color: #dbeafe;
     color: #3b82f6;
   }
@@ -2154,7 +2154,7 @@ onMounted(() => {
 .content-item-name {
   font-size: 14px;
   font-weight: 500;
-  color: #111827;
+  color: var(--text);
   margin-bottom: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2165,7 +2165,7 @@ onMounted(() => {
 
 .content-item-meta {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-3);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2249,7 +2249,7 @@ onMounted(() => {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 14px;
-  color: #111827;
+  color: var(--text);
   outline: none;
   transition: all 0.2s ease;
 
@@ -2266,7 +2266,7 @@ onMounted(() => {
   justify-content: center;
   padding: 80px 20px;
   text-align: center;
-  color: #6b7280;
+  color: var(--text-3);
 }
 
 .empty-icon-large {
@@ -2291,7 +2291,7 @@ onMounted(() => {
 
 .empty-description {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-3);
   margin-bottom: 24px;
   line-height: 1.5;
 }
@@ -2371,13 +2371,13 @@ onMounted(() => {
 .cover-upload-text {
   flex: 1;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-3);
 }
 
 /* 右侧AI助手区域 - 问知识库 - 完全按照原型图实现 */
 .ai-assistant {
   width: 600px;
-  background: white;
+  background: var(--surface);
   border-left: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
@@ -2394,7 +2394,7 @@ onMounted(() => {
 
 .ai-header {
   padding: 20px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2409,7 +2409,7 @@ onMounted(() => {
 .ai-header-title {
   font-size: 16px;
   font-weight: 600;
-  color: #1e3a8a;
+  color: var(--color-primary);
 }
 
 .kb-messages-container {
@@ -2441,13 +2441,13 @@ onMounted(() => {
 }
 
 .kb-messages-container::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--border-hover);
   border-radius: 3px;
 }
 
 .empty-chat-message {
   font-size: 16px;
-  color: #6b7280;
+  color: var(--text-3);
   text-align: center;
   line-height: 1.6;
 }
@@ -2506,8 +2506,8 @@ onMounted(() => {
   line-height: 1.6;
   word-wrap: break-word;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e5e7eb;
-  background: #fff;
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: #374151;
 }
 
@@ -2548,7 +2548,7 @@ onMounted(() => {
 .kb-input-area {
   padding: 20px;
   border-top: 1px solid #f0f0f0;
-  background: #fff;
+  background: var(--surface);
   flex-shrink: 0; // 防止被压缩
 }
 
@@ -2556,7 +2556,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   background: #f8f9fa;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0;
   transition: all 0.2s ease;
@@ -2630,7 +2630,7 @@ onMounted(() => {
 
 .kb-documents-title {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-3);
   margin-bottom: 8px;
   font-weight: 500;
 }
@@ -2646,7 +2646,7 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  background: #f9fafb;
+  background: var(--hover-light);
   border-radius: 6px;
   font-size: 12px;
   transition: background 0.2s ease;
@@ -2721,7 +2721,7 @@ onMounted(() => {
 
 .kb-streaming-text {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-3);
 }
 
 .main-content-fade-enter-active,

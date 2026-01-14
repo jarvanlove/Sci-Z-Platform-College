@@ -52,7 +52,9 @@ export default {
     none: '없음',
     yuan: '￥',
     added: '추가됨',
-    remove: '제거'
+    remove: '제거',
+    collapseSidebar: '사이드바 접기',
+    expandSidebar: '사이드바 펼치기'
   },
   // 페이지네이션
   pagination: {
@@ -100,6 +102,7 @@ export default {
     reportGenerate: '보고서 생성',
     knowledge: '지식베이스',
     knowledgeList: '지식베이스 목록',
+    practice: '실천',
     ai: 'AI 어시스턴트',
     aiChat: 'AI 대화',
     user: '사용자 센터',
@@ -1006,8 +1009,7 @@ export default {
     chat: {
       title: 'AI 대화',
       newChat: '새 대화',
-      startNewChat: '새 대화 시작',
-      selectOrCreateChat: '대화를 선택하거나 새 대화를 만드세요',
+      greeting: '안녕하세요, 저는',
       clear: '지우기',
       settings: '설정',
       user: '사용자',
@@ -1040,9 +1042,13 @@ export default {
       generating: '생성 중...',
       copy: '복사',
       retry: '다시 시도',
+      regenerate: '재생성',
+      edit: '편집',
+      editMessagePlaceholder: '메시지 내용 편집...',
       // 🔥 修复：使用全角 ＠ 符号，避免 Vue I18n 编译错误
       inputPlaceholderWithKb: '＠지식베이스를 입력하거나 직접 질문하세요',
-      attachmentTitle: '첨부 파일 추가 (파일 업로드 시 지식베이스 선택 필요)',
+      inputPlaceholderGuest: '자유롭게 질문하세요',
+      attachmentTitle: '첨부 파일 추가',
       aiContentHint: 'AI가 생성한 내용은 참고용입니다',
       editTitle: '제목 편집',
       enterNewTitle: '새 대화 제목을 입력하세요',
@@ -1059,7 +1065,18 @@ export default {
       stopped: '생성이 중지되었습니다',
       copiedToClipboard: '클립보드에 복사되었습니다',
       copyFailed: '복사에 실패했습니다',
-      switchedTo: '{model}로 전환되었습니다'
+      switchedTo: '{model}로 전환되었습니다',
+      history: '대화 기록',
+      justNow: '방금',
+      noHistory: '대화 기록이 없습니다',
+      rename: '이름 변경',
+      delete: '삭제',
+      alreadyNewChat: '이미 최신 대화입니다',
+      updateTitleFailed: '제목 업데이트에 실패했습니다',
+      operationFailed: '작업에 실패했습니다',
+      deleteFailed: '삭제에 실패했습니다',
+      chatPinned: '대화가 고정되었습니다',
+      chatUnpinned: '고정이 해제되었습니다'
     },
     knowledge: {
       searchKb: '지식베이스 검색',
@@ -1090,6 +1107,17 @@ export default {
       documentType: '문서 유형',
       timeRange: '시간 범위'
     }
+  },
+
+  // 실천 관련
+  practice: {
+    subtitle: '연구 프로젝트 관리 및 실천 도구',
+    dashboardDesc: '프로젝트 개요 및 통계 데이터 보기',
+    projectDesc: '연구 프로젝트의 전체 생명주기 관리, 프로젝트 진행 상황 추적',
+    declarationDesc: '연구 프로젝트 신청 생성 및 관리',
+    reportDesc: '연구 보고서 생성 및 관리',
+    knowledgeDesc: '지식베이스 구축 및 관리, 문서 업로드 및 검색 지원',
+    systemDesc: '권한 설정, 로그 조회, API 키 설정'
   },
 
   // 시스템 관리

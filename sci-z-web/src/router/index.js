@@ -28,7 +28,7 @@ const routes = [
   },
   {
     path: '/',
-    redirect: '/login'
+    redirect: '/ai/chat' // 默认跳转到AI对话（公开页面），路由守卫会根据登录状态进一步处理
   },
   {
     path: '/dashboard',
@@ -38,7 +38,7 @@ const routes = [
       title: '仪表板', 
       requiresAuth: true,
       permission: 'menu:dashboard:view',
-      layout: 'main'
+      layout: 'toc' // 🔥 修复：使用 ToC 布局
     }
   },
   {
@@ -53,7 +53,7 @@ const routes = [
           title: '申报列表', 
           requiresAuth: true,
           permission: 'menu:declaration:list',
-          layout: 'main'
+          layout: 'toc' // 使用 ToC 布局
         }
       },
       {
@@ -65,7 +65,7 @@ const routes = [
           requiresAuth: true,
           // 🔥 详情页和创建页不是独立菜单，继承列表页权限
           permission: 'menu:declaration:list',
-          layout: 'main'
+          layout: 'toc' // 使用 ToC 布局
         }
       },
       {
@@ -77,7 +77,7 @@ const routes = [
           requiresAuth: true,
           // 🔥 详情页和创建页不是独立菜单，继承列表页权限
           permission: 'menu:declaration:list',
-          layout: 'main'
+          layout: 'toc' // 使用 ToC 布局
         }
       }
     ]
@@ -94,7 +94,7 @@ const routes = [
           title: '项目列表', 
           requiresAuth: true,
           permission: 'menu:project:list',
-          layout: 'main'
+          layout: 'toc' // 使用 ToC 布局
         }
       },
       {
@@ -106,7 +106,7 @@ const routes = [
           requiresAuth: true,
           // 🔥 详情页和进度页不是独立菜单，继承列表页权限
           permission: 'menu:project:list',
-          layout: 'main'
+          layout: 'toc' // 使用 ToC 布局
         }
       },
       {
@@ -118,7 +118,7 @@ const routes = [
           requiresAuth: true,
           // 🔥 详情页和进度页不是独立菜单，继承列表页权限
           permission: 'menu:project:list',
-          layout: 'main'
+          layout: 'toc' // 使用 ToC 布局
         }
       }
     ]
@@ -135,7 +135,7 @@ const routes = [
           title: '报告列表', 
           requiresAuth: true,
           permission: 'menu:report:list',
-          layout: 'main'
+          layout: 'toc' // 使用 ToC 布局
         }
       },
       {
@@ -147,7 +147,7 @@ const routes = [
           requiresAuth: true,
           // 🔥 报告生成页不是独立菜单，继承列表页权限
           permission: 'menu:report:list',
-          layout: 'main'
+          layout: 'toc' // 使用 ToC 布局
         }
       }
     ]
@@ -162,12 +162,22 @@ const routes = [
         component: () => import('@/views/Knowledge/List.vue'),
         meta: { 
           title: '知识库', 
-          requiresAuth: true,
+          requiresAuth: true, // 需要登录
           permission: 'menu:knowledge:list',
-          layout: 'main'
+          layout: 'toc' // 使用 ToC 布局
         }
       }
     ]
+  },
+  {
+    path: '/practice',
+    name: 'Practice',
+    component: () => import('@/views/Practice/index.vue'),
+    meta: { 
+      title: '实践', 
+      requiresAuth: true, // 需要登录
+      layout: 'toc' // 使用 ToC 布局
+    }
   },
   {
     path: '/literature',
@@ -179,9 +189,8 @@ const routes = [
         component: () => import('@/views/Literature/Search.vue'),
         meta: { 
           title: '文献搜索', 
-          requiresAuth: true,
-          permission: 'menu:literature:search',
-          layout: 'main'
+          requiresAuth: false, // 不需要登录即可访问，但功能受限
+          layout: 'toc' // 使用 ToC 布局
         }
       },
       {
@@ -193,7 +202,7 @@ const routes = [
           requiresAuth: true,
           // 详情页继承搜索页权限
           permission: 'menu:literature:search',
-          layout: 'main'
+          layout: 'toc' // 使用 ToC 布局
         }
       }
     ]
@@ -210,9 +219,8 @@ const routes = [
     }),
     meta: { 
       title: 'AI助手', 
-      requiresAuth: true,
-      permission: 'menu:ai:chat',
-      layout: 'main'
+      requiresAuth: false, // 不需要登录即可访问，但功能受限
+      layout: 'toc' // 使用 ToC 布局
     }
   },
   {
@@ -227,7 +235,7 @@ const routes = [
           title: '个人信息', 
           requiresAuth: true,
           permission: 'menu:user:profile',
-          layout: 'main'
+          layout: 'toc' // 🔥 修复：使用 ToC 布局，在侧边栏右侧显示
         }
       },
       {
@@ -238,7 +246,7 @@ const routes = [
           title: '安全设置', 
           requiresAuth: true,
           permission: 'menu:user:security',
-          layout: 'main'
+          layout: 'toc' // 🔥 修复：使用 ToC 布局，在侧边栏右侧显示
         }
       }
     ]
@@ -250,13 +258,23 @@ const routes = [
     meta: { 
       title: '操作手册', 
       requiresAuth: true,
-      layout: 'main'
+      layout: 'toc' // 🔥 修复：使用 ToC 布局
     }
   },
   {
     path: '/system',
     component: RouterView,
     children: [
+      {
+        path: '',
+        name: 'SystemIndex',
+        component: () => import('@/views/System/index.vue'),
+        meta: { 
+          title: '系统设置', 
+          requiresAuth: true,
+          layout: 'toc'
+        }
+      },
       {
         path: 'user',
         name: 'SystemUser',
@@ -265,7 +283,7 @@ const routes = [
           title: '用户管理', 
           requiresAuth: true,
           permission: 'menu:system:user',
-          layout: 'main'
+          layout: 'toc' // 🔥 修复：使用 ToC 布局
         }
       },
       {
@@ -276,7 +294,7 @@ const routes = [
           title: '角色权限', 
           requiresAuth: true,
           permission: 'menu:system:role',
-          layout: 'main'
+          layout: 'toc' // 🔥 修复：使用 ToC 布局
         }
       },
       {
@@ -287,7 +305,7 @@ const routes = [
           title: '系统配置', 
           requiresAuth: true,
           permission: 'menu:system:config',
-          layout: 'main'
+          layout: 'toc' // 🔥 修复：使用 ToC 布局
         }
       },
       {
@@ -298,7 +316,7 @@ const routes = [
           title: '日志管理', 
           requiresAuth: true,
           permission: 'menu:system:logs',
-          layout: 'main'
+          layout: 'toc' // 🔥 修复：使用 ToC 布局
         }
       },
       {
@@ -309,7 +327,7 @@ const routes = [
           title: 'API Key 配置', 
           requiresAuth: true,
           permission: 'menu:system:apikey',
-          layout: 'main'
+          layout: 'toc' // 🔥 修复：使用 ToC 布局
         }
       }
     ]
@@ -332,9 +350,21 @@ const AUTH_PAGES = ['/login', '/register', '/reset-password']
 
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
-  const publicPages = ['/login', '/register', '/reset-password']
-  const authRequired = !publicPages.includes(to.path)
   const authStore = useAuthStore()
+  
+  // 🔥 处理根路径重定向：始终跳转到AI对话页面
+  // 当访问根路径时，Vue Router 会先执行 redirect 到 /ai/chat，然后进入路由守卫
+  // 这里不再重定向到知识库，保持默认在AI对话页面
+  if (to.path === '/') {
+    routerLogger.info('访问根路径，重定向到AI对话')
+    return next('/ai/chat')
+  }
+  
+  // 公开页面：登录、注册、重置密码、AI对话、文献搜索
+  const publicPages = ['/login', '/register', '/reset-password', '/ai/chat', '/literature/search']
+  // 如果路由明确标记为不需要认证，也视为公开页面
+  const isPublicPage = publicPages.includes(to.path) || to.meta.requiresAuth === false
+  const authRequired = !isPublicPage
 
   // 🔥 关键修复：登录/注册/忘记密码页面强制使用明亮主题
   const isAuthPage = AUTH_PAGES.includes(to.path)
@@ -362,9 +392,9 @@ router.beforeEach(async (to, from, next) => {
   // 检查是否需要认证
   if (authRequired) {
       if (!authStore.isLoggedIn) {
-        routerLogger.info('用户未登录，重定向到登录页面', { targetPath: to.path })
-        ElMessage.error('请先登录')
-        return next('/login')
+        routerLogger.info('用户未登录，重定向到AI对话页面', { targetPath: to.path })
+        // 🔥 修改：未登录用户访问任何需要认证的页面，都重定向到 /ai/chat
+        return next('/ai/chat')
       }
       
       try {
@@ -383,9 +413,10 @@ router.beforeEach(async (to, from, next) => {
             // 不阻止路由跳转，允许用户继续使用（前端可以独立开发调试）
           } else {
             // 非网络错误的情况，说明服务端会话已失效
-            routerLogger.warn('服务端会话无效，重定向到登录页面', { targetPath: to.path })
+            routerLogger.warn('服务端会话无效，重定向到AI对话页面', { targetPath: to.path })
             ElMessage.error('登录状态已过期，请重新登录')
-            return next('/login')
+            // 🔥 修改：会话失效时重定向到 /ai/chat
+            return next('/ai/chat')
           }
         }
       } catch (error) {
@@ -403,12 +434,14 @@ router.beforeEach(async (to, from, next) => {
         } else {
           routerLogger.error('登录状态校验异常', { error: error.message })
           ElMessage.error('校验登录状态失败，请重新登录')
-          return next('/login')
+          // 🔥 修改：校验失败时重定向到 /ai/chat
+          return next('/ai/chat')
         }
       }
     
     // 检查页面权限 - 完全依赖后端返回的权限列表，不进行任何硬编码
-    if (to.meta.permission) {
+    // 只有需要登录的页面才检查权限
+    if (to.meta.permission && authRequired) {
       // 🔥 关键修复：权限检查完全依赖后端返回的权限列表，不进行任何硬编码
       let hasPermission = authStore.hasPermission(to.meta.permission)
       
@@ -441,22 +474,33 @@ router.beforeEach(async (to, from, next) => {
         })
         ElMessage.error('没有权限访问该页面')
         
-        // 如果当前要访问的就是dashboard，则重定向到登录页面避免无限循环
+        // 如果当前要访问的就是dashboard，则重定向到AI对话页面
         if (to.path === '/dashboard') {
-          routerLogger.warn('无权限访问dashboard，重定向到登录页面')
-          return next('/login')
+          routerLogger.warn('无权限访问dashboard，重定向到AI对话页面')
+          return next('/ai/chat')
         }
         
-        // 重定向到有权限的页面
-        return next('/dashboard')
+        // 重定向到AI对话页面
+        return next('/ai/chat')
       }
     }
   }
 
-  // 如果已登录用户访问登录页面，重定向到仪表板
-  if (to.path === '/login' && authStore.isLoggedIn) {
-    routerLogger.info('已登录用户访问登录页面，重定向到仪表板')
-    return next('/dashboard')
+  // 🔥 修改：未登录用户访问登录页面，也重定向到AI对话页面（在AI对话页面进行登录）
+  if (to.path === '/login') {
+    if (authStore.isLoggedIn) {
+      routerLogger.info('已登录用户访问登录页面，重定向到AI对话页面')
+      return next('/ai/chat')
+    } else {
+      routerLogger.info('未登录用户访问登录页面，重定向到AI对话页面')
+      return next('/ai/chat')
+    }
+  }
+  
+  // 🔥 修改：未登录用户访问注册/重置密码页面，也重定向到AI对话页面
+  if ((to.path === '/register' || to.path === '/reset-password') && !authStore.isLoggedIn) {
+    routerLogger.info('未登录用户访问认证页面，重定向到AI对话页面', { targetPath: to.path })
+    return next('/ai/chat')
   }
 
   next()

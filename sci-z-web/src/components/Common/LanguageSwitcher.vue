@@ -5,13 +5,16 @@
  */
 -->
 <template>
-  <el-dropdown @command="handleLanguageChange" trigger="click">
+  <el-dropdown @command="handleLanguageChange" @visible-change="handleVisibleChange" trigger="click">
     <el-button type="text" class="language-switcher">
       <el-icon class="language-icon">
         <SwitchFilled />
       </el-icon>
       <span>{{ currentLocaleName }}</span>
-      <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+      <el-icon class="el-icon--right">
+        <ArrowUp v-if="isDropdownOpen" />
+        <ArrowDown v-else />
+      </el-icon>
     </el-button>
     <template #dropdown>
       <el-dropdown-menu>
@@ -30,12 +33,20 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { SwitchFilled, ArrowDown } from '@element-plus/icons-vue'
+import { SwitchFilled, ArrowDown, ArrowUp } from '@element-plus/icons-vue'
 import { supportedLocales, setLocale, getCurrentLocale } from '@/locales'
 
 const { t } = useI18n()
+
+// 下拉菜单打开状态
+const isDropdownOpen = ref(false)
+
+// 处理下拉菜单显示状态变化
+const handleVisibleChange = (visible) => {
+  isDropdownOpen.value = visible
+}
 
 // 当前语言
 const currentLocale = computed(() => getCurrentLocale())
@@ -65,14 +76,14 @@ const handleLanguageChange = (locale) => {
   transition: all 0.2s ease;
   
   &:hover {
-    color: var(--color-primary);
+    color: var(--text);
     background-color: var(--hover);
   }
 }
 
 .language-icon {
   font-size: 16px;
-  color: var(--color-primary);
+  color: var(--text);
 }
 
 .locale-flag {
@@ -89,7 +100,7 @@ const handleLanguageChange = (locale) => {
   align-items: center;
   
   &.is-active {
-    color: var(--color-primary);
+    color: var(--text);
     background-color: var(--hover);
   }
   

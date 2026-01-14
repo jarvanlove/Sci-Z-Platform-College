@@ -10,6 +10,191 @@
   box-sizing: border-box;
 }
 
+// 编辑标题对话框样式（匹配原型图）
+// 使用更高优先级的选择器覆盖全局样式
+.el-message-box.edit-title-dialog,
+.edit-title-dialog {
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  border: none !important;
+  width: 400px !important;
+}
+
+// 强制移除输入框的所有阴影和轮廓
+.el-message-box.edit-title-dialog .el-input__wrapper,
+.edit-title-dialog .el-input__wrapper {
+  box-shadow: none !important;
+}
+
+.el-message-box.edit-title-dialog .el-input__wrapper:hover,
+.edit-title-dialog .el-input__wrapper:hover {
+  box-shadow: none !important;
+}
+
+.el-message-box.edit-title-dialog .el-input__wrapper.is-focus,
+.edit-title-dialog .el-input__wrapper.is-focus {
+  box-shadow: none !important;
+}
+
+.el-message-box.edit-title-dialog .el-input__wrapper.is-focus:hover,
+.edit-title-dialog .el-input__wrapper.is-focus:hover {
+  box-shadow: none !important;
+}
+
+.edit-title-dialog .el-message-box__header {
+  background: white !important;
+  padding: 20px 24px 16px 24px !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+  position: relative !important;
+}
+
+.edit-title-dialog .el-message-box__title {
+  color: #1e3a8a !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.5 !important;
+}
+
+.edit-title-dialog .el-message-box__headerbtn {
+  top: 20px !important;
+  right: 24px !important;
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.edit-title-dialog .el-message-box__close {
+  color: #6b7280 !important;
+  font-size: 18px !important;
+}
+
+.edit-title-dialog .el-message-box__close:hover {
+  color: #374151 !important;
+}
+
+.edit-title-dialog .el-message-box__content {
+  padding: 20px 24px !important;
+  background: white !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+}
+
+.edit-title-dialog .el-message-box__message {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  color: #6b7280 !important;
+  margin: 0 0 16px 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  order: 1 !important;
+}
+
+.edit-title-dialog .el-message-box__input {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  width: 100% !important;
+  order: 2 !important;
+}
+
+.edit-title-dialog .el-input {
+  width: 100% !important;
+}
+
+.edit-title-dialog .el-input__wrapper {
+  border-radius: 6px !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: none !important;
+  padding: 8px 12px !important;
+  background-color: #ffffff !important;
+}
+
+.edit-title-dialog .el-input__wrapper:hover {
+  border-color: #9ca3af !important;
+  box-shadow: none !important;
+}
+
+.edit-title-dialog .el-input__wrapper.is-focus {
+  border-color: #1e3a8a !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.edit-title-dialog .el-input__wrapper.is-focus:hover {
+  box-shadow: none !important;
+}
+
+.edit-title-dialog .el-input__wrapper.is-focus .el-input__inner {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.edit-title-dialog .el-input__inner {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.edit-title-dialog .el-input__inner:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.edit-title-dialog .el-input__inner {
+  font-size: 14px !important;
+  color: #374151 !important;
+  height: auto !important;
+  line-height: 1.5 !important;
+}
+
+.edit-title-dialog .el-input__inner::placeholder {
+  color: #9ca3af !important;
+}
+
+.edit-title-dialog .el-message-box__btns {
+  padding: 16px 24px 20px 24px !important;
+  background: white !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 12px !important;
+  border-top: none !important;
+  margin-top: 0 !important;
+}
+
+.edit-title-dialog .el-message-box__btns .el-button {
+  padding: 8px 20px !important;
+  border-radius: 6px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  border: 1px solid !important;
+  transition: all 0.2s ease !important;
+  min-width: 80px !important;
+  height: 36px !important;
+}
+
+.edit-title-dialog .el-message-box__btns .el-button--default {
+  background: white !important;
+  border-color: #d1d5db !important;
+  color: #374151 !important;
+}
+
+.edit-title-dialog .el-message-box__btns .el-button--default:hover {
+  background: #f9fafb !important;
+  border-color: #9ca3af !important;
+  color: #374151 !important;
+}
+
+.edit-title-dialog .el-message-box__btns .el-button--primary {
+  background: #1e3a8a !important;
+  border-color: #1e3a8a !important;
+  color: white !important;
+}
+
+.edit-title-dialog .el-message-box__btns .el-button--primary:hover {
+  background: #1e40af !important;
+  border-color: #1e40af !important;
+  color: white !important;
+}
+
 body {
   font-family: var(--font-family);
   font-size: var(--font-size-base);

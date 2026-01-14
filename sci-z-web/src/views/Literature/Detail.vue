@@ -1195,7 +1195,7 @@ onMounted(() => {
 .literature-detail-container {
   padding: 0;
   height: calc(100vh - 60px);
-  background: #f5f5f5;
+  background: var(--bg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1212,7 +1212,7 @@ onMounted(() => {
     overflow-y: auto;
     overflow-x: hidden;
     padding: 20px;
-    background: #fff;
+    background: var(--surface);
     min-height: 0; // 确保可以滚动
 
     .loading-container {
@@ -1246,13 +1246,13 @@ onMounted(() => {
 
           .header-icon {
             font-size: 18px;
-            color: #6b7280;
+            color: var(--text-3);
           }
 
           .header-title {
             font-size: 16px;
             font-weight: 600;
-            color: #111827;
+            color: var(--text);
           }
         }
       }
@@ -1270,11 +1270,11 @@ onMounted(() => {
           color: #6b7280;
 
           .info-label {
-            color: #6b7280;
+            color: var(--text-3);
           }
 
           .info-value {
-            color: #111827;
+            color: var(--text);
             font-weight: 500;
           }
 
@@ -1343,7 +1343,7 @@ onMounted(() => {
 
           .publication-text {
             font-size: 14px;
-            color: #111827;
+            color: var(--text);
           }
         }
       }
@@ -1377,7 +1377,7 @@ onMounted(() => {
 
           .author-name {
             font-size: 14px;
-            color: #374151;
+            color: var(--text);
             font-weight: 500;
           }
 
@@ -1396,10 +1396,10 @@ onMounted(() => {
           display: flex;
           flex-direction: column;
           gap: 0;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border);
           border-radius: 8px;
           overflow: hidden;
-          background: #fff;
+          background: var(--surface);
 
           .links-table-row {
             display: flex;
@@ -1413,7 +1413,7 @@ onMounted(() => {
             }
 
             &:hover {
-              background-color: #f9fafb;
+              background-color: var(--hover-light);
             }
 
             .links-table-label {
@@ -1423,7 +1423,7 @@ onMounted(() => {
               min-width: 80px;
               font-size: 14px;
               font-weight: 500;
-              color: #6b7280;
+              color: var(--text-3);
               flex-shrink: 0;
 
               .link-icon {
@@ -1441,7 +1441,7 @@ onMounted(() => {
               font-size: 14px;
 
               .link-value {
-                color: #111827;
+                color: var(--text);
               }
 
               .link-value-empty {
@@ -1454,7 +1454,7 @@ onMounted(() => {
               }
 
               .link-label-inline {
-                color: #6b7280;
+                color: var(--text-3);
                 font-weight: 500;
               }
 
@@ -1473,7 +1473,7 @@ onMounted(() => {
 
               .pdf-tip-text {
                 font-size: 13px;
-                color: #6b7280;
+                color: var(--text-3);
                 margin-left: 8px;
 
                 .pdf-tip-link {
@@ -1540,7 +1540,7 @@ onMounted(() => {
           .keyword-tag {
             background: #f3f4f6;
             color: #4b5563;
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--border);
           }
         }
       }
@@ -1572,7 +1572,7 @@ onMounted(() => {
   // 右侧AI对话侧边栏
   .chat-sidebar {
     width: 400px;
-    background: #fff;
+    background: var(--surface);
     border-left: 1px solid #e5e7eb;
     display: flex;
     flex-direction: column;
@@ -1618,7 +1618,7 @@ onMounted(() => {
           .document-title {
             font-size: 14px;
             font-weight: 500;
-            color: #111827;
+            color: var(--text);
             flex: 1;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -1650,7 +1650,7 @@ onMounted(() => {
           align-items: center;
           gap: 8px;
           padding: 8px;
-          background: #fff;
+          background: var(--surface);
           border-radius: 4px;
           margin-bottom: 8px;
 
@@ -1691,7 +1691,7 @@ onMounted(() => {
           gap: 8px;
           padding: 12px;
           background: #f9fafb;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border);
           border-radius: 8px;
           cursor: pointer;
           transition: all 0.2s;
@@ -1739,13 +1739,13 @@ onMounted(() => {
             .tip-title {
               font-size: 16px;
               font-weight: 600;
-              color: #374151;
+              color: var(--text);
               margin: 0 0 8px 0;
             }
 
             .tip-content {
               font-size: 14px;
-              color: #6b7280;
+              color: var(--text-3);
               margin: 0;
               line-height: 1.6;
               max-width: 300px;
@@ -1822,7 +1822,7 @@ onMounted(() => {
                   }
 
                   .message-text {
-                    color: #111827;
+                    color: var(--text);
                     line-height: 1.6;
                     white-space: pre-wrap;
                     word-wrap: break-word;
@@ -1837,7 +1837,7 @@ onMounted(() => {
       .chat-input-area {
         border-top: 1px solid #e5e7eb;
         padding: 16px;
-        background: #fff;
+        background: var(--surface);
         flex-shrink: 0; // 输入区域固定，不收缩
 
         .input-toolbar {

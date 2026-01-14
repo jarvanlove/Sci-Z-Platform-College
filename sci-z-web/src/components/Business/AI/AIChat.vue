@@ -6,177 +6,330 @@
 -->
 <template>
   <div class="ai-chat-container" ref="containerRef">
-    <!-- 🔥 调试信息：确保组件已渲染（生产环境可关闭） -->
-    <div v-if="false" style="position: fixed; top: 80px; left: 10px; z-index: 99999; background: blue; color: white; padding: 4px; font-size: 12px;">
-      AIChat 组件已加载 - {{ containerRef ? '有ref' : '无ref' }}
-    </div>
-    
-    <!-- 左侧对话列表 -->
-    <div class="chat-list-sidebar">
-      <div class="chat-list-header">
-        <button class="new-chat-btn" @click="createNewChat">
-          <el-icon><Plus /></el-icon>
-          {{ $t('ai.chat.newChat') }}
-        </button>
-  </div>
-      <div class="chat-list">
-        <div
-          v-for="chat in chats"
-          :key="chat.id"
-          class="chat-item"
-          :class="{ 
-            active: currentChat && currentChat.id === chat.id,
-            pinned: chat.pinned 
-          }"
-          @click="selectChat(chat)"
-        >
-          <div class="chat-item-content">
-            <div class="chat-title">
-              <el-icon v-if="chat.pinned" class="pin-icon"><StarFilled /></el-icon>
-              {{ chat.title || $t('ai.chat.newChat') }}
-            </div>
-            <div class="chat-preview">{{ chat.lastMessage || '' }}</div>
-            <div class="chat-meta">
-              <span class="chat-time">{{ formatTime(chat.updatedAt) }}</span>
-            </div>
-          </div>
-
-          <div class="chat-item-actions" @click.stop>
-            <el-dropdown @command="(cmd) => handleChatAction(cmd, chat)" trigger="click">
-              <button class="chat-more-btn">
-                <el-icon><MoreFilled /></el-icon>
-              </button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="edit">
-                    <el-icon><Edit /></el-icon>
-                    {{ $t('common.edit') }}
-                  </el-dropdown-item>
-                  <el-dropdown-item command="pin">
-                    <el-icon><Star /></el-icon>
-                    {{ chat.pinned ? $t('ai.chat.unpin') : $t('ai.chat.pin') }}
-                  </el-dropdown-item>
-                  <el-dropdown-item command="delete" divided>
-                    <el-icon><Delete /></el-icon>
-                    {{ $t('common.delete') }}
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 右侧对话内容 -->
+    <!-- 对话内容区域（全宽，因为对话列表已在侧边栏） -->
     <div class="chat-content">
-      <div v-if="!currentChat" class="empty-state">
-        <div class="empty-icon">💬</div>
-        <div class="empty-text">{{ $t('ai.chat.startNewChat') }}</div>
-        <div class="empty-desc">{{ $t('ai.chat.selectOrCreateChat') }}</div>
-      </div>
+      <!-- 未登录提示（仅在未登录且用户尝试操作时显示，初始加载时不显示） -->
+      <!-- 已隐藏：初始页面加载时不显示提示 -->
 
-      <template v-else>
-        <!-- 对话头部 -->
-        <div class="chat-header">
-          <div class="chat-title-header">{{ currentChat.title || $t('ai.chat.newChat') }}</div>
-        </div>
-
-        <!-- 对话区 -->
-        <div
-        class="kb-messages-container"
-        :class="{ 'has-messages': uniqueMessages.length > 0 }"
-        ref="kbMessages"
-      >
-          <!-- 空状态显示 -->
-          <div v-if="uniqueMessages.length === 0" class="empty-chat-message">
-            {{ $t('ai.chat.welcomeMessage') }}
+      <!-- 消息区域（可滚动） -->
+      <div class="chat-messages-wrapper">
+        <!-- 对话界面（无论是否登录都显示） -->
+        <div v-if="!currentChat" class="empty-state">
+          <div class="empty-greeting">
+            <span class="greeting-text">{{ $t('ai.chat.greeting') }}</span>
+            <img src="@/assets/images/logo.svg" alt="Sci-Z Platform" class="greeting-logo" />
           </div>
-
-          <!-- 消息列表 -->
-          <template v-if="uniqueMessages.length > 0">
-            <div class="kb-messages">
-              <div
-                v-for="msg in uniqueMessages"
-                :key="msg.id"
-                class="kb-message"
-                :class="msg.type"
-              >
-                <div class="kb-message-avatar" :class="msg.type">
-                  {{ msg.type === 'user' ? $t('ai.chat.userLabel') : $t('ai.chat.assistantLabel') }}
-                </div>
-                <div class="kb-message-bubble">
-                  <div class="kb-message-content-wrapper">
-                    <div
-                      class="kb-message-content"
-                      v-html="formatKbContent(msg.content)"
-                    ></div>
-                    <!-- 文档片段展示 -->
-                    <div v-if="msg.documents && msg.documents.length > 0" class="kb-message-documents">
-                      <div class="kb-documents-title">{{ $t('ai.chat.referenceDocuments') }}</div>
-                      <div class="kb-documents-list">
-                        <div
-                          v-for="(doc, index) in msg.documents"
-                          :key="doc.id || index"
-                          class="kb-document-item"
-                          :title="doc.content ? doc.content.substring(0, 100) : ''"
-                        >
-                          <el-icon class="kb-document-icon"><Document /></el-icon>
-                          <div class="kb-document-info">
-                            <span class="kb-document-name">{{ doc.document_name || doc.name || $t('ai.chat.documentNumber', { index: index + 1 }) }}</span>
-                            <span v-if="(doc.dataset_name || doc.datasetName) && (doc.dataset_name || doc.datasetName) !== (doc.document_name || doc.name)" class="kb-document-dataset">（{{ doc.dataset_name || doc.datasetName }}）</span>
-                          </div>
-                          <span v-if="doc.score" class="kb-document-score">{{ $t('ai.chat.relevance') }} {{ (doc.score * 100).toFixed(0) }}%</span>
-                        </div>
-                      </div>
-                    </div>
-                    <!-- 流式生成指示器 -->
-                    <div v-if="msg.streaming" class="kb-streaming-indicator">
-                      <span class="kb-streaming-dot"></span>
-                      <span class="kb-streaming-text">{{ $t('ai.chat.generating') }}</span>
-                    </div>
-                  </div>
-                  <div class="kb-message-meta">
-                    <div class="kb-message-actions">
-                      <!-- AI消息的复制和重试按钮 -->
-                      <template v-if="msg.type === 'ai'">
-                        <button
-                          class="kb-copy-btn"
-                          @click="copyKbMessage(msg.content)"
-                        >
-                          <el-icon><DocumentCopy /></el-icon>
-                          <span>{{ $t('ai.chat.copy') }}</span>
-                        </button>
-                        <button
-                          class="kb-retry-btn"
-                          @click="retryKbMessage(msg)"
-                        >
-                          <el-icon><Refresh /></el-icon>
-                          <span>{{ $t('ai.chat.retry') }}</span>
-                        </button>
-                      </template>
-
-                      <!-- 用户消息的复制按钮 -->
-                      <template v-if="msg.type === 'user'">
-                        <button
-                          class="kb-copy-btn"
-                          @click="copyKbMessage(msg.content)"
-                        >
-                          <el-icon><DocumentCopy /></el-icon>
-                          <span>{{ $t('ai.chat.copy') }}</span>
-                        </button>
-                      </template>
-                    </div>
-                    <span>{{ formatTime(msg.timestamp) }}</span>
+          
+          <!-- 空状态时，输入框居中显示 -->
+          <div class="empty-state-input">
+            <div class="kb-input-container">
+              <!-- 附件预览区域 -->
+              <div v-if="attachments.length > 0" class="attachment-preview">
+                <div
+                  v-for="(attachment, index) in attachments"
+                  :key="index"
+                  class="attachment-item"
+                >
+                  <span class="attachment-icon">{{ getFileIcon(attachment.type) }}</span>
+                  <div class="attachment-name">{{ attachment.name }}</div>
+                  <div class="attachment-size">{{ attachment.size }}</div>
+                  <div
+                    class="attachment-remove"
+                    @click="removeAttachment(index)"
+                  >
+                    <el-icon><Close /></el-icon>
                   </div>
                 </div>
               </div>
+
+              <textarea
+                v-model="inputMessage"
+                class="kb-message-input"
+                :placeholder="inputPlaceholder"
+                @keydown.enter.exact.prevent="handleEnterKey"
+                @keydown.up.prevent="navigateKbList('up')"
+                @keydown.down.prevent="navigateKbList('down')"
+                @keydown.escape="hideKnowledgeBaseList"
+                @keydown.backspace="handleBackspace"
+                @input="handleInputChange"
+                ref="messageInput"
+              ></textarea>
+
+              <!-- 知识库选择下拉框 -->
+              <div
+                v-if="showKnowledgeBaseList"
+                class="knowledge-base-dropdown"
+              >
+                <div class="kb-dropdown-header">
+                  <span class="kb-dropdown-title">{{ $t('knowledge.sharedKnowledgeBase') }}</span>
+                </div>
+                <div class="kb-dropdown-section">
+                  <div class="kb-list">
+                    <div
+                      v-for="(kb, index) in filteredKnowledgeBases"
+                      :key="kb.id"
+                      class="kb-item"
+                      :class="{ selected: selectedKbIndex === index }"
+                      @click="selectKnowledgeBase(kb)"
+                    >
+                      <div class="kb-icon">{{ getKbIcon(kb) }}</div>
+                      <div class="kb-name">{{ kb.name }}</div>
+                      <div v-if="isKbSelected(kb.id)" class="kb-selected-mark">✓</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 底部控制栏 -->
+              <div class="kb-input-bottom-bar">
+                <!-- 模型选择 -->
+                <div
+                  class="custom-model-selector"
+                  @click.stop="toggleModelDropdown"
+                >
+                  <div class="model-display">
+                    {{ getSelectedModelName(selectedModel) }}
+                    <el-icon><ArrowDown /></el-icon>
+                  </div>
+                  <div v-if="showModelDropdown" class="model-dropdown">
+                    <div
+                      v-for="model in modelOptions"
+                      :key="model.value"
+                      class="model-option"
+                      :class="{ active: selectedModel === model.value }"
+                      @click.stop="selectModel(model.value)"
+                    >
+                      <div class="model-name">{{ model.name }}</div>
+                      <div class="model-desc">{{ model.description }}</div>
+                      <div
+                        v-if="selectedModel === model.value"
+                        class="check-icon"
+                      >
+                        ✓
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="kb-right-controls">
+                  <!-- 附件按钮 -->
+                  <el-tooltip
+                    :content="$t('ai.chat.attachmentTitle')"
+                    placement="right"
+                    :offset="10"
+                    :hide-after="0"
+                    :show-after="200"
+                    :teleported="true"
+                    :popper-options="{
+                      modifiers: [
+                        {
+                          name: 'eventListeners',
+                          options: {
+                            scroll: false,
+                            resize: false
+                          }
+                        }
+                      ]
+                    }"
+                  >
+                    <button
+                      class="kb-attachment-btn"
+                      @click="handleAttachmentClick"
+                    >
+                      <svg class="attachment-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M16.5 6v11.5a4.5 4.5 0 0 1-9 0V5a2.5 2.5 0 0 1 5 0v10.5a1.5 1.5 0 0 1-3 0V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </button>
+                  </el-tooltip>
+
+                  <!-- 隐藏的文件输入 -->
+                  <input
+                    ref="fileInput"
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.xlsx,.ppt,.pptx,.txt,.md,.jpg,.jpeg,.png"
+                    style="display: none"
+                    @change="handleFileUpload"
+                  />
+
+                  <!-- 发送/停止按钮 -->
+                  <button
+                    v-if="!isGenerating"
+                    class="kb-send-btn"
+                    :class="{ active: inputMessage.trim() || selectedKnowledgeBases.length > 0 }"
+                    :disabled="isSendingMessage || isGenerating"
+                    @click.stop.prevent="() => { console.log('[按钮点击] 发送按钮被点击'); sendKbMessage(); }"
+                  >
+                    <el-icon><ArrowUp /></el-icon>
+                  </button>
+
+                  <!-- 停止按钮 -->
+                  <button
+                    v-if="isGenerating"
+                    class="kb-stop-btn"
+                    @click="stopGeneration"
+                  >
+                    <el-icon><Close /></el-icon>
+                  </button>
+                </div>
+              </div>
             </div>
-          </template>
+            <div class="input-footer">{{ $t('ai.chat.aiContentHint') }}</div>
+          </div>
         </div>
 
-        <!-- 输入区域 -->
-        <div class="kb-input-area">
+        <template v-else>
+          <!-- 对话头部 -->
+          <div class="chat-header">
+            <div class="chat-title-header">{{ currentChat.title || $t('ai.chat.newChat') }}</div>
+          </div>
+
+          <!-- 对话区 -->
+          <div
+            class="kb-messages-container"
+            :class="{ 'has-messages': uniqueMessages.length > 0 }"
+            ref="kbMessages"
+            @scroll="handleMessagesScroll"
+          >
+            <!-- 空状态显示 -->
+            <div v-if="uniqueMessages.length === 0" class="empty-chat-message">
+              {{ $t('ai.chat.welcomeMessage') }}
+            </div>
+
+            <!-- 消息列表 -->
+            <template v-if="uniqueMessages.length > 0">
+              <div class="kb-messages">
+                <div
+                  v-for="msg in uniqueMessages"
+                  :key="msg.id"
+                  class="kb-message"
+                  :class="msg.type"
+                  :data-message-id="msg.id"
+                >
+                  <div class="kb-message-bubble">
+                    <!-- 🔥 修复：正常显示状态和编辑状态统一在一个容器中 -->
+                    <div class="kb-message-content-wrapper" :class="{ 'is-editing': msg.editing && msg.type === 'user' }">
+                      <!-- 正常显示状态 -->
+                      <div v-if="!msg.editing || msg.type !== 'user'" class="kb-message-content-display">
+                        <div
+                          class="kb-message-content"
+                          v-html="formatKbContent(msg.content)"
+                        ></div>
+                        <!-- 文档片段展示 -->
+                        <div v-if="msg.documents && msg.documents.length > 0" class="kb-message-documents">
+                          <div class="kb-documents-title">{{ $t('ai.chat.referenceDocuments') }}</div>
+                          <div class="kb-documents-list">
+                            <div
+                              v-for="(doc, index) in msg.documents"
+                              :key="doc.id || index"
+                              class="kb-document-item"
+                              :title="doc.content ? doc.content.substring(0, 100) : ''"
+                            >
+                              <el-icon class="kb-document-icon"><Document /></el-icon>
+                              <div class="kb-document-info">
+                                <span class="kb-document-name">{{ doc.document_name || doc.name || $t('ai.chat.documentNumber', { index: index + 1 }) }}</span>
+                                <span v-if="(doc.dataset_name || doc.datasetName) && (doc.dataset_name || doc.datasetName) !== (doc.document_name || doc.name)" class="kb-document-dataset">（{{ doc.dataset_name || doc.datasetName }}）</span>
+                              </div>
+                              <span v-if="doc.score" class="kb-document-score">{{ $t('ai.chat.relevance') }} {{ (doc.score * 100).toFixed(0) }}%</span>
+                            </div>
+                          </div>
+                        </div>
+                        <!-- 流式生成指示器 -->
+                        <div v-if="msg.streaming" class="kb-streaming-indicator">
+                          <span class="kb-streaming-dot"></span>
+                          <span class="kb-streaming-text">{{ $t('ai.chat.generating') }}</span>
+                        </div>
+                      </div>
+                      
+                      <!-- 🔥 修复：编辑状态 - 参考千问设计，可变高度的编辑框 -->
+                      <div v-if="msg.editing && msg.type === 'user'" class="kb-message-content-edit">
+                        <div class="kb-edit-box">
+                          <div
+                            class="kb-edit-content"
+                            contenteditable="true"
+                            @input="(e) => { 
+                              msg.editContent = e.target.innerText || e.target.textContent;
+                              autoResizeEditBox(e.target);
+                            }"
+                            @keydown.enter.ctrl.prevent="confirmEditUserMessage(msg)"
+                            @keydown.escape.prevent="cancelEditUserMessage(msg)"
+                            ref="editContentRef"
+                          >{{ msg.editContent }}</div>
+                          <!-- 编辑操作按钮 - 显示在框内右下角 -->
+                          <div class="kb-edit-actions-inline">
+                            <button
+                              class="kb-edit-btn-cancel"
+                              @click="cancelEditUserMessage(msg)"
+                            >
+                              {{ $t('common.cancel') }}
+                            </button>
+                            <button
+                              class="kb-edit-btn-confirm"
+                              :disabled="!msg.editContent || !msg.editContent.trim()"
+                              @click="confirmEditUserMessage(msg)"
+                            >
+                              {{ $t('common.confirm') }}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="kb-message-meta">
+                      <div class="kb-message-actions">
+                        <!-- AI消息的复制和重试按钮 -->
+                        <template v-if="msg.type === 'ai'">
+                          <button
+                            class="kb-copy-btn"
+                            @click="copyKbMessage(msg.content)"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 4px;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2" fill="none"/>
+                            </svg>
+                            <span>{{ $t('ai.chat.copy') }}</span>
+                          </button>
+                          <button
+                            class="kb-retry-btn"
+                            @click="retryKbMessage(msg)"
+                          >
+                            <el-icon><Refresh /></el-icon>
+                            <span>{{ $t('ai.chat.regenerate') }}</span>
+                          </button>
+                        </template>
+
+                        <!-- 用户消息的编辑和复制按钮 -->
+                        <template v-if="msg.type === 'user' && !msg.editing">
+                          <button
+                            class="kb-edit-btn"
+                            @click="startEditUserMessage(msg)"
+                          >
+                            <el-icon><EditPen /></el-icon>
+                            <span>{{ $t('ai.chat.edit') }}</span>
+                          </button>
+                          <button
+                            class="kb-copy-btn"
+                            @click="copyKbMessage(msg.content)"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 4px;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2" fill="none"/>
+                            </svg>
+                            <span>{{ $t('ai.chat.copy') }}</span>
+                          </button>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      <!-- 输入区域（有对话时显示在底部） -->
+      <div v-if="currentChat" class="kb-input-area">
           <div class="kb-input-container">
             <!-- 附件预览区域 -->
             <div v-if="attachments.length > 0" class="attachment-preview">
@@ -200,7 +353,7 @@
             <textarea
               v-model="inputMessage"
               class="kb-message-input"
-              :placeholder="$t('ai.chat.inputPlaceholderWithKb')"
+              :placeholder="inputPlaceholder"
               @keydown.enter.exact.prevent="handleEnterKey"
               @keydown.up.prevent="navigateKbList('up')"
               @keydown.down.prevent="navigateKbList('down')"
@@ -268,13 +421,34 @@
 
               <div class="kb-right-controls">
                 <!-- 附件按钮 -->
-                <button
-                  class="kb-attachment-btn"
-                  @click="handleAttachmentClick"
-                  :title="$t('ai.chat.attachmentTitle')"
+                <el-tooltip
+                  :content="$t('ai.chat.attachmentTitle')"
+                  placement="right"
+                  :offset="10"
+                  :hide-after="0"
+                  :show-after="200"
+                  :teleported="true"
+                  :popper-options="{
+                    modifiers: [
+                      {
+                        name: 'eventListeners',
+                        options: {
+                          scroll: false,
+                          resize: false
+                        }
+                      }
+                    ]
+                  }"
                 >
-                  <el-icon><Paperclip /></el-icon>
-                </button>
+                  <button
+                    class="kb-attachment-btn"
+                    @click="handleAttachmentClick"
+                  >
+                    <svg class="attachment-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M16.5 6v11.5a4.5 4.5 0 0 1-9 0V5a2.5 2.5 0 0 1 5 0v10.5a1.5 1.5 0 0 1-3 0V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                </el-tooltip>
 
                 <!-- 隐藏的文件输入 -->
                 <input
@@ -309,22 +483,34 @@
             </div>
           </div>
           <div class="input-footer">{{ $t('ai.chat.aiContentHint') }}</div>
+          <!-- 🔥 修复：滚动到底部按钮 - 在输入框区域右下角 -->
+          <button
+            v-if="showScrollToBottom"
+            class="scroll-to-bottom-btn-input"
+            @click="scrollKbToBottom"
+            :title="$t('ai.chat.scrollToBottom') || '滚动到底部'"
+          >
+            <el-icon><ArrowDown /></el-icon>
+          </button>
         </div>
-      </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue'
+import { ref, computed, onMounted, nextTick, onUnmounted, watch, provide } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useAuthStore } from '@/store/modules/auth'
+import { useLoginModal } from '@/composables/useLoginModal'
 import {
   Plus,
   MoreFilled,
   StarFilled,
   Star,
   Edit,
+  EditPen,
   Delete,
   Document,
   DocumentCopy,
@@ -332,7 +518,8 @@ import {
   Close,
   ArrowDown,
   ArrowUp,
-  Paperclip
+  Paperclip,
+  Top
 } from '@element-plus/icons-vue'
 import {
   getKnowledgeList
@@ -363,7 +550,77 @@ import {
 import { createLogger } from '@/utils/simpleLogger'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
 const logger = createLogger('AIChat')
+const { openLoginModal } = useLoginModal()
+
+// 提供判断当前对话是否为空的方法给侧边栏使用
+const isCurrentChatEmpty = () => {
+  // 如果没有当前对话，返回 false（可以创建新对话）
+  if (!currentChat.value) {
+    return false
+  }
+  // 如果当前对话没有消息，返回 true（空对话）
+  return !messages.value || messages.value.length === 0
+}
+
+// 提供创建新对话的方法给侧边栏使用
+const handleCreateNewChatFromSidebar = async () => {
+  try {
+    // 🔥 修复：检查是否已经是新建对话状态（与侧边栏的 isNewChatActive 逻辑一致）
+    // 条件：currentChat为null 且 没有消息 且 sessionStorage中没有对话ID
+    const storedId = sessionStorage.getItem('currentConversationId')
+    const hasNoMessages = !messages.value || messages.value.length === 0
+    const hasNoStoredId = !storedId || storedId === '' || storedId === 'null' || storedId === 'undefined'
+    const hasNoCurrentChat = !currentChat.value
+    
+    // 如果满足新建对话的所有条件，提示用户（已经是新建对话状态）
+    if (hasNoCurrentChat && hasNoMessages && hasNoStoredId) {
+      logger.info('当前已是最新对话状态，提示用户', { 
+        hasNoCurrentChat, 
+        hasNoMessages, 
+        hasNoStoredId,
+        storedId 
+      })
+      ElMessage.warning(t('ai.chat.alreadyNewChat') || '当前已是最新对话')
+      return
+    }
+    
+    // 如果当前有对话但标记为新对话且没有消息，也需要检查
+    if (currentChat.value && currentChat.value.isNew && hasNoMessages) {
+      logger.info('当前已是最新对话状态（isNew=true），提示用户')
+      ElMessage.warning(t('ai.chat.alreadyNewChat') || '当前已是最新对话')
+      return
+    }
+    
+    // 🔥 修复：否则，清除当前状态，切换到新建对话状态
+    logger.info('切换到新建对话状态', { 
+      hasCurrentChat: !!currentChat.value,
+      messagesCount: messages.value?.length || 0,
+      storedId 
+    })
+    // 创建新对话（不调用后端接口，只切换状态）
+    await createNewChat()
+  } catch (error) {
+    console.error('创建新对话失败', error)
+    ElMessage.error(t('ai.chat.operationFailed'))
+  }
+}
+
+// 提供刷新侧边栏的方法
+const refreshSidebar = () => {
+  // 这个方法会被侧边栏注入使用
+  // 可以通过事件总线或直接调用侧边栏方法
+}
+
+// 通过 provide 暴露方法给侧边栏
+provide('aiChatMethods', {
+  isCurrentChatEmpty,
+  handleCreateNewChatFromSidebar,
+  refreshSidebar
+})
 
 // 响应式数据
 const chats = ref([])
@@ -374,11 +631,15 @@ const kbMessages = ref(null)
 const messageInput = ref(null) // 添加缺失的 messageInput ref
 const containerRef = ref(null) // 容器引用
 const isGenerating = ref(false)
+// 🔥 修复：滚动到底部按钮显示状态
+const showScrollToBottom = ref(false)
 const isSendingMessage = ref(false) // 发送消息的锁，防止重复调用
 const currentAbortController = ref(null)
 const currentConversationId = ref(null)
 const sendingMessageKey = ref(null) // 当前正在发送的消息唯一标识（内容），用于防重复
 const lastUserMessageId = ref(null) // 最后发送的用户消息ID，用于清除重复
+// 🔥 修复：防重复加载标记，避免 chatSelected 事件和定时器检查同时触发
+const isHandlingChatSelected = ref(false)
 
 // 对话列表相关
 const contextMenu = ref({ chat: null, x: 0, y: 0 })
@@ -417,14 +678,24 @@ const modelOptions = ref([
 
 // 计算属性
 const filteredKnowledgeBases = computed(() => {
-  if (!kbSearchQuery.value.trim()) return knowledgeBaseList.value
-  return knowledgeBaseList.value.filter((kb) =>
+  // 过滤掉无效的元素（防止 undefined 或 null）
+  const validKbList = knowledgeBaseList.value.filter((kb) => kb && kb.name)
+  if (!kbSearchQuery.value.trim()) return validKbList
+  return validKbList.filter((kb) =>
     kb.name.toLowerCase().includes(kbSearchQuery.value.toLowerCase())
   )
 })
 
 const hasKnowledgeBaseSelected = computed(() => {
   return selectedKnowledgeBases.value.length > 0
+})
+
+// 动态 placeholder：未登录时显示"尽管问"，已登录时显示带知识库的提示
+const inputPlaceholder = computed(() => {
+  if (!authStore.isLoggedIn) {
+    return t('ai.chat.inputPlaceholderGuest')
+  }
+  return t('ai.chat.inputPlaceholderWithKb')
 })
 
 // 去重消息列表（基于ID和内容去重，保留最后一个）
@@ -472,6 +743,12 @@ const uniqueMessages = computed(() => {
 
 // 方法
 const loadChats = async () => {
+  // 未登录用户不需要加载对话列表，静默跳过
+  if (!authStore.isLoggedIn) {
+    chats.value = []
+    return
+  }
+
   try {
     logger.info('加载对话列表')
     // 使用新接口：分页查询会话列表
@@ -485,6 +762,18 @@ const loadChats = async () => {
       chats.value = []
     }
   } catch (error) {
+    // 如果是401未授权错误，静默处理（退出登录后正常情况）
+    const isUnauthorized = error?.message?.includes('未授权') || 
+                          error?.message?.includes('Unauthorized') ||
+                          error?.response?.status === 401 ||
+                          error?.code === 401
+    
+    if (isUnauthorized && !authStore.isLoggedIn) {
+      // 退出登录后的401错误是正常的，静默处理
+      chats.value = []
+      return
+    }
+    
     logger.error('加载对话列表失败', error)
     // 如果新接口失败，尝试使用旧接口
     try {
@@ -496,6 +785,17 @@ const loadChats = async () => {
         chats.value = []
       }
     } catch (fallbackError) {
+      // 如果是401未授权错误，静默处理
+      const isFallbackUnauthorized = fallbackError?.message?.includes('未授权') || 
+                                    fallbackError?.message?.includes('Unauthorized') ||
+                                    fallbackError?.response?.status === 401 ||
+                                    fallbackError?.code === 401
+      
+      if (isFallbackUnauthorized && !authStore.isLoggedIn) {
+        chats.value = []
+        return
+      }
+      
       logger.error('使用旧接口加载对话列表也失败', fallbackError)
       chats.value = []
     }
@@ -513,14 +813,42 @@ const sortChats = () => {
 }
 
 const loadKnowledgeBases = async () => {
+  // 未登录用户不需要加载知识库列表，静默跳过
+  if (!authStore.isLoggedIn) {
+    knowledgeBaseList.value = []
+    return
+  }
+
   try {
     logger.info('加载知识库列表')
     const response = await getKnowledgeList({ page: 1, size: 100 })
     if (response.code === 200 && response.data) {
       knowledgeBaseList.value = response.data.records || response.data.list || []
-      logger.info('知识库列表加载成功', knowledgeBaseList.value.length)
+      logger.info('知识库列表加载成功', {
+        count: knowledgeBaseList.value.length,
+        items: knowledgeBaseList.value.map(kb => ({
+          id: kb.id,
+          name: kb.name,
+          hasName: !!kb.name
+        }))
+      })
+    } else {
+      logger.warn('知识库列表响应异常', { code: response.code, data: response.data })
     }
   } catch (error) {
+    // 如果是401未授权错误，静默处理（未登录用户正常情况）
+    const isUnauthorized = error?.message?.includes('未授权') || 
+                          error?.message?.includes('Unauthorized') ||
+                          error?.response?.status === 401 ||
+                          error?.code === 401
+    
+    if (isUnauthorized && !authStore.isLoggedIn) {
+      // 未登录时的401错误是正常的，静默处理
+      knowledgeBaseList.value = []
+      return
+    }
+    
+    // 其他错误才记录为错误日志
     logger.error('加载知识库列表失败', error)
     knowledgeBaseList.value = []
   }
@@ -528,82 +856,133 @@ const loadKnowledgeBases = async () => {
 
 const createNewChat = async () => {
   try {
-    const newChat = {
-      id: Date.now(),
-      title: '',
-      lastMessage: '',
-      updatedAt: new Date(),
-      unreadCount: 0,
-      isNew: true,
-      pinned: false,
-      messages: []
+    // 🔥 修复：检查是否已经是新建对话状态（currentChat为null且没有消息）
+    const storedId = sessionStorage.getItem('currentConversationId')
+    const hasNoMessages = !messages.value || messages.value.length === 0
+    const hasNoStoredId = !storedId || storedId === '' || storedId === 'null' || storedId === 'undefined'
+    const hasNoCurrentChat = !currentChat.value
+    
+    if (hasNoCurrentChat && hasNoMessages && hasNoStoredId) {
+      // 已经是新建对话状态，提示用户
+      ElMessage.info(t('ai.chat.alreadyNewChat') || '当前已是最新对话')
+      // 🔥 修复：已经是新建对话状态，不执行任何路由操作，直接返回
+      return
+    }
+    
+    // 如果当前有对话且有消息，也需要检查
+    if (currentChat.value && currentChat.value.isNew && hasNoMessages) {
+      // 已经是新对话且没有消息，提示用户
+      ElMessage.info(t('ai.chat.alreadyNewChat') || '当前已是最新对话')
+      // 🔥 修复：已经是新建对话状态，不执行任何路由操作，直接返回
+      return
     }
 
-    // 调用API创建对话
-    try {
-      // 使用新接口：创建AI会话
-      const response = await createAiConversation({ title: '' })
-      if (response.code === 200 && response.data) {
-        newChat.id = response.data.id
-        newChat.createdAt = response.data.createdTime || response.data.createdAt
-        newChat.pinned = response.data.isPinned === 1
-        newChat.isNew = false // 创建成功，标记为非新会话
-        logger.info('创建新会话成功', { conversationId: response.data.id })
-      }
-    } catch (error) {
-      logger.warn('创建对话API调用失败，尝试使用旧接口', error)
-      // 如果新接口失败，尝试使用旧接口
+    logger.info('创建新对话', {
+      hasCurrentChat: !!currentChat.value,
+      messagesCount: messages.value?.length || 0,
+      storedId
+    })
+    
+    // 🔥 修复：直接设置为空状态，不创建临时对话对象，不调用后端接口
+    // 清除当前对话和消息
+    currentChat.value = null
+    messages.value = []
+    
+    // 清除 sessionStorage
+    sessionStorage.removeItem('currentConversationId')
+    
+    // 🔥 修复：只有在URL中确实有conversationId参数时才清除，避免路由冗余导航
+    // 使用try-catch捕获路由错误，确保不影响主要功能
+    // 注意：如果当前路由已经是 /ai/chat 且没有query参数，不要调用router.replace，避免路由冗余导航
+    // 只有在确实需要清除URL参数时才调用，且要确保不会导致路由冗余导航
+    const hasConversationIdInUrl = route.path === '/ai/chat' && route.query && route.query.conversationId
+    if (hasConversationIdInUrl) {
       try {
-        const fallbackResponse = await createConversation({ title: '' })
-        if (fallbackResponse.code === 200 && fallbackResponse.data) {
-          newChat.id = fallbackResponse.data.id
-          newChat.createdAt = fallbackResponse.data.createdAt
-          newChat.isNew = false // 创建成功，标记为非新会话
+        await nextTick()
+        // 🔥 修复：使用 router.replace 但捕获所有可能的错误，包括路由冗余导航
+        await router.replace({ path: '/ai/chat', query: {} }).catch((err) => {
+          // 忽略路由冗余导航错误（这是Vue Router的正常优化行为，不影响功能）
+          if (err.name !== 'NavigationDuplicated' && err.name !== 'NavigationCancelled') {
+            logger.debug('清除URL参数时出现路由错误（可忽略）', err)
+          }
+        })
+      } catch (err) {
+        // 忽略路由错误，不影响主要功能
+        if (err.name !== 'NavigationDuplicated' && err.name !== 'NavigationCancelled') {
+          logger.debug('清除URL参数时出现路由错误（可忽略）', err)
         }
-      } catch (fallbackError) {
-        logger.warn('使用旧接口创建对话也失败，使用本地ID', fallbackError)
-        // 如果都失败，保持 isNew = true，在发送第一条消息时会再次尝试创建
       }
     }
-
-    chats.value.unshift(newChat)
-    saveChatsToStorage()
-    selectChat(newChat)
-    ElMessage.success(t('ai.chat.chatCreated'))
+    
+    // 🔥 修复：通知侧边栏更新选中状态（清除选中状态，显示"新建对话"为选中）
+    // 触发自定义事件，通知侧边栏清除选中状态
+    window.dispatchEvent(new CustomEvent('chatCleared', { detail: {} }))
+    
+    logger.info('已切换到新建对话状态（不调用后端接口）')
   } catch (error) {
-    logger.error('创建对话失败', error)
+    logger.error('创建新对话失败', error)
     ElMessage.error(t('ai.chat.createError'))
   }
 }
 
-const selectChat = async (chat) => {
-  // 如果选中的是同一个对话，不重复加载
-  if (currentChat.value && currentChat.value.id === chat.id) {
+const selectChat = async (chat, forceLoadFromApi = false) => {
+  // 如果选中的是同一个对话，不重复加载（除非强制从API加载）
+  if (currentChat.value && currentChat.value.id === chat.id && !forceLoadFromApi) {
+    logger.info('已选中相同对话，跳过加载', chat.id)
     return
   }
+  
+  logger.info('选择对话', { chatId: chat.id, chatTitle: chat.title, isNew: chat.isNew, forceLoadFromApi })
   currentChat.value = chat
   currentConversationId.value = null
-  await loadMessages(chat.id)
+  
+  // 如果是新对话（没有ID或isNew为true），不加载消息
+  if (chat.id && !chat.isNew) {
+    logger.info('选择对话，加载消息列表', { chatId: chat.id, forceLoadFromApi })
+    await loadMessages(chat.id, forceLoadFromApi)
+  } else {
+    // 新对话，清空消息列表
+    messages.value = []
+    logger.info('新对话，清空消息列表')
+  }
+  
   chat.unreadCount = 0
   saveChatsToStorage()
+  
+  // 🔥 修复：只使用 sessionStorage 存储对话ID，不在路由中显示参数
+  if (chat.id && !chat.isNew) {
+    sessionStorage.setItem('currentConversationId', String(chat.id))
+    // 清除URL中的conversationId参数（如果存在）
+    if (route.query.conversationId) {
+      router.replace({ path: '/ai/chat', query: {} })
+    }
+  } else {
+    // 新对话，清除存储的对话ID
+    sessionStorage.removeItem('currentConversationId')
+    // 清除URL中的conversationId参数（如果存在）
+    if (route.query.conversationId) {
+      router.replace({ path: '/ai/chat', query: {} })
+    }
+  }
 }
 
-const loadMessages = async (chatId) => {
+const loadMessages = async (chatId, forceLoadFromApi = false) => {
+  // 未登录用户不需要加载消息，静默跳过
+  if (!authStore.isLoggedIn) {
+    messages.value = []
+    return
+  }
+
   try {
-    // 从本地存储加载
-    const chat = chats.value.find((c) => c.id === chatId)
-    if (chat && chat.messages) {
-      messages.value = [...chat.messages]
-      // 恢复会话ID（如果有）
-      if (chat.messages.length > 0) {
-        const lastAiMessage = [...chat.messages].reverse().find(m => m.type === 'ai')
-        if (lastAiMessage && lastAiMessage.conversationId) {
-          currentConversationId.value = lastAiMessage.conversationId
-        }
-      }
-    } else {
+    logger.info('加载消息列表', { chatId, forceLoadFromApi })
+    // 🔥 修复：支持字符串和数字类型的ID比较
+    const chat = chats.value.find((c) => String(c.id) === String(chatId))
+    
+    // 🔥 修复：如果强制从API加载，或者本地没有消息，则从API加载
+    if (forceLoadFromApi || !chat || !chat.messages || chat.messages.length === 0) {
       // 尝试从API加载
       try {
+        logger.info('从API加载消息列表', chatId)
         // 使用新接口：查询会话的所有消息列表
         const response = await listAiMessages(chatId)
         if (response.code === 200 && response.data) {
@@ -647,8 +1026,24 @@ const loadMessages = async (chatId) => {
             chat.messages = apiMessages
             saveChatsToStorage()
           }
+          logger.info('从API加载消息列表成功', { chatId, messageCount: apiMessages.length })
+        } else {
+          logger.warn('从API加载消息列表返回空数据', chatId)
+          messages.value = []
         }
       } catch (error) {
+        // 如果是401未授权错误，静默处理（退出登录后正常情况）
+        const isUnauthorized = error?.message?.includes('未授权') || 
+                              error?.message?.includes('Unauthorized') ||
+                              error?.response?.status === 401 ||
+                              error?.code === 401
+        
+        if (isUnauthorized && !authStore.isLoggedIn) {
+          // 退出登录后的401错误是正常的，静默处理
+          messages.value = []
+          return
+        }
+        
         logger.warn('从新API加载消息失败，尝试使用旧接口', error)
         // 如果新接口失败，尝试使用旧接口
         try {
@@ -666,15 +1061,55 @@ const loadMessages = async (chatId) => {
               chat.messages = apiMessages
               saveChatsToStorage()
             }
+            logger.info('使用旧接口加载消息列表成功', { chatId, messageCount: apiMessages.length })
           }
         } catch (fallbackError) {
-          logger.warn('使用旧接口加载消息也失败，使用本地存储', fallbackError)
-          messages.value = []
+          // 如果是401未授权错误，静默处理
+          const isFallbackUnauthorized = fallbackError?.message?.includes('未授权') || 
+                                        fallbackError?.message?.includes('Unauthorized') ||
+                                        fallbackError?.response?.status === 401 ||
+                                        fallbackError?.code === 401
+          
+          if (isFallbackUnauthorized && !authStore.isLoggedIn) {
+            messages.value = []
+            return
+          }
+          
+          logger.warn('使用旧接口加载消息也失败，尝试使用本地存储', fallbackError)
+          // 如果API都失败，尝试使用本地存储
+          if (chat && chat.messages && chat.messages.length > 0) {
+            messages.value = [...chat.messages]
+            logger.info('使用本地存储的消息', { chatId, messageCount: chat.messages.length })
+            // 恢复会话ID（如果有）
+            if (chat.messages.length > 0) {
+              const lastAiMessage = [...chat.messages].reverse().find(m => m.type === 'ai')
+              if (lastAiMessage && lastAiMessage.conversationId) {
+                currentConversationId.value = lastAiMessage.conversationId
+              }
+            }
+          } else {
+            messages.value = []
+          }
+        }
+      }
+    } else {
+      // 本地有消息且不强制从API加载，使用本地消息
+      messages.value = [...chat.messages]
+      logger.info('使用本地存储的消息（不强制从API加载）', { chatId, messageCount: chat.messages.length })
+      // 恢复会话ID（如果有）
+      if (chat.messages.length > 0) {
+        const lastAiMessage = [...chat.messages].reverse().find(m => m.type === 'ai')
+        if (lastAiMessage && lastAiMessage.conversationId) {
+          currentConversationId.value = lastAiMessage.conversationId
         }
       }
     }
     nextTick(() => {
       scrollKbToBottom()
+      // 滚动后检查位置
+      setTimeout(() => {
+        checkScrollPosition()
+      }, 100)
     })
   } catch (error) {
     logger.error('加载消息失败', error)
@@ -786,10 +1221,49 @@ const formatTime = (date) => {
   return `${formatDate(d)} ${formatHourMinute(d)}`
 }
 
+// 🔥 修复：滚动到底部函数 - 参考千问设计
 const scrollKbToBottom = () => {
   if (kbMessages.value) {
-    kbMessages.value.scrollTop = kbMessages.value.scrollHeight
+    kbMessages.value.scrollTo({
+      top: kbMessages.value.scrollHeight,
+      behavior: 'smooth'
+    })
+    // 滚动到底部后，延迟检查位置（等待滚动动画完成）
+    setTimeout(() => {
+      checkScrollPosition()
+    }, 300)
   }
+}
+
+// 🔥 修复：检查滚动位置，决定是否显示滚动到底部按钮 - 参考千问设计
+const checkScrollPosition = () => {
+  if (!kbMessages.value) {
+    showScrollToBottom.value = false
+    return
+  }
+  
+  const container = kbMessages.value
+  const scrollHeight = container.scrollHeight
+  const clientHeight = container.clientHeight
+  const scrollTop = container.scrollTop
+  
+  // 🔥 修复：参考千问设计，判断是否在底部（留20px的容差，更宽松的判断）
+  // 计算距离底部的距离
+  const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+  const isAtBottom = distanceFromBottom < 20
+  
+  // 🔥 修复：只有当内容高度超过容器高度，且不在底部时才显示按钮
+  // 按钮会一直显示直到滚动到底部才消失
+  if (scrollHeight > clientHeight && !isAtBottom) {
+    showScrollToBottom.value = true
+  } else {
+    showScrollToBottom.value = false
+  }
+}
+
+// 🔥 修复：处理滚动事件
+const handleMessagesScroll = () => {
+  checkScrollPosition()
 }
 // 使用一个标记来确保函数只执行一次（防止并发调用）
 let isExecuting = false
@@ -824,6 +1298,15 @@ const sendKbMessage = async () => {
   }
   // 立即设置执行标记（同步操作，防止并发）
   isExecuting = true
+  
+  // 🔥 检查用户是否已登录
+  if (!authStore.isLoggedIn) {
+    console.log('[sendKbMessage] 用户未登录，显示登录弹窗')
+    ElMessage.warning(t('user.pleaseLogin'))
+    openLoginModal()
+    isExecuting = false
+    return
+  }
   
   if (isGenerating.value) {
     console.warn('[sendKbMessage] 正在生成回答，忽略重复请求')
@@ -947,25 +1430,55 @@ const sendKbMessage = async () => {
     currentMessageCount: messages.value.length
   })
   
-  // 确保有会话ID
+  // 🔥 修复：确保有会话ID（如果是新建对话状态，在发送第一条消息时创建）
   let conversationId = currentChat.value?.id
-  if (!conversationId || currentChat.value?.isNew) {
-    // 如果没有会话ID或是新会话，需要先创建会话
+  let isNewConversationCreated = false
+  
+  // 如果当前是新建对话状态（currentChat为null）或没有会话ID，需要先创建会话
+  if (!currentChat.value || !conversationId || currentChat.value?.isNew) {
+    // 如果没有会话ID或是新会话，需要先创建会话（调用后端接口）
     try {
+      logger.info('发送第一条消息，创建新会话')
       const createResp = await createAiConversation({ title: '' })
       if (createResp.code === 200 && createResp.data) {
         conversationId = createResp.data.id
-        if (currentChat.value) {
+        isNewConversationCreated = true
+        
+        // 如果当前没有对话对象，创建一个
+        if (!currentChat.value) {
+          currentChat.value = {
+            id: conversationId,
+            title: '',
+            lastMessage: '',
+            updatedAt: new Date(),
+            unreadCount: 0,
+            isNew: false,
+            pinned: createResp.data.isPinned === 1,
+            createdAt: createResp.data.createdTime || createResp.data.createdAt,
+            messages: []
+          }
+          // 添加到对话列表
+          chats.value.unshift(currentChat.value)
+        } else {
+          // 如果已有对话对象，更新它
           currentChat.value.id = conversationId
           currentChat.value.isNew = false
           currentChat.value.createdAt = createResp.data.createdTime || createResp.data.createdAt
           currentChat.value.pinned = createResp.data.isPinned === 1
         }
-        logger.info('创建新会话成功', { conversationId })
+        
+        // 🔥 修复：设置 sessionStorage，并立即触发侧边栏刷新和更新选中状态
+        sessionStorage.setItem('currentConversationId', String(conversationId))
+        // 立即触发 chatCreated 事件，通知侧边栏刷新对话列表并更新选中状态
+        window.dispatchEvent(new CustomEvent('chatCreated', { detail: { conversationId } }))
+        
+        logger.info('创建新会话成功，已通知侧边栏刷新', { conversationId })
       }
     } catch (error) {
       logger.error('创建会话失败', error)
       ElMessage.error(t('ai.chat.conversationFailed'))
+      isExecuting = false
+      return
     }
   }
   
@@ -1058,6 +1571,18 @@ const sendKbMessage = async () => {
           currentChat.value = { ...refreshedChat, messages: currentChat.value?.messages || [] }
         }
       }
+      
+      // 🔥 修复：如果创建了新对话，通知侧边栏刷新对话列表并更新选中状态
+      if (isNewConversationCreated && conversationId) {
+        // 使用 sessionStorage 存储当前对话ID
+        sessionStorage.setItem('currentConversationId', String(conversationId))
+        // 触发自定义事件，通知侧边栏刷新对话列表并更新选中状态
+        window.dispatchEvent(new CustomEvent('chatCreated', { detail: { conversationId } }))
+        // 清除URL中的conversationId参数
+        if (route.query.conversationId) {
+          router.replace({ path: '/ai/chat', query: {} })
+        }
+      }
     } catch (error) {
       logger.warn('刷新对话列表失败', error)
       // 即使刷新失败，也不影响主流程
@@ -1141,7 +1666,17 @@ const sendKbMessage = async () => {
         const message = messages.value.find(m => m.id === aiMessageId)
         if (message) {
           message.content += answer
-          nextTick(scrollKbToBottom)
+          nextTick(() => {
+          scrollKbToBottom()
+      // 滚动后检查位置
+      setTimeout(() => {
+        checkScrollPosition()
+      }, 100)
+          // 滚动后检查位置
+          setTimeout(() => {
+            checkScrollPosition()
+          }, 100)
+        })
         }
       },
       onEnd: async (data) => {
@@ -1190,8 +1725,24 @@ const sendKbMessage = async () => {
           currentConversationId.value = data.conversationId
         }
         
-        // 保存AI消息到后端
+        // 🔥 修复：获取当前对话ID（优先使用 currentChat 的ID，如果没有则使用 Dify 返回的ID）
         const conversationId = currentChat.value?.id || data.conversationId
+        
+        // 🔥 修复：如果当前对话是新创建的（之前没有ID），现在有了ID，需要通知侧边栏
+        if (conversationId && (!currentChat.value?.id || currentChat.value?.isNew)) {
+          // 更新 currentChat 的ID（如果还没有）
+          if (currentChat.value && !currentChat.value.id) {
+            currentChat.value.id = conversationId
+            currentChat.value.isNew = false
+          }
+          // 设置 sessionStorage
+          sessionStorage.setItem('currentConversationId', String(conversationId))
+          // 立即触发事件，通知侧边栏刷新
+          window.dispatchEvent(new CustomEvent('chatCreated', { detail: { conversationId } }))
+          logger.info('流式问答完成，通知侧边栏刷新对话列表', { conversationId })
+        }
+        
+        // 保存AI消息到后端
         if (conversationId && message && message.content) {
           try {
             // 将文档片段转换为JSON字符串，统一使用下划线命名
@@ -1275,22 +1826,53 @@ const sendKbMessage = async () => {
           }
         }
         
-        // 刷新对话列表，更新最后一条消息和更新时间
+        // 🔥 修复：刷新对话列表，更新最后一条消息和更新时间，并通知侧边栏刷新
         try {
           await loadChats()
-          // 刷新后，如果当前对话还在，重新选中它（保持选中状态）
-          if (currentChat.value && conversationId) {
-            const refreshedChat = chats.value.find(c => c.id === conversationId || c.id === currentChat.value.id)
-            if (refreshedChat) {
-              currentChat.value = refreshedChat
+          // 🔥 修复：确保 conversationId 存在（优先使用 currentChat 的ID）
+          const finalConversationId = conversationId || currentChat.value?.id || data.conversationId
+          
+          if (finalConversationId) {
+            // 刷新后，如果当前对话还在，重新选中它（保持选中状态）
+            if (currentChat.value) {
+              const refreshedChat = chats.value.find(c => String(c.id) === String(finalConversationId) || String(c.id) === String(currentChat.value.id))
+              if (refreshedChat) {
+                currentChat.value = refreshedChat
+              }
+            }
+            
+            // 🔥 修复：无论当前对话是否存在，都要通知侧边栏刷新并选中
+            sessionStorage.setItem('currentConversationId', String(finalConversationId))
+            // 触发自定义事件，通知侧边栏刷新对话列表并更新选中状态
+            window.dispatchEvent(new CustomEvent('chatCreated', { detail: { conversationId: finalConversationId } }))
+            logger.info('流式问答完成，已通知侧边栏刷新对话列表', { conversationId: finalConversationId })
+            
+            // 清除URL中的conversationId参数
+            if (route.query.conversationId) {
+              router.replace({ path: '/ai/chat', query: {} })
             }
           }
         } catch (error) {
           logger.warn('刷新对话列表失败', error)
-          // 即使刷新失败，也不影响主流程
+          // 即使刷新失败，也尝试通知侧边栏（如果有conversationId）
+          const finalConversationId = conversationId || currentChat.value?.id || data.conversationId
+          if (finalConversationId) {
+            sessionStorage.setItem('currentConversationId', String(finalConversationId))
+            window.dispatchEvent(new CustomEvent('chatCreated', { detail: { conversationId: finalConversationId } }))
+          }
         }
         
-        nextTick(scrollKbToBottom)
+        nextTick(() => {
+          scrollKbToBottom()
+      // 滚动后检查位置
+      setTimeout(() => {
+        checkScrollPosition()
+      }, 100)
+          // 滚动后检查位置
+          setTimeout(() => {
+            checkScrollPosition()
+          }, 100)
+        })
         logger.info('流式问答完成', { 
           conversationId: data.conversationId || conversationId,
           messageId: data.messageId,
@@ -1338,7 +1920,17 @@ const sendKbMessage = async () => {
           message.streaming = false
         }
         logger.error('流式问答失败', error)
-        nextTick(scrollKbToBottom)
+        nextTick(() => {
+          scrollKbToBottom()
+      // 滚动后检查位置
+      setTimeout(() => {
+        checkScrollPosition()
+      }, 100)
+          // 滚动后检查位置
+          setTimeout(() => {
+            checkScrollPosition()
+          }, 100)
+        })
       }
     })
 
@@ -1444,10 +2036,336 @@ const retryKbMessage = (msg) => {
   }
 }
 
+// 编辑用户消息相关
+// 自动调整编辑输入框高度
+// 🔥 修复：自动调整编辑输入框高度 - 参考千问的设计，完全自适应
+const autoResizeEditInput = (textarea) => {
+  if (textarea) {
+    // 重置高度为auto，让内容自然撑开
+    textarea.style.height = 'auto'
+    textarea.style.maxHeight = 'none'
+    textarea.style.overflowY = 'hidden'
+    // 设置高度为scrollHeight（内容高度），完全自适应
+    textarea.style.height = textarea.scrollHeight + 'px'
+  }
+}
+
+// 🔥 修复：自动调整编辑框高度 - 参考千问设计
+const autoResizeEditBox = (element) => {
+  if (element) {
+    // 重置高度为auto，让内容自然撑开
+    element.style.height = 'auto'
+    element.style.maxHeight = 'none'
+    element.style.overflowY = 'hidden'
+    // 设置高度为scrollHeight（内容高度），完全自适应
+    const scrollHeight = element.scrollHeight
+    element.style.height = scrollHeight + 'px'
+    
+    // 同时调整父容器的高度
+    const editBox = element.closest('.kb-edit-box')
+    if (editBox) {
+      editBox.style.height = 'auto'
+      editBox.style.minHeight = Math.max(60, scrollHeight + 50) + 'px' // 内容高度 + 按钮区域高度
+    }
+  }
+}
+
+// 🔥 修复：开始编辑用户消息 - 参考千问设计，可变高度的编辑框
+const startEditUserMessage = (msg) => {
+  if (msg.type !== 'user') return
+  
+  // 移除HTML标签，获取纯文本
+  const textContent = msg.content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/<br>/g, '\n')
+  msg.editing = true
+  msg.editContent = textContent
+  
+  nextTick(() => {
+    // 找到当前消息的编辑内容区域
+    const messageElement = document.querySelector(`[data-message-id="${msg.id}"]`)
+    if (messageElement) {
+      const editContent = messageElement.querySelector('.kb-edit-content')
+      if (editContent) {
+        // 重置样式，确保自适应
+        editContent.style.height = 'auto'
+        editContent.style.maxHeight = 'none'
+        editContent.style.overflowY = 'hidden'
+        
+        editContent.focus()
+        // 选中所有文本
+        const range = document.createRange()
+        range.selectNodeContents(editContent)
+        const selection = window.getSelection()
+        selection.removeAllRanges()
+        selection.addRange(range)
+        
+        // 自动调整高度
+        autoResizeEditBox(editContent)
+      }
+    }
+  })
+}
+
+// 取消编辑用户消息
+const cancelEditUserMessage = (msg) => {
+  msg.editing = false
+  msg.editContent = ''
+}
+
+// 确认编辑用户消息（相当于重新发送）
+const confirmEditUserMessage = async (msg) => {
+  if (!msg.editContent || !msg.editContent.trim()) return
+  
+  const newContent = msg.editContent.trim()
+  
+  // 更新消息内容
+  msg.content = newContent
+  msg.editing = false
+  msg.editContent = ''
+  
+  // 更新持久化存储
+  if (currentChat.value && currentChat.value.messages) {
+    const persistentMsg = currentChat.value.messages.find(m => m.id === msg.id)
+    if (persistentMsg) {
+      persistentMsg.content = newContent
+      saveChatsToStorage()
+    }
+  }
+  
+  // 找到当前消息的位置，移除之后的所有AI回复
+  const messageIndex = messages.value.findIndex(m => m.id === msg.id)
+  if (messageIndex !== -1) {
+    // 移除后续的AI回复
+    for (let i = messages.value.length - 1; i > messageIndex; i--) {
+      if (messages.value[i].type === 'ai') {
+        messages.value.splice(i, 1)
+      }
+    }
+    
+    // 从持久化存储中移除后续AI回复
+    if (currentChat.value && currentChat.value.messages) {
+      const persistentIndex = currentChat.value.messages.findIndex(m => m.id === msg.id)
+      if (persistentIndex !== -1) {
+        for (let i = currentChat.value.messages.length - 1; i > persistentIndex; i--) {
+          if (currentChat.value.messages[i].type === 'ai') {
+            currentChat.value.messages.splice(i, 1)
+          }
+        }
+        saveChatsToStorage()
+      }
+    }
+  }
+  
+  // 🔥 修复：从消息内容中提取知识库信息和问题内容，直接调用runWorkflowStream重新生成回复
+  // 不调用sendKbMessage，避免创建新的用户消息
+  const rawText = newContent
+  
+  // 从消息内容中提取知识库名（匹配@知识库名格式）
+  const kbMatches = rawText.match(/@([^\s@]+)/g) || []
+  const matchedKbs = []
+  if (kbMatches.length > 0) {
+    kbMatches.forEach(kbMatch => {
+      const kbName = kbMatch.substring(1) // 移除@符号
+      const kb = knowledgeBaseList.value.find(k => k.name === kbName)
+      if (kb) {
+        matchedKbs.push(kb)
+      }
+    })
+  }
+  
+  // 移除所有 @知识库名字 的内容，只保留实际的问题内容
+  let text = rawText
+  if (matchedKbs.length > 0) {
+    for (const kb of matchedKbs) {
+      const kbText = `@${kb.name}`
+      text = text.replace(new RegExp(`\\s*${kbText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`, 'g'), ' ').trim()
+    }
+    text = text.replace(/\s+/g, ' ').trim()
+  }
+  
+  // 收集知识库ID
+  let knowledgeIds = []
+  if (matchedKbs.length > 0) {
+    knowledgeIds = matchedKbs.map(kb => String(kb.id))
+  }
+  
+  // 获取会话ID
+  const conversationId = currentChat.value?.id || currentConversationId.value
+  
+  // 创建AI消息占位
+  const timestamp = Date.now()
+  const random = Math.floor(Math.random() * 10000)
+  const aiMessageId = `${timestamp + 1}-${random}`
+  const aiMessage = {
+    id: aiMessageId,
+    type: 'ai',
+    content: '',
+    timestamp: new Date(),
+    streaming: true,
+    documents: []
+  }
+  
+  messages.value.push(aiMessage)
+  
+  nextTick(() => {
+    scrollKbToBottom()
+  })
+  
+  // 设置生成标志
+  isGenerating.value = true
+  
+  try {
+    const knowledgeIdToSend = knowledgeIds.length > 0 ? knowledgeIds : undefined
+    const abortController = await runWorkflowStream({
+      query: text,
+      knowledgeId: knowledgeIdToSend,
+      workflowId: undefined,
+      files: undefined,
+      conversationId: conversationId || undefined,
+      onMessage: (answer) => {
+        const message = messages.value.find(m => m.id === aiMessageId)
+        if (message) {
+          message.content += answer
+          nextTick(() => {
+            scrollKbToBottom()
+            setTimeout(() => {
+              checkScrollPosition()
+            }, 100)
+          })
+        }
+      },
+      onEnd: async (data) => {
+        const message = messages.value.find(m => m.id === aiMessageId)
+        if (message) {
+          message.streaming = false
+          if (data.documents && Array.isArray(data.documents) && data.documents.length > 0) {
+            message.documents = data.documents.map(doc => ({
+              id: doc.document_id || doc.documentId || doc.id || doc.segment_id || doc.segmentId,
+              documentId: doc.document_id || doc.documentId || doc.id,
+              name: doc.document_name || doc.name || `文档 ${doc.id || doc.segment_id || ''}`,
+              document_name: doc.document_name || doc.name,
+              datasetName: doc.dataset_name || doc.datasetName,
+              dataset_name: doc.dataset_name || doc.datasetName,
+              content: doc.content || '',
+              score: doc.score || 0,
+              segmentId: doc.segment_id || doc.segmentId,
+              segment_id: doc.segment_id || doc.segmentId
+            }))
+          } else {
+            message.documents = []
+          }
+          message.conversationId = data.conversationId || conversationId
+        }
+        
+        if (data.conversationId) {
+          currentConversationId.value = data.conversationId
+        }
+        
+        const finalConversationId = conversationId || data.conversationId
+        
+        // 保存AI消息到后端
+        if (finalConversationId && message && message.content) {
+          try {
+            const sourcesJson = message.documents && message.documents.length > 0
+              ? JSON.stringify(message.documents.map(doc => ({
+                  document_id: doc.document_id || doc.documentId || doc.id,
+                  document_name: doc.document_name || doc.name,
+                  dataset_name: doc.dataset_name || doc.datasetName,
+                  content: doc.content,
+                  score: doc.score,
+                  segment_id: doc.segment_id || doc.segmentId
+                })))
+              : null
+            
+            const messageResp = await createAiMessage({
+              conversationId: String(finalConversationId),
+              role: 'assistant',
+              content: message.content,
+              difyMessageId: data.messageId || null,
+              sources: sourcesJson,
+              confidence: null
+            })
+            
+            if (messageResp.code === 200 && messageResp.data) {
+              message.id = messageResp.data.id
+              message.timestamp = new Date(messageResp.data.created_time || messageResp.data.createdTime)
+            }
+          } catch (error) {
+            logger.warn('保存AI消息到后端失败', error)
+          }
+        }
+        
+        // 保存到当前对话
+        if (currentChat.value && currentChat.value.messages) {
+          const messageIndex = currentChat.value.messages.findIndex(m => m.id === aiMessageId)
+          if (messageIndex !== -1) {
+            currentChat.value.messages[messageIndex] = message
+          } else {
+            currentChat.value.messages.push(message)
+          }
+          saveChatsToStorage()
+        }
+        
+        isGenerating.value = false
+        currentAbortController.value = null
+        
+        nextTick(() => {
+          scrollKbToBottom()
+          setTimeout(() => {
+            checkScrollPosition()
+          }, 100)
+        })
+      },
+      onError: (error) => {
+        isGenerating.value = false
+        currentAbortController.value = null
+        logger.error('编辑消息后重新生成回复失败', error)
+        ElMessage.error(t('ai.chat.generateFailed') || '生成回复失败')
+        // 移除AI消息占位
+        const index = messages.value.findIndex(m => m.id === aiMessageId)
+        if (index > -1) {
+          messages.value.splice(index, 1)
+        }
+      }
+    })
+    
+    currentAbortController.value = abortController
+  } catch (error) {
+    isGenerating.value = false
+    currentAbortController.value = null
+    logger.error('编辑消息后重新生成回复失败', error)
+    ElMessage.error(t('ai.chat.generateFailed') || '生成回复失败')
+    // 移除AI消息占位
+    const index = messages.value.findIndex(m => m.id === aiMessageId)
+    if (index > -1) {
+      messages.value.splice(index, 1)
+    }
+  }
+}
+
 // @知识库选择相关方法
 const handleInputChange = (event) => {
   // 自动调整输入框高度
   autoResizeInput(event)
+  
+  // 未登录用户不显示知识库列表
+  if (!authStore.isLoggedIn) {
+    showKnowledgeBaseList.value = false
+    selectedKbIndex.value = -1
+    return
+  }
+  
+  // 如果知识库列表为空，不显示下拉框
+  const validKbList = knowledgeBaseList.value.filter((kb) => kb && kb.name)
+  if (validKbList.length === 0) {
+    console.log('[handleInputChange] 知识库列表为空，不显示下拉框', {
+      totalCount: knowledgeBaseList.value.length,
+      validCount: validKbList.length,
+      items: knowledgeBaseList.value.map(kb => ({ id: kb?.id, name: kb?.name, hasName: !!kb?.name }))
+    })
+    showKnowledgeBaseList.value = false
+    selectedKbIndex.value = -1
+    return
+  }
   
   const value = event.target.value
   const cursorPos = event.target.selectionStart
@@ -1458,13 +2376,17 @@ const handleInputChange = (event) => {
     const textAfterAt = value.substring(lastAtIndex + 1, cursorPos)
     // 如果@后面没有空格或换行，且没有选择知识库，显示列表
     if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
-      // 检查是否已经选择了知识库
-      const hasSelectedKb = knowledgeBaseList.value.some((kb) => {
+      // 检查是否已经选择了知识库（添加空值检查）
+      const hasSelectedKb = validKbList.some((kb) => {
         const kbText = `@${kb.name}`
         return value.substring(lastAtIndex, cursorPos).includes(kbText)
       })
       
       if (!hasSelectedKb) {
+        console.log('[handleInputChange] 显示知识库列表', {
+          validKbCount: validKbList.length,
+          items: validKbList.map(kb => ({ id: kb.id, name: kb.name }))
+        })
         showKnowledgeBaseList.value = true
         selectedKbIndex.value = 0 // 默认选中第一个
       } else {
@@ -1484,6 +2406,12 @@ const handleInputChange = (event) => {
 }
 
 const selectKnowledgeBase = (kb) => {
+  // 安全检查：确保 kb 存在且有 name 属性
+  if (!kb || !kb.name) {
+    console.warn('[selectKnowledgeBase] 无效的知识库对象', kb)
+    return
+  }
+  
   const textarea = document.querySelector('.kb-message-input')
   if (textarea) {
     const cursorPos = textarea.selectionStart
@@ -1564,8 +2492,13 @@ const handleEnterKey = (event) => {
   
   if (showKnowledgeBaseList.value && selectedKbIndex.value >= 0) {
     // 如果有选中的知识库，选择它
-    const selectedKb = filteredKnowledgeBases.value[selectedKbIndex.value]
-    selectKnowledgeBase(selectedKb)
+    const list = filteredKnowledgeBases.value
+    if (selectedKbIndex.value < list.length) {
+      const selectedKb = list[selectedKbIndex.value]
+      if (selectedKb) {
+        selectKnowledgeBase(selectedKb)
+      }
+    }
   } else {
     // 否则发送消息
     console.log('[handleEnterKey] 调用 sendKbMessage')
@@ -1630,9 +2563,53 @@ const autoResizeInput = (event) => {
   }
 }
 
-// 模型选择器相关方法
+// 🔥 修复：模型选择器相关方法 - 有消息时向上显示，没消息时向下显示
 const toggleModelDropdown = () => {
   showModelDropdown.value = !showModelDropdown.value
+  
+  if (showModelDropdown.value) {
+    // 🔥 修复：根据是否有消息来决定下拉框方向
+    // 有消息时向上显示，没消息时向下显示
+    nextTick(() => {
+      const selector = document.querySelector('.custom-model-selector')
+      const dropdown = document.querySelector('.model-dropdown')
+      if (selector && dropdown) {
+        const rect = selector.getBoundingClientRect()
+        const viewportHeight = window.innerHeight
+        const dropdownHeight = 300 // max-height
+        const spaceBelow = viewportHeight - rect.bottom
+        const spaceAbove = rect.top
+        
+        // 🔥 修复：有消息时向上显示，没消息时向下显示
+        const hasMessages = messages.value && messages.value.length > 0
+        
+        if (hasMessages) {
+          // 有消息时，向上显示
+          dropdown.style.top = 'auto'
+          dropdown.style.bottom = `${viewportHeight - rect.top + 8}px`
+          dropdown.style.left = `${rect.left}px`
+          dropdown.style.right = 'auto'
+          dropdown.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)' // 向上显示时阴影在下方
+        } else {
+          // 没消息时，向下显示（如果下方空间不足，才向上）
+          if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+            dropdown.style.top = 'auto'
+            dropdown.style.bottom = `${viewportHeight - rect.top + 8}px`
+            dropdown.style.left = `${rect.left}px`
+            dropdown.style.right = 'auto'
+            dropdown.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
+          } else {
+            // 默认向下显示
+            dropdown.style.top = `${rect.bottom + 8}px`
+            dropdown.style.bottom = 'auto'
+            dropdown.style.left = `${rect.left}px`
+            dropdown.style.right = 'auto'
+            dropdown.style.boxShadow = '0 -4px 12px rgba(0, 0, 0, 0.15)' // 向下显示时阴影在上方
+          }
+        }
+      }
+    })
+  }
 }
 
 const getSelectedModelName = (modelValue) => {
@@ -1855,38 +2832,137 @@ onMounted(async () => {
     // 🔥 修复：确保组件容器已渲染
     await nextTick()
     
-    // 加载对话列表（先尝试本地存储，再尝试API）
-    loadChatsFromStorage()
-    
-    // 并行加载对话列表和知识库列表
-    await Promise.all([
-      loadChats().catch(err => {
-        logger.warn('加载对话列表失败，继续使用本地数据', err)
-        // 🔥 修复：即使API失败，也确保页面可以显示
-        if (chats.value.length === 0) {
-          // 如果本地也没有数据，创建一个新对话
-          createNewChat().catch(createErr => {
-            logger.error('创建新对话失败', createErr)
-          })
-        }
-      }),
-      loadKnowledgeBases().catch(err => {
-        logger.warn('加载知识库列表失败，继续初始化', err)
-      })
-    ])
-    
-    // 如果没有当前对话，自动选择第一个对话或创建新对话
-    if (!currentChat.value) {
-      if (chats.value.length > 0) {
-        // 如果有已有对话，选择第一个
-        await selectChat(chats.value[0])
-      } else {
-        // 如果没有对话，自动创建一个新对话
-        await createNewChat()
+    // 只有登录用户才加载对话列表和知识库
+    if (authStore.isLoggedIn) {
+      // 加载对话列表（先尝试本地存储，再尝试API）
+      loadChatsFromStorage()
+      
+      // 🔥 修复：确保三个接口都被调用
+      // 1. 历史对话列表接口
+      // 2. 知识库列表接口
+      // 3. 默认选中第一个对话的消息列表接口
+      logger.info('开始并行加载对话列表和知识库列表')
+      await Promise.all([
+        loadChats().catch(err => {
+          logger.warn('加载对话列表失败，继续使用本地数据', err)
+          // 🔥 修复：即使API失败，也确保页面可以显示
+          if (chats.value.length === 0) {
+            // 如果本地也没有数据，创建一个新对话
+            createNewChat().catch(createErr => {
+              logger.error('创建新对话失败', createErr)
+            })
+          }
+        }),
+        loadKnowledgeBases().catch(err => {
+          logger.warn('加载知识库列表失败，继续初始化', err)
+          // 🔥 修复：即使失败也要确保知识库列表被初始化
+          knowledgeBaseList.value = []
+        })
+      ])
+      
+      // 🔥 修复：确保知识库列表已加载（如果之前失败，再次尝试）
+      if (!knowledgeBaseList.value || knowledgeBaseList.value.length === 0) {
+        logger.info('知识库列表为空，再次尝试加载')
+        await loadKnowledgeBases().catch(err => {
+          logger.warn('再次加载知识库列表失败', err)
+        })
       }
+      
+      logger.info('对话列表和知识库列表加载完成', {
+        chatsCount: chats.value.length,
+        kbCount: knowledgeBaseList.value.length
+      })
+      
+      // 🔥 修复：只从 sessionStorage 获取对话ID，不在路由中显示参数
+      const conversationIdFromStorage = sessionStorage.getItem('currentConversationId')
+      
+      // 清除URL中的conversationId参数（如果存在，保持URL干净）
+      if (route.query.conversationId) {
+        router.replace({ path: '/ai/chat', query: {} })
+      }
+      
+      // 🔥 修复：登录后默认选中新建对话，不读取 sessionStorage 中的对话ID
+      // 只有当用户主动点击历史对话时，才会设置 sessionStorage
+      // 如果 sessionStorage 中有对话ID，说明用户之前选择了某个对话（可能是刷新页面），则加载该对话
+      // 如果 sessionStorage 中没有对话ID，说明是新建对话状态，保持空状态
+      if (conversationIdFromStorage && conversationIdFromStorage !== 'null' && conversationIdFromStorage !== 'undefined') {
+        logger.info('从sessionStorage获取对话ID（可能是刷新页面）', conversationIdFromStorage)
+        const chat = chats.value.find(c => String(c.id) === String(conversationIdFromStorage))
+        if (chat) {
+          logger.info('找到对话，加载消息列表', chat.id)
+          await selectChat(chat, true)
+        } else {
+          // 如果对话列表中找不到，尝试加载该对话的消息
+          logger.info('对话列表中找不到，直接加载消息列表', conversationIdFromStorage)
+          // 先创建一个临时对话对象
+          const tempChat = {
+            id: conversationIdFromStorage,
+            title: '',
+            lastMessage: '',
+            updatedAt: new Date(),
+            unreadCount: 0,
+            isNew: false,
+            pinned: false,
+            messages: []
+          }
+          // 添加到对话列表
+          chats.value.unshift(tempChat)
+          // 加载消息
+          await loadMessages(conversationIdFromStorage, true)
+          // 设置当前对话
+          currentChat.value = tempChat
+        }
+      } else {
+        // 🔥 修复：默认选中新建对话状态
+        // 清除当前对话，显示空状态（新建对话界面）
+        currentChat.value = null
+        messages.value = []
+        // 确保 sessionStorage 中没有对话ID
+        sessionStorage.removeItem('currentConversationId')
+        logger.info('没有对话ID，保持新建对话状态')
+      }
+      
+      // 🔥 修复：添加 chatSelected 事件监听器，监听侧边栏选择对话
+      window.addEventListener('chatSelected', handleChatSelected)
+      // 🔥 修复：添加 createNewChatRequest 事件监听器，监听侧边栏新建对话请求
+      window.addEventListener('createNewChatRequest', handleCreateNewChatRequest)
+    } else {
+      // 未登录用户：不需要加载知识库列表（需要登录才能使用知识库）
+      knowledgeBaseList.value = []
     }
     
     document.addEventListener('click', handleClickOutside)
+    
+    // 🔥 修复：启动 sessionStorage 检查定时器（作为备用方案）
+    if (storageCheckInterval) {
+      clearInterval(storageCheckInterval)
+    }
+    storageCheckInterval = setInterval(() => {
+      checkSessionStorageConversationId()
+    }, 500)
+    
+    // 🔥 修复：初始化时检查滚动位置
+    nextTick(() => {
+      checkScrollPosition()
+    })
+    
+    // 🔥 修复：监听消息变化，检查滚动位置
+    watch(() => messages.value.length, () => {
+      nextTick(() => {
+        checkScrollPosition()
+      })
+    })
+    
+    // 🔥 修复：监听窗口大小变化，检查滚动位置
+    const handleResize = () => {
+      nextTick(() => {
+        checkScrollPosition()
+      })
+    }
+    window.addEventListener('resize', handleResize)
+    
+    // 保存 resize 监听器，用于卸载时移除
+    windowResizeHandler = handleResize
     
     logger.info('AI对话页面初始化完成', {
       chatsCount: chats.value.length,
@@ -1924,38 +3000,205 @@ onMounted(async () => {
   }
 })
 
+// 🔥 修复：移除路由监听，改为监听 sessionStorage 变化
+// 路由中不再显示 conversationId 参数，只使用 sessionStorage
+
+// 🔥 修复：监听登录状态，只在真正登录成功时清除对话ID，刷新页面时保留
+watch(() => authStore.isLoggedIn, async (isLoggedIn, wasLoggedIn) => {
+  if (!isLoggedIn) {
+    // 用户退出登录，清除当前对话和消息
+    currentChat.value = null
+    messages.value = []
+    chats.value = []
+    knowledgeBaseList.value = [] // 清除知识库列表
+    // 清除路由中的 conversationId 参数
+    if (route.path === '/ai/chat' && route.query.conversationId) {
+      router.replace({ path: '/ai/chat', query: {} }).catch(() => {
+        // 忽略路由冗余导航错误
+      })
+    }
+    // 清除 sessionStorage
+    sessionStorage.removeItem('currentConversationId')
+  } else if (isLoggedIn && wasLoggedIn === false) {
+    // 🔥 修复：只有在真正登录成功时（从未登录变为已登录）才清除对话ID
+    // 刷新页面时 wasLoggedIn 可能是 undefined，不应该清除
+    // 只有当 wasLoggedIn 明确为 false 时，才是真正的登录成功
+    const storedId = sessionStorage.getItem('currentConversationId')
+    // 只有在 sessionStorage 中没有对话ID时，才清除（避免清除刷新页面时的状态）
+    if (!storedId || storedId === 'null' || storedId === 'undefined') {
+      logger.info('用户登录成功，清除之前的对话ID，默认选中新建对话')
+      sessionStorage.removeItem('currentConversationId')
+      currentChat.value = null
+      messages.value = []
+    } else {
+      logger.info('用户登录成功，保留 sessionStorage 中的对话ID（可能是刷新页面）', storedId)
+    }
+    
+    // 🔥 修复：登录成功后立即加载知识库列表和对话列表
+    logger.info('用户登录成功，立即加载知识库列表和对话列表')
+    try {
+      await Promise.all([
+        loadKnowledgeBases().catch(err => {
+          logger.warn('登录后加载知识库列表失败', err)
+          knowledgeBaseList.value = []
+        }),
+        loadChats().catch(err => {
+          logger.warn('登录后加载对话列表失败', err)
+        })
+      ])
+      
+      // 🔥 修复：如果知识库列表仍然为空，再次尝试加载
+      if (!knowledgeBaseList.value || knowledgeBaseList.value.length === 0) {
+        logger.info('登录后知识库列表仍然为空，再次尝试加载')
+        await loadKnowledgeBases().catch(err => {
+          logger.warn('再次加载知识库列表失败', err)
+        })
+      }
+      
+      logger.info('登录后知识库列表和对话列表加载完成', {
+        kbCount: knowledgeBaseList.value.length,
+        chatsCount: chats.value.length
+      })
+    } catch (error) {
+      logger.error('登录后加载数据失败', error)
+    }
+  }
+  // 🔥 修复：刷新页面时（wasLoggedIn 可能是 undefined），不执行任何操作，保留 sessionStorage 中的状态
+}, { immediate: false })
+
+// 🔥 修复：监听 createNewChatRequest 事件，当侧边栏点击新建对话时处理
+const handleCreateNewChatRequest = async () => {
+  try {
+    logger.info('收到createNewChatRequest事件，处理新建对话请求')
+    await handleCreateNewChatFromSidebar()
+  } catch (error) {
+    logger.error('处理新建对话请求失败', error)
+  }
+}
+
+// 🔥 修复：监听 chatSelected 事件，当侧边栏选择对话时立即加载
+const handleChatSelected = async (e) => {
+  const chatId = e.detail?.chatId
+  if (!chatId || !authStore.isLoggedIn) {
+    return
+  }
+  
+  // 🔥 修复：如果正在处理，跳过（防止重复调用）
+  if (isHandlingChatSelected.value) {
+    logger.debug('正在处理chatSelected事件，跳过重复调用', chatId)
+    return
+  }
+  
+  // 🔥 修复：设置标记，防止定时器检查重复加载
+  isHandlingChatSelected.value = true
+  
+  try {
+    logger.info('收到chatSelected事件，立即加载对话', chatId)
+    const chat = chats.value.find(c => String(c.id) === String(chatId))
+    if (chat) {
+      await selectChat(chat, true)
+    } else {
+      // 如果对话列表中找不到，尝试直接加载消息
+      logger.info('对话列表中找不到，直接加载消息列表', chatId)
+      await loadMessages(chatId, true)
+      // 创建临时对话对象
+      const tempChat = {
+        id: chatId,
+        title: '',
+        lastMessage: '',
+        updatedAt: new Date(),
+        unreadCount: 0,
+        isNew: false,
+        pinned: false,
+        messages: []
+      }
+      chats.value.unshift(tempChat)
+      currentChat.value = tempChat
+    }
+  } finally {
+    // 🔥 修复：清除标记，允许后续检查
+    setTimeout(() => {
+      isHandlingChatSelected.value = false
+    }, 1000) // 延迟1秒清除，确保定时器检查不会重复加载
+  }
+}
+
+// 🔥 修复：监听 sessionStorage 变化，当侧边栏选择对话时自动加载（作为备用方案）
+let storageCheckInterval = null
+// 🔥 修复：窗口大小变化监听器
+let windowResizeHandler = null
+const checkSessionStorageConversationId = () => {
+  if (!authStore.isLoggedIn) {
+    return
+  }
+  
+  // 🔥 修复：如果正在处理 chatSelected 事件，跳过检查（防止重复加载）
+  if (isHandlingChatSelected.value) {
+    return
+  }
+  
+  // 只从 sessionStorage 获取对话ID
+  const storedId = sessionStorage.getItem('currentConversationId')
+  
+  // 如果URL中有conversationId参数，清除它（保持URL干净）
+  if (route.query && route.query.conversationId && route.path === '/ai/chat') {
+    router.replace({ path: '/ai/chat', query: {} }).catch(() => {
+      // 忽略路由冗余导航错误
+    })
+  }
+  
+  if (storedId && storedId !== 'null' && storedId !== 'undefined') {
+    const chat = chats.value.find(c => String(c.id) === String(storedId))
+    // 🔥 修复：只有在对话ID变化且不是当前对话时才加载（避免重复加载）
+    if (chat && (!currentChat.value || String(currentChat.value.id) !== String(storedId))) {
+      logger.info('sessionStorage变化，加载对话', storedId)
+      selectChat(chat, true)
+    }
+  } else if (!storedId && currentChat.value && !currentChat.value.isNew) {
+    // 如果sessionStorage没有ID但当前有对话（且不是新对话），清除当前对话（切换到新建对话）
+    logger.info('sessionStorage没有ID，清除当前对话')
+    currentChat.value = null
+    messages.value = []
+  }
+}
+
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  // 🔥 修复：移除事件监听器
+  window.removeEventListener('chatSelected', handleChatSelected)
+  window.removeEventListener('createNewChatRequest', handleCreateNewChatRequest)
   // 停止正在进行的请求
   if (currentAbortController.value) {
     currentAbortController.value.abort()
+  }
+  // 🔥 修复：清除 sessionStorage 检查定时器
+  if (storageCheckInterval) {
+    clearInterval(storageCheckInterval)
+    storageCheckInterval = null
+  }
+  // 🔥 修复：移除窗口大小变化监听器
+  if (windowResizeHandler) {
+    window.removeEventListener('resize', windowResizeHandler)
+    windowResizeHandler = null
   }
 })
 </script>
 
 <style lang="scss" scoped>
-// AI对话页面需要全屏显示，覆盖MainLayout的限制
+// AI对话页面需要全屏显示
 .ai-chat-container {
   display: flex !important;
-  // 🔥 修复：使用多种方式确保高度正确
-  height: calc(100vh - 56px) !important; // 减去 Header 高度
-  min-height: calc(100vh - 56px) !important;
-  // 🔥 备用方案：如果 calc 不生效，使用固定高度
-  min-height: 600px !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
   width: 100% !important;
   max-width: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
-  background: #f7f9fc !important;
+  background: var(--bg) !important;
   overflow: hidden !important;
   position: relative !important;
-  // 🔥 确保容器占满可用空间
   flex: 1 1 auto !important;
-  // 🔥 添加备用方案：如果 flex 不生效，使用绝对定位
   box-sizing: border-box !important;
-  // 🔥 确保容器可见
-  visibility: visible !important;
-  opacity: 1 !important;
 }
 
 // 🔥 修复：使用更强的选择器优先级，确保在生产环境也能生效
@@ -1985,220 +3228,35 @@ onUnmounted(() => {
   overflow: hidden !important;
 }
 
-/* 左侧对话列表 */
-.chat-list-sidebar {
-  width: 280px;
-  background: #ffffff;
-  border-right: 1px solid #e5e7eb;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-.chat-list-header {
-  padding: 16px;
-  background: linear-gradient(135deg, #fafbfc 0%, #f7f9fc 100%);
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.new-chat-btn {
-  width: 100%;
-  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-  color: white;
-  border: none;
-  padding: 12px 16px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(30, 58, 138, 0.15);
-
-  &:hover {
-    background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
-    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
-    transform: translateY(-2px);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-}
-
-.chat-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.chat-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.chat-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.chat-list::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
-}
-
-.chat-list::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
-
-.chat-item {
-  padding: 12px;
-  margin-bottom: 4px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  &:hover {
-    background: #f9fafb;
-  }
-
-  &.active {
-    background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-    box-shadow: 0 2px 8px rgba(30, 58, 138, 0.08);
-  }
-
-  &.active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 24px;
-    background: linear-gradient(180deg, #1e3a8a 0%, #0ea5e9 100%);
-    border-radius: 0 2px 2px 0;
-  }
-
-  &.pinned {
-    background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-  }
-}
-
-.chat-item-content {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.chat-item-actions {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  display: flex;
-  align-items: center;
-  margin-left: 8px;
-  flex-shrink: 0;
-}
-
-.chat-item:hover .chat-item-actions,
-.chat-item.active .chat-item-actions {
-  opacity: 1;
-}
-
-.chat-more-btn {
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: transparent;
-  color: #9ca3af;
-  cursor: pointer;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  font-size: 16px;
-  font-weight: bold;
-
-  &:hover {
-    background: #f3f4f6;
-    color: #6b7280;
-  }
-}
-
-.chat-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #111827;
-  margin-bottom: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  .pin-icon {
-    color: #1e3a8a;
-    flex-shrink: 0;
-  }
-}
-
-.chat-item.active .chat-title,
-.chat-item.pinned .chat-title {
-  color: #1e3a8a;
-  font-weight: 600;
-}
-
-.chat-preview {
-  font-size: 12px;
-  color: #6b7280;
-  line-height: 1.5;
-  margin-bottom: 6px;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.chat-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.chat-time {
-  font-size: 11px;
-  color: #9ca3af;
-}
-
-.unread-badge {
-  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
-  color: white;
-  font-size: 10px;
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-weight: 600;
-  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
-}
-
-/* 右侧对话内容 */
+/* 对话内容区域（全宽） */
 .chat-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
+  background: var(--surface);
   position: relative;
-  // 🔥 修复：确保内容区域有最小高度，避免被压缩
   min-height: 0;
   overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
+
+// 登录提示横幅
+.login-prompt-banner {
+  padding: 12px 24px;
+  background: #fff7ed;
+  border-bottom: 1px solid #fed7aa;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+// 消息区域包装器（可滚动）
+.chat-messages-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .chat-header {
@@ -2207,13 +3265,13 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #fafbfc;
+  background: var(--surface);
 }
 
 .chat-title-header {
   font-size: 18px;
   font-weight: 600;
-  color: #1e3a8a;
+  color: var(--color-primary);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2226,38 +3284,48 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #6b7280;
+  color: var(--text-3);
   padding: 40px;
+  gap: 48px; // 增加间距，让输入框与上方内容有足够距离
 }
 
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 24px;
-  opacity: 0.6;
+.empty-greeting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
-.empty-text {
-  font-size: 18px;
+.greeting-text {
+  font-size: 24px;
   font-weight: 500;
-  color: #374151;
-  margin-bottom: 12px;
+  color: var(--text);
 }
 
-.empty-desc {
-  font-size: 14px;
-  color: #9ca3af;
+.greeting-logo {
+  height: 40px;
+  width: auto;
+  flex-shrink: 0;
 }
 
-// 消息容器样式（复用知识库页面样式）
+// 空状态时的输入框（居中显示）
+.empty-state-input {
+  width: 100%;
+  max-width: 800px; // 限制最大宽度，保持美观
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+// 🔥 修复：消息容器样式 - 统一背景颜色，居中显示，两边留白一致
 .kb-messages-container {
   flex: 1;
   overflow-y: auto;
   overflow-x: visible;
-  padding: 24px;
-  background: linear-gradient(180deg, #fafbfc 0%, #f7f9fc 100%);
+  padding: 24px; // 🔥 修复：恢复原始内边距
+  background: var(--surface); // 🔥 修复：统一背景颜色为白色，与输入框保持一致
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: center; // 🔥 修复：消息居中显示
   justify-content: center;
   position: relative;
   z-index: 1;
@@ -2296,18 +3364,21 @@ onUnmounted(() => {
 
 .empty-chat-message {
   font-size: 16px;
-  color: #6b7280;
+  color: var(--text-3);
   text-align: center;
   line-height: 1.6;
 }
 
 .kb-messages {
   width: 100%;
-  max-width: 100%;
+  max-width: 1000px; // 🔥 修复：统一最大宽度，居中显示，两边留白一致
+  margin-left: auto;
+  margin-right: auto;
   overflow: visible;
+  padding: 0; // 🔥 修复：确保没有额外的padding，让内容完美居中
 }
 
-// 消息样式（复用知识库页面样式）
+// 🔥 修复：消息样式 - 参考原版 AIChat_Orgin.vue，保持原有美观布局
 .kb-message {
   margin-bottom: 24px;
   display: flex;
@@ -2324,32 +3395,14 @@ onUnmounted(() => {
   }
 }
 
-.kb-message-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 600;
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-
-  &.user {
-    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
-    color: #fff;
-  }
-
-  &.ai {
-    background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
-    color: #fff;
-  }
+.kb-message-bubble {
+  max-width: 75%; // 🔥 修复：AI消息气泡宽度适当增加
+  position: relative;
 }
 
-.kb-message-bubble {
-  max-width: 70%;
-  position: relative;
+// 🔥 修复：AI消息气泡向右侧移动一点，大致在对话框中间位置
+.kb-message.ai .kb-message-bubble {
+  margin-left: 15%;
 }
 
 .kb-message-content-wrapper {
@@ -2361,15 +3414,21 @@ onUnmounted(() => {
   white-space: pre-wrap;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   transition: all 0.2s ease;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  color: #374151;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  position: relative;
+  
+  // 🔥 修复：编辑状态下为按钮留出空间
+  &.is-editing {
+    padding-bottom: 45px;
+  }
 }
 
 .kb-message.user .kb-message-content-wrapper {
-  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-  color: #fff;
-  border-color: transparent;
+  background: var(--hover);
+  color: var(--text);
+  border-color: #e5e7eb;
   border-radius: 16px 16px 4px 16px;
 }
 
@@ -2396,8 +3455,56 @@ onUnmounted(() => {
   }
 }
 
+// 🔥 修复：编辑状态容器 - 简化样式，正常编辑显示
+.kb-message-content-edit {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// 🔥 修复：编辑框 - 简化样式，像普通的文本输入框
+.kb-edit-box {
+  width: 100%;
+}
+
+// 🔥 修复：编辑内容区域 - 使用textarea样式，正常编辑显示
+.kb-edit-content {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  outline: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  resize: vertical;
+  overflow-y: auto;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  font-family: inherit;
+  
+  &:focus {
+    outline: none;
+    border-color: #1e3a8a;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1);
+  }
+}
+
+// 🔥 修复：编辑操作按钮 - 显示在编辑框下方，间距适当调整
+.kb-edit-actions-inline {
+  display: flex;
+  gap: 12px; // 🔥 修复：增加按钮间距，不那么紧凑
+  justify-content: flex-end;
+  margin-top: 12px; // 🔥 修复：增加与编辑框的间距
+}
+
 .kb-message.user .kb-message-content {
-  color: #fff !important;
+  color: #111827 !important; // 🔥 修复：输入消息字体颜色更深一点
 }
 
 .kb-message-meta {
@@ -2406,7 +3513,7 @@ onUnmounted(() => {
   gap: 8px;
   margin-top: 8px;
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--text-3);
   justify-content: space-between;
 }
 
@@ -2417,27 +3524,122 @@ onUnmounted(() => {
 }
 
 .kb-copy-btn,
-.kb-retry-btn {
+.kb-retry-btn,
+.kb-edit-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  background: var(--hover);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #9ca3af;
+  color: var(--text-3);
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
     background: #e5e7eb;
-    color: #374151;
+    color: var(--text);
     border-color: #d1d5db;
   }
 
   &:active {
     background: #d1d5db;
+  }
+}
+
+// 🔥 修复：编辑状态样式 - 参考千问的设计，自适应高度，无最大高度限制
+.kb-edit-wrapper {
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+// 🔥 修复：编辑状态样式 - 在原消息内容背景的右下角显示按钮
+.kb-message-content-wrapper.is-editing {
+  position: relative;
+  padding-bottom: 50px; // 为按钮留出空间
+}
+
+.kb-message-content-edit {
+  position: relative;
+  width: 100%;
+  min-height: 40px;
+}
+
+.kb-edit-content {
+  outline: none;
+  min-height: 20px;
+  
+  &:focus {
+    outline: none;
+  }
+  
+  &:empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-3);
+  }
+}
+
+.kb-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+// 🔥 修复：编辑按钮样式 - 稍微小一点，圆角多一些，更美观
+.kb-edit-btn-cancel,
+.kb-edit-btn-confirm {
+  padding: 6px 16px; // 🔥 修复：按钮稍微小一点
+  border: none;
+  border-radius: 16px; // 🔥 修复：圆角多一些
+  font-size: 13px; // 🔥 修复：字体稍微小一点
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 60px; // 🔥 修复：最小宽度稍微小一点
+  text-align: center;
+}
+
+.kb-edit-btn-cancel {
+  background: var(--hover);
+  color: var(--text-3);
+  border: 1px solid var(--border);
+
+  &:hover {
+    background: #e5e7eb;
+    color: var(--text);
+    border-color: #d1d5db;
+  }
+  
+  &:active {
+    background: #d1d5db;
+  }
+}
+
+.kb-edit-btn-confirm {
+  background: #1e3a8a;
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(30, 58, 138, 0.2);
+
+  &:hover:not(:disabled) {
+    background: #1e40af;
+    box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3);
+    transform: translateY(-1px);
+  }
+  
+  &:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(30, 58, 138, 0.2);
+  }
+
+  &:disabled {
+    background: #d1d5db;
+    color: var(--text-3);
+    cursor: not-allowed;
+    box-shadow: none;
   }
 }
 
@@ -2450,7 +3652,7 @@ onUnmounted(() => {
 
 .kb-documents-title {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-3);
   margin-bottom: 8px;
   font-weight: 500;
 }
@@ -2473,7 +3675,7 @@ onUnmounted(() => {
 }
 
 .kb-document-item:hover {
-  background: #f3f4f6;
+  background: var(--hover);
 }
 
 .kb-document-icon {
@@ -2491,20 +3693,20 @@ onUnmounted(() => {
 }
 
 .kb-document-name {
-  color: #374151;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .kb-document-dataset {
-  color: #9ca3af;
+  color: var(--text-3);
   font-size: 11px;
   flex-shrink: 0;
 }
 
 .kb-document-score {
-  color: #9ca3af;
+  color: var(--text-3);
   font-size: 11px;
   flex-shrink: 0;
 }
@@ -2540,23 +3742,31 @@ onUnmounted(() => {
 
 .kb-streaming-text {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-3);
 }
 
-// 输入区域样式（复用知识库页面样式）
+// 🔥 修复：输入区域样式 - 保持与空状态一致的宽度，并确保footer正确显示
 .kb-input-area {
   padding: 20px;
-  border-top: 1px solid #f0f0f0;
-  background: #fff;
-  position: relative;
+  background: var(--surface);
+  position: relative; // 🔥 修复：添加 position: relative，让滚动到底部按钮可以绝对定位
   z-index: 10;
+  display: flex;
+  flex-direction: column; // 🔥 修复：使用flex-direction: column，确保footer在底部
+  align-items: center; // 🔥 修复：输入框居中显示
+  
+  .kb-input-container {
+    max-width: 1000px; // 🔥 修复：限制输入框最大宽度，与消息内容保持一致，确保对齐
+    width: 100%;
+  }
 }
 
 .kb-input-container {
+  position: relative; // 🔥 修复：添加 position: relative，让知识库下拉框可以正确绝对定位
   display: flex;
   flex-direction: column;
   background: #f8f9fa;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0;
   transition: all 0.2s ease;
@@ -2581,7 +3791,7 @@ onUnmounted(() => {
   white-space: pre-wrap;
 
   &::placeholder {
-    color: #9ca3af;
+    color: var(--text-3);
   }
 }
 
@@ -2594,7 +3804,7 @@ onUnmounted(() => {
   padding: 8px;
   background: #f8f9fa;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
 }
 
 .attachment-item {
@@ -2603,10 +3813,10 @@ onUnmounted(() => {
   gap: 8px;
   padding: 8px 12px;
   background: white;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 12px;
-  color: #374151;
+  color: var(--text);
   max-width: 200px;
 }
 
@@ -2623,14 +3833,14 @@ onUnmounted(() => {
 }
 
 .attachment-size {
-  color: #9ca3af;
+  color: var(--text-3);
   font-size: 11px;
 }
 
 .attachment-remove {
   width: 16px;
   height: 16px;
-  color: #9ca3af;
+  color: var(--text-3);
   cursor: pointer;
   border-radius: 50%;
   display: flex;
@@ -2639,7 +3849,7 @@ onUnmounted(() => {
   transition: all 0.2s ease;
 
   &:hover {
-    background: #f3f4f6;
+    background: var(--hover);
     color: #dc2626;
   }
 }
@@ -2650,8 +3860,8 @@ onUnmounted(() => {
   bottom: 100%;
   left: 0;
   right: 0;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   z-index: 1002;
@@ -2663,14 +3873,14 @@ onUnmounted(() => {
 .kb-dropdown-header {
   padding: 12px 16px;
   border-bottom: 1px solid #f3f4f6;
-  background: #fafbfc;
+  background: var(--surface);
   border-radius: 12px 12px 0 0;
 }
 
 .kb-dropdown-title {
   font-size: 14px;
   font-weight: 600;
-  color: #1e3a8a;
+  color: var(--color-primary);
 }
 
 .kb-dropdown-section {
@@ -2684,7 +3894,7 @@ onUnmounted(() => {
 .kb-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 8px 12px;
   margin: 2px 0;
   border-radius: 8px;
@@ -2719,7 +3929,7 @@ onUnmounted(() => {
 
 .kb-name {
   font-size: 13px;
-  color: #374151;
+  color: var(--text);
   font-weight: 500;
   flex: 1;
 }
@@ -2750,11 +3960,11 @@ onUnmounted(() => {
 
 .model-display {
   padding: 8px 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 12px;
-  color: #6b7280;
-  background: #ffffff;
+  color: var(--text-3);
+  background: var(--surface);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -2770,20 +3980,17 @@ onUnmounted(() => {
 }
 
 .model-dropdown {
-  position: fixed;
-  bottom: auto;
-  left: auto;
-  right: auto;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  position: fixed; // 🔥 修复：使用fixed定位，根据位置动态计算
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1001;
-  margin-bottom: 8px;
   overflow: hidden;
   max-height: 300px;
   overflow-y: auto;
   width: 320px;
+  // 🔥 修复：位置由JavaScript动态计算，根据视口空间决定向上或向下显示
 }
 
 .model-option {
@@ -2811,13 +4018,13 @@ onUnmounted(() => {
 .model-name {
   font-size: 13px;
   font-weight: 500;
-  color: #111827;
+  color: var(--text);
   margin-bottom: 2px;
 }
 
 .model-desc {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-3);
   line-height: 1.3;
 }
 
@@ -2843,9 +4050,9 @@ onUnmounted(() => {
   width: 32px;
   height: 32px;
   border: none;
-  background: #f3f4f6;
-  color: #6b7280;
-  border-radius: 8px;
+  background: #f8f9fa;
+  color: var(--text-3);
+  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2854,25 +4061,24 @@ onUnmounted(() => {
   flex-shrink: 0;
 
   &:hover {
-    background: #e5e7eb;
-    color: #374151;
-    transform: translateY(-1px);
+    background: #f1f3f5;
+    color: var(--text);
   }
 
   &:active {
-    transform: translateY(0);
+    background: #e9ecef;
   }
 
   &.disabled {
     background: #f9fafb;
     color: #d1d5db;
     cursor: not-allowed;
+  }
 
-    &:hover {
-      background: #f9fafb;
-      color: #d1d5db;
-      transform: none;
-    }
+  .attachment-icon-svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.5;
   }
 }
 
@@ -2922,11 +4128,57 @@ onUnmounted(() => {
   }
 }
 
+// 🔥 修复：输入框底部提示文字样式 - 确保在对话框底部正确显示
 .input-footer {
   margin-top: 12px;
   text-align: center;
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--text-3);
+  width: 100%;
+  max-width: 1000px; // 🔥 修复：与输入框宽度保持一致
+  padding: 0 20px; // 🔥 修复：添加内边距，与输入框对齐
+}
+
+// 🔥 修复：滚动到底部按钮样式 - 在输入框区域右下角
+.scroll-to-bottom-btn-input {
+  position: absolute; // 🔥 修复：使用absolute定位，相对于输入框区域
+  bottom: 180px; // 🔥 修复：距离底部60px，往上移动一点
+  right: calc(50% - 500px + 20px); // 🔥 修复：根据输入框容器最大宽度1000px，居中后右边距20px
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1001; // 🔥 修复：提高z-index，确保按钮在最上层
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  color: var(--text-3);
+
+  &:hover {
+    background: #1e3a8a;
+    border-color: #1e3a8a;
+    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+    color: #fff;
+    transform: translateY(-2px);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+
+  .el-icon {
+    font-size: 18px;
+  }
+  
+  // 🔥 修复：响应式调整，小屏幕时使用固定右边距
+  @media (max-width: 1200px) {
+    right: 20px;
+  }
 }
 
 // 响应式设计

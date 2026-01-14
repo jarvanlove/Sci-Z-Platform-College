@@ -52,7 +52,9 @@ export default {
     none: 'なし',
     yuan: '￥',
     added: '追加済み',
-    remove: '削除'
+    remove: '削除',
+    collapseSidebar: 'サイドバーを折りたたむ',
+    expandSidebar: 'サイドバーを展開'
   },
   // ページネーション
   pagination: {
@@ -100,6 +102,7 @@ export default {
     reportGenerate: 'レポート生成',
     knowledge: 'ナレッジベース',
     knowledgeList: 'ナレッジベース一覧',
+    practice: '実践',
     ai: 'AIアシスタント',
     aiChat: 'AI対話',
     user: 'ユーザーセンター',
@@ -1007,8 +1010,7 @@ export default {
     chat: {
       title: 'AI対話',
       newChat: '新しい対話',
-      startNewChat: '新しい対話を開始',
-      selectOrCreateChat: '対話を選択するか、新しい対話を作成してください',
+      greeting: 'こんにちは、私は',
       clear: 'クリア',
       settings: '設定',
       user: 'ユーザー',
@@ -1041,9 +1043,13 @@ export default {
       generating: '生成中...',
       copy: 'コピー',
       retry: '再試行',
+      regenerate: '再生成',
+      edit: '編集',
+      editMessagePlaceholder: 'メッセージ内容を編集...',
       // 🔥 修复：使用全角 ＠ 符号，避免 Vue I18n 编译错误
       inputPlaceholderWithKb: '＠ナレッジベースを入力するか、直接質問してください',
-      attachmentTitle: '添付ファイルを追加（ファイルをアップロードする場合はナレッジベースを選択する必要があります）',
+      inputPlaceholderGuest: '何でも聞いてください',
+      attachmentTitle: '添付ファイルを追加',
       aiContentHint: 'AIが生成した内容は参考のみ',
       editTitle: 'タイトルを編集',
       enterNewTitle: '新しい対話タイトルを入力してください',
@@ -1060,7 +1066,18 @@ export default {
       stopped: '生成が停止されました',
       copiedToClipboard: 'クリップボードにコピーしました',
       copyFailed: 'コピーに失敗しました',
-      switchedTo: '{model}に切り替えました'
+      switchedTo: '{model}に切り替えました',
+      history: '対話履歴',
+      justNow: 'たった今',
+      noHistory: '対話履歴がありません',
+      rename: '名前変更',
+      delete: '削除',
+      alreadyNewChat: 'すでに最新の対話です',
+      updateTitleFailed: 'タイトルの更新に失敗しました',
+      operationFailed: '操作に失敗しました',
+      deleteFailed: '削除に失敗しました',
+      chatPinned: '対話をピン留めしました',
+      chatUnpinned: 'ピン留めを解除しました'
     },
     knowledge: {
       searchKb: 'ナレッジベースを検索',
@@ -1091,6 +1108,17 @@ export default {
       documentType: 'ドキュメントタイプ',
       timeRange: '時間範囲'
     }
+  },
+
+  // 実践関連
+  practice: {
+    subtitle: '研究プロジェクト管理と実践ツール',
+    dashboardDesc: 'プロジェクト概要と統計データを表示',
+    projectDesc: '研究プロジェクトの全ライフサイクルを管理し、プロジェクトの進捗を追跡',
+    declarationDesc: '研究プロジェクトの申請を作成および管理',
+    reportDesc: '研究報告書を生成および管理',
+    knowledgeDesc: 'ナレッジベースを構築および管理し、ドキュメントのアップロードと検索をサポート',
+    systemDesc: '権限設定、ログ照会、APIキー設定'
   },
 
   // システム管理

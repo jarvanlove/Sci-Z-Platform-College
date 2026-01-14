@@ -69,7 +69,8 @@ const handleLoginSuccess = async (userData) => {
     
     // 判断跳转目标页面
     const redirect = router.currentRoute.value.query.redirect
-    const targetPath = redirect && redirect !== '/login' ? redirect : '/dashboard'
+    // 🔥 修改：默认跳转到AI对话页面（TOC布局的默认首页）
+    const targetPath = redirect && redirect !== '/login' ? redirect : '/ai/chat'
     
     // 跳转到目标页面
     await router.push(targetPath)

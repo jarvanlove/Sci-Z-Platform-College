@@ -230,8 +230,12 @@ const handleLogout = async () => {
     // 显示退出成功消息
     ElMessage.success(t('auth.logoutSuccess'))
     
-    // 跳转到登录页
-    await router.push('/login')
+    // 保持在当前页面或跳转到AI对话页面（公开页面）
+    const currentPath = router.currentRoute.value.path
+    const publicPages = ['/ai/chat', '/literature/search']
+    if (!publicPages.includes(currentPath)) {
+      await router.push('/ai/chat')
+    }
     
     // 开发环境日志
     if (import.meta.env.DEV) {

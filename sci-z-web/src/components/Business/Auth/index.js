@@ -6,6 +6,9 @@
 // 登录表单组件
 export { default as LoginForm } from './LoginForm.vue'
 
+// 登录弹窗组件
+export { default as LoginModal } from './LoginModal.vue'
+
 // 注册表单组件
 export { default as RegisterForm } from './RegisterForm.vue'
 

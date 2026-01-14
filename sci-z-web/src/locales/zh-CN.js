@@ -8,7 +8,7 @@ export default {
 
   // 通用
   common: {
-    confirm: '确认',
+    confirm: '确定',
     cancel: '取消',
     save: '保存',
     delete: '删除',
@@ -52,7 +52,13 @@ export default {
     none: '暂无',
     yuan: '￥',
     added: '已添加',
-    remove: '移除'
+    remove: '移除',
+    minuteAgo: '分钟前',
+    hourAgo: '小时前',
+    dayAgo: '天前',
+    justNow: '刚刚',
+    collapseSidebar: '收起侧边栏',
+    expandSidebar: '展开侧边栏'
   },
   // 分页
   pagination: {
@@ -87,15 +93,17 @@ export default {
     dashboard: '仪表板',
     academic: '学术搜索',
     literature: '文献搜索',
-    declaration: '申报管理',
+    scienceNavigation: '科学导航',
+    practice: '实践',
+    declaration: '申报智能体',
     declarationList: '申报列表',
     declarationCreate: '新建申报',
-    project: '项目管理',
+    project: '项目智能体',
     projectList: '项目列表',
     projectDetail: '项目详情',
     projectProgress: '项目进度',
     acceptance: '验收管理',
-    report: '报告管理',
+    report: '报告智能体',
     reportList: '报告列表',
     reportGenerate: '报告生成',
     knowledge: '知识库',
@@ -105,7 +113,7 @@ export default {
     user: '用户中心',
     userProfile: '个人信息',
     userSecurity: '安全设置',
-    system: '系统管理',
+    system: '系统设置',
     systemUser: '用户管理',
     systemRole: '角色权限',
     systemConfig: '系统配置',
@@ -395,7 +403,10 @@ export default {
       operatingSystem: '操作系统',
       loginStatus: '登录状态',
       loadLogsError: '登录日志加载失败，请稍后重试'
-    }
+    },
+    login: '登录',
+    logout: '退出登录',
+    pleaseLogin: '请先登录'
   },
 
   // 申报相关
@@ -1015,8 +1026,7 @@ export default {
     chat: {
       title: 'AI对话',
       newChat: '新建对话',
-      startNewChat: '开始新对话',
-      selectOrCreateChat: '请选择一个对话或创建新对话',
+      greeting: '你好，我是',
       clear: '清空',
       settings: '设置',
       user: '用户',
@@ -1049,10 +1059,14 @@ export default {
       generating: '正在生成...',
       copy: '复制',
       retry: '重试',
+      regenerate: '重新生成',
+      edit: '编辑',
+      editMessagePlaceholder: '编辑消息内容...',
       // 🔥 修复：使用全角 ＠ 符号，避免 Vue I18n 编译错误
       // 全角字符不会被 Vue I18n 识别为链接格式，既保留了视觉效果又避免了编译错误
-      inputPlaceholderWithKb: '输入＠知识库或直接提问',
-      attachmentTitle: '添加附件（上传文件时需要选择知识库）',
+      inputPlaceholderWithKb: '＠知识库或直接提问',
+      inputPlaceholderGuest: '尽管问',
+      attachmentTitle: '添加附件',
       aiContentHint: '内容由AI生成仅供参考',
       editTitle: '编辑标题',
       enterNewTitle: '请输入新的对话标题',
@@ -1069,7 +1083,18 @@ export default {
       stopped: '已停止生成',
       copiedToClipboard: '已复制到剪贴板',
       copyFailed: '复制失败',
-      switchedTo: '已切换到{model}'
+      switchedTo: '已切换到{model}',
+      history: '历史对话',
+      justNow: '刚刚',
+      noHistory: '暂无对话历史',
+      rename: '重命名',
+      delete: '删除',
+      alreadyNewChat: '当前已经是最新对话',
+      updateTitleFailed: '更新标题失败',
+      operationFailed: '操作失败',
+      deleteFailed: '删除失败',
+      chatPinned: '对话已置顶',
+      chatUnpinned: '已取消置顶'
     },
     knowledge: {
       searchKb: '搜索知识库',
@@ -1102,8 +1127,32 @@ export default {
     }
   },
 
+  // 实践相关
+  practice: {
+    subtitle: '科研项目管理与实践工具',
+    dashboardDesc: '查看项目概览和统计数据',
+    projectDesc: '管理科研项目全生命周期，跟踪项目进度',
+    declarationDesc: '创建和管理科研项目申报',
+    reportDesc: '生成和管理科研报告',
+    knowledgeDesc: '构建和管理知识库，支持文档上传和检索',
+    systemDesc: '权限配置、日志查询、apiKey配置'
+  },
+
+  // 科学导航相关
+  scienceNavigation: {
+    subtitle: '探索科学领域，浏览学术资源',
+    comingSoon: '功能即将上线',
+    comingSoonDesc: '科学导航功能正在开发中，敬请期待'
+  },
+
   // 系统管理相关
   system: {
+    index: {
+      userDesc: '管理系统用户，包括创建、编辑、启用/禁用用户',
+      roleDesc: '管理角色和权限，配置角色权限树',
+      logDesc: '查看和管理系统操作日志、登录日志',
+      apikeyDesc: '配置和管理 API Key，用于第三方服务集成'
+    },
     userManagement: '用户管理',
     roleManagement: '角色管理',
     permissionManagement: '权限管理',

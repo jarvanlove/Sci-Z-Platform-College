@@ -10,7 +10,9 @@ import java.util.*;
 /**
  * Dify Chatbot 模型配置请求
  *
- * <p>默认按照控制台生成的配置初始化各项字段，便于直接提交。</p>
+ * <p>
+ * 默认按照控制台生成的配置初始化各项字段，便于直接提交。
+ * </p>
  */
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -18,7 +20,7 @@ import java.util.*;
 public class DifyChatbotModelConfigRequest {
 
     @JsonProperty("pre_prompt")
-    private String prePrompt = "你的名字是小查";
+    private String prePrompt = "你的名字是Sci-Z";
 
     // @JsonProperty("pre_prompt")
     // private String AiChatPrePrompt = "你的名字是小查";
@@ -141,11 +143,11 @@ public class DifyChatbotModelConfigRequest {
         }
 
         private FileUpload(Boolean enabled,
-                           List<String> allowedFileTypes,
-                           List<String> allowedFileExtensions,
-                           List<String> allowedFileUploadMethods,
-                           Integer numberLimits,
-                           Image image) {
+                List<String> allowedFileTypes,
+                List<String> allowedFileExtensions,
+                List<String> allowedFileUploadMethods,
+                Integer numberLimits,
+                Image image) {
             this.enabled = enabled;
             this.allowedFileTypes = allowedFileTypes;
             this.allowedFileExtensions = allowedFileExtensions;
@@ -163,9 +165,9 @@ public class DifyChatbotModelConfigRequest {
                             ".MP4", ".MOV", ".MPEG", ".WEBM")),
                     new ArrayList<>(Arrays.asList("remote_url", "local_file")),
                     3,
-                    Image.defaultConfig()
-            );
+                    Image.defaultConfig());
         }
+
         @Data
         @JsonIgnoreProperties(ignoreUnknown = true)
         public static class Image {
@@ -182,19 +184,20 @@ public class DifyChatbotModelConfigRequest {
 
             public Image() {
             }
+
             private Image(Boolean enabled, String detail, Integer numberLimits, List<String> transferMethods) {
                 this.enabled = enabled;
                 this.detail = detail;
                 this.numberLimits = numberLimits;
                 this.transferMethods = transferMethods;
             }
+
             public static Image defaultConfig() {
                 return new Image(
                         false,
                         "high",
                         3,
-                        new ArrayList<>(Arrays.asList("remote_url", "local_file"))
-                );
+                        new ArrayList<>(Arrays.asList("remote_url", "local_file")));
             }
         }
     }
@@ -250,8 +253,7 @@ public class DifyChatbotModelConfigRequest {
                     "langgenius/tongyi/tongyi",
                     "qwen3-next-80b-a3b-instruct",
                     "chat",
-                    new HashMap<>()
-            );
+                    new HashMap<>());
         }
     }
 
@@ -280,11 +282,11 @@ public class DifyChatbotModelConfigRequest {
         }
 
         private DatasetConfigs(String retrievalModel,
-                               Integer topK,
-                               String rerankingMode,
-                               RerankingModel rerankingModel,
-                               Boolean rerankingEnable,
-                               DatasetCollection datasets) {
+                Integer topK,
+                String rerankingMode,
+                RerankingModel rerankingModel,
+                Boolean rerankingEnable,
+                DatasetCollection datasets) {
             this.retrievalModel = retrievalModel;
             this.topK = topK;
             this.rerankingMode = rerankingMode;
@@ -300,8 +302,7 @@ public class DifyChatbotModelConfigRequest {
                     "reranking_model",
                     RerankingModel.defaultConfig(),
                     false,
-                    DatasetCollection.defaultConfig()
-            );
+                    DatasetCollection.defaultConfig());
         }
 
         @Data
@@ -383,4 +384,3 @@ public class DifyChatbotModelConfigRequest {
         }
     }
 }
-

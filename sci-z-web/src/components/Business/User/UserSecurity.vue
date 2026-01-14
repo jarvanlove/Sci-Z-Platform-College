@@ -333,7 +333,8 @@ const handleChangePassword = async () => {
     const successMessage = response?.data?.message || t('user.security.changePasswordSuccess')
     ElMessage.success(successMessage)
     ElMessage.info(t('user.security.redirectToLogin'))
-    await authStore.logout({ redirectPath: '/login', useReplace: true })
+    // 🔥 修改：密码重置后重定向到AI对话页面
+    await authStore.logout({ redirectPath: '/ai/chat', useReplace: true })
   } catch (error) {
     if (error !== 'cancel') {
       logger.error('change password failed', { error: error.message })

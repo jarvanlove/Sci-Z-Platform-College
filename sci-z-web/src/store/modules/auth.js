@@ -583,14 +583,23 @@ export const useAuthStore = defineStore('auth', {
         clearRemember = false
       } = options
 
+      // 🔥 修复：先设置退出标志，防止其他请求的 401 错误触发错误提示
+      this.isLoggingOut = true
+
       try {
         if (this.token) {
           await logoutApi()
         }
       } catch (error) {
+        // 🔥 修复：退出登录接口失败时，不显示错误消息（避免干扰用户）
         authLogger.error('退出登录失败', { error: error.message })
+        // 即使退出接口失败，也继续执行清理逻辑
       } finally {
         this.resetState({ clearRemember })
+        // 🔥 修复：重置退出标志（延迟重置，确保所有请求都能检测到）
+        setTimeout(() => {
+          this.isLoggingOut = false
+        }, 1000)
         
         // 🔥 关键修复：退出登录后重置主题为明亮主题
         try {

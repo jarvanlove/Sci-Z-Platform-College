@@ -106,15 +106,19 @@ service.interceptors.response.use(
       
       switch (status) {
         case 401:
-          ElMessage.error('登录已过期，请重新登录')
           const authStore = useAuthStore()
-          // 避免重复调用 logout，如果已经在跳转中则跳过
-          if (!authStore.isLoggingOut) {
-            authStore.isLoggingOut = true
-            authStore.logout().finally(() => {
-              authStore.isLoggingOut = false
-            })
+          // 🔥 修复：如果正在退出登录，不显示错误消息（避免退出时出现多个错误提示）
+          if (authStore.isLoggingOut) {
+            // 正在退出登录，静默处理 401 错误
+            return Promise.reject(error)
           }
+          
+          // 避免重复调用 logout
+          ElMessage.error('登录已过期，请重新登录')
+          authStore.isLoggingOut = true
+          authStore.logout().finally(() => {
+            authStore.isLoggingOut = false
+          })
           break
         case 403:
           ElMessage.error('没有权限访问该资源')
