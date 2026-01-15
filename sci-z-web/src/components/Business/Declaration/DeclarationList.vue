@@ -181,9 +181,9 @@
         <!-- 操作列 -->
         <template #actions="{ row }">
           <div class="action-buttons">
-            <!-- 更新申报状态按钮（只有工作流已完成时才显示） -->
+            <!-- 更新申报状态按钮（只有工作流已完成且申报状态不是"申报成功"或"申报未通过"时才显示） -->
             <BaseTooltip
-              v-if="row.workflowStatus === 'completed'"
+              v-if="row.workflowStatus === 'completed' && row.statusType !== 'success' && row.statusType !== 'failed'"
               :content="$t('declaration.updateStatus') || '更新申报状态'"
               placement="top"
             >

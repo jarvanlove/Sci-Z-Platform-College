@@ -126,7 +126,11 @@
               </button>
             </BaseTooltip>
             <!-- 编辑按钮 -->
-            <BaseTooltip :content="$t('common.edit')" placement="top">
+            <BaseTooltip
+              v-if="row.status !== PROJECT_STATUS.CANCELLED"
+              :content="$t('common.edit')"
+              placement="top"
+            >
               <button
                 class="action-btn btn-primary"
                 @click.stop="handleEdit(row)"

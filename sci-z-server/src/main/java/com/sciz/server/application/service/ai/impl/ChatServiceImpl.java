@@ -6,8 +6,11 @@ import com.sciz.server.application.service.ai.AiConversationService;
 import com.sciz.server.application.service.ai.ChatService;
 import com.sciz.server.application.service.knowledge.KnowledgeService;
 import com.sciz.server.domain.pojo.dto.request.chat.ChatWorkflowRunReq;
+import com.sciz.server.domain.pojo.dto.request.file.FileSyncDifyReq;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeChatbotStreamReq;
+import com.sciz.server.domain.pojo.entity.file.SysAttachment;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
+import com.sciz.server.domain.pojo.repository.file.SysAttachmentRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
 import com.sciz.server.infrastructure.external.dify.config.DifyConfig;
 import com.sciz.server.infrastructure.external.dify.dto.DifyChatbotMessageRequest;
@@ -16,11 +19,15 @@ import com.sciz.server.infrastructure.external.dify.dto.DifyFileUploadResponse;
 import com.sciz.server.infrastructure.external.dify.dto.DifyWorkflowRequest;
 import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiService;
+import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
 import com.sciz.server.infrastructure.external.dify.service.impl.DifyApiKeyServiceImpl;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
 import com.sciz.server.domain.pojo.dto.response.user.LoginUserContext;
+import com.sciz.server.infrastructure.shared.utils.MinioUtil;
+import io.minio.GetObjectResponse;
+import io.minio.MinioClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +36,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -53,6 +62,12 @@ public class ChatServiceImpl implements ChatService {
     private final SysKnowledgeBaseRepo knowledgeBaseRepo;
     private final DifyConfig difyConfig;
     private final ObjectMapper objectMapper;
+    private final SysAttachmentRepo sysAttachmentRepo;
+    private final DifyWorkflowService difyWorkflowService;
+    private final MinioClient minioClient;
+    
+    @org.springframework.beans.factory.annotation.Value("${minio.bucket-name:sciz-files}")
+    private String bucketName;
 
     /**
      * 执行 Dify 工作流或直接调用 Chatbot 流式对话
@@ -69,6 +84,90 @@ public class ChatServiceImpl implements ChatService {
         List<org.springframework.web.multipart.MultipartFile> files = req.getFiles();
         String conversationId = req.getConversationId();
         String user = req.getUser();
+        List<Long> attachmentIds = req.getAttachmentIds();
+        
+        // 1. 如果提供了 attachmentIds，从 MinIO 获取文件并解析（最多处理3个，防止上下文太长）
+        if (attachmentIds != null && !attachmentIds.isEmpty()) {
+            // 限制最多处理3个附件
+            int maxAttachmentCount = 3;
+            List<Long> validAttachmentIds = attachmentIds.stream()
+                    .filter(id -> id != null)
+                    .limit(maxAttachmentCount)
+                    .toList();
+            
+            if (validAttachmentIds.size() < attachmentIds.size()) {
+                log.warn(String.format("附件数量超过限制，仅处理前 %d 个: total=%d, processing=%d", 
+                        maxAttachmentCount, attachmentIds.size(), validAttachmentIds.size()));
+            }
+            
+            log.info(String.format("检测到 attachmentIds，开始处理文件解析: attachmentIds=%s, userId=%s, processing=%d", 
+                    attachmentIds, userId, validAttachmentIds.size()));
+            
+            List<String> parsedTexts = new ArrayList<>();
+            
+            for (int i = 0; i < validAttachmentIds.size(); i++) {
+                Long attachmentId = validAttachmentIds.get(i);
+                try {
+                    // 1.1 查询附件信息
+                    SysAttachment attachment = sysAttachmentRepo.findById(attachmentId);
+                    if (attachment == null) {
+                        log.warn(String.format("附件不存在，跳过: attachmentId=%s", attachmentId));
+                        continue;
+                    }
+                    
+                    // 1.2 从 MinIO 下载文件
+                    GetObjectResponse fileResponse = MinioUtil.download(minioClient, bucketName, attachment.getFilePath());
+                    
+                    // 1.3 读取文件内容并转换为 MultipartFile
+                    byte[] fileBytes;
+                    try (InputStream inputStream = fileResponse) {
+                        fileBytes = inputStream.readAllBytes();
+                    }
+                    MultipartFile multipartFile = new ByteArrayMultipartFile(
+                            attachment.getOriginalName(),
+                            fileBytes,
+                            attachment.getMimeType()
+                    );
+                    
+                    // 1.4 上传文件到 Dify（使用 file key）
+                    String fileResourceId = workflowId != null ? workflowId : "work_file";
+                    FileSyncDifyReq syncReq = new FileSyncDifyReq(multipartFile, fileResourceId, "file");
+                    var syncResp = difyWorkflowService.syncFileToDify(syncReq);
+                    String difyFileId = syncResp.difyFileId();
+                    
+                    log.info(String.format("文件已上传到 Dify: difyFileId=%s, attachmentId=%s, index=%d/%d", 
+                            difyFileId, attachmentId, i + 1, validAttachmentIds.size()));
+                    
+                    // 1.5 调用 Dify 文件解析工作流（使用传入的 workflowId 或默认值）
+                    String parseWorkflowId = workflowId != null ? workflowId : fileResourceId;
+                    String parsedText = executeFileParseWorkflow(difyFileId, userId, parseWorkflowId, "file");
+                    
+                    // 1.6 如果解析结果不为空，添加到列表中
+                    if (StringUtils.hasText(parsedText)) {
+                        parsedTexts.add(parsedText);
+                        log.info(String.format("文件解析成功: attachmentId=%s, index=%d/%d, 解析文本长度=%d 字符", 
+                                attachmentId, i + 1, validAttachmentIds.size(), parsedText.length()));
+                    } else {
+                        log.warn(String.format("文件解析结果为空: attachmentId=%s, difyFileId=%s", attachmentId, difyFileId));
+                    }
+                    
+                } catch (Exception e) {
+                    log.error(String.format("处理 attachmentId 失败: attachmentId=%s, index=%d/%d, err=%s", 
+                            attachmentId, i + 1, validAttachmentIds.size(), e.getMessage()), e);
+                    // 单个附件处理失败不影响其他附件，继续处理下一个
+                }
+            }
+            
+            // 1.7 将所有解析结果拼接到 query 中
+            if (!parsedTexts.isEmpty()) {
+                String allParsedText = String.join("\n\n", parsedTexts);
+                query = query + "\n\n" + allParsedText;
+                log.info(String.format("所有文件解析结果已拼接到 query，文件数量=%d, 总长度=%d 字符", 
+                        parsedTexts.size(), allParsedText.length()));
+            } else {
+                log.warn(String.format("所有附件解析结果均为空: attachmentIds=%s", attachmentIds));
+            }
+        }
 
         boolean hasFiles = files != null && !files.isEmpty() && files.stream().anyMatch(file -> !file.isEmpty());
 
@@ -909,5 +1008,120 @@ public class ChatServiceImpl implements ChatService {
         }
 
         return rerankingModel;
+    }
+
+    /**
+     * 执行文件解析工作流
+     *
+     * @param difyFileId String Dify 文件ID
+     * @param userId     Long 用户ID
+     * @param workflowId String 工作流ID
+     * @param keyType    String 密钥类型（workflow/file）
+     * @return String 解析后的文本内容
+     */
+    private String executeFileParseWorkflow(String difyFileId, Long userId, String workflowId, String keyType) {
+        try {
+            log.info(String.format("开始执行文件解析工作流: difyFileId=%s, workflowId=%s", difyFileId, workflowId));
+            
+            // 1. 构建工作流输入参数（使用文件ID，参考 buildWorkflowInputs 方法的格式）
+            List<String> fileIds = List.of(difyFileId);
+            Map<String, Object> inputs = buildWorkflowInputs(fileIds);
+            
+            // 2. 构建工作流请求
+            DifyWorkflowRequest workflowRequest = new DifyWorkflowRequest();
+            workflowRequest.setUserId(userId);
+            workflowRequest.setResourceId(workflowId);
+            workflowRequest.setKeyType(keyType);
+            workflowRequest.setInputs(inputs);
+            workflowRequest.setResponseMode("blocking");
+            workflowRequest.setUser(String.valueOf(userId));
+            
+            // 3. 执行工作流
+            ResponseEntity<String> workflowResponse = difyApiService.runWorkflowWithDynamicKey(
+                    workflowRequest, userId, workflowId, keyType);
+            
+            if (!workflowResponse.getStatusCode().is2xxSuccessful() || workflowResponse.getBody() == null) {
+                throw new BusinessException(ResultCode.SERVER_ERROR, 
+                        "文件解析工作流执行失败: " + workflowResponse.getBody());
+            }
+            
+            // 4. 解析工作流响应，获取 outputs.text 数据
+            String parsedText = parseWorkflowResponse(workflowResponse.getBody());
+            
+            log.info(String.format("文件解析工作流执行成功: difyFileId=%s, 解析文本长度=%d", 
+                    difyFileId, parsedText != null ? parsedText.length() : 0));
+            
+            return parsedText;
+            
+        } catch (Exception e) {
+            log.error(String.format("执行文件解析工作流失败: difyFileId=%s, workflowId=%s, err=%s", 
+                    difyFileId, workflowId, e.getMessage()), e);
+            throw new BusinessException(ResultCode.SERVER_ERROR, "文件解析工作流执行失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 字节数组 MultipartFile 实现（用于从 MinIO 下载的文件）
+     */
+    private static class ByteArrayMultipartFile implements MultipartFile {
+        private final String fileName;
+        private final byte[] content;
+        private final String contentType;
+
+        public ByteArrayMultipartFile(String fileName, byte[] content, String contentType) {
+            this.fileName = fileName;
+            this.content = content;
+            this.contentType = contentType;
+        }
+
+        @Override
+        public String getName() {
+            return "file";
+        }
+
+        @Override
+        public String getOriginalFilename() {
+            return fileName;
+        }
+
+        @Override
+        public String getContentType() {
+            return contentType;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return content == null || content.length == 0;
+        }
+
+        @Override
+        public long getSize() {
+            return content != null ? content.length : 0;
+        }
+
+        @Override
+        public byte[] getBytes() {
+            return content;
+        }
+
+        @Override
+        public InputStream getInputStream() {
+            return new ByteArrayInputStream(content);
+        }
+
+        @Override
+        public org.springframework.core.io.Resource getResource() {
+            return new org.springframework.core.io.ByteArrayResource(content) {
+                @Override
+                public String getFilename() {
+                    return fileName;
+                }
+            };
+        }
+
+        @Override
+        public void transferTo(java.io.File dest) {
+            throw new UnsupportedOperationException("transferTo not supported");
+        }
     }
 }
