@@ -14,9 +14,14 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
+import io.netty.channel.ChannelOption;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 
 import java.io.*;
 import java.net.URI;
@@ -49,8 +54,19 @@ public class PdfCacheServiceImpl implements PdfCacheService {
 
     /**
      * WebClient 实例（用于异步非阻塞HTTP请求）
+     * 超时配置：
+     * - 连接超时：20秒（如果20秒内无法建立连接，则超时）
+     * - 下载超时：60秒（连接成功后，下载数据的时间限制为60秒）
      */
     private final WebClient webClient = WebClient.builder()
+            .clientConnector(new ReactorClientHttpConnector(
+                    HttpClient.create()
+                            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 20000) // 连接超时20秒（无法连接时）
+                            .doOnConnected(conn -> 
+                                conn.addHandlerLast(new ReadTimeoutHandler(60)) // 读取超时60秒（连接成功后下载时间）
+                                    .addHandlerLast(new WriteTimeoutHandler(20)) // 写入超时20秒
+                            )
+            ))
             .exchangeStrategies(ExchangeStrategies.builder()
                     .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(80 * 1024 * 1024)) // 80MB缓冲区
                     .build())
@@ -313,7 +329,7 @@ public class PdfCacheServiceImpl implements PdfCacheService {
                             "PDF下载失败: HTTP " + response.statusCode().value()));
                 })
                 .bodyToMono(byte[].class)
-                .timeout(Duration.ofSeconds(60))
+                // 超时已通过 HttpClient 配置：连接超时20秒，读取超时60秒
                 .flatMap(fileBytes -> {
                     // 验证文件内容
                     if (fileBytes == null || fileBytes.length == 0) {
