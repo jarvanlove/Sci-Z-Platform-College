@@ -29,9 +29,15 @@
                   v-for="(attachment, index) in attachments"
                   :key="index"
                   class="attachment-item"
+                  :class="{ 'knowledge-file': attachment.type === 'knowledge' }"
                 >
                   <span class="attachment-icon">{{ getFileIcon(attachment.type) }}</span>
-                  <div class="attachment-name">{{ attachment.name }}</div>
+                  <div class="attachment-info">
+                    <div class="attachment-name">{{ attachment.name }}</div>
+                    <div v-if="attachment.type === 'knowledge'" class="attachment-source">
+                      来自：{{ attachment.knowledgeName }}
+                    </div>
+                  </div>
                   <div class="attachment-size">{{ attachment.size }}</div>
                   <div
                     class="attachment-remove"
@@ -337,9 +343,15 @@
                 v-for="(attachment, index) in attachments"
                 :key="index"
                 class="attachment-item"
+                :class="{ 'knowledge-file': attachment.type === 'knowledge' }"
               >
                 <span class="attachment-icon">{{ getFileIcon(attachment.type) }}</span>
-                <div class="attachment-name">{{ attachment.name }}</div>
+                <div class="attachment-info">
+                  <div class="attachment-name">{{ attachment.name }}</div>
+                  <div v-if="attachment.type === 'knowledge'" class="attachment-source">
+                    来自：{{ attachment.knowledgeName }}
+                  </div>
+                </div>
                 <div class="attachment-size">{{ attachment.size }}</div>
                 <div
                   class="attachment-remove"
@@ -422,32 +434,42 @@
               <div class="kb-right-controls">
                 <!-- 附件按钮 -->
                 <el-tooltip
-                  :content="$t('ai.chat.attachmentTitle')"
-                  placement="right"
-                  :offset="10"
+                  placement="top"
+                  effect="light"
+                  :show-after="300"
                   :hide-after="0"
-                  :show-after="200"
-                  :teleported="true"
-                  :popper-options="{
-                    modifiers: [
-                      {
-                        name: 'eventListeners',
-                        options: {
-                          scroll: false,
-                          resize: false
-                        }
-                      }
-                    ]
-                  }"
                 >
-                  <button
-                    class="kb-attachment-btn"
-                    @click="handleAttachmentClick"
+                  <template #content>
+                    <div class="attachment-tooltip-content">
+                      <div class="tooltip-item">• 支持上传个人知识库与本地文件</div>
+                      <div class="tooltip-item">• 文件数量:最多支持10个</div>
+                      <div class="tooltip-item">• 文件类型: 支持pdf、doc、docx、ppt、pptx、xls、xlsx、csv、md, txt</div>
+                      <div class="tooltip-item">• 知识库文件:最多支持3个</div>
+                    </div>
+                  </template>
+                  <el-dropdown
+                    trigger="click"
+                    @command="handleAttachmentCommand"
+                    placement="top-end"
                   >
-                    <svg class="attachment-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M16.5 6v11.5a4.5 4.5 0 0 1-9 0V5a2.5 2.5 0 0 1 5 0v10.5a1.5 1.5 0 0 1-3 0V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </button>
+                    <button
+                      class="kb-attachment-btn"
+                    >
+                      <el-icon><Paperclip /></el-icon>
+                    </button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="local">
+                          <el-icon><Folder /></el-icon>
+                          <span style="margin-left: 8px">本地文件</span>
+                        </el-dropdown-item>
+                        <el-dropdown-item command="knowledge">
+                          <el-icon><Document /></el-icon>
+                          <span style="margin-left: 8px">知识库文件</span>
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
                 </el-tooltip>
 
                 <!-- 隐藏的文件输入 -->
@@ -455,7 +477,7 @@
                   ref="fileInput"
                   type="file"
                   multiple
-                  accept=".pdf,.doc,.docx,.xlsx,.ppt,.pptx,.txt,.md,.jpg,.jpeg,.png"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.md"
                   style="display: none"
                   @change="handleFileUpload"
                 />
@@ -494,6 +516,103 @@
           </button>
         </div>
     </div>
+
+    <!-- 知识库选择对话框 -->
+    <el-dialog
+      v-model="showKnowledgeDialog"
+      title="选择知识库"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <div v-loading="loadingKnowledgeList" class="knowledge-dialog-content">
+        <div v-if="knowledgeListForSelect.length === 0 && !loadingKnowledgeList" class="empty-state">
+          <el-empty description="暂无知识库" />
+        </div>
+        <div v-else class="knowledge-list">
+          <div
+            v-for="kb in knowledgeListForSelect"
+            :key="kb.id"
+            class="knowledge-item"
+            :class="{ selected: selectedKnowledgeForFile?.id === kb.id }"
+            @click="selectKnowledgeForFile(kb)"
+          >
+            <div class="knowledge-icon">📚</div>
+            <div class="knowledge-info">
+              <div class="knowledge-name">{{ kb.name }}</div>
+              <div v-if="kb.description" class="knowledge-desc">{{ kb.description }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showKnowledgeDialog = false">取消</el-button>
+          <el-button
+            type="primary"
+            @click="confirmKnowledgeSelection"
+            :disabled="!selectedKnowledgeForFile"
+          >
+            确定
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 文档选择对话框 -->
+    <el-dialog
+      v-model="showDocumentDialog"
+      title="选择文档"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div v-loading="loadingDocuments" class="document-dialog-content">
+        <div v-if="selectedKnowledgeForFile" class="selected-knowledge-info">
+          <el-icon><Document /></el-icon>
+          <span>知识库：{{ selectedKnowledgeForFile.name }}</span>
+        </div>
+        <div v-if="documentList.length === 0 && !loadingDocuments" class="empty-state">
+          <el-empty description="该知识库暂无文档" />
+        </div>
+        <div v-else class="document-list">
+          <div class="document-limit-hint">
+            <el-icon><InfoFilled /></el-icon>
+            <span>知识库文件最多只能选择3个</span>
+          </div>
+          <el-checkbox-group v-model="selectedDocuments" :max="3">
+            <div
+              v-for="doc in documentList"
+              :key="doc.id"
+              class="document-item"
+            >
+              <el-checkbox :label="doc.id" class="document-checkbox" :disabled="selectedDocuments.length >= 3 && !selectedDocuments.includes(doc.id)">
+                <div class="document-info">
+                  <div class="document-name">{{ doc.fileName || doc.name || '未命名文档' }}</div>
+                  <div v-if="doc.fileSize" class="document-size">{{ formatFileSize(doc.fileSize) }}</div>
+                </div>
+              </el-checkbox>
+            </div>
+          </el-checkbox-group>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <span class="selected-count">
+            已选择 {{ selectedDocuments.length }} 个文档
+            <span v-if="selectedDocuments.length >= 3" class="limit-warning">（已达上限）</span>
+          </span>
+          <div>
+            <el-button @click="showDocumentDialog = false">取消</el-button>
+            <el-button
+              type="primary"
+              @click="confirmDocumentSelection"
+              :disabled="selectedDocuments.length === 0"
+            >
+              确定
+            </el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -519,10 +638,13 @@ import {
   ArrowDown,
   ArrowUp,
   Paperclip,
-  Top
+  Folder,
+  Check,
+  InfoFilled
 } from '@element-plus/icons-vue'
 import {
-  getKnowledgeList
+  getKnowledgeList,
+  getKnowledgeFileRelationList
 } from '@/api/Knowledge/knowledge'
 import {
   streamKnowledgeChatbot
@@ -654,6 +776,16 @@ const kbSearchQuery = ref('')
 // 附件功能
 const attachments = ref([])
 const fileInput = ref(null)
+
+// 知识库文件选择功能
+const showKnowledgeDialog = ref(false)
+const showDocumentDialog = ref(false)
+const knowledgeListForSelect = ref([])
+const loadingKnowledgeList = ref(false)
+const selectedKnowledgeForFile = ref(null)
+const documentList = ref([])
+const loadingDocuments = ref(false)
+const selectedDocuments = ref([])
 
 // 模型选择
 const showModelDropdown = ref(false)
@@ -1590,8 +1722,17 @@ const sendKbMessage = async () => {
   }
 
   // 在清空之前先保存文件列表和知识库列表（用于后续接口调用）
-  const filesToUpload = attachments.value.length > 0 ? attachments.value.map(att => att.file) : null
-  const hasFiles = filesToUpload && filesToUpload.length > 0
+  // 区分本地文件和知识库文件
+  const localFiles = attachments.value
+    .filter(att => att.type !== 'knowledge' && att.file)
+    .map(att => att.file)
+  // 提取知识库文件的 attachmentId（Long 类型）
+  const knowledgeFileAttachmentIds = attachments.value
+    .filter(att => att.type === 'knowledge' && att.attachmentId != null)
+    .map(att => att.attachmentId)
+  
+  const filesToUpload = localFiles.length > 0 ? localFiles : null
+  const hasFiles = (filesToUpload && filesToUpload.length > 0) || knowledgeFileAttachmentIds.length > 0
   const knowledgeBasesToUse = [...selectedKnowledgeBases.value] // 保存知识库列表副本
 
   // 清空输入框和附件（但保留副本用于接口调用）
@@ -1632,7 +1773,8 @@ const sendKbMessage = async () => {
     query: text,
     conversationId: currentConversationId.value || conversationId,
     selectedKbCount: knowledgeBasesToUse.length,
-    filesCount: filesToUpload?.length || 0
+    filesCount: filesToUpload?.length || 0,
+    attachmentIdsCount: knowledgeFileAttachmentIds.length
   })
 
   try {
@@ -1641,7 +1783,8 @@ const sendKbMessage = async () => {
       query: text,
       conversationId: currentConversationId.value || conversationId,
       selectedKbCount: knowledgeBasesToUse.length,
-      filesCount: filesToUpload?.length || 0
+      filesCount: filesToUpload?.length || 0,
+      attachmentIdsCount: knowledgeFileAttachmentIds.length
     })
 
     // 调用新的工作流流式接口
@@ -1659,7 +1802,8 @@ const sendKbMessage = async () => {
       query: text, // 必填：用户问题
       knowledgeId: knowledgeIdToSend || undefined, // 可选：知识库ID（支持单个ID或数组，不传则不使用知识库）
       workflowId: undefined, // 可选：工作流ID（暂时不传，由后端决定）
-      files: filesToUpload || undefined, // 可选：文件列表（不传则不执行工作流）
+      files: filesToUpload || undefined, // 可选：本地文件列表（不传则不执行工作流）
+      attachmentIds: knowledgeFileAttachmentIds.length > 0 ? knowledgeFileAttachmentIds : undefined, // 可选：知识库文件 attachmentId 列表
       conversationId: currentConversationId.value || conversationId || undefined, // 可选：会话ID
       onMessage: (answer) => {
         // 追加回答内容
@@ -2003,36 +2147,242 @@ const copyKbMessage = async (content) => {
   }
 }
 
-// 重试消息
-const retryKbMessage = (msg) => {
+// 重试消息（基于原用户消息重新生成，不重复创建用户消息）
+const retryKbMessage = async (msg) => {
   // 找到对应的用户消息
   const messageIndex = messages.value.findIndex(m => m.id === msg.id)
-  if (messageIndex > 0) {
-    const userMessage = messages.value[messageIndex - 1]
-    if (userMessage && userMessage.type === 'user') {
-      // 移除当前AI回复
-      messages.value.splice(messageIndex, 1)
-      
-      // 同时从持久化存储中移除
-      if (currentChat.value && currentChat.value.messages) {
-        const persistentIndex = currentChat.value.messages.findIndex(m => m.id === msg.id)
-        if (persistentIndex !== -1) {
-          currentChat.value.messages.splice(persistentIndex, 1)
-          saveChatsToStorage()
-        }
-      }
-      
-      // 提取用户原始输入（移除@知识库标记）
-      let userInput = userMessage.content
-      const kbRegex = /@[\w\s]+/g
-      userInput = userInput.replace(kbRegex, '').trim()
-      
-      // 重新发送
-      inputMessage.value = userInput
-      nextTick(() => {
-        sendKbMessage()
-      })
+  if (messageIndex <= 0) {
+    logger.warn('无法找到对应的用户消息', { aiMessageId: msg.id })
+    return
+  }
+  
+  const userMessage = messages.value[messageIndex - 1]
+  if (!userMessage || userMessage.type !== 'user') {
+    logger.warn('前一条消息不是用户消息', { aiMessageId: msg.id, prevMessageType: userMessage?.type })
+    return
+  }
+  
+  // 如果正在生成，不允许重试
+  if (isGenerating.value) {
+    ElMessage.warning('正在生成回答，请稍候...')
+    return
+  }
+  
+  // 移除当前AI回复
+  messages.value.splice(messageIndex, 1)
+  
+  // 同时从持久化存储中移除
+  if (currentChat.value && currentChat.value.messages) {
+    const persistentIndex = currentChat.value.messages.findIndex(m => m.id === msg.id)
+    if (persistentIndex !== -1) {
+      currentChat.value.messages.splice(persistentIndex, 1)
+      saveChatsToStorage()
     }
+  }
+  
+  // 提取用户原始输入（移除@知识库标记）
+  let text = userMessage.content
+  const kbRegex = /@[\w\s]+/g
+  text = text.replace(kbRegex, '').trim()
+  
+  // 从用户消息中提取知识库信息
+  let knowledgeId = null
+  let knowledgeIds = []
+  const kbNames = userMessage.content.match(/@[\w\s]+/g) || []
+  if (kbNames.length > 0) {
+    // 从用户消息内容中提取知识库名称，查找对应的知识库ID
+    for (const kbName of kbNames) {
+      const kbNameClean = kbName.replace('@', '').trim()
+      const kb = knowledgeBaseList.value.find(k => k.name === kbNameClean)
+      if (kb && kb.id) {
+        knowledgeIds.push(kb.id)
+      }
+    }
+    if (knowledgeIds.length > 0) {
+      knowledgeId = knowledgeIds[0] // 兼容旧接口
+    }
+  }
+  
+  // 从用户消息中提取附件信息
+  const userAttachments = userMessage.attachments || []
+  const localFiles = userAttachments
+    .filter(att => att.type !== 'knowledge' && att.file)
+    .map(att => att.file)
+  const knowledgeFileAttachmentIds = userAttachments
+    .filter(att => att.type === 'knowledge' && att.attachmentId != null)
+    .map(att => att.attachmentId)
+  
+  const filesToUpload = localFiles.length > 0 ? localFiles : null
+  const knowledgeIdToSend = knowledgeIds.length > 0 ? knowledgeIds : (knowledgeId ? [knowledgeId] : undefined)
+  
+  // 获取会话ID
+  const conversationId = currentChat.value?.id || currentConversationId.value || userMessage.conversationId
+  
+  // 创建新的AI消息占位
+  const timestamp = Date.now()
+  const random = Math.floor(Math.random() * 10000)
+  const aiMessageId = `${timestamp}-${random}`
+  const aiMessage = {
+    id: aiMessageId,
+    type: 'ai',
+    content: '',
+    timestamp: new Date(),
+    streaming: true,
+    documents: []
+  }
+  
+  messages.value.push(aiMessage)
+  logger.info('重新生成：AI消息占位已添加', { id: aiMessageId })
+  
+  nextTick(() => {
+    scrollKbToBottom()
+  })
+  
+  // 设置生成标志
+  isGenerating.value = true
+  currentAbortController.value = new AbortController()
+  
+  try {
+    logger.info('重新生成：开始流式问答', { 
+      knowledgeId: knowledgeIdToSend || '无知识库',
+      query: text,
+      conversationId: conversationId,
+      filesCount: filesToUpload?.length || 0,
+      attachmentIdsCount: knowledgeFileAttachmentIds.length
+    })
+    
+    // 直接调用流式生成API，不创建新的用户消息
+    const abortController = await runWorkflowStream({
+      query: text,
+      knowledgeId: knowledgeIdToSend || undefined,
+      workflowId: undefined,
+      files: filesToUpload || undefined,
+      attachmentIds: knowledgeFileAttachmentIds.length > 0 ? knowledgeFileAttachmentIds : undefined,
+      conversationId: conversationId || undefined,
+      onMessage: (answer) => {
+        const message = messages.value.find(m => m.id === aiMessageId)
+        if (message) {
+          message.content += answer
+          nextTick(() => {
+            scrollKbToBottom()
+          })
+        }
+      },
+      onEnd: async (data) => {
+        const message = messages.value.find(m => m.id === aiMessageId)
+        if (message) {
+          message.streaming = false
+          if (data.documents && Array.isArray(data.documents) && data.documents.length > 0) {
+            message.documents = data.documents.map(doc => ({
+              id: doc.document_id || doc.documentId || doc.id || doc.segment_id || doc.segmentId,
+              documentId: doc.document_id || doc.documentId || doc.id,
+              name: doc.document_name || doc.name || `文档 ${doc.id || doc.segment_id || ''}`,
+              document_name: doc.document_name || doc.name,
+              datasetName: doc.dataset_name || doc.datasetName,
+              dataset_name: doc.dataset_name || doc.datasetName,
+              content: doc.content || '',
+              score: doc.score || 0,
+              segmentId: doc.segment_id || doc.segmentId,
+              segment_id: doc.segment_id || doc.segmentId
+            }))
+          } else {
+            message.documents = []
+          }
+          message.conversationId = data.conversationId || conversationId
+        }
+        
+        if (data.conversationId) {
+          currentConversationId.value = data.conversationId
+        }
+        
+        // 保存AI消息到后端
+        const finalConversationId = conversationId || data.conversationId
+        if (finalConversationId && message && message.content) {
+          try {
+            const sourcesJson = message.documents && message.documents.length > 0
+              ? JSON.stringify(message.documents.map(doc => ({
+                  document_id: doc.document_id || doc.documentId || doc.id,
+                  document_name: doc.document_name || doc.name,
+                  dataset_name: doc.dataset_name || doc.datasetName,
+                  content: doc.content,
+                  score: doc.score,
+                  segment_id: doc.segment_id || doc.segmentId
+                })))
+              : null
+            
+            const messageResp = await createAiMessage({
+              conversationId: String(finalConversationId),
+              role: 'assistant',
+              content: message.content,
+              difyMessageId: data.messageId || null,
+              sources: sourcesJson,
+              confidence: null
+            })
+            
+            if (messageResp.code === 200 && messageResp.data) {
+              message.id = messageResp.data.id
+              message.timestamp = new Date(messageResp.data.created_time || messageResp.data.createdTime)
+              logger.info('重新生成：保存AI消息成功', { messageId: messageResp.data.id })
+            }
+          } catch (error) {
+            logger.warn('重新生成：保存AI消息到后端失败', error)
+          }
+        }
+        
+        // 保存消息到当前对话
+        if (currentChat.value && currentChat.value.messages) {
+          const messageIndex = currentChat.value.messages.findIndex(m => m.id === aiMessageId)
+          if (messageIndex !== -1) {
+            currentChat.value.messages[messageIndex] = message
+            saveChatsToStorage()
+          }
+        }
+        
+        isGenerating.value = false
+        currentAbortController.value = null
+        
+        nextTick(() => {
+          scrollKbToBottom()
+        })
+        
+        logger.info('重新生成：流式问答完成', { 
+          conversationId: finalConversationId,
+          messageId: data.messageId,
+          documentCount: (data.documents || []).length
+        })
+      },
+      onError: (error) => {
+        isGenerating.value = false
+        currentAbortController.value = null
+        
+        const message = messages.value.find(m => m.id === aiMessageId)
+        if (message) {
+          message.streaming = false
+          if (!message.content) {
+            message.content = t('ai.chat.generateError') || '生成失败，请重试'
+          }
+        }
+        
+        logger.error('重新生成：流式问答失败', error)
+        ElMessage.error(t('ai.chat.generateError') || '生成失败，请重试')
+      }
+    })
+    
+    currentAbortController.value = abortController
+  } catch (error) {
+    isGenerating.value = false
+    currentAbortController.value = null
+    
+    const message = messages.value.find(m => m.id === aiMessageId)
+    if (message) {
+      message.streaming = false
+      if (!message.content) {
+        message.content = t('ai.chat.generateError') || '生成失败，请重试'
+      }
+    }
+    
+    logger.error('重新生成：调用流式接口失败', error)
+    ElMessage.error(t('ai.chat.generateError') || '生成失败，请重试')
   }
 }
 
@@ -2624,9 +2974,150 @@ const selectModel = (model) => {
 }
 
 // 附件相关方法
-const handleAttachmentClick = () => {
-  // 现在支持在有知识库的情况下也上传文件
-  fileInput.value && fileInput.value.click()
+const handleAttachmentCommand = (command) => {
+  if (command === 'local') {
+    // 选择本地文件
+    fileInput.value && fileInput.value.click()
+  } else if (command === 'knowledge') {
+    // 选择知识库文件
+    openKnowledgeDialog()
+  }
+}
+
+// 打开知识库选择对话框
+const openKnowledgeDialog = async () => {
+  showKnowledgeDialog.value = true
+  selectedKnowledgeForFile.value = null
+  
+  // 如果知识库列表为空，加载知识库列表
+  if (knowledgeListForSelect.value.length === 0) {
+    await loadKnowledgeListForSelect()
+  }
+}
+
+// 加载知识库列表（用于文件选择）
+const loadKnowledgeListForSelect = async () => {
+  loadingKnowledgeList.value = true
+  try {
+    const response = await getKnowledgeList({ page: 1, size: 100 })
+    if (response.code === 200 && response.data) {
+      knowledgeListForSelect.value = response.data.records || response.data.list || []
+      logger.info('知识库列表加载成功', knowledgeListForSelect.value.length)
+    }
+  } catch (error) {
+    logger.error('加载知识库列表失败', error)
+    ElMessage.error('加载知识库列表失败')
+    knowledgeListForSelect.value = []
+  } finally {
+    loadingKnowledgeList.value = false
+  }
+}
+
+// 选择知识库
+const selectKnowledgeForFile = (kb) => {
+  selectedKnowledgeForFile.value = kb
+}
+
+// 确认知识库选择，打开文档选择对话框
+const confirmKnowledgeSelection = async () => {
+  if (!selectedKnowledgeForFile.value) {
+    ElMessage.warning('请选择知识库')
+    return
+  }
+  
+  showKnowledgeDialog.value = false
+  showDocumentDialog.value = true
+  selectedDocuments.value = []
+  
+  // 加载该知识库的文档列表
+  await loadDocumentsForKnowledge(selectedKnowledgeForFile.value.id)
+}
+
+// 加载知识库的文档列表
+const loadDocumentsForKnowledge = async (knowledgeId) => {
+  loadingDocuments.value = true
+  try {
+    const response = await getKnowledgeFileRelationList({
+      knowledgeId: knowledgeId,
+      page: 1,
+      size: 1000
+    })
+    if (response.code === 200 && response.data) {
+      documentList.value = response.data.records || response.data.list || []
+      logger.info('文档列表加载成功', { knowledgeId, count: documentList.value.length })
+    }
+  } catch (error) {
+    logger.error('加载文档列表失败', error)
+    ElMessage.error('加载文档列表失败')
+    documentList.value = []
+  } finally {
+    loadingDocuments.value = false
+  }
+}
+
+// 确认文档选择
+const confirmDocumentSelection = () => {
+  if (selectedDocuments.value.length === 0) {
+    ElMessage.warning('请至少选择一个文档')
+    return
+  }
+  
+  // 检查知识库文件数量限制（最多3个）
+  const currentKnowledgeFileCount = attachments.value.filter(att => att.type === 'knowledge').length
+  const newKnowledgeFileCount = selectedDocuments.value.length
+  
+  if (currentKnowledgeFileCount + newKnowledgeFileCount > 3) {
+    ElMessage.warning(`知识库文件最多只能选择3个，当前已有${currentKnowledgeFileCount}个，本次最多只能选择${3 - currentKnowledgeFileCount}个`)
+    return
+  }
+  
+  // 将选中的文档添加到附件列表
+  const selectedDocList = documentList.value.filter(doc => 
+    selectedDocuments.value.includes(doc.id)
+  )
+  
+  let addedCount = 0
+  selectedDocList.forEach(doc => {
+    // 检查是否已添加
+    const exists = attachments.value.some(att => 
+      att.type === 'knowledge' && att.id === doc.id
+    )
+    
+    if (!exists) {
+      // 检查总文件数量限制（包括本地文件和知识库文件）
+      if (attachments.value.length >= 10) {
+        ElMessage.warning('最多只能添加10个文件（包括本地文件和知识库文件）')
+        return
+      }
+      
+      // 再次检查知识库文件数量限制
+      const currentKbCount = attachments.value.filter(att => att.type === 'knowledge').length
+      if (currentKbCount >= 3) {
+        ElMessage.warning('知识库文件最多只能选择3个')
+        return
+      }
+      
+      attachments.value.push({
+        id: doc.id,
+        name: doc.fileName || doc.name || '未命名文档',
+        size: doc.fileSize ? formatFileSize(doc.fileSize) : '未知大小',
+        type: 'knowledge', // 标记为知识库文件
+        knowledgeId: selectedKnowledgeForFile.value.id,
+        knowledgeName: selectedKnowledgeForFile.value.name,
+        attachmentId: doc.attachmentId ? Number(doc.attachmentId) : null, // 使用 attachmentId 字段，转换为数字
+        file: null // 知识库文件没有 File 对象
+      })
+      addedCount++
+    }
+  })
+  
+  showDocumentDialog.value = false
+  selectedDocuments.value = []
+  selectedKnowledgeForFile.value = null
+  
+  if (addedCount > 0) {
+    ElMessage.success(`已添加 ${addedCount} 个文档`)
+  }
 }
 
 const handleFileUpload = (event) => {
@@ -2646,7 +3137,7 @@ const handleFileUpload = (event) => {
     }
     
     // 检查文件类型
-    const allowedTypes = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.csv', '.jpg', '.jpeg', '.png', '.md', '.txt']
+    const allowedTypes = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.csv', '.md', '.txt']
     const fileExtension = '.' + file.name.split('.').pop().toLowerCase()
     if (!allowedTypes.includes(fileExtension)) {
       ElMessage.warning(`文件 ${file.name} 格式不支持`)
@@ -2676,6 +3167,11 @@ const formatFileSize = (bytes) => {
 }
 
 const getFileIcon = (fileType) => {
+  // 知识库文件使用特殊图标
+  if (fileType === 'knowledge') {
+    return '📚'
+  }
+  
   const iconMap = {
     '.pdf': '📕',
     '.doc': '📘',
@@ -2685,9 +3181,6 @@ const getFileIcon = (fileType) => {
     '.xls': '📊',
     '.xlsx': '📊',
     '.csv': '📋',
-    '.jpg': '🖼️',
-    '.jpeg': '🖼️',
-    '.png': '🖼️',
     '.md': '📝',
     '.txt': '📄'
   }
@@ -3244,8 +3737,8 @@ onUnmounted(() => {
 // 登录提示横幅
 .login-prompt-banner {
   padding: 12px 24px;
-  background: #fff7ed;
-  border-bottom: 1px solid #fed7aa;
+  background: var(--warning-light);
+  border-bottom: 1px solid var(--border);
   z-index: 10;
   flex-shrink: 0;
 }
@@ -3261,7 +3754,7 @@ onUnmounted(() => {
 
 .chat-header {
   padding: 16px 24px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -3355,11 +3848,11 @@ onUnmounted(() => {
 }
 
 .kb-messages-container:hover::-webkit-scrollbar-thumb {
-  background: #e5e7eb;
+  background: var(--border);
 }
 
 .kb-messages-container::-webkit-scrollbar-thumb:hover {
-  background: #d1d5db;
+  background: var(--border-hover);
 }
 
 .empty-chat-message {
@@ -3428,7 +3921,7 @@ onUnmounted(() => {
 .kb-message.user .kb-message-content-wrapper {
   background: var(--hover);
   color: var(--text);
-  border-color: #e5e7eb;
+  border-color: var(--border);
   border-radius: 16px 16px 4px 16px;
 }
 
@@ -3490,8 +3983,8 @@ onUnmounted(() => {
   
   &:focus {
     outline: none;
-    border-color: #1e3a8a;
-    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.1);
   }
 }
 
@@ -3504,7 +3997,7 @@ onUnmounted(() => {
 }
 
 .kb-message.user .kb-message-content {
-  color: #111827 !important; // 🔥 修复：输入消息字体颜色更深一点
+  color: var(--text) !important; // 🔥 修复：输入消息字体颜色更深一点
 }
 
 .kb-message-meta {
@@ -3539,13 +4032,13 @@ onUnmounted(() => {
   transition: all 0.2s ease;
 
   &:hover {
-    background: #e5e7eb;
+    background: var(--border);
     color: var(--text);
-    border-color: #d1d5db;
+    border-color: var(--border-hover);
   }
 
   &:active {
-    background: #d1d5db;
+    background: var(--border-hover);
   }
 }
 
@@ -3620,23 +4113,23 @@ onUnmounted(() => {
 }
 
 .kb-edit-btn-confirm {
-  background: #1e3a8a;
-  color: #fff;
-  box-shadow: 0 2px 4px rgba(30, 58, 138, 0.2);
+  background: var(--color-primary);
+  color: var(--surface);
+  box-shadow: 0 2px 4px rgba(var(--color-primary-rgb), 0.2);
 
   &:hover:not(:disabled) {
-    background: #1e40af;
-    box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3);
+    background: var(--color-primary-dark);
+    box-shadow: 0 2px 6px rgba(var(--color-primary-rgb), 0.3);
     transform: translateY(-1px);
   }
   
   &:active:not(:disabled) {
     transform: translateY(0);
-    box-shadow: 0 1px 3px rgba(30, 58, 138, 0.2);
+    box-shadow: 0 1px 3px rgba(var(--color-primary-rgb), 0.2);
   }
 
   &:disabled {
-    background: #d1d5db;
+    background: var(--border-hover);
     color: var(--text-3);
     cursor: not-allowed;
     box-shadow: none;
@@ -3647,7 +4140,7 @@ onUnmounted(() => {
 .kb-message-documents {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
 }
 
 .kb-documents-title {
@@ -3668,7 +4161,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  background: #f9fafb;
+  background: var(--hover-light);
   border-radius: 6px;
   font-size: 12px;
   transition: background 0.2s ease;
@@ -3679,7 +4172,7 @@ onUnmounted(() => {
 }
 
 .kb-document-icon {
-  color: #3b82f6;
+  color: var(--color-primary-lighter);
   font-size: 14px;
   flex-shrink: 0;
 }
@@ -3718,14 +4211,14 @@ onUnmounted(() => {
   gap: 8px;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
 }
 
 .kb-streaming-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: var(--color-primary-lighter);
   animation: kb-streaming-pulse 1.5s ease-in-out infinite;
 }
 
@@ -3765,7 +4258,7 @@ onUnmounted(() => {
   position: relative; // 🔥 修复：添加 position: relative，让知识库下拉框可以正确绝对定位
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
+  background: var(--hover-light);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0;
@@ -3784,7 +4277,7 @@ onUnmounted(() => {
   resize: none;
   outline: none;
   background: transparent;
-  color: #333;
+  color: var(--text);
   overflow-y: hidden;
   font-family: inherit;
   word-wrap: break-word;
@@ -3802,7 +4295,7 @@ onUnmounted(() => {
   gap: 8px;
   margin-bottom: 12px;
   padding: 8px;
-  background: #f8f9fa;
+  background: var(--hover-light);
   border-radius: 8px;
   border: 1px solid var(--border);
 }
@@ -3812,12 +4305,17 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 12px;
   color: var(--text);
   max-width: 200px;
+
+  &.knowledge-file {
+    border-color: var(--color-primary-lighter);
+    background: var(--hover);
+  }
 }
 
 .attachment-icon {
@@ -3825,16 +4323,30 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.attachment-name {
+.attachment-info {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.attachment-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.attachment-source {
+  color: var(--color-primary-lighter);
+  font-size: 10px;
 }
 
 .attachment-size {
   color: var(--text-3);
   font-size: 11px;
+  flex-shrink: 0;
 }
 
 .attachment-remove {
@@ -3850,7 +4362,7 @@ onUnmounted(() => {
 
   &:hover {
     background: var(--hover);
-    color: #dc2626;
+    color: var(--color-error);
   }
 }
 
@@ -3872,7 +4384,7 @@ onUnmounted(() => {
 
 .kb-dropdown-header {
   padding: 12px 16px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border);
   background: var(--surface);
   border-radius: 12px 12px 0 0;
 }
@@ -3904,21 +4416,21 @@ onUnmounted(() => {
   position: relative;
 
   &:hover {
-    background: #e3f2fd;
-    border-color: #bbdefb;
+    background: var(--hover);
+    border-color: var(--border);
   }
 
   &.selected {
-    background: #bbdefb;
-    border-color: #90caf9;
-    box-shadow: 0 2px 4px rgba(30, 58, 138, 0.1);
+    background: var(--hover);
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 4px rgba(var(--color-primary-rgb), 0.1);
   }
 }
 
 .kb-icon {
   width: 24px;
   height: 24px;
-  background: #1e3a8a;
+  background: var(--color-primary);
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -3935,7 +4447,7 @@ onUnmounted(() => {
 }
 
 .kb-selected-mark {
-  color: #3b82f6;
+  color: var(--color-primary-lighter);
   font-weight: bold;
   font-size: 14px;
 }
@@ -3946,7 +4458,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px 12px 16px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
   background: transparent;
 }
 
@@ -3974,8 +4486,8 @@ onUnmounted(() => {
   font-weight: bold;
 
   &:hover {
-    border-color: #d1d5db;
-    background: #f9fafb;
+    border-color: var(--border-hover);
+    background: var(--hover-light);
   }
 }
 
@@ -4000,18 +4512,18 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   position: relative;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border);
 
   &:last-child {
     border-bottom: none;
   }
 
   &:hover {
-    background: #f8f9fa;
+    background: var(--hover-light);
   }
 
   &.active {
-    background: #eef2ff;
+    background: var(--hover);
   }
 }
 
@@ -4033,7 +4545,7 @@ onUnmounted(() => {
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #3b82f6;
+  color: var(--color-primary-lighter);
   font-weight: bold;
   font-size: 14px;
 }
@@ -4050,7 +4562,7 @@ onUnmounted(() => {
   width: 32px;
   height: 32px;
   border: none;
-  background: #f8f9fa;
+  background: var(--hover-light);
   color: var(--text-3);
   border-radius: 6px;
   cursor: pointer;
@@ -4061,17 +4573,17 @@ onUnmounted(() => {
   flex-shrink: 0;
 
   &:hover {
-    background: #f1f3f5;
+    background: var(--hover);
     color: var(--text);
   }
 
   &:active {
-    background: #e9ecef;
+    background: var(--border);
   }
 
   &.disabled {
-    background: #f9fafb;
-    color: #d1d5db;
+    background: var(--hover-light);
+    color: var(--border-hover);
     cursor: not-allowed;
   }
 
@@ -4087,8 +4599,8 @@ onUnmounted(() => {
   width: 32px;
   height: 32px;
   border: none;
-  background: #e5e7eb;
-  color: #fff;
+  background: var(--border);
+  color: var(--surface);
   border-radius: 8px;
   cursor: pointer;
   display: flex;
@@ -4098,11 +4610,11 @@ onUnmounted(() => {
   flex-shrink: 0;
 
   &.active {
-    background: #1e3a8a;
-    color: #fff;
+    background: var(--color-primary);
+    color: var(--surface);
 
     &:hover {
-      background: #1e40af;
+      background: var(--color-primary-dark);
     }
   }
 }
@@ -4112,8 +4624,8 @@ onUnmounted(() => {
   width: 32px;
   height: 32px;
   border: none;
-  background: #1e3a8a;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--surface);
   border-radius: 8px;
   cursor: pointer;
   display: flex;
@@ -4123,7 +4635,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 
   &:hover {
-    background: #1e40af;
+    background: var(--color-primary-dark);
     transform: scale(1.05);
   }
 }
@@ -4159,10 +4671,10 @@ onUnmounted(() => {
   color: var(--text-3);
 
   &:hover {
-    background: #1e3a8a;
-    border-color: #1e3a8a;
-    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
-    color: #fff;
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.3);
+    color: var(--surface);
     transform: translateY(-2px);
   }
 
@@ -4178,6 +4690,200 @@ onUnmounted(() => {
   // 🔥 修复：响应式调整，小屏幕时使用固定右边距
   @media (max-width: 1200px) {
     right: 20px;
+  }
+}
+
+// 知识库选择对话框样式
+.knowledge-dialog-content {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.knowledge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.knowledge-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: var(--color-primary-lighter);
+    background: var(--hover-light);
+  }
+
+  &.selected {
+    border-color: var(--color-primary-lighter);
+    background: var(--hover);
+  }
+}
+
+.knowledge-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.knowledge-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.knowledge-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.knowledge-desc {
+  font-size: 12px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// 文档选择对话框样式
+.document-dialog-content {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.selected-knowledge-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--color-primary-dark);
+  font-weight: 500;
+}
+
+.document-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.document-item {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: var(--color-primary-lighter);
+    background: var(--hover-light);
+  }
+}
+
+.document-checkbox {
+  width: 100%;
+  margin: 0;
+
+  :deep(.el-checkbox__label) {
+    width: 100%;
+    padding-left: 8px;
+  }
+}
+
+.document-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.document-name {
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-size {
+  font-size: 12px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selected-count {
+  font-size: 14px;
+  color: var(--text-3);
+  
+  .limit-warning {
+    color: var(--color-error);
+    font-weight: 500;
+    margin-left: 4px;
+  }
+}
+
+.document-limit-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--warning-light);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--text);
+  
+  .el-icon {
+    color: var(--text-3);
+    font-size: 16px;
+  }
+}
+
+// 覆盖 Element Plus tooltip 样式，设置白色背景
+// 注意：tooltip 会被挂载到 body，需要使用深度选择器
+:deep(.el-tooltip__popper) {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  color: var(--text) !important;
+  
+  .el-tooltip__arrow::before {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+  }
+}
+
+.attachment-tooltip-content {
+  padding: 4px 0;
+  line-height: 1.8;
+  
+  .tooltip-item {
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+    
+    &.tooltip-warning {
+      color: var(--color-error);
+      font-weight: 500;
+    }
   }
 }
 

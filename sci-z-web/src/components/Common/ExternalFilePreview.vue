@@ -68,7 +68,7 @@ const loadTimeout = ref(null)
 const previewUrl = computed(() => {
   if (!props.fileUrl) return ''
   if (useProxy.value) {
-    return `/api/proxy/pdf?url=${encodeURIComponent(props.fileUrl)}`
+  return `/api/proxy/pdf?url=${encodeURIComponent(props.fileUrl)}`
   }
   return props.fileUrl
 })

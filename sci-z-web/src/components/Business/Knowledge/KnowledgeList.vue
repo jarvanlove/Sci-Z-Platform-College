@@ -880,7 +880,14 @@ const createKnowledgeBase = async () => {
     }
   } catch (error) {
     logger.error('创建知识库失败', error)
-    ElMessage.error(t('knowledge.createKbFailedRetry'))
+    // 检查是否是知识库名称重复错误（错误码 6002）
+    const errorCode = error.response?.data?.code || error.code
+    if (errorCode === 6002) {
+      ElMessage.error('已存在该知识库')
+    } else {
+      const errorMessage = error.response?.data?.message || error.message || t('knowledge.createKbFailedRetry')
+      ElMessage.error(errorMessage)
+    }
   }
 }
 

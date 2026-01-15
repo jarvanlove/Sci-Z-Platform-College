@@ -273,6 +273,96 @@ public class DifyApiService {
     }
 
     /**
+     * 查询文档片段详情并拼接所有 content 字段
+     * GET /datasets/{dataset_id}/documents/{document_id}/segments?page=1&limit=100000
+     * 
+     * @param datasetId  数据集ID
+     * @param documentId 文档ID
+     * @param userId     用户ID
+     * @param resourceId 资源ID
+     * @param keyType    密钥类型
+     * @return 拼接后的 content 内容
+     */
+    public ResponseEntity<String> getDocumentSegmentsAndConcatContent(String datasetId, String documentId,
+            Long userId, String resourceId, String keyType) {
+        try {
+            log.info(String.format("查询文档片段详情: datasetId=%s, documentId=%s, userId=%s", datasetId, documentId, userId));
+            
+            // 构建查询参数
+            Map<String, Object> params = new HashMap<>();
+            params.put("page", 1);
+            params.put("limit", 100000);
+            
+            // 调用 Dify API 获取文档片段列表
+            String endpoint = "/datasets/" + datasetId + "/documents/" + documentId + "/segments";
+            ResponseEntity<String> response = difyApiClient.request("GET", endpoint, params, userId, resourceId, keyType);
+            
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.warn(String.format("获取文档片段失败: datasetId=%s, documentId=%s, status=%s", 
+                        datasetId, documentId, response.getStatusCode()));
+                return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
+            }
+            
+            // 解析响应 JSON
+            @SuppressWarnings("unchecked")
+            Map<String, Object> responseMap = objectMapper.readValue(response.getBody(), Map.class);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> dataList = (List<Map<String, Object>>) responseMap.get("data");
+            
+            if (dataList == null || dataList.isEmpty()) {
+                log.info(String.format("文档片段列表为空: datasetId=%s, documentId=%s", datasetId, documentId));
+                // 返回空内容
+                Map<String, Object> result = new HashMap<>();
+                result.put("content", "");
+                result.put("total", 0);
+                return ResponseEntity.ok(objectMapper.writeValueAsString(result));
+            }
+            
+            // 拼接所有 content 字段
+            StringBuilder contentBuilder = new StringBuilder();
+            for (Map<String, Object> segment : dataList) {
+                Object contentObj = segment.get("content");
+                if (contentObj != null) {
+                    String content = contentObj.toString();
+                    if (!content.trim().isEmpty()) {
+                        if (contentBuilder.length() > 0) {
+                            contentBuilder.append("\n\n");
+                        }
+                        contentBuilder.append(content);
+                    }
+                }
+            }
+            
+            // 构建返回结果
+            Map<String, Object> result = new HashMap<>();
+            result.put("content", contentBuilder.toString());
+            result.put("total", dataList.size());
+            result.put("dataset_id", datasetId);
+            result.put("document_id", documentId);
+            
+            log.info(String.format("文档片段内容拼接完成: datasetId=%s, documentId=%s, segmentCount=%d, contentLength=%d", 
+                    datasetId, documentId, dataList.size(), contentBuilder.length()));
+            
+            return ResponseEntity.ok(objectMapper.writeValueAsString(result));
+            
+        } catch (HttpClientErrorException e) {
+            log.error(String.format("Dify API调用失败: datasetId=%s, documentId=%s, err=%s", 
+                    datasetId, documentId, e.getMessage()), e);
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        } catch (JsonProcessingException e) {
+            log.error(String.format("解析文档片段响应失败: datasetId=%s, documentId=%s, err=%s", 
+                    datasetId, documentId, e.getMessage()), e);
+            return ResponseEntity.status(500)
+                    .body("{\"error\": \"解析文档片段响应失败: " + e.getMessage() + "\"}");
+        } catch (Exception e) {
+            log.error(String.format("查询文档片段详情异常: datasetId=%s, documentId=%s, err=%s", 
+                    datasetId, documentId, e.getMessage()), e);
+            return ResponseEntity.status(500)
+                    .body("{\"error\": \"查询文档片段详情异常: " + e.getMessage() + "\"}");
+        }
+    }
+
+    /**
      * 构建默认配置JSON
      * 使用配置文件中的文档处理配置
      */

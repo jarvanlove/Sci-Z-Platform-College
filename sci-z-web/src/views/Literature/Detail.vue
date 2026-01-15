@@ -489,6 +489,7 @@ const pdfFileName = ref('')
 const pdfLoading = ref(false)
 const pdfDownloading = ref(false)
 const cachedPdfBlob = ref(null) // 缓存的PDF Blob
+const isDownloadingPdf = ref(false) // 防止重复下载的标志位
 
 // 加载文献详情（从 sessionStorage）
 const loadLiteratureDetail = () => {
@@ -524,9 +525,9 @@ const loadLiteratureDetail = () => {
       literature.value = JSON.parse(storedData)
       logger.info('加载文献详情成功', { id })
       
-      // 自动下载PDF用于对话
+      // 自动下载PDF用于对话和预览（统一处理）
       if (literature.value?.accessInfo?.pdfLink) {
-        downloadPdfForChat()
+        downloadPdfUnified()
       }
     } catch (e) {
       logger.warn('解析 sessionStorage 数据失败', e)
@@ -542,13 +543,26 @@ const loadLiteratureDetail = () => {
   loading.value = false
 }
 
-// 自动下载PDF用于对话
-const downloadPdfForChat = async () => {
+// 统一的PDF下载方法（用于预览和对话）
+const downloadPdfUnified = async () => {
   if (!literature.value?.accessInfo?.pdfLink) {
     logger.warn('PDF链接不存在，无法下载')
     return false
   }
 
+  // 如果已经有缓存的PDF，直接返回成功
+  if (cachedPdfBlob.value) {
+    logger.info('PDF已缓存，跳过下载')
+    return true
+  }
+
+  // 防止重复下载
+  if (isDownloadingPdf.value) {
+    logger.info('PDF正在下载中，跳过重复请求')
+    return false
+  }
+
+  isDownloadingPdf.value = true
   const pdfUrl = literature.value.accessInfo.pdfLink
   const fileName = `${literature.value.paperInfo?.title || '文献'}.pdf`
 
@@ -592,9 +606,11 @@ const downloadPdfForChat = async () => {
     const file = new File([blob], sanitizeFileName(fileName), { type: 'application/pdf' })
     
     // 缓存PDF Blob用于预览和下载
-    cachedPdfBlob.value = blob
+    const pdfBlob = new Blob([blob], { type: 'application/pdf' })
+    cachedPdfBlob.value = pdfBlob
     pdfFileName.value = file.name
     
+    // 添加到聊天附件
     chatAttachments.value = [{
       name: file.name,
       size: formatFileSize(file.size),
@@ -605,29 +621,33 @@ const downloadPdfForChat = async () => {
     pdfFile.value = file
     hasPdfFile.value = true
     
-    ElMessage.success('PDF文件已加载，可以开始对话')
+    ElMessage.success('PDF文件已加载，可以开始对话或预览')
     logger.info('PDF文件下载成功并添加到聊天附件', { fileName, size: file.size })
     return true
   } catch (error) {
     logger.error('下载PDF文件失败', error)
     ElMessage.warning('PDF文件无法自动下载，您可以手动上传文件进行对话')
     return false
+  } finally {
+    isDownloadingPdf.value = false
   }
 }
 
-// 检查响应是否为需要授权访问的错误
+// 检查响应是否为需要授权访问的错误（包括超时和403）
 const checkRequiresAuth = async (response) => {
-  if (response.status === 403) {
+  // 处理超时（408）和需要授权（403）的情况
+  if (response.status === 403 || response.status === 408) {
     const contentType = response.headers.get('content-type') || ''
     if (contentType.includes('application/json')) {
       try {
         // 使用 clone() 避免消耗原始响应
         const clonedResponse = response.clone()
         const errorData = await clonedResponse.json()
-        if (errorData.requiresAuth === true) {
+        // 检查 requiresAuth 字段或超时状态码
+        if (errorData.requiresAuth === true || response.status === 408) {
           return {
             requiresAuth: true,
-            message: errorData.message || '该PDF需要授权访问，请手动下载后上传'
+            message: errorData.message || '当前连接需要认证，请求超时，请手动下载'
           }
         }
       } catch (e) {
@@ -685,7 +705,7 @@ const handleBack = () => {
   router.back()
 }
 
-// 预览PDF（使用缓存的PDF）
+// 预览PDF（使用缓存的PDF，如果没有则提示用户）
 const handlePreviewPdf = async () => {
   if (!literature.value?.accessInfo?.pdfLink) {
     ElMessage.warning('PDF链接不存在')
@@ -708,91 +728,19 @@ const handlePreviewPdf = async () => {
       return
     }
 
-    // 如果没有缓存，先下载
-    ElMessage.info('正在加载PDF...')
-    const pdfUrl = literature.value.accessInfo.pdfLink
-    const fileName = `${literature.value.paperInfo?.title || '文献'}.pdf`
-    
-    // 先尝试使用代理接口
-    let blob = null
-    let useProxy = true
-    
-    try {
-      const proxyUrl = `/api/proxy/pdf?url=${encodeURIComponent(pdfUrl)}`
-      const response = await fetch(proxyUrl)
-      
-      if (!response.ok) {
-        // 检查是否需要授权访问
-        const authError = await checkRequiresAuth(response)
-        if (authError) {
-          showRequiresAuthMessage(authError.message)
-          pdfLoading.value = false
-          return
-        }
-        // 代理失败，尝试直接使用原始链接
-        logger.warn('代理接口失败，尝试直接使用PDF链接', { status: response.status })
-        useProxy = false
-      } else {
-        blob = await response.blob()
-        // 检查文件大小（至少10KB，放宽限制）
-        if (blob.size < 10 * 1024) {
-          // 文件太小，可能是错误响应，尝试直接使用原始链接
-          logger.warn('代理返回的文件过小，尝试直接使用PDF链接', { size: blob.size })
-          useProxy = false
-        } else {
-          // 检查是否是PDF格式（通过检查blob的前几个字节）
-          const arrayBuffer = await blob.slice(0, 4).arrayBuffer()
-          const uint8Array = new Uint8Array(arrayBuffer)
-          const pdfSignature = [0x25, 0x50, 0x44, 0x46] // %PDF
-          const isPdf = uint8Array.length >= 4 && 
-                        uint8Array[0] === pdfSignature[0] && 
-                        uint8Array[1] === pdfSignature[1] && 
-                        uint8Array[2] === pdfSignature[2] && 
-                        uint8Array[3] === pdfSignature[3]
-
-          if (!isPdf) {
-            // 检查Content-Type
-            const contentType = response.headers.get('content-type') || ''
-            if (!contentType.includes('pdf') && !contentType.includes('octet-stream') && !contentType.includes('binary')) {
-              logger.warn('代理返回的文件可能不是PDF格式，尝试直接使用PDF链接', { contentType, size: blob.size })
-              useProxy = false
-            }
-          }
-        }
-      }
-    } catch (proxyError) {
-      logger.warn('代理接口调用失败，尝试直接使用PDF链接', proxyError)
-      useProxy = false
-    }
-
-    // 如果代理失败或返回的不是PDF，直接使用原始PDF链接
-    if (!useProxy || !blob) {
-      logger.info('使用原始PDF链接进行预览', { pdfUrl })
-      // 直接使用原始PDF链接创建预览URL
-      pdfPreviewUrl.value = pdfUrl
-      pdfFileName.value = sanitizeFileName(fileName)
-      showPdfPreview.value = true
+    // 如果没有缓存，检查是否正在下载
+    if (isDownloadingPdf.value) {
+      ElMessage.info('PDF正在加载中，请稍候...')
       pdfLoading.value = false
-      ElMessage.success('PDF加载成功')
       return
     }
 
-    // 使用代理返回的blob
-    // 缓存PDF Blob（强制设置为PDF类型）
-    const pdfBlob = new Blob([blob], { type: 'application/pdf' })
-    cachedPdfBlob.value = pdfBlob
-    pdfFileName.value = sanitizeFileName(fileName)
-    
-    // 创建blob URL用于预览
-    pdfPreviewUrl.value = URL.createObjectURL(pdfBlob)
-    showPdfPreview.value = true
-    
-    ElMessage.success('PDF加载成功')
-    logger.info('PDF加载成功并创建预览', { fileName, size: blob.size })
+    // 如果没有缓存且没有在下载，提示用户PDF未加载
+    ElMessage.warning('PDF文件尚未加载，无法预览。请等待自动加载完成或手动上传文件。')
+    pdfLoading.value = false
   } catch (error) {
     logger.error('预览PDF失败', error)
     ElMessage.error('预览失败：' + (error.message || '未知错误'))
-  } finally {
     pdfLoading.value = false
   }
 }
@@ -882,48 +830,21 @@ const handleConfirmCollect = async () => {
     
     let pdfFile = null
     
-    // 优先使用缓存的PDF
+    // 优先使用缓存的PDF，如果没有则尝试下载
     if (cachedPdfBlob.value) {
       pdfFile = new File([cachedPdfBlob.value], fileName, { type: 'application/pdf' })
       logger.info('使用缓存的PDF进行收藏')
     } else {
-      // 下载PDF文件
-      try {
-        const proxyUrl = `/api/proxy/pdf?url=${encodeURIComponent(pdfLink)}`
-        const response = await fetch(proxyUrl)
-        
-        if (!response.ok) {
-          // 检查是否需要授权访问
-          const authError = await checkRequiresAuth(response)
-          if (authError) {
-            showRequiresAuthMessage(authError.message)
-            collecting.value = false
-            return
-          }
-          
-          throw new Error(`PDF下载失败: HTTP ${response.status}`)
-        }
-
-        const blob = await response.blob()
-        
-        if (blob.size < 10 * 1024) {
-          throw new Error('PDF文件大小过小，可能不是有效的PDF文件')
-        }
-
-        // 转换为File对象
-        pdfFile = new File([blob], fileName, { type: 'application/pdf' })
-        
-        // 缓存PDF Blob
-        cachedPdfBlob.value = blob
-        pdfFileName.value = fileName
-        
-        logger.info('PDF文件下载成功', { fileName, size: blob.size })
-      } catch (downloadError) {
-        logger.error('下载PDF文件失败', downloadError)
-        ElMessage.error('下载PDF文件失败：' + (downloadError.message || '未知错误'))
+      // 如果没有缓存，尝试下载
+      ElMessage.info('正在下载PDF文件...')
+      const downloadSuccess = await downloadPdfUnified()
+      if (!downloadSuccess || !cachedPdfBlob.value) {
+        ElMessage.error('PDF文件下载失败，无法收藏')
         collecting.value = false
         return
       }
+      pdfFile = new File([cachedPdfBlob.value], fileName, { type: 'application/pdf' })
+      logger.info('PDF文件下载成功，准备收藏', { fileName })
     }
 
     // 调用批量上传接口
@@ -1171,12 +1092,7 @@ const scrollChatToBottom = () => {
   }
 }
 
-// 监听PDF链接变化，自动下载
-watch(() => literature.value?.accessInfo?.pdfLink, (newPdfLink) => {
-  if (newPdfLink && !hasPdfFile.value) {
-    downloadPdfForChat()
-  }
-}, { immediate: false })
+// 监听PDF链接变化，自动下载（已移除，避免重复请求，统一在loadLiteratureDetail中处理）
 
 // 组件卸载时清理blob URL
 onUnmounted(() => {

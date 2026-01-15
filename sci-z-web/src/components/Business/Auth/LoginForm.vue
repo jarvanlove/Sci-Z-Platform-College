@@ -159,8 +159,7 @@ const handleLogin = async () => {
       rememberMe: loginForm.rememberMe
     })
 
-    // 登录成功
-    ElMessage.success(t('auth.loginSuccess'))
+    // 🔥 修复：移除这里的登录成功提示，由父组件统一处理，避免重复提示
     emit('login-success', response.data)
     
   } catch (error) {
