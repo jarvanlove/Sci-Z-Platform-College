@@ -1,186 +1,98 @@
 <!--
 /**
  * @description 登录表单组件
- * 基于原型图设计的登录表单，包含用户名、密码、验证码、记住我等功能
+ * 支持账号密码登录和短信验证码登录两种方式
  */
 -->
 <template>
-  <el-form
-    ref="loginFormRef"
-    :model="loginForm"
-    :rules="loginRules"
-    class="login-form"
-    @submit.prevent="handleLogin"
-  >
-    <!-- 用户名输入 -->
-    <el-form-item prop="username">
-      <el-input
-        v-model="loginForm.username"
-        :placeholder="$t('auth.username')"
-        size="large"
-        prefix-icon="User"
-        clearable
-      />
-    </el-form-item>
-
-    <!-- 密码输入 -->
-    <el-form-item prop="password">
-      <el-input
-        v-model="loginForm.password"
-        type="password"
-        :placeholder="$t('auth.password')"
-        size="large"
-        prefix-icon="Lock"
-        show-password
-        clearable
-      />
-    </el-form-item>
-
-    <!-- 验证码输入（失败3次后显示） -->
-    <el-form-item v-if="showCaptcha" prop="captcha">
-      <div class="captcha-container">
-        <el-input
-          v-model="loginForm.captcha"
-          :placeholder="$t('auth.captcha')"
-          size="large"
-          prefix-icon="Picture"
-          clearable
+  <div class="login-form-wrapper">
+    <!-- 登录方式切换 Tab -->
+    <el-tabs v-model="activeTab" class="login-tabs" @tab-change="handleTabChange">
+      <el-tab-pane :label="$t('auth.smsLogin')" name="sms">
+        <SmsLoginForm
+          ref="smsFormRef"
+          :agreement-checked="props.smsAgreement"
+          @login-success="handleLoginSuccess"
+          @login-attempt="handleSmsLoginAttempt"
         />
-        <div class="captcha-image" @click="refreshCaptcha">
-          <img v-if="captchaUrl" :src="captchaUrl" alt="验证码" />
-          <span v-else>{{ $t('common.loading') }}</span>
-        </div>
-      </div>
-    </el-form-item>
-
-    <!-- 记住我和忘记密码 -->
-    <el-form-item>
-      <div class="form-options">
-        <el-checkbox v-model="loginForm.rememberMe">
-          {{ $t('auth.rememberMe') }}
-        </el-checkbox>
-        <el-button type="text" @click="handleForgotPassword">
-          {{ $t('auth.forgotPassword') }}
-        </el-button>
-      </div>
-    </el-form-item>
-
-    <!-- 登录按钮 -->
-    <el-form-item>
-      <BaseButton
-        type="primary"
-        size="large"
-        :loading="loading"
-        :disabled="!isFormValid"
-        class="login-button"
-        @click="handleLogin"
-      >
-        {{ $t('auth.login') }}
-      </BaseButton>
-    </el-form-item>
-  </el-form>
+      </el-tab-pane>
+      <el-tab-pane :label="$t('auth.passwordLogin')" name="password">
+        <PasswordLoginForm
+          ref="passwordFormRef"
+          @login-success="handleLoginSuccess"
+          @forgot-password="handleForgotPassword"
+        />
+      </el-tab-pane>
+    </el-tabs>
+  </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
-import { BaseButton } from '@/components/Common'
-import { getCaptcha } from '@/api/Auth'
-import { useAuthStore } from '@/store/modules/auth'
-import { getLastUsername } from '@/utils/auth'
-import { createLogger } from '@/utils/simpleLogger'
+import PasswordLoginForm from './PasswordLoginForm.vue'
+import SmsLoginForm from './SmsLoginForm.vue'
 
-// 创建日志器
-const authLogger = createLogger('LoginForm')
+// 定义 props（接收父组件传递的协议状态）
+const props = defineProps({
+  smsAgreement: {
+    type: Boolean,
+    default: false
+  },
+  activeTab: {
+    type: String,
+    default: 'sms'
+  }
+})
 
-// 定义事件
-const emit = defineEmits(['login-success', 'forgot-password'])
+// 定义 emits
+const emit = defineEmits(['update:activeTab', 'login-success', 'forgot-password', 'tab-change', 'sms-login-attempt'])
 
 // 路由和国际化
 const router = useRouter()
 const { t } = useI18n()
-const authStore = useAuthStore()
+
+// Tab 切换（使用 v-model 与父组件同步）
+const activeTab = ref(props.activeTab)
+
+// 监听 props 变化，同步 activeTab
+watch(() => props.activeTab, (newVal) => {
+  activeTab.value = newVal
+})
 
 // 表单引用
-const loginFormRef = ref()
+const passwordFormRef = ref()
+const smsFormRef = ref()
 
-// 加载状态
-const loading = ref(false)
-
-// 验证码相关
-const showCaptcha = ref(false)
-const captchaUrl = ref('')
-const captchaKey = ref('') // 验证码唯一标识，登录时需要传递
-const loginFailCount = ref(0)
-
-// 表单数据
-const loginForm = reactive({
-  username: '',
-  password: '',
-  captcha: '',
-  rememberMe: false
+// 暴露 activeTab 给父组件
+defineExpose({
+  activeTab
 })
 
-// 表单验证规则
-const loginRules = {
-  username: [
-    { required: true, message: t('auth.username'), trigger: 'blur' },
-    { min: 3, max: 20, message: '用户名长度为3-20个字符', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: t('auth.password'), trigger: 'blur' },
-    { min: 3, max: 20, message: '密码长度为3-20个字符', trigger: 'blur' }
-  ],
-  captcha: [
-    { required: true, message: t('auth.captcha'), trigger: 'blur' }
-  ]
+// 处理 Tab 切换
+const handleTabChange = (tabName) => {
+  activeTab.value = tabName
+  // 同步到父组件
+  emit('update:activeTab', tabName)
+  // 切换 Tab 时重置表单
+  if (tabName === 'password' && passwordFormRef.value?.resetForm) {
+    passwordFormRef.value.resetForm()
+  } else if (tabName === 'sms' && smsFormRef.value?.resetForm) {
+    smsFormRef.value.resetForm()
+  }
+  // 通知父组件 Tab 切换
+  emit('tab-change', tabName)
 }
 
-// 表单是否有效
-const isFormValid = computed(() => {
-  return loginForm.username && loginForm.password && (!showCaptcha.value || loginForm.captcha)
-})
+// 处理登录成功
+const handleLoginSuccess = (userData) => {
+  emit('login-success', userData)
+}
 
-// 处理登录
-const handleLogin = async () => {
-  if (!loginFormRef.value) return
-  
-  try {
-    await loginFormRef.value.validate()
-    loading.value = true
-
-    const response = await authStore.login({
-      username: loginForm.username,
-      password: loginForm.password,
-      captcha: loginForm.captcha,
-      captchaKey: captchaKey.value, // 传递验证码唯一标识
-      rememberMe: loginForm.rememberMe
-    })
-
-    // 🔥 修复：移除这里的登录成功提示，由父组件统一处理，避免重复提示
-    emit('login-success', response.data)
-    
-  } catch (error) {
-    // 错误日志已在auth store中记录
-    
-    // 增加失败次数
-    loginFailCount.value++
-    
-    // 失败3次后显示验证码
-    if (loginFailCount.value >= 3) {
-      showCaptcha.value = true
-      await refreshCaptcha()
-    }
-    
-    // 显示错误信息
-    const errorMessage = error.response?.data?.message || t('auth.loginFailed')
-    ElMessage.error(errorMessage)
-    
-  } finally {
-    loading.value = false
-  }
+// 处理短信登录尝试（用于协议校验）
+const handleSmsLoginAttempt = () => {
+  emit('sms-login-attempt')
 }
 
 // 处理忘记密码
@@ -188,110 +100,43 @@ const handleForgotPassword = () => {
   emit('forgot-password')
   router.push('/reset-password')
 }
-
-// 刷新验证码
-const refreshCaptcha = async () => {
-  try {
-    const response = await getCaptcha()
-    // 根据后端 CaptchaResp 定义，使用 captchaImage 和 captchaKey
-    captchaUrl.value = response.data.captchaImage || response.data.captchaUrl // 兼容两种字段名
-    captchaKey.value = response.data.captchaKey || ''
-  } catch (error) {
-    // 验证码获取失败，静默处理
-  }
-}
-
-// 处理键盘事件（Enter 键提交登录）
-const handleKeyDown = (event) => {
-  if (event.key === 'Enter' && isFormValid.value && !loading.value) {
-    handleLogin()
-  }
-}
-
-// 组件挂载时初始化
-onMounted(() => {
-  // 💾 自动填充上次登录的用户名（提升用户体验）
-  const lastUsername = getLastUsername()
-  if (lastUsername) {
-    loginForm.username = lastUsername
-    authLogger.info('已自动填充上次登录的用户名', { username: lastUsername })
-  }
-  
-  const rememberedFlag = localStorage.getItem('auth_remember_me')
-  const defaultRemember = rememberedFlag === null ? true : rememberedFlag === '1'
-  loginForm.rememberMe = authStore.rememberMe ?? defaultRemember
-  authStore.rememberMe = loginForm.rememberMe
-  
-  // 为表单添加键盘事件监听
-  document.addEventListener('keydown', handleKeyDown)
-})
-
-// 组件卸载时清理事件监听
-onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeyDown)
-})
-
-watch(
-  () => loginForm.rememberMe,
-  (value) => {
-    authStore.rememberMe = value
-  }
-)
 </script>
 
 <style lang="scss" scoped>
-.login-form {
+.login-form-wrapper {
   width: 100%;
   
-  .captcha-container {
-    display: flex;
-    gap: var(--gap-sm);
-    
-    .el-input {
-      flex: 1;
+  .login-tabs {
+    :deep(.el-tabs__header) {
+      margin-bottom: 24px;
     }
     
-    .captcha-image {
-      width: 120px;
-      height: 40px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      background: var(--bg);
-      
-      img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        border-radius: var(--radius-sm);
-      }
-      
-      span {
-        font-size: 12px;
-        color: var(--text-3);
-      }
+    :deep(.el-tabs__item) {
+      font-size: 16px;
+      font-weight: 500;
+      padding: 0 20px;
+      color: var(--text-2);
+      transition: color 0.2s ease;
       
       &:hover {
-        border-color: var(--color-primary);
+        color: var(--color-primary);
+      }
+      
+      &.is-active {
+        color: var(--color-primary);
+        font-weight: 600;
       }
     }
-  }
-  
-  .form-options {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-  }
-  
-  .login-button {
-    width: 100%;
-    height: 48px;
-    font-size: 16px;
-    font-weight: 600;
+    
+    :deep(.el-tabs__active-bar) {
+      height: 3px;
+      background-color: var(--color-primary);
+    }
+    
+    // 确保激活的 tab 使用主题色
+    :deep(.el-tabs__item.is-active) {
+      color: var(--color-primary) !important;
+    }
   }
 }
 </style>

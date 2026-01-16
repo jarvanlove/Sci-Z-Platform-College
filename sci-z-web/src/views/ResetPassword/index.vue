@@ -14,7 +14,6 @@
         <div class="logo-section">
           <img src="@/assets/images/logo.svg" alt="Logo" />
           <h1>{{ $t('auth.resetPassword') }}</h1>
-          <p>{{ $t('auth.resetPasswordDesc') }}</p>
         </div>
         
         <!-- 表单区域 -->

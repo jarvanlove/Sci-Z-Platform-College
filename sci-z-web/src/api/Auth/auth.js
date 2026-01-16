@@ -11,16 +11,36 @@ import { LoginRequest, LoginResponse, RegisterRequest, ResetPasswordRequest, Cap
  * 用户登录
  * @param {LoginRequest} data - 登录请求参数
  * @returns {Promise<LoginResponse>}
+ * 
+ * 后端接口：POST /auth/login
+ * 
+ * 入参说明（支持两种登录方式）：
+ * 
+ * 1. 账号密码登录（loginType = "password"，默认）：
+ *    - loginType: String - 登录类型，值为 "password"（可选，默认为 "password"）
+ *    - username: String - 用户名或邮箱（必填）
+ *    - password: String - 密码（必填）
+ *    - rememberMe: Boolean - 记住我（可选，默认 false）
+ *    - captcha: String - 图形验证码（可选，登录失败3次后必填）
+ *    - captchaKey: String - 图形验证码唯一标识（可选，登录失败3次后必填）
+ * 
+ * 2. 短信验证码登录（loginType = "sms"）：
+ *    - loginType: String - 登录类型，值为 "sms"（必填）
+ *    - phone: String - 手机号（必填）
+ *    - smsCode: String - 短信验证码（必填，6位数字）
+ *    - rememberMe: Boolean - 记住我（可选，默认 false）
+ *    - captcha: String - 图形验证码（可选，发送短信失败3次后必填）
+ *    - captchaKey: String - 图形验证码唯一标识（可选，发送短信失败3次后必填）
+ * 
+ * 出参：{ token, tokenType, expiresIn, userInfo, roles, permissions, menus }
+ * 
+ * 说明：
+ * - 采用方案一，登录接口一次性返回所有初始化数据（包括菜单）
+ * - 使用策略模式支持多种登录方式，后续可扩展扫码登录、微信登录等
+ * - 登录失败3次后需要输入图形验证码
+ * - 短信登录需要先调用 sendSmsVerificationCode 接口获取验证码
  */
-
 export const login = (data) => {
-  /**
-   * 登录接口
-   * 后端接口：POST /auth/login
-   * 入参：{ username, password, rememberMe, captcha }
-   * 出参：{ token, tokenType, expiresIn, userInfo, roles, permissions, menus }
-   * 说明：采用方案一，登录接口一次性返回所有初始化数据（包括菜单）
-   */
   return request({
     url: AUTH_API.LOGIN,
     method: HTTP_METHODS.POST,

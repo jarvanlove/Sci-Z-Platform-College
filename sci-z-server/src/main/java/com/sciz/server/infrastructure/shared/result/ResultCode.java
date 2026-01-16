@@ -451,6 +451,16 @@ public enum ResultCode {
     SMS_PROVIDER_NOT_CONFIGURED(9014, "短信服务商未配置"),
 
     /**
+     * 短信验证码错误
+     */
+    SMS_CODE_INVALID(9015, "短信验证码错误"),
+
+    /**
+     * 短信验证码已过期
+     */
+    SMS_CODE_EXPIRED(9016, "短信验证码已过期"),
+
+    /**
      * 邮箱验证码发送成功
      */
     EMAIL_CODE_SEND_SUCCESS(9100, "验证码发送成功"),

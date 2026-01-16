@@ -497,11 +497,13 @@ router.beforeEach(async (to, from, next) => {
     }
   }
   
-  // 🔥 修改：未登录用户访问注册/重置密码页面，也重定向到AI对话页面
-  if ((to.path === '/register' || to.path === '/reset-password') && !authStore.isLoggedIn) {
-    routerLogger.info('未登录用户访问认证页面，重定向到AI对话页面', { targetPath: to.path })
-    return next('/ai/chat')
-  }
+  // 🔥 修改：未登录用户访问注册/重置密码页面，允许访问（会以弹窗形式显示）
+  // 如果需要弹窗形式，可以在对应的页面组件中处理
+  // 暂时允许直接访问这些页面
+  // if ((to.path === '/register' || to.path === '/reset-password') && !authStore.isLoggedIn) {
+  //   routerLogger.info('未登录用户访问认证页面，重定向到AI对话页面', { targetPath: to.path })
+  //   return next('/ai/chat')
+  // }
 
   next()
 })

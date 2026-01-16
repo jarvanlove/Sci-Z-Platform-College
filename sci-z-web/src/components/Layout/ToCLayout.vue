@@ -48,7 +48,13 @@ const showTopRightLogin = computed(() => {
 
 // 显示登录弹窗
 const goToLogin = () => {
-  openLoginModal()
+  // 更新路由并打开登录弹窗
+  router.push('/login').then(() => {
+    openLoginModal()
+  }).catch(() => {
+    // 如果路由已经是 /login，直接打开弹窗
+    openLoginModal()
+  })
 }
 
 // 提供侧边栏引用给子组件（如果需要）

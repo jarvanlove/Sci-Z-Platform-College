@@ -48,8 +48,11 @@ service.interceptors.response.use(
     
     // 统一处理业务错误
     if (data.code && data.code !== 200) {
+      const error = new Error(data.message || '请求失败')
+      // 🔥 标记：表示错误信息已经在拦截器中显示，组件中不需要再次显示
+      error._messageShown = true
       ElMessage.error(data.message || '请求失败')
-      return Promise.reject(new Error(data.message || '请求失败'))
+      return Promise.reject(error)
     }
     
     return data
@@ -84,6 +87,7 @@ service.interceptors.response.use(
         // 开发环境下静默处理，不弹出错误提示
       } else {
         // 生产环境仍然提示
+        error._messageShown = true // 标记已显示
         if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
           ElMessage.error('请求超时，请稍后重试或联系管理员')
         } else {
@@ -104,6 +108,19 @@ service.interceptors.response.use(
     if (error.response) {
       const { status, data } = error.response
       
+      // 🔥 如果错误信息已经在响应拦截器中显示过（业务错误），不再重复显示
+      if (error._messageShown) {
+        return Promise.reject(error)
+      }
+      
+      // 🔥 优先使用后端返回的错误信息（如果有的话），其次才使用状态码对应的默认信息
+      let errorMessage = null
+      
+      // 检查响应体中是否有错误信息（后端返回的 Result 格式：{ code, message, data }）
+      if (data && (data.message || data.error)) {
+        errorMessage = data.message || data.error
+      }
+      
       switch (status) {
         case 401:
           const authStore = useAuthStore()
@@ -113,29 +130,55 @@ service.interceptors.response.use(
             return Promise.reject(error)
           }
           
+          // 🔥 修复：对于公开页面（如 /ai/chat），如果用户未登录，401 错误应该静默处理
+          const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
+          const publicPages = ['/ai/chat', '/literature/search', '/login', '/register', '/reset-password']
+          const isPublicPage = publicPages.includes(currentPath)
+          
+          if (isPublicPage && !authStore.isLoggedIn) {
+            // 在公开页面且用户未登录时，401 错误是正常的（可能是退出登录后的残留请求），静默处理
+            error._messageShown = true // 标记已显示（虽然不显示，但标记避免重复处理）
+            return Promise.reject(error)
+          }
+          
           // 避免重复调用 logout
-          ElMessage.error('登录已过期，请重新登录')
+          error._messageShown = true // 标记已显示
+          ElMessage.error(errorMessage || '登录已过期，请重新登录')
           authStore.isLoggingOut = true
           authStore.logout().finally(() => {
             authStore.isLoggingOut = false
           })
           break
         case 403:
-          ElMessage.error('没有权限访问该资源')
+          error._messageShown = true // 标记已显示
+          ElMessage.error(errorMessage || '没有权限访问该资源')
           break
         case 404:
-          ElMessage.error('请求的资源不存在')
+          error._messageShown = true // 标记已显示
+          ElMessage.error(errorMessage || '请求的资源不存在')
           break
         case 500:
-          ElMessage.error('服务器内部错误')
+          error._messageShown = true // 标记已显示
+          // 🔥 优先显示后端返回的错误信息（如"用户名不存在"），如果没有才显示默认信息
+          ElMessage.error(errorMessage || '服务器内部错误')
           break
         default:
-          ElMessage.error(data?.message || '请求失败')
+          error._messageShown = true // 标记已显示
+          // 🔥 优先显示后端返回的错误信息
+          ElMessage.error(errorMessage || '请求失败')
       }
     } else {
+      // 🔥 如果错误信息已经显示过，不再重复显示
+      if (error._messageShown) {
+        return Promise.reject(error)
+      }
+      
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        error._messageShown = true // 标记已显示
         ElMessage.error('请求超时，请稍后重试或联系管理员')
-      } else {
+      } else if (!isNetworkError) {
+        // 网络错误已经在上面处理过了，这里只处理其他未标记的错误
+        error._messageShown = true // 标记已显示
         ElMessage.error('网络错误，请检查网络连接')
       }
     }

@@ -84,7 +84,7 @@ public class AuthController {
         return Result.success(resp, ResultCode.USER_REGISTER_SUCCESS.getMessage());
     }
 
-    @Operation(summary = "重置密码", description = "校验图形验证码、邮箱验证码并重置密码")
+    @Operation(summary = "重置密码", description = "支持手机号和邮箱两种方式重置密码，校验对应验证码并重置密码")
     @PostMapping("/reset-password")
     public Result<Void> resetPassword(@RequestBody @Valid ResetPasswordReq request) {
         authService.resetPassword(request);

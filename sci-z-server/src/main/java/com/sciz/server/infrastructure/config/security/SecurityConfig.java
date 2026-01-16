@@ -33,6 +33,7 @@ public class SecurityConfig {
                .addExclude("/api/auth/register") // 注册
                .addExclude("/api/auth/reset-password") // 重置密码
                .addExclude("/api/auth/captcha") // 获取验证码
+               .addExclude("/api/auth/sms-code") // 发送短信验证码
                .addExclude("/api/auth/department/label") // 获取行业部门标签
                .addExclude("/api/auth/email-code") // 发送重置密码邮箱验证码
                // 静态资源和文档

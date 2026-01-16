@@ -15,28 +15,47 @@
       </template>
     </router-view>
     
-    <!-- 全局登录弹窗 -->
+    <!-- 全局认证弹窗 -->
     <LoginModal v-model="showLoginModal" />
+    <RegisterModal v-model="showRegisterModal" />
+    <ResetPasswordModal v-model="showResetPasswordModal" />
   </div>
 </template>
 
 <script setup>
 import { watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/modules/auth'
 import MainLayout from '@/components/Layout/MainLayout.vue'
 import ToCLayout from '@/components/Layout/ToCLayout.vue'
-import { LoginModal } from '@/components/Business/Auth'
-import { useLoginModal } from '@/composables/useLoginModal'
+import { LoginModal, RegisterModal, ResetPasswordModal } from '@/components/Business/Auth'
+import { useAuthModal } from '@/composables/useAuthModal'
 
+const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
-const { showLoginModal } = useLoginModal()
+const { showLoginModal, showRegisterModal, showResetPasswordModal, closeAllModals, openLoginModal, openRegisterModal, openResetPasswordModal } = useAuthModal()
 
-// 监听登录状态，如果已登录则关闭弹窗
+// 监听登录状态，如果已登录则关闭所有弹窗
 watch(() => authStore.isLoggedIn, (isLoggedIn) => {
   if (isLoggedIn) {
-    showLoginModal.value = false
+    closeAllModals()
   }
 })
+
+// 监听路由变化，当路由变化到 /login、/register 或 /reset-password 时，打开对应的弹窗
+watch(() => route.path, (newPath) => {
+  if (newPath === '/login') {
+    // 如果路由是 /login，打开登录弹窗
+    openLoginModal()
+  } else if (newPath === '/register') {
+    // 如果路由是 /register，打开注册弹窗
+    openRegisterModal()
+  } else if (newPath === '/reset-password') {
+    // 如果路由是 /reset-password，打开重置密码弹窗
+    openResetPasswordModal()
+  }
+}, { immediate: true })
 
 // 获取路由应该使用的布局
 const getLayout = (route) => {

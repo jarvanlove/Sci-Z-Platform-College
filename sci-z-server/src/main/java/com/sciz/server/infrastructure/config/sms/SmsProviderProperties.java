@@ -11,7 +11,7 @@ import org.springframework.util.StringUtils;
  * @date 2025-11-11 21:45
  */
 @ConfigurationProperties(prefix = "sms")
-public record SmsProviderProperties(AliyunConfig aliyun, TwilioConfig twilio) {
+public record SmsProviderProperties(AliyunConfig aliyun) {
 
     public record AliyunConfig(
             boolean enabled,
@@ -33,25 +33,6 @@ public record SmsProviderProperties(AliyunConfig aliyun, TwilioConfig twilio) {
 
         public String templateParamNameOrDefault() {
             return StringUtils.hasText(templateParamName) ? templateParamName : "code";
-        }
-    }
-
-    public record TwilioConfig(
-            boolean enabled,
-            String accountSid,
-            String authToken,
-            String fromNumber,
-            String apiUrl) {
-
-        public boolean isValid() {
-            return enabled
-                    && StringUtils.hasText(accountSid)
-                    && StringUtils.hasText(authToken)
-                    && StringUtils.hasText(fromNumber);
-        }
-
-        public String resolvedApiUrl() {
-            return StringUtils.hasText(apiUrl) ? apiUrl : "https://api.twilio.com/2010-04-01";
         }
     }
 }

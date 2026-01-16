@@ -1,25 +1,19 @@
-import { ref } from 'vue'
-
-// 全局登录弹窗状态
-const showLoginModal = ref(false)
+import { useAuthModal } from './useAuthModal'
 
 /**
- * 登录弹窗管理 composable
- * 提供显示/隐藏登录弹窗的方法
+ * 登录弹窗管理 composable（向后兼容）
+ * 实际使用 useAuthModal，保持 API 兼容性
  */
 export function useLoginModal() {
-  const openLoginModal = () => {
-    showLoginModal.value = true
-  }
-
-  const closeLoginModal = () => {
-    showLoginModal.value = false
-  }
-
+  const { showLoginModal, openLoginModal, closeLoginModal } = useAuthModal()
+  
   return {
     showLoginModal,
     openLoginModal,
     closeLoginModal
   }
 }
+
+// 重新导出 useAuthModal，方便新代码使用
+export { useAuthModal }
 

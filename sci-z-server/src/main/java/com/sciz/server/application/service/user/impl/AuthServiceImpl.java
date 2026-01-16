@@ -5,6 +5,7 @@ import cn.dev33.satoken.stp.SaTokenInfo;
 import cn.dev33.satoken.stp.StpUtil;
 import com.sciz.server.application.service.user.AuthService;
 import com.sciz.server.application.service.user.PermissionService;
+import com.sciz.server.application.service.user.strategy.LoginStrategyFactory;
 import com.sciz.server.domain.pojo.dto.request.user.EmailCodeSendReq;
 import com.sciz.server.domain.pojo.dto.request.user.LoginReq;
 import com.sciz.server.domain.pojo.dto.request.user.PhoneCodeSendReq;
@@ -44,6 +45,7 @@ import com.sciz.server.infrastructure.shared.constant.SystemConstant;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import com.sciz.server.infrastructure.shared.enums.EnableStatus;
 import com.sciz.server.infrastructure.shared.enums.LoginStatus;
+import com.sciz.server.infrastructure.shared.enums.LoginTypeStatus;
 import com.sciz.server.infrastructure.shared.enums.UserStatus;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
 import com.sciz.server.infrastructure.shared.event.user.UserEmailVerificationEvent;
@@ -98,6 +100,7 @@ public class AuthServiceImpl implements AuthService {
     private final AuthConverter authConverter;
     private final SmsService smsService;
     private final FileService fileService;
+    private final LoginStrategyFactory loginStrategyFactory;
 
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Shanghai");
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -115,7 +118,8 @@ public class AuthServiceImpl implements AuthService {
             SysUserProfileRepo sysUserProfileRepo,
             AuthConverter authConverter,
             SmsService smsService,
-            FileService fileService) {
+            FileService fileService,
+            LoginStrategyFactory loginStrategyFactory) {
         this.sysUserRepo = sysUserRepo;
         this.stringRedisTemplate = stringRedisTemplate;
         this.eventPublisher = eventPublisher;
@@ -129,48 +133,69 @@ public class AuthServiceImpl implements AuthService {
         this.authConverter = authConverter;
         this.smsService = smsService;
         this.fileService = fileService;
+        this.loginStrategyFactory = loginStrategyFactory;
     }
 
     /**
-     * 用户登录（验证码校验 → 账号锁定校验 → 用户有效性校验 → 密码校验 → 清理失败计数 → Sa-Token 登录 → 写入登录用户上下文 →
-     * 组装返回 → 发布事件）
+     * 用户登录（使用策略模式支持多种登录方式）
+     * 流程：获取登录策略 → 参数校验 → 验证码校验（如需要） → 账号锁定校验 → 查找用户 → 用户有效性校验 →
+     * 凭证校验 → 清理失败计数 → Sa-Token 登录 → 写入登录用户上下文 → 组装返回 → 发布事件
      *
-     * @param loginReq LoginReq 登录请求（包含用户名、密码、验证码等）
+     * @param loginReq LoginReq 登录请求（包含登录类型、用户名/手机号、密码/验证码等）
      * @param request  HttpServletRequest 请求对象（用于获取客户端信息）
      * @return LoginResp 登录返回（包含 token、用户信息、角色/权限/菜单）
      */
     @Override
     public LoginResp login(LoginReq loginReq, HttpServletRequest request) {
-        var username = loginReq.getUsername();
-        var rawPassword = loginReq.getPassword();
+        var loginType = loginReq.getLoginType();
         var rememberMe = loginReq.getRememberMe();
         var captcha = loginReq.getCaptcha();
         var captchaKey = loginReq.getCaptchaKey();
 
-        // 1. 参数校验
-        validateLoginParams(username, rawPassword);
+        // 1. 获取登录策略
+        var strategy = loginStrategyFactory.getStrategy(loginType);
+        log.info(String.format("login start, loginType=%s", loginType));
 
-        // 2. 验证码校验（登录失败次数 >= 3 次时需要验证码）
-        validateCaptchaIfRequired(username, captcha, captchaKey);
+        // 2. 策略参数校验（不同登录方式校验不同参数）
+        strategy.validateParams(loginReq);
 
-        // 3. 账号锁定校验
-        checkAccountLock(username);
+        // 3. 验证码校验（登录失败次数 >= 3 次时需要图形验证码）
+        var failCountKey = strategy.getFailCountKey(loginReq);
+        validateCaptchaIfRequired(failCountKey, captcha, captchaKey);
 
-        // 4. 用户有效性校验
-        log.info(String.format("login start, username=%s", username));
-        var user = sysUserRepo.findByUsername(username);
-        validateUser(user, username);
+        // 4. 账号锁定校验
+        checkAccountLock(failCountKey);
 
-        // 5. 密码校验
-        validatePassword(rawPassword, user.getPassword(), username);
+        // 5. 查找用户（不同登录方式通过不同字段查找）
+        var user = strategy.findUser(loginReq);
+        
+        // 5.1. 短信登录时，如果用户不存在，自动创建用户（验证码登录即注册）
+        if (user == null && LoginTypeStatus.SMS.getCode().equals(loginType)) {
+            var phone = normalizePhone(loginReq.getPhone());
+            log.info(String.format("短信登录用户不存在，开始自动注册: phone=%s", phone));
+            user = autoRegisterUserByPhone(phone);
+            log.info(String.format("自动注册成功: userId=%s, username=%s, phone=%s", 
+                    user.getId(), user.getUsername(), phone));
+        }
+        
+        if (user == null) {
+            log.warn(String.format("用户不存在: loginType=%s", loginType));
+            throw BusinessException.of(ResultCode.USER_NOT_FOUND, "用户不存在");
+        }
+        
+        var username = user.getUsername();
+        validateUser(user, failCountKey);
 
-        // 6. 清理失败计数和验证码
-        clearLoginFailCount(username);
+        // 6. 凭证校验（不同登录方式校验不同凭证：密码/短信验证码等）
+        strategy.validateCredential(loginReq, user);
 
-        // 7. Sa-Token 登录
+        // 7. 清理失败计数和验证码
+        clearLoginFailCount(failCountKey);
+
+        // 8. Sa-Token 登录
         var tokenInfo = performSaTokenLogin(user.getId(), rememberMe);
 
-        // 8. 写入登录用户上下文（使用 Sa-Token Session 机制）
+        // 9. 写入登录用户上下文（使用 Sa-Token Session 机制）
         var industryType = industryConfigCache.get().getType();
         cacheLoginUserContext(user, industryType);
 
@@ -180,25 +205,20 @@ public class AuthServiceImpl implements AuthService {
         // 11. 发布登录日志事件
         publishLoginLogEvent(user, request);
 
-        log.info(String.format("login success, userId=%s, username=%s", user.getId(), user.getUsername()));
+        log.info(String.format("login success, loginType=%s, userId=%s, username=%s", loginType, user.getId(), username));
         return loginResp;
     }
 
-    /**
-     * 参数校验
-     */
-    private void validateLoginParams(String username, String rawPassword) {
-        if (!StringUtils.hasText(username) || !StringUtils.hasText(rawPassword)) {
-            log.warn(String.format("login bad request, username=%s", username));
-            throw BusinessException.of(ResultCode.BAD_REQUEST);
-        }
-    }
 
     /**
      * 验证码校验（如果前端提供了验证码）
      * 前端在失败次数 >= 3 次时会主动获取验证码并提交
+     *
+     * @param failCountKey String 失败计数标识（用户名或手机号）
+     * @param captcha      String 图形验证码
+     * @param captchaKey   String 图形验证码唯一标识
      */
-    private void validateCaptchaIfRequired(String username, String captcha, String captchaKey) {
+    private void validateCaptchaIfRequired(String failCountKey, String captcha, String captchaKey) {
         // 如果前端没有提供验证码，跳过验证
         if (!StringUtils.hasText(captcha) && !StringUtils.hasText(captchaKey)) {
             return;
@@ -206,8 +226,8 @@ public class AuthServiceImpl implements AuthService {
 
         // 前端提供了验证码，但不完整
         if (!StringUtils.hasText(captcha) || !StringUtils.hasText(captchaKey)) {
-            log.warn(String.format("验证码参数不完整, username=%s, hasCaptcha=%s, hasCaptchaKey=%s",
-                    username, StringUtils.hasText(captcha), StringUtils.hasText(captchaKey)));
+            log.warn(String.format("验证码参数不完整, failCountKey=%s, hasCaptcha=%s, hasCaptchaKey=%s",
+                    failCountKey, StringUtils.hasText(captcha), StringUtils.hasText(captchaKey)));
             throw BusinessException.of(ResultCode.CAPTCHA_REQUIRED);
         }
 
@@ -215,7 +235,7 @@ public class AuthServiceImpl implements AuthService {
         var cacheKey = String.format(CacheConstant.CAPTCHA_KEY_PREFIX, captchaKey);
         var cachedCaptcha = Optional.ofNullable(RedisUtil.get(stringRedisTemplate, cacheKey))
                 .orElseThrow(() -> {
-                    log.warn(String.format("验证码已过期, username=%s, captchaKey=%s", username, captchaKey));
+                    log.warn(String.format("验证码已过期, failCountKey=%s, captchaKey=%s", failCountKey, captchaKey));
                     return BusinessException.of(ResultCode.CAPTCHA_EXPIRED);
                 });
 
@@ -224,13 +244,13 @@ public class AuthServiceImpl implements AuthService {
         var normalizedCachedCaptcha = cachedCaptcha.trim().toUpperCase(Locale.ROOT);
 
         if (!CaptchaUtil.verify(normalizedUserCaptcha, normalizedCachedCaptcha)) {
-            log.warn(String.format("验证码错误, username=%s, input=%s", username, captcha));
+            log.warn(String.format("验证码错误, failCountKey=%s, input=%s", failCountKey, captcha));
             throw BusinessException.of(ResultCode.CAPTCHA_INVALID);
         }
 
         // 验证码校验成功，删除已使用的验证码
         RedisUtil.delete(stringRedisTemplate, cacheKey);
-        log.debug(String.format("验证码校验成功: username=%s", username));
+        log.debug(String.format("验证码校验成功: failCountKey=%s", failCountKey));
     }
 
     /**
@@ -268,23 +288,37 @@ public class AuthServiceImpl implements AuthService {
      */
     /**
      * 校验账号唯一性
+     * 用户名始终校验，邮箱和手机号根据是否提供进行校验
+     *
+     * @param username String 用户名（必填）
+     * @param email    String 邮箱（可选）
+     * @param phone    String 手机号（可选）
      */
     private void ensureAccountUniqueness(String username, String email, String phone) {
+        // 用户名始终校验唯一性
         Optional.ofNullable(sysUserRepo.findByUsername(username))
                 .ifPresent(existing -> {
                     log.warn(String.format("register username exists, username=%s", username));
                     throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "用户名已存在");
                 });
-        Optional.ofNullable(sysUserRepo.findByEmail(email))
-                .ifPresent(existing -> {
-                    log.warn(String.format("register email exists, email=%s", email));
-                    throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "邮箱已被注册");
-                });
-        Optional.ofNullable(sysUserRepo.findByPhone(phone))
-                .ifPresent(existing -> {
-                    log.warn(String.format("register phone exists, phone=%s", phone));
-                    throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "手机号已被注册");
-                });
+        
+        // 如果提供了邮箱，校验邮箱唯一性
+        if (StringUtils.hasText(email)) {
+            Optional.ofNullable(sysUserRepo.findByEmail(email))
+                    .ifPresent(existing -> {
+                        log.warn(String.format("register email exists, email=%s", email));
+                        throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "邮箱已被注册");
+                    });
+        }
+        
+        // 如果提供了手机号，校验手机号唯一性
+        if (StringUtils.hasText(phone)) {
+            Optional.ofNullable(sysUserRepo.findByPhone(phone))
+                    .ifPresent(existing -> {
+                        log.warn(String.format("register phone exists, phone=%s", phone));
+                        throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "手机号已被注册");
+                    });
+        }
     }
 
     /**
@@ -340,72 +374,160 @@ public class AuthServiceImpl implements AuthService {
 
     /**
      * 为新注册用户绑定默认角色
+     * 优先使用 normal_users，如果不存在则回退到 user（向后兼容）
      *
      * @param userId       Long 用户ID
      * @param industryType String 行业类型
      */
     private void assignDefaultRole(Long userId, String industryType) {
-        Optional.ofNullable(sysRoleRepo.findByCode(SystemConstant.DEFAULT_USER_ROLE_CODE, industryType))
-                .ifPresentOrElse(defaultRole -> {
+        // 优先查找 normal_users 角色
+        var defaultRole = Optional.ofNullable(sysRoleRepo.findByCode(SystemConstant.DEFAULT_USER_ROLE_CODE, industryType))
+                .orElseGet(() -> {
+                    // 如果 normal_users 不存在，回退到 user（向后兼容）
+                    log.info(String.format("默认角色 normal_users 不存在，尝试使用备用角色 user: industryType=%s", industryType));
+                    return sysRoleRepo.findByCode(SystemConstant.FALLBACK_USER_ROLE_CODE, industryType);
+                });
+        
+        Optional.ofNullable(defaultRole)
+                .ifPresentOrElse(role -> {
                     var now = LocalDateTime.now();
                     var userRole = new SysUserRole();
                     userRole.setUserId(userId);
-                    userRole.setRoleId(defaultRole.getId());
+                    userRole.setRoleId(role.getId());
                     userRole.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
                     userRole.setCreatedTime(now);
                     userRole.setUpdatedTime(now);
                     Optional.ofNullable(sysUserRoleRepo.save(userRole))
-                            .ifPresentOrElse(id -> permissionService.refreshUserAuthCache(userId, industryType),
-                                    () -> log.error(String.format("绑定默认角色失败: userId=%s, roleId=%s", userId,
-                                            defaultRole.getId())));
-                }, () -> log.warn(String.format("默认角色不存在: code=%s, industryType=%s",
-                        SystemConstant.DEFAULT_USER_ROLE_CODE, industryType)));
+                            .ifPresentOrElse(id -> {
+                                log.info(String.format("绑定默认角色成功: userId=%s, roleId=%s, roleCode=%s", 
+                                        userId, role.getId(), role.getRoleCode()));
+                                permissionService.refreshUserAuthCache(userId, industryType);
+                            }, () -> log.error(String.format("绑定默认角色失败: userId=%s, roleId=%s", userId,
+                                    role.getId())));
+                }, () -> log.warn(String.format("默认角色不存在: 已尝试 normal_users 和 user, industryType=%s", industryType)));
+    }
+
+    /**
+     * 验证码登录即注册：自动创建用户
+     * 用户名=手机号，真实姓名=用户_手机号，密码=随机生成，部门ID=31
+     *
+     * @param phone String 手机号（已规格化）
+     * @return SysUser 创建的用户实体
+     */
+    @Transactional(rollbackFor = Exception.class)
+    private SysUser autoRegisterUserByPhone(String phone) {
+        log.info(String.format("开始自动注册用户: phone=%s", phone));
+        
+        // 1. 检查手机号是否已被注册（防止并发注册）
+        var existingUser = sysUserRepo.findByPhone(phone);
+        if (existingUser != null) {
+            log.info(String.format("手机号已存在，返回已有用户: userId=%s, phone=%s", existingUser.getId(), phone));
+            return existingUser;
+        }
+        
+        // 2. 生成用户信息
+        var username = phone; // 用户名 = 手机号
+        var realName = "用户_" + phone; // 真实姓名 = 用户_手机号
+        var email = ""; // 邮箱为空
+        var randomPassword = generateRandomPassword(); // 生成随机密码（6-32位）
+        
+        // 3. 检查用户名唯一性（虽然手机号作为用户名，但需要确保唯一）
+        if (sysUserRepo.findByUsername(username) != null) {
+            log.warn(String.format("自动注册失败，用户名已存在: username=%s", username));
+            throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "该手机号已被注册");
+        }
+        
+        // 4. 获取行业类型和默认部门
+        var industryView = industryConfigCache.get();
+        var industryType = industryView.getType();
+        var departmentId = 31L; // 默认部门ID = 31
+        
+        // 5. 验证部门是否存在（通过ID查找）
+        var department = sysDepartmentRepo.findById(departmentId);
+        if (department == null || department.getIsDeleted() == DeleteStatus.DELETED.getCode()) {
+            log.error(String.format("自动注册失败，默认部门不存在或已删除: departmentId=%s", departmentId));
+            throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED, "默认部门不存在");
+        }
+        
+        // 6. 构造并持久化用户实体
+        var user = buildUserEntity(username, realName, email, phone, randomPassword, industryType, departmentId);
+        var userId = Optional.ofNullable(sysUserRepo.save(user))
+                .orElseThrow(() -> {
+                    log.error(String.format("自动注册失败，保存用户失败: username=%s", username));
+                    return BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
+                });
+        
+        // 7. 重新查询用户实体（save 返回的是 ID，需要重新查询获取完整实体）
+        var savedUser = Optional.ofNullable(sysUserRepo.findById(userId))
+                .orElseThrow(() -> {
+                    log.error(String.format("自动注册失败，查询用户失败: userId=%s", userId));
+                    return BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
+                });
+        
+        // 8. 绑定默认角色并刷新权限缓存
+        assignDefaultRole(savedUser.getId(), industryType);
+        
+        log.info(String.format("自动注册成功: userId=%s, username=%s, phone=%s", 
+                savedUser.getId(), savedUser.getUsername(), phone));
+        return savedUser;
+    }
+    
+    /**
+     * 生成随机密码（6-32位，包含字母和数字）
+     *
+     * @return String 随机密码
+     */
+    private String generateRandomPassword() {
+        var random = new SecureRandom();
+        var length = 16; // 生成16位随机密码
+        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        var password = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            password.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return password.toString();
     }
 
     /**
      * 检查账号锁定状态
+     *
+     * @param failCountKey String 失败计数标识（用户名或手机号）
      */
-    private void checkAccountLock(String username) {
-        var lockKey = String.format(CacheConstant.AUTH_LOCK_KEY, username);
+    private void checkAccountLock(String failCountKey) {
+        var lockKey = String.format(CacheConstant.AUTH_LOCK_KEY, failCountKey);
         var locked = RedisUtil.get(stringRedisTemplate, lockKey);
         if (StringUtils.hasText(locked)) {
-            log.warn(String.format("login locked, username=%s", username));
+            log.warn(String.format("login locked, failCountKey=%s", failCountKey));
             throw BusinessException.of(ResultCode.USER_ACCOUNT_LOCKED);
         }
     }
 
     /**
      * 校验用户有效性
+     *
+     * @param user         SysUser 用户实体
+     * @param failCountKey String 失败计数标识（用户名或手机号）
      */
-    private void validateUser(SysUser user, String username) {
+    private void validateUser(SysUser user, String failCountKey) {
         Optional.ofNullable(user)
                 .filter(current -> !Optional.ofNullable(current.getStatus())
                         .map(UserStatus.DISABLED.getCode()::equals)
                         .orElse(false))
                 .orElseThrow(() -> {
-                    onFail(username);
-                    log.warn(String.format("login user invalid, username=%s", username));
+                    onFail(failCountKey);
+                    log.warn(String.format("login user invalid, failCountKey=%s", failCountKey));
                     return BusinessException.of(ResultCode.USER_LOGIN_FAILED);
                 });
     }
 
-    /**
-     * 校验密码
-     */
-    private void validatePassword(String rawPassword, String hashedPassword, String username) {
-        var match = bcryptMatches(rawPassword, hashedPassword);
-        if (!match) {
-            onFail(username);
-            log.warn(String.format("login password mismatch, username=%s", username));
-            throw BusinessException.of(ResultCode.USER_LOGIN_FAILED);
-        }
-    }
 
     /**
      * 清理登录失败计数
+     *
+     * @param failCountKey String 失败计数标识（用户名或手机号）
      */
-    private void clearLoginFailCount(String username) {
-        var failKey = String.format(CacheConstant.AUTH_FAIL_KEY, username);
+    private void clearLoginFailCount(String failCountKey) {
+        var failKey = String.format(CacheConstant.AUTH_FAIL_KEY, failCountKey);
         RedisUtil.delete(stringRedisTemplate, failKey);
     }
 
@@ -751,6 +873,43 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
+     * 校验短信验证码
+     *
+     * @param phone   String 手机号
+     * @param smsCode String 短信验证码
+     */
+    private void validateSmsVerificationCode(String phone, String smsCode) {
+        if (!StringUtils.hasText(smsCode)) {
+            log.warn(String.format("短信验证码为空: phone=%s", phone));
+            throw BusinessException.of(ResultCode.SMS_CODE_INVALID);
+        }
+
+        var cacheKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_CODE_KEY, phone);
+        var cachedCode = RedisUtil.get(stringRedisTemplate, cacheKey);
+        if (!StringUtils.hasText(cachedCode)) {
+            log.warn(String.format("短信验证码已过期: phone=%s", phone));
+            throw BusinessException.of(ResultCode.SMS_CODE_EXPIRED);
+        }
+
+        if (!cachedCode.equals(smsCode.trim())) {
+            log.warn(String.format("短信验证码错误: phone=%s, input=%s", phone, smsCode));
+            throw BusinessException.of(ResultCode.SMS_CODE_INVALID);
+        }
+    }
+
+    /**
+     * 清理短信验证码缓存
+     *
+     * @param phone String 手机号
+     */
+    private void clearSmsVerificationCode(String phone) {
+        var cacheKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_CODE_KEY, phone);
+        var limitKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_RATE_LIMIT_KEY, phone);
+        RedisUtil.delete(stringRedisTemplate, cacheKey);
+        RedisUtil.delete(stringRedisTemplate, limitKey);
+    }
+
+    /**
      * 校验短信验证码发送频率
      *
      * @param phone String 手机号
@@ -794,13 +953,13 @@ public class AuthServiceImpl implements AuthService {
 
         log.info(String.format("发送短信验证码: phone=%s", phone));
 
-        validateCaptchaStrict(req.captcha(), req.captchaKey());
+        // 如果提供了图形验证码，则进行校验（可选，失败次数达到阈值时前端会提供）
+        if (StringUtils.hasText(req.captcha()) && StringUtils.hasText(req.captchaKey())) {
+            validateCaptchaStrict(req.captcha(), req.captchaKey());
+        }
 
-        var user = Optional.ofNullable(sysUserRepo.findByPhone(phone))
-                .orElseThrow(() -> {
-                    log.warn(String.format("发送短信验证码失败，手机号不存在: phone=%s", phone));
-                    return BusinessException.of(ResultCode.PHONE_NOT_FOUND);
-                });
+        // 移除用户存在性检查，支持验证码登录即注册功能
+        // 允许未注册用户发送验证码，登录时如果用户不存在会自动创建
 
         ensureSmsVerificationRateLimit(phone);
 
@@ -808,7 +967,12 @@ public class AuthServiceImpl implements AuthService {
         cacheSmsVerificationCode(phone, verificationCode);
         smsService.sendVerificationCode(phone, verificationCode);
 
-        log.info(String.format("短信验证码发送成功: userId=%s, phone=%s", user.getId(), phone));
+        var user = sysUserRepo.findByPhone(phone);
+        if (user != null) {
+            log.info(String.format("短信验证码发送成功: userId=%s, phone=%s", user.getId(), phone));
+        } else {
+            log.info(String.format("短信验证码发送成功（新用户）: phone=%s", phone));
+        }
     }
 
     /**
@@ -838,10 +1002,10 @@ public class AuthServiceImpl implements AuthService {
     /**
      * 登录失败计数与锁定处理
      *
-     * @param username String 用户名
+     * @param failCountKey String 失败计数标识（用户名或手机号）
      */
-    private void onFail(String username) {
-        String failKey = String.format(CacheConstant.AUTH_FAIL_KEY, username);
+    private void onFail(String failCountKey) {
+        String failKey = String.format(CacheConstant.AUTH_FAIL_KEY, failCountKey);
         Long cnt = 1L;
         String val = RedisUtil.get(stringRedisTemplate, failKey);
         if (StringUtils.hasText(val)) {
@@ -854,11 +1018,11 @@ public class AuthServiceImpl implements AuthService {
         RedisUtil.set(stringRedisTemplate, failKey, String.valueOf(cnt),
                 java.time.Duration.ofSeconds(CacheConstant.AUTH_LOCK_DURATION));
         if (cnt >= CacheConstant.MAX_LOGIN_FAIL_COUNT) {
-            String lockKey = String.format(CacheConstant.AUTH_LOCK_KEY, username);
+            String lockKey = String.format(CacheConstant.AUTH_LOCK_KEY, failCountKey);
             RedisUtil.set(stringRedisTemplate, lockKey, "1",
                     java.time.Duration.ofSeconds(CacheConstant.AUTH_LOCK_DURATION));
         }
-        log.warn(String.format("login failed, username=%s, count=%s", username, cnt));
+        log.warn(String.format("login failed, failCountKey=%s, count=%s", failCountKey, cnt));
     }
 
     /**
@@ -960,39 +1124,94 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 重置密码：规格化邮箱 → 校验图形验证码 → 校验邮箱验证码 → 更新密码并清理验证码缓存
+     * 重置密码：支持手机号和邮箱两种方式
+     * 手机号重置：规格化手机号 → 校验短信验证码 → 更新密码并清理验证码缓存
+     * 邮箱重置：规格化邮箱 → 校验邮箱验证码 → 更新密码并清理验证码缓存
      *
      * @param req ResetPasswordReq 重置密码请求
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void resetPassword(ResetPasswordReq req) {
+        // 判断重置方式：手机号或邮箱
+        var phone = Optional.ofNullable(req.phone())
+                .map(this::normalizePhone)
+                .filter(StringUtils::hasText)
+                .orElse(null);
         var email = Optional.ofNullable(req.email())
                 .map(this::normalizeEmail)
                 .filter(StringUtils::hasText)
-                .orElseThrow(() -> BusinessException.of(ResultCode.BAD_REQUEST, "邮箱不能为空"));
-        log.info(String.format("重置密码开始: email=%s", email));
+                .orElse(null);
 
-        validateCaptchaStrict(req.captcha(), req.captchaKey());
+        SysUser user;
+        if (StringUtils.hasText(phone)) {
+            // 手机号重置
+            log.info(String.format("重置密码开始（手机号）: phone=%s", phone));
 
-        var user = Optional.ofNullable(sysUserRepo.findByEmail(email))
-                .orElseThrow(() -> {
-                    log.warn(String.format("重置密码失败，邮箱不存在: email=%s", email));
-                    return BusinessException.of(ResultCode.EMAIL_NOT_FOUND);
-                });
+            // 校验参数
+            if (!StringUtils.hasText(req.smsCode())) {
+                throw BusinessException.of(ResultCode.BAD_REQUEST, "短信验证码不能为空");
+            }
 
-        validateEmailVerificationCode(email, req.emailCode());
+            // 查找用户
+            user = Optional.ofNullable(sysUserRepo.findByPhone(phone))
+                    .orElseThrow(() -> {
+                        log.warn(String.format("重置密码失败，手机号不存在: phone=%s", phone));
+                        return BusinessException.of(ResultCode.PHONE_NOT_FOUND);
+                    });
 
-        user.setPassword(hashPassword(req.newPassword()));
-        user.setUpdatedTime(LocalDateTime.now());
+            // 校验短信验证码
+            validateSmsVerificationCode(phone, req.smsCode());
 
-        if (!sysUserRepo.updateById(user)) {
-            log.error(String.format("重置密码更新数据库失败: userId=%s, email=%s", user.getId(), email));
-            throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
+            // 更新密码
+            user.setPassword(hashPassword(req.newPassword()));
+            user.setUpdatedTime(LocalDateTime.now());
+
+            if (!sysUserRepo.updateById(user)) {
+                log.error(String.format("重置密码更新数据库失败: userId=%s, phone=%s", user.getId(), phone));
+                throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
+            }
+
+            // 清理短信验证码缓存
+            clearSmsVerificationCode(phone);
+            log.info(String.format("重置密码成功（手机号）: userId=%s, phone=%s", user.getId(), phone));
+
+        } else if (StringUtils.hasText(email)) {
+            // 邮箱重置
+            log.info(String.format("重置密码开始（邮箱）: email=%s", email));
+
+            // 校验参数
+            if (!StringUtils.hasText(req.emailCode())) {
+                throw BusinessException.of(ResultCode.BAD_REQUEST, "邮箱验证码不能为空");
+            }
+
+            // 查找用户
+            user = Optional.ofNullable(sysUserRepo.findByEmail(email))
+                    .orElseThrow(() -> {
+                        log.warn(String.format("重置密码失败，邮箱不存在: email=%s", email));
+                        return BusinessException.of(ResultCode.EMAIL_NOT_FOUND);
+                    });
+
+            // 校验邮箱验证码
+            validateEmailVerificationCode(email, req.emailCode());
+
+            // 更新密码
+            user.setPassword(hashPassword(req.newPassword()));
+            user.setUpdatedTime(LocalDateTime.now());
+
+            if (!sysUserRepo.updateById(user)) {
+                log.error(String.format("重置密码更新数据库失败: userId=%s, email=%s", user.getId(), email));
+                throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
+            }
+
+            // 清理邮箱验证码缓存
+            clearEmailVerificationCode(email);
+            log.info(String.format("重置密码成功（邮箱）: userId=%s, email=%s", user.getId(), email));
+
+        } else {
+            // 两种方式都未提供
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "手机号或邮箱不能为空");
         }
-
-        clearEmailVerificationCode(email);
-        log.info(String.format("重置密码成功: userId=%s, email=%s", user.getId(), email));
     }
 
     /**
@@ -1041,7 +1260,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * 用户注册:规格化入参 → 校验验证码 → 校验账号唯一性 → 校验院系有效性 → 构造实体并入库 → 返回注册结果
+     * 用户注册:规格化入参 → 校验联系方式（至少提供一个） → 校验验证码 → 校验账号唯一性 → 校验院系有效性 → 构造实体并入库 → 返回注册结果
      *
      * @param registerReq RegisterReq 注册请求
      * @return RegisterResp 注册结果
@@ -1052,18 +1271,51 @@ public class AuthServiceImpl implements AuthService {
         // 1. 规格化并提取入参
         var username = registerReq.getUsername().trim();
         var realName = registerReq.getRealName().trim();
-        var email = registerReq.getEmail().trim().toLowerCase(Locale.ROOT);
-        var phone = registerReq.getPhone().trim();
+        var email = Optional.ofNullable(registerReq.getEmail())
+                .map(e -> e.trim().toLowerCase(Locale.ROOT))
+                .orElse("");
+        var phone = Optional.ofNullable(registerReq.getPhone())
+                .map(p -> p.trim())
+                .orElse("");
         var departmentCode = registerReq.getDepartment().trim().toUpperCase(Locale.ROOT);
+        var verificationCode = Optional.ofNullable(registerReq.getVerificationCode())
+                .map(v -> v.trim())
+                .orElse("");
 
         log.info(String.format("register start, username=%s, email=%s, phone=%s, department=%s",
                 username, email, phone, departmentCode));
 
-        // 2. 校验验证码 & 账号唯一性
-        validateCaptchaStrict(registerReq.getCaptcha(), registerReq.getCaptchaKey());
+        // 2. 校验联系方式：至少提供一个（邮箱或手机号）
+        if (!StringUtils.hasText(email) && !StringUtils.hasText(phone)) {
+            log.warn("register failed: email and phone both empty");
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "邮箱和手机号至少提供一个");
+        }
+
+        // 3. 根据提供的联系方式校验对应的验证码
+        if (StringUtils.hasText(phone)) {
+            // 手机号注册：校验短信验证码
+            if (!StringUtils.hasText(verificationCode)) {
+                log.warn(String.format("register failed: phone provided but verification code empty, phone=%s", phone));
+                throw BusinessException.of(ResultCode.BAD_REQUEST, "短信验证码不能为空");
+            }
+            var normalizedPhone = normalizePhone(phone);
+            validateSmsVerificationCode(normalizedPhone, verificationCode);
+            clearSmsVerificationCode(normalizedPhone);
+            phone = normalizedPhone; // 使用规格化后的手机号
+        } else if (StringUtils.hasText(email)) {
+            // 邮箱注册：校验邮箱验证码
+            if (!StringUtils.hasText(verificationCode)) {
+                log.warn(String.format("register failed: email provided but verification code empty, email=%s", email));
+                throw BusinessException.of(ResultCode.BAD_REQUEST, "邮箱验证码不能为空");
+            }
+            validateEmailVerificationCode(email, verificationCode);
+            clearEmailVerificationCode(email);
+        }
+
+        // 4. 校验账号唯一性
         ensureAccountUniqueness(username, email, phone);
 
-        // 3. 校验院系/行业信息
+        // 5. 校验院系/行业信息
         var industryView = industryConfigCache.get();
         var industryType = industryView.getType();
         var department = Optional.ofNullable(sysDepartmentRepo.findByCode(industryType, departmentCode))
@@ -1073,7 +1325,7 @@ public class AuthServiceImpl implements AuthService {
                     return BusinessException.of(ResultCode.BAD_REQUEST, "院系/部门不存在或已停用");
                 });
 
-        // 4. 构造并持久化用户实体
+        // 6. 构造并持久化用户实体（email 和 phone 可能为空字符串）
         var user = buildUserEntity(username, realName, email, phone, registerReq.getPassword(),
                 industryType, department.getId());
 
@@ -1083,10 +1335,10 @@ public class AuthServiceImpl implements AuthService {
                     return BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED);
                 });
 
-        // 5. 绑定默认角色并刷新权限缓存
+        // 7. 绑定默认角色并刷新权限缓存
         assignDefaultRole(user.getId(), industryType);
 
-        // 6. 返回注册结果
+        // 8. 返回注册结果
         log.info(String.format("register success, userId=%s, username=%s", user.getId(), username));
         return authConverter.toRegisterResp(user);
     }

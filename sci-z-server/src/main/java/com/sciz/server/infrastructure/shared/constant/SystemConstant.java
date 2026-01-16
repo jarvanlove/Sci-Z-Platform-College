@@ -110,8 +110,14 @@ public class SystemConstant {
 
         /**
          * 默认用户角色编码
+         * 优先使用 normal_users，如果不存在则回退到 user（向后兼容）
          */
-        public static final String DEFAULT_USER_ROLE_CODE = "user";
+        public static final String DEFAULT_USER_ROLE_CODE = "normal_users";
+        
+        /**
+         * 备用默认用户角色编码（向后兼容）
+         */
+        public static final String FALLBACK_USER_ROLE_CODE = "user";
 
         /**
          * 日期时间格式

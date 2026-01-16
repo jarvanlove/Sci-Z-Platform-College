@@ -8,6 +8,10 @@ import lombok.Data;
 
 /**
  * 用户注册请求
+ * 支持手机号注册和邮箱注册两种方式
+ * - 手机号注册：提供 phone 和 verificationCode（短信验证码）
+ * - 邮箱注册：提供 email 和 verificationCode（邮箱验证码）
+ * email 和 phone 至少提供一个，但不能都为空
  *
  * @author JiaWen.Wu
  * @className RegisterReq
@@ -31,17 +35,15 @@ public class RegisterReq {
     private String realName;
 
     /**
-     * 邮箱地址
+     * 邮箱地址（邮箱注册时必填）
      */
-    @NotBlank(message = "邮箱不能为空")
     @Email(message = "邮箱格式不正确")
     @Size(max = 100, message = "邮箱长度不能超过100个字符")
     private String email;
 
     /**
-     * 手机号（大陆 11 位）
+     * 手机号（手机号注册时必填，大陆 11 位）
      */
-    @NotBlank(message = "手机号不能为空")
     @Pattern(regexp = "^1\\d{10}$", message = "手机号格式不正确，请输入大陆手机号")
     private String phone;
 
@@ -60,20 +62,10 @@ public class RegisterReq {
     private String password;
 
     /**
-     * 图形验证码输入值
+     * 验证码（短信验证码或邮箱验证码，6位数字）
+     * 手机号注册时：为短信验证码
+     * 邮箱注册时：为邮箱验证码
      */
-    @NotBlank(message = "验证码不能为空")
-    private String captcha;
-
-    /**
-     * 图形验证码唯一标识
-     */
-    @NotBlank(message = "验证码标识不能为空")
-    private String captchaKey;
-
-    /**
-     * 预留短信验证码字段
-     */
-    @Size(max = 6, message = "短信验证码长度不能超过6个字符")
+    @Size(min = 6, max = 6, message = "验证码必须为6位数字")
     private String verificationCode;
 }

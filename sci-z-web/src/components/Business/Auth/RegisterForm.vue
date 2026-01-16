@@ -11,6 +11,7 @@
     :rules="registerRules"
     label-position="top"
     class="register-form"
+    :validate-on-rule-change="false"
   >
     <!-- 基本信息 -->
     <div class="form-group">
@@ -24,7 +25,6 @@
               :placeholder="$t('auth.register.usernamePlaceholder')"
               size="large"
               clearable
-              @blur="validateUsername"
             />
             <div v-if="usernameError" class="status-message error">
               {{ usernameError }}
@@ -42,50 +42,11 @@
               :placeholder="$t('auth.register.realNamePlaceholder')"
               size="large"
               clearable
-              @blur="validateRealName"
             />
             <div v-if="realNameError" class="status-message error">
               {{ realNameError }}
             </div>
             <div v-else-if="realNameSuccess" class="status-message success">
-              <span class="status-icon">✓</span>
-            </div>
-          </el-form-item>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-item">
-          <el-form-item :label="$t('auth.register.emailLabel')" prop="email">
-            <el-input
-              v-model="registerForm.email"
-              :placeholder="$t('auth.register.emailPlaceholder')"
-              size="large"
-              clearable
-              @blur="validateEmailField"
-            />
-            <div v-if="emailError" class="status-message error">
-              {{ emailError }}
-            </div>
-            <div v-else-if="emailSuccess" class="status-message success">
-              <span class="status-icon">✓</span>
-            </div>
-          </el-form-item>
-        </div>
-
-        <div class="form-item">
-          <el-form-item :label="$t('auth.register.phoneLabel')" prop="phone">
-            <el-input
-              v-model="registerForm.phone"
-              :placeholder="$t('auth.register.phonePlaceholder')"
-              size="large"
-              clearable
-              @blur="validatePhoneField"
-            />
-            <div v-if="phoneError" class="status-message error">
-              {{ phoneError }}
-            </div>
-            <div v-else-if="phoneSuccess" class="status-message success">
               <span class="status-icon">✓</span>
             </div>
           </el-form-item>
@@ -114,6 +75,111 @@
           </div>
         </el-form-item>
       </div>
+    </div>
+
+    <!-- 联系方式选择 Tab -->
+    <div class="form-group">
+      <div class="group-title">{{ $t('auth.register.contactMethod') }}</div>
+      <el-tabs v-model="activeTab" class="register-tabs" @tab-change="handleTabChange">
+        <el-tab-pane :label="$t('auth.register.phoneRegister')" name="phone">
+          <!-- 手机号输入 -->
+          <el-form-item prop="phone">
+            <el-input
+              v-model="registerForm.phone"
+              :placeholder="$t('auth.phone')"
+              size="large"
+              clearable
+              maxlength="11"
+              class="phone-input"
+            >
+              <template #prefix>
+                <el-icon class="phone-icon"><Phone /></el-icon>
+                <span class="phone-prefix">+86</span>
+              </template>
+            </el-input>
+            <div v-if="phoneError" class="status-message error">
+              {{ phoneError }}
+            </div>
+            <div v-else-if="phoneSuccess" class="status-message success">
+              <span class="status-icon">✓</span>
+            </div>
+          </el-form-item>
+
+          <!-- 短信验证码输入 -->
+          <el-form-item prop="smsCode">
+            <div class="sms-code-container">
+              <el-input
+                v-model="registerForm.smsCode"
+                :placeholder="$t('auth.smsCode')"
+                maxlength="6"
+                size="large"
+                clearable
+                class="sms-code-input"
+              >
+                <template #prefix>
+                  <el-icon class="sms-icon"><Message /></el-icon>
+                </template>
+              </el-input>
+              <el-button
+                type="primary"
+                size="large"
+                :disabled="!canSendSmsCode || smsCodeCountdown > 0"
+                :loading="sendingSmsCode"
+                class="send-sms-button"
+                @click="handleSendSmsCode"
+              >
+                {{ smsCodeCountdown > 0 ? `${smsCodeCountdown}s` : $t('auth.sendSmsCode') }}
+              </el-button>
+            </div>
+          </el-form-item>
+        </el-tab-pane>
+
+        <el-tab-pane :label="$t('auth.register.emailRegister')" name="email">
+          <!-- 邮箱输入 -->
+          <el-form-item prop="email">
+            <el-input
+              v-model="registerForm.email"
+              :placeholder="$t('auth.register.emailPlaceholder')"
+              size="large"
+              clearable
+            />
+            <div v-if="emailError" class="status-message error">
+              {{ emailError }}
+            </div>
+            <div v-else-if="emailSuccess" class="status-message success">
+              <span class="status-icon">✓</span>
+            </div>
+          </el-form-item>
+
+          <!-- 邮箱验证码输入 -->
+          <el-form-item prop="emailCode">
+            <div class="sms-code-container">
+              <el-input
+                v-model="registerForm.emailCode"
+                :placeholder="$t('auth.emailCode')"
+                maxlength="6"
+                size="large"
+                clearable
+                class="sms-code-input"
+              >
+                <template #prefix>
+                  <el-icon class="sms-icon"><Message /></el-icon>
+                </template>
+              </el-input>
+              <el-button
+                type="primary"
+                size="large"
+                :disabled="!canSendEmailCode || emailCodeCountdown > 0"
+                :loading="sendingEmailCode"
+                class="send-sms-button"
+                @click="handleSendEmailCode"
+              >
+                {{ emailCodeCountdown > 0 ? `${emailCodeCountdown}s` : $t('auth.sendCode') }}
+              </el-button>
+            </div>
+          </el-form-item>
+        </el-tab-pane>
+      </el-tabs>
     </div>
 
     <!-- 密码设置 -->
@@ -152,7 +218,6 @@
             size="large"
             show-password
             clearable
-            @blur="validateConfirmPassword"
           />
           <div v-if="confirmPasswordError" class="status-message error">
             {{ confirmPasswordError }}
@@ -164,61 +229,6 @@
       </div>
     </div>
 
-    <!-- 身份验证 -->
-    <div class="form-group">
-      <div class="group-title">{{ $t('auth.register.identityVerification') }}</div>
-
-      <div class="form-row single">
-        <div class="form-item">
-          <el-form-item :label="$t('auth.register.captchaLabel')" prop="captcha">
-            <div class="captcha-wrapper">
-              <el-input
-                v-model="registerForm.captcha"
-                :placeholder="$t('auth.register.captchaPlaceholder')"
-                size="large"
-                clearable
-              />
-              <div class="captcha-image" @click="refreshCaptcha">
-                <img v-if="captchaUrl" :src="captchaUrl" :alt="$t('auth.register.captchaAlt')" />
-                <span v-else>{{ $t('common.loading') }}</span>
-              </div>
-            </div>
-            <div v-if="captchaError" class="status-message error">
-              {{ captchaError }}
-            </div>
-          </el-form-item>
-        </div>
-      </div>
-
-      <!--
-        TODO: 开通短信验证码服务后启用以下模块，并同步恢复发送逻辑。
-        <div class="form-row single">
-          <div class="form-item">
-            <el-form-item :label="$t('auth.register.verificationCodeLabel')" prop="verificationCode">
-              <div class="sms-code-wrapper">
-                <el-input
-                  v-model="registerForm.verificationCode"
-                  :placeholder="$t('auth.register.verificationCodePlaceholder')"
-                  maxlength="6"
-                  size="large"
-                  clearable
-                />
-                <BaseButton
-                  type="primary"
-                  :disabled="!canSendSmsCode || smsCodeCountdown > 0"
-                  @click="handleSendSmsCode"
-                >
-                  {{ smsCodeCountdown > 0 ? `${smsCodeCountdown}s` : $t('auth.register.sendSmsCode') }}
-                </BaseButton>
-              </div>
-              <div class="verification-hint">
-                {{ $t('auth.register.smsCodeHint') }}
-              </div>
-            </el-form-item>
-          </div>
-        </div>
-      -->
-    </div>
 
     <!-- 用户协议 -->
     <div class="form-group agreement-group">
@@ -249,21 +259,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Phone, Message } from '@element-plus/icons-vue'
 import { BaseButton } from '@/components/Common'
 import AgreementNotice from '@/components/Common/AgreementNotice.vue'
-import { register, getCaptcha } from '@/api/Auth'
+import { register, sendEmailCode, sendSmsVerificationCode } from '@/api/Auth'
 import { validateEmail, validatePhone, validatePassword } from '@/utils/validate'
 import { createLogger } from '@/utils/simpleLogger'
 import { useIndustryStore } from '@/store/modules/industry'
-
-/**
- * TODO: 短信服务未开通前保持以下导入注释，开通后去掉注释并使用 sendSmsVerificationCode 发送短信验证码。
- * import { sendSmsVerificationCode } from '@/api/Auth'
- */
 
 const emit = defineEmits(['register-success'])
 
@@ -292,6 +298,9 @@ const confirmPasswordSuccess = ref(false)
 const captchaError = ref('')
 const agreementError = ref('')
 
+// Tab 切换（默认手机号注册）
+const activeTab = ref('phone')
+
 const registerForm = reactive({
   username: '',
   realName: '',
@@ -300,9 +309,8 @@ const registerForm = reactive({
   department: '',
   password: '',
   confirmPassword: '',
-  captcha: '',
-  captchaKey: '',
-  // verificationCode: '',
+  smsCode: '',
+  emailCode: '',
   agreement: false
 })
 
@@ -310,124 +318,229 @@ const departments = ref([])
 const departmentsLoading = ref(false)
 const departmentLabel = computed(() => t(industryStore.departmentLabelKey))
 const departmentPlaceholder = computed(() => t(industryStore.departmentPlaceholderKey))
-/**
- * TODO: 短信验证码服务开通后启用以下状态管理逻辑，并搭配 sendSmsVerificationCode 接口使用。
- *
- * const smsCodeCountdown = ref(0)
- * let smsCountdownTimer = null
- * const canSendSmsCode = computed(() => {
- *   return (
- *     !!registerForm.phone &&
- *     !!registerForm.captcha &&
- *     !!registerForm.captchaKey &&
- *     !phoneError.value &&
- *     smsCodeCountdown.value === 0
- *   )
- * })
- *
- * const handleSendSmsCode = async () => {
- *   if (!canSendSmsCode.value) return
- *   try {
- *     await sendSmsVerificationCode({
- *       phone: registerForm.phone,
- *       captcha: registerForm.captcha,
- *       captchaKey: registerForm.captchaKey
- *     })
- *     ElMessage.success(t('auth.register.smsCodeSent'))
- *     smsCodeCountdown.value = 60
- *     smsCountdownTimer = window.setInterval(() => {
- *       if (smsCodeCountdown.value <= 0) {
- *         window.clearInterval(smsCountdownTimer)
- *         smsCountdownTimer = null
- *         return
- *       }
- *       smsCodeCountdown.value -= 1
- *     }, 1000)
- *   } catch (error) {
- *     logger.error('Send sms verification code failed', error)
- *     ElMessage.error(t('auth.register.smsCodeSendFailed'))
- *   }
- * }
- */
 
-const registerRules = {
-  username: [
-    { required: true, message: t('auth.register.usernameRequired'), trigger: 'blur' },
-    { min: 3, max: 20, message: t('auth.register.usernameLength'), trigger: 'blur' },
-    {
-      pattern: /^[a-zA-Z0-9_]+$/,
-      message: t('auth.register.usernamePattern'),
-      trigger: 'blur'
+// 短信验证码相关状态
+const smsCodeCountdown = ref(0)
+let smsCountdownTimer = null
+const sendingSmsCode = ref(false)
+const canSendSmsCode = computed(() => {
+  return (
+    !!registerForm.phone &&
+    !phoneError.value &&
+    smsCodeCountdown.value === 0 &&
+    !sendingSmsCode.value
+  )
+})
+
+const handleSendSmsCode = async () => {
+  if (!canSendSmsCode.value) return
+  
+  // 先验证手机号
+  const phoneValid = await validatePhoneField()
+  if (!phoneValid) {
+    ElMessage.warning(t('auth.register.phoneRequired'))
+    return
+  }
+  
+  sendingSmsCode.value = true
+  try {
+    await sendSmsVerificationCode({
+      phone: registerForm.phone
+    })
+    ElMessage.success(t('auth.smsCodeSent'))
+    smsCodeCountdown.value = 60
+    smsCountdownTimer = window.setInterval(() => {
+      if (smsCodeCountdown.value <= 0) {
+        window.clearInterval(smsCountdownTimer)
+        smsCountdownTimer = null
+        return
+      }
+      smsCodeCountdown.value -= 1
+    }, 1000)
+  } catch (error) {
+    logger.error('Send sms verification code failed', error)
+    if (!error._messageShown) {
+      ElMessage.error(t('auth.smsCodeSendFailed'))
     }
-  ],
-  realName: [
-    { required: true, message: t('auth.register.realNameRequired'), trigger: 'blur' },
-    { min: 2, max: 10, message: t('auth.register.realNameLength'), trigger: 'blur' }
-  ],
-  email: [
-    { required: true, message: t('auth.register.emailRequired'), trigger: 'blur' },
-    { type: 'email', message: t('auth.register.emailFormat'), trigger: 'blur' }
-  ],
-  phone: [
-    { required: true, message: t('auth.register.phoneRequired'), trigger: 'blur' },
-    {
-      validator: (rule, value, callback) => {
-        const phone = (value || '').trim()
-        if (!phone) {
-          callback()
-          return
-        }
-        if (!validatePhone(phone)) {
-          callback(new Error(t('auth.register.phoneFormat')))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
-  ],
-  department: [
-    { required: true, message: departmentPlaceholder.value, trigger: 'change' }
-  ],
-  password: [
-    { required: true, message: t('auth.register.passwordRequired'), trigger: 'blur' },
-    { min: 6, max: 20, message: t('auth.register.passwordLength'), trigger: 'blur' }
-  ],
-  confirmPassword: [
-    { required: true, message: t('auth.register.confirmPasswordRequired'), trigger: 'blur' }
-  ],
-  captcha: [
-    { required: true, message: t('auth.register.captchaRequired'), trigger: 'blur' }
-  ]
-  // verificationCode: [
-  //   {
-  //     validator: (rule, value, callback) => {
-  //       if (!value) {
-  //         callback()
-  //         return
-  //       }
-  //       if (!/^\d{6}$/.test(value)) {
-  //         callback(new Error(t('auth.register.verificationCodeLength')))
-  //       } else {
-  //         callback()
-  //       }
-  //     },
-  //     trigger: 'blur'
-  //   }
-  // ]
+  } finally {
+    sendingSmsCode.value = false
+  }
 }
 
+// 发送邮箱验证码
+const handleSendEmailCode = async () => {
+  if (!canSendEmailCode.value) return
+  
+  // 先验证邮箱
+  const emailValid = await validateEmailField()
+  if (!emailValid) {
+    ElMessage.warning(t('auth.register.emailRequired'))
+    return
+  }
+  
+  sendingEmailCode.value = true
+  try {
+    await sendEmailCode({
+      email: registerForm.email,
+      provider: 'NETEASE'
+    })
+    ElMessage.success(t('auth.emailCodeSent'))
+    emailCodeCountdown.value = 60
+    emailCountdownTimer = window.setInterval(() => {
+      if (emailCodeCountdown.value <= 0) {
+        window.clearInterval(emailCountdownTimer)
+        emailCountdownTimer = null
+        return
+      }
+      emailCodeCountdown.value -= 1
+    }, 1000)
+  } catch (error) {
+    logger.error('Send email verification code failed', error)
+    if (!error._messageShown) {
+      ElMessage.error(t('auth.sendCodeFailed'))
+    }
+  } finally {
+    sendingEmailCode.value = false
+  }
+}
+
+// Tab 切换处理
+const handleTabChange = (tabName) => {
+  // 清除表单值和校验状态
+  registerForm.phone = ''
+  registerForm.email = ''
+  registerForm.smsCode = ''
+  registerForm.emailCode = ''
+  phoneError.value = ''
+  emailError.value = ''
+  phoneSuccess.value = false
+  emailSuccess.value = false
+  
+  // 清除倒计时
+  if (smsCountdownTimer) {
+    clearInterval(smsCountdownTimer)
+    smsCountdownTimer = null
+    smsCodeCountdown.value = 0
+  }
+  if (emailCountdownTimer) {
+    clearInterval(emailCountdownTimer)
+    emailCountdownTimer = null
+    emailCodeCountdown.value = 0
+  }
+  
+  // 清除表单校验
+  nextTick(() => {
+    if (registerFormRef.value) {
+      registerFormRef.value.clearValidate()
+    }
+  })
+}
+
+// 表单验证规则（根据 Tab 动态生成）
+const registerRules = computed(() => {
+  const rules = {
+    username: [
+      { required: true, message: t('auth.register.usernameRequired'), trigger: 'blur' },
+      { min: 3, max: 20, message: t('auth.register.usernameLength'), trigger: 'blur' },
+      {
+        pattern: /^[a-zA-Z0-9_]+$/,
+        message: t('auth.register.usernamePattern'),
+        trigger: 'blur'
+      }
+    ],
+    realName: [
+      { required: true, message: t('auth.register.realNameRequired'), trigger: 'blur' },
+      { min: 2, max: 10, message: t('auth.register.realNameLength'), trigger: 'blur' }
+    ],
+    department: [
+      { required: true, message: departmentPlaceholder.value, trigger: 'change' }
+    ],
+    password: [
+      { required: true, message: t('auth.register.passwordRequired'), trigger: 'blur' },
+      { min: 6, max: 20, message: t('auth.register.passwordLength'), trigger: 'blur' }
+    ],
+    confirmPassword: [
+      { required: true, message: t('auth.register.confirmPasswordRequired'), trigger: 'blur' }
+    ]
+  }
+
+  // 根据当前 Tab 添加不同的验证规则
+  if (activeTab.value === 'phone') {
+    rules.phone = [
+      { required: true, message: t('auth.register.phoneRequired'), trigger: 'blur' },
+      {
+        validator: (rule, value, callback) => {
+          const phone = (value || '').trim()
+          if (!phone) {
+            callback()
+            return
+          }
+          if (!validatePhone(phone)) {
+            callback(new Error(t('auth.register.phoneFormat')))
+          } else {
+            callback()
+          }
+        },
+        trigger: 'blur'
+      }
+    ]
+    rules.smsCode = [
+      { required: true, message: t('auth.smsCodeRequired'), trigger: 'blur' },
+      {
+        validator: (rule, value, callback) => {
+          if (!value) {
+            callback(new Error(t('auth.smsCodeRequired')))
+            return
+          }
+          if (!/^\d{6}$/.test(value)) {
+            callback(new Error(t('auth.smsCodeLength')))
+          } else {
+            callback()
+          }
+        },
+        trigger: 'blur'
+      }
+    ]
+  } else {
+    rules.email = [
+      { required: true, message: t('auth.register.emailRequired'), trigger: 'blur' },
+      { type: 'email', message: t('auth.register.emailFormat'), trigger: 'blur' }
+    ]
+    rules.emailCode = [
+      { required: true, message: t('auth.emailCodeRequired'), trigger: 'blur' },
+      {
+        validator: (rule, value, callback) => {
+          if (!value) {
+            callback(new Error(t('auth.emailCodeRequired')))
+            return
+          }
+          if (!/^\d{6}$/.test(value)) {
+            callback(new Error(t('auth.emailCodeLength')))
+          } else {
+            callback()
+          }
+        },
+        trigger: 'blur'
+      }
+    ]
+  }
+
+  return rules
+})
+
 const isFormValid = computed(() => {
-  return (
-    registerForm.username &&
+  const baseValid = registerForm.username &&
     registerForm.realName &&
-    registerForm.email &&
-    registerForm.phone &&
     registerForm.department &&
     registerForm.password &&
     registerForm.confirmPassword &&
-    registerForm.captcha
-  )
+    registerForm.agreement
+
+  if (activeTab.value === 'phone') {
+    return baseValid && registerForm.phone && registerForm.smsCode && registerForm.smsCode.length === 6
+  } else {
+    return baseValid && registerForm.email && registerForm.emailCode && registerForm.emailCode.length === 6
+  }
 })
 
 // const canSendCode = computed(() => {
@@ -648,16 +761,30 @@ const handleRegister = async () => {
 
     loading.value = true
 
-    const payload = {
-      username: registerForm.username,
-      realName: registerForm.realName,
-      email: registerForm.email,
-      phone: registerForm.phone,
-      department: registerForm.department,
-      password: registerForm.password,
-      captcha: registerForm.captcha,
-      captchaKey: registerForm.captchaKey
-      // verificationCode: registerForm.verificationCode
+    // 根据当前 Tab 构建不同的 payload
+    let payload
+    if (activeTab.value === 'phone') {
+      // 手机号注册
+      payload = {
+        username: registerForm.username,
+        realName: registerForm.realName,
+        phone: registerForm.phone,
+        department: registerForm.department,
+        password: registerForm.password,
+        verificationCode: registerForm.smsCode,
+        email: '' // 手机号注册时邮箱可以为空
+      }
+    } else {
+      // 邮箱注册
+      payload = {
+        username: registerForm.username,
+        realName: registerForm.realName,
+        email: registerForm.email,
+        department: registerForm.department,
+        password: registerForm.password,
+        verificationCode: registerForm.emailCode,
+        phone: '' // 邮箱注册时手机号可以为空
+      }
     }
 
     const response = await register(payload)
@@ -668,8 +795,10 @@ const handleRegister = async () => {
   } catch (error) {
     logger.error('handleRegister error', error)
     const message = error.response?.data?.message || t('auth.register.registerFailed')
-    ElMessage.error(message)
-    await refreshCaptcha()
+    if (!error._messageShown) {
+      ElMessage.error(message)
+    }
+    // await refreshCaptcha() // 图形验证码已注释，不再刷新
   } finally {
     loading.value = false
   }
@@ -748,13 +877,19 @@ watch(
 )
 
 onMounted(async () => {
-  await Promise.all([refreshCaptcha(), fetchDepartments()])
+  await fetchDepartments()
+  // await refreshCaptcha() // 图形验证码已注释，不再加载
 })
 
 onUnmounted(() => {
-  // if (countdownTimer) {
-  //   clearInterval(countdownTimer)
-  // }
+  if (smsCountdownTimer) {
+    clearInterval(smsCountdownTimer)
+    smsCountdownTimer = null
+  }
+  if (emailCountdownTimer) {
+    clearInterval(emailCountdownTimer)
+    emailCountdownTimer = null
+  }
 })
 </script>
 
@@ -870,6 +1005,29 @@ onUnmounted(() => {
   }
 }
 
+.sms-code-wrapper {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+
+  .el-input {
+    flex: 1;
+  }
+
+  .el-button,
+  :deep(.base-button) {
+    min-width: 130px;
+    flex-shrink: 0;
+  }
+}
+
+.verification-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
 .captcha-image {
   width: 120px;
   height: 44px;
@@ -933,6 +1091,91 @@ onUnmounted(() => {
 
 .submit-section {
   margin-top: 8px;
+}
+
+// Tab 样式
+.register-tabs {
+  :deep(.el-tabs__header) {
+    margin-bottom: 20px;
+  }
+  
+  :deep(.el-tabs__item) {
+    font-size: 16px;
+    font-weight: 500;
+    padding: 0 20px;
+    color: var(--text-2);
+    transition: color 0.2s ease;
+    
+    &:hover {
+      color: var(--color-primary);
+    }
+    
+    &.is-active {
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+  }
+  
+  :deep(.el-tabs__active-bar) {
+    height: 3px;
+    background-color: var(--color-primary);
+  }
+  
+  :deep(.el-tabs__item.is-active) {
+    color: var(--color-primary) !important;
+  }
+}
+
+// 手机号输入框样式
+.phone-input {
+  :deep(.el-input__wrapper) {
+    padding-left: 100px;
+  }
+  
+  .phone-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-3);
+    font-size: 16px;
+    margin-right: 8px;
+  }
+  
+  .phone-prefix {
+    position: absolute;
+    left: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--el-input-text-color, var(--el-text-color-regular));
+    font-size: 14px;
+    font-weight: 500;
+    border-right: 1px solid var(--border);
+    padding-right: 12px;
+    margin-right: 8px;
+  }
+}
+
+// 验证码容器样式（与登录弹窗保持一致）
+.sms-code-container {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  
+  .sms-code-input {
+    flex: 1;
+    
+    .sms-icon {
+      color: var(--text-3);
+      font-size: 16px;
+    }
+  }
+  
+  .send-sms-button {
+    min-width: 120px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
 }
 
 .register-button {

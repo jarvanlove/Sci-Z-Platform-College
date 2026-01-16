@@ -1,7 +1,7 @@
 <!--
 /**
  * @description 重置密码表单组件
- * 基于原型图设计的重置密码表单，包含邮箱、验证码、新密码等功能
+ * 支持邮箱和手机号两种方式重置密码
  */
 -->
 <template>
@@ -11,61 +11,95 @@
     :rules="resetRules"
     class="reset-form"
     autocomplete="off"
+    :validate-on-rule-change="false"
     @submit.prevent="handleReset"
   >
-    <!-- 邮箱输入 -->
-    <el-form-item prop="email">
-      <el-input
-        v-model="resetForm.email"
-        :placeholder="$t('auth.email')"
-        size="large"
-        prefix-icon="Message"
-        clearable
-        autocomplete="off"
-        name="reset-email"
-      />
-    </el-form-item>
+    <!-- Tab 切换 -->
+    <el-tabs v-model="activeTab" class="reset-tabs" @tab-change="handleTabChange">
+      <el-tab-pane :label="$t('auth.resetPassword.phoneReset')" name="phone">
+        <!-- 手机号输入 -->
+        <el-form-item prop="phone">
+          <el-input
+            v-model="resetForm.phone"
+            :placeholder="$t('auth.phone')"
+            size="large"
+            clearable
+            maxlength="11"
+            autocomplete="off"
+            name="reset-phone"
+            class="phone-input"
+          >
+            <template #prefix>
+              <el-icon class="phone-icon"><Phone /></el-icon>
+              <span class="phone-prefix">+86</span>
+            </template>
+          </el-input>
+        </el-form-item>
 
-    <!-- 验证码输入 -->
-    <el-form-item prop="captcha">
-      <div class="captcha-container">
-        <el-input
-          v-model="resetForm.captcha"
-          :placeholder="$t('auth.captcha')"
-          size="large"
-          prefix-icon="Picture"
-          clearable
-          autocomplete="off"
-          name="reset-captcha"
-        />
-        <div class="captcha-image" @click="refreshCaptcha">
-          <img v-if="captchaUrl" :src="captchaUrl" alt="验证码" />
-          <span v-else>{{ $t('common.loading') }}</span>
-        </div>
-      </div>
-    </el-form-item>
+        <!-- 短信验证码输入 -->
+        <el-form-item prop="smsCode">
+          <div class="sms-code-container">
+            <el-input
+              v-model="resetForm.smsCode"
+              :placeholder="$t('auth.resetPassword.verificationCodePlaceholder')"
+              size="large"
+              prefix-icon="Message"
+              clearable
+              maxlength="6"
+              autocomplete="one-time-code"
+              name="reset-sms-code"
+            />
+            <BaseButton
+              type="primary"
+              size="large"
+              :disabled="!canSendSmsCode || smsCodeCountdown > 0"
+              @click="sendSmsCode"
+            >
+              {{ smsCodeCountdown > 0 ? `${smsCodeCountdown}s` : $t('auth.resetPassword.getVerificationCode') }}
+            </BaseButton>
+          </div>
+        </el-form-item>
+      </el-tab-pane>
 
-    <!-- 邮箱验证码输入 -->
-    <el-form-item prop="emailCode">
-      <div class="email-code-container">
-        <el-input
-          v-model="resetForm.emailCode"
-          :placeholder="$t('auth.emailCode')"
-          size="large"
-          prefix-icon="Message"
-          clearable
-          autocomplete="one-time-code"
-          name="reset-email-code"
-        />
-        <BaseButton
-          type="primary"
-          :disabled="!canSendEmailCode || emailCodeCountdown > 0"
-          @click="sendEmailCode"
-        >
-          {{ emailCodeCountdown > 0 ? `${emailCodeCountdown}s` : $t('auth.sendCode') }}
-        </BaseButton>
-      </div>
-    </el-form-item>
+      <el-tab-pane :label="$t('auth.resetPassword.emailReset')" name="email">
+        <!-- 邮箱输入 -->
+        <el-form-item prop="email">
+          <el-input
+            v-model="resetForm.email"
+            :placeholder="$t('auth.email')"
+            size="large"
+            prefix-icon="Message"
+            clearable
+            autocomplete="off"
+            name="reset-email"
+          />
+        </el-form-item>
+
+        <!-- 邮箱验证码输入 -->
+        <el-form-item prop="emailCode">
+          <div class="email-code-container">
+            <el-input
+              v-model="resetForm.emailCode"
+              :placeholder="$t('auth.emailCode')"
+              size="large"
+              prefix-icon="Message"
+              clearable
+              maxlength="6"
+              autocomplete="one-time-code"
+              name="reset-email-code"
+            />
+            <BaseButton
+              type="primary"
+              size="large"
+              :disabled="!canSendEmailCode || emailCodeCountdown > 0"
+              @click="sendEmailCode"
+            >
+              {{ emailCodeCountdown > 0 ? `${emailCodeCountdown}s` : $t('auth.sendCode') }}
+            </BaseButton>
+          </div>
+        </el-form-item>
+      </el-tab-pane>
+    </el-tabs>
 
     <!-- 新密码输入 -->
     <el-form-item prop="newPassword">
@@ -107,7 +141,7 @@
         class="reset-button"
         @click="handleReset"
       >
-        {{ $t('auth.resetPassword') }}
+        {{ t('auth.resetPasswordButton') }}
       </BaseButton>
     </el-form-item>
   </el-form>
@@ -118,8 +152,10 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import { Phone } from '@element-plus/icons-vue'
 import { BaseButton } from '@/components/Common'
-import { resetPassword, getCaptcha, sendEmailCode as sendEmailCodeApi } from '@/api/Auth'
+import { resetPassword, sendEmailCode as sendEmailCodeApi, sendSmsVerificationCode } from '@/api/Auth'
+import { validatePhone } from '@/utils/validate'
 
 // 定义事件
 const emit = defineEmits(['reset-success', 'go-to-login'])
@@ -134,8 +170,8 @@ const resetFormRef = ref()
 // 加载状态
 const loading = ref(false)
 
-// 验证码相关
-const captchaUrl = ref('')
+// Tab 切换（默认手机号重置）
+const activeTab = ref('phone')
 
 // 邮箱验证码相关
 const emailCodeCountdown = ref(0)
@@ -143,81 +179,166 @@ let emailCodeTimer = null
 const canSendEmailCode = computed(() => {
   return (
     resetForm.email &&
-    resetForm.captcha &&
-    resetForm.captchaKey &&
+    !emailError.value &&
     emailCodeCountdown.value === 0
   )
 })
 
+// 短信验证码相关
+const smsCodeCountdown = ref(0)
+let smsCodeTimer = null
+const canSendSmsCode = computed(() => {
+  return (
+    resetForm.phone &&
+    !phoneError.value &&
+    smsCodeCountdown.value === 0
+  )
+})
+
+// 错误状态
+const emailError = ref('')
+const phoneError = ref('')
+
 // 表单数据
 const resetForm = reactive({
+  phone: '',
   email: '',
-  captcha: '',
-  captchaKey: '', // 图形验证码唯一标识
+  smsCode: '',
   emailCode: '',
   newPassword: '',
   confirmPassword: ''
 })
 
 const blankFormFields = {
+  phone: '',
   email: '',
-  captcha: '',
+  smsCode: '',
   emailCode: '',
   newPassword: '',
   confirmPassword: ''
 }
 
-const clearFormValues = (preserveCaptchaKey = true) => {
-  const currentCaptchaKey = preserveCaptchaKey ? resetForm.captchaKey : ''
-  Object.assign(resetForm, {
-    ...blankFormFields,
-    captchaKey: currentCaptchaKey
+const clearFormValues = () => {
+  Object.assign(resetForm, blankFormFields)
+  emailError.value = ''
+  phoneError.value = ''
+  // 使用 nextTick 确保 DOM 更新后再清除校验
+  nextTick(() => {
+    if (resetFormRef.value && typeof resetFormRef.value.clearValidate === 'function') {
+      resetFormRef.value.clearValidate()
+    }
   })
-  if (resetFormRef.value && typeof resetFormRef.value.clearValidate === 'function') {
-    resetFormRef.value.clearValidate()
-  }
 }
 
 // 表单验证规则
-const resetRules = {
-  email: [
-    { required: true, message: t('auth.email'), trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
-  ],
-  captcha: [
-    { required: true, message: t('auth.captcha'), trigger: 'blur' }
-  ],
-  emailCode: [
-    { required: true, message: t('auth.emailCode'), trigger: 'blur' }
-  ],
-  newPassword: [
-    { required: true, message: t('auth.newPassword'), trigger: 'blur' },
-    { min: 6, max: 20, message: '密码长度为6-20个字符', trigger: 'blur' },
-    { pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{6,}$/, message: '密码必须包含大小写字母和数字', trigger: 'blur' }
-  ],
-  confirmPassword: [
-    { required: true, message: t('auth.confirmPassword'), trigger: 'blur' },
-    {
-      validator: (rule, value, callback) => {
-        if (value !== resetForm.newPassword) {
-          callback(new Error('两次输入的密码不一致'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
-  ]
-}
+const resetRules = computed(() => {
+  const rules = {
+    newPassword: [
+      { required: true, message: t('auth.newPassword'), trigger: 'blur' },
+      { min: 6, max: 20, message: t('auth.resetPassword.passwordLength'), trigger: 'blur' }
+    ],
+    confirmPassword: [
+      { required: true, message: t('auth.confirmPassword'), trigger: 'blur' },
+      {
+        validator: (rule, value, callback) => {
+          if (value !== resetForm.newPassword) {
+            callback(new Error(t('auth.resetPassword.passwordMismatch')))
+          } else {
+            callback()
+          }
+        },
+        trigger: 'blur'
+      }
+    ]
+  }
+
+  // 根据当前 Tab 添加不同的验证规则
+  if (activeTab.value === 'phone') {
+    rules.phone = [
+      { required: true, message: t('auth.phoneRequired'), trigger: 'blur' },
+      {
+        validator: (rule, value, callback) => {
+          const phone = (value || '').trim()
+          if (!phone) {
+            callback()
+            return
+          }
+          if (!validatePhone(phone)) {
+            phoneError.value = t('auth.phoneInvalid')
+            callback(new Error(t('auth.phoneInvalid')))
+          } else {
+            phoneError.value = ''
+            callback()
+          }
+        },
+        trigger: 'blur'
+      }
+    ]
+    rules.smsCode = [
+      { required: true, message: t('auth.smsCodeRequired'), trigger: 'blur' },
+      {
+        validator: (rule, value, callback) => {
+          if (!value) {
+            callback()
+            return
+          }
+          if (!/^\d{6}$/.test(value)) {
+            callback(new Error(t('auth.smsCodeLength')))
+          } else {
+            callback()
+          }
+        },
+        trigger: 'blur'
+      }
+    ]
+  } else {
+    rules.email = [
+      { required: true, message: t('auth.email'), trigger: 'blur' },
+      { type: 'email', message: t('auth.resetPassword.emailFormat'), trigger: 'blur' }
+    ]
+    rules.emailCode = [
+      { required: true, message: t('auth.emailCode'), trigger: 'blur' },
+      {
+        validator: (rule, value, callback) => {
+          if (!value) {
+            callback()
+            return
+          }
+          if (!/^\d{6}$/.test(value)) {
+            callback(new Error(t('auth.resetPassword.emailCodeLength')))
+          } else {
+            callback()
+          }
+        },
+        trigger: 'blur'
+      }
+    ]
+  }
+
+  return rules
+})
 
 // 表单是否有效
 const isFormValid = computed(() => {
-  return resetForm.email && 
-         resetForm.captcha && 
-         resetForm.emailCode && 
-         resetForm.newPassword && 
-         resetForm.confirmPassword
+  if (activeTab.value === 'phone') {
+    return resetForm.phone &&
+           resetForm.smsCode &&
+           resetForm.newPassword &&
+           resetForm.confirmPassword &&
+           !phoneError.value
+  } else {
+    return resetForm.email &&
+           resetForm.emailCode &&
+           resetForm.newPassword &&
+           resetForm.confirmPassword &&
+           !emailError.value
+  }
 })
+
+// 处理 Tab 切换
+const handleTabChange = (tabName) => {
+  clearFormValues()
+}
 
 // 处理重置密码
 const handleReset = async () => {
@@ -227,13 +348,24 @@ const handleReset = async () => {
     await resetFormRef.value.validate()
     loading.value = true
 
-    const response = await resetPassword({
-      email: resetForm.email,
-      captcha: resetForm.captcha,
-      captchaKey: resetForm.captchaKey, // 传递验证码唯一标识
-      emailCode: resetForm.emailCode,
-      newPassword: resetForm.newPassword
-    })
+    let payload
+    if (activeTab.value === 'phone') {
+      // 手机号重置
+      payload = {
+        phone: resetForm.phone,
+        smsCode: resetForm.smsCode,
+        newPassword: resetForm.newPassword
+      }
+    } else {
+      // 邮箱重置
+      payload = {
+        email: resetForm.email,
+        emailCode: resetForm.emailCode,
+        newPassword: resetForm.newPassword
+      }
+    }
+
+    const response = await resetPassword(payload)
 
     // 重置成功
     ElMessage.success(t('auth.resetSuccess'))
@@ -246,21 +378,14 @@ const handleReset = async () => {
     console.error('重置密码失败:', error)
     
     // 显示错误信息
-    const errorMessage = error.response?.data?.message || t('auth.resetFailed')
-    ElMessage.error(errorMessage)
-    
-    // 刷新验证码
-    await refreshCaptcha()
+    if (!error._messageShown) {
+      const errorMessage = error.response?.data?.message || t('auth.resetFailed')
+      ElMessage.error(errorMessage)
+    }
     
   } finally {
     loading.value = false
   }
-}
-
-// 处理跳转到登录
-const handleGoToLogin = () => {
-  emit('go-to-login')
-  router.push('/login')
 }
 
 // 发送邮箱验证码
@@ -268,14 +393,24 @@ const sendEmailCode = async () => {
   if (!canSendEmailCode.value) return
   
   try {
-    const email = (resetForm.email || '').trim()
-    const captcha = (resetForm.captcha || '').trim()
+    const email = (resetForm.email || '').trim().toLowerCase()
     resetForm.email = email
-    resetForm.captcha = captcha
+    
+    // 先验证邮箱格式
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      emailError.value = t('auth.resetPassword.emailFormat')
+      ElMessage.warning(t('auth.resetPassword.emailFormat'))
+      return
+    }
+    emailError.value = ''
+    
+    // 后端需要 captcha、captchaKey 和 provider，但前端不显示图形验证码
+    // TODO: 后端需要修改，移除图形验证码要求
     await sendEmailCodeApi({
       email,
-      captcha,
-      captchaKey: resetForm.captchaKey
+      captcha: '',
+      captchaKey: '',
+      provider: 'NETEASE' // 默认使用网易邮箱
     })
     
     ElMessage.success(t('auth.emailCodeSent'))
@@ -295,42 +430,70 @@ const sendEmailCode = async () => {
     
   } catch (error) {
     console.error('发送邮箱验证码失败:', error)
-    const errorMessage = error.response?.data?.message || t('auth.sendCodeFailed')
-    ElMessage.error(errorMessage)
-    
-    // 刷新验证码
-    await refreshCaptcha()
+    if (!error._messageShown) {
+      const errorMessage = error.response?.data?.message || t('auth.sendCodeFailed')
+      ElMessage.error(errorMessage)
+    }
   }
 }
 
-// 刷新验证码
-const refreshCaptcha = async () => {
+// 发送短信验证码
+const sendSmsCode = async () => {
+  if (!canSendSmsCode.value) return
+  
   try {
-    const response = await getCaptcha()
-    // 根据后端 CaptchaResp 定义，使用 captchaImage 和 captchaKey
-    captchaUrl.value = response.data.captchaImage || response.data.captchaUrl // 兼容两种字段名
-    resetForm.captchaKey = response.data.captchaKey || ''
-    resetForm.captcha = ''
+    const phone = (resetForm.phone || '').trim()
+    resetForm.phone = phone
+    
+    // 先验证手机号格式
+    if (!validatePhone(phone)) {
+      phoneError.value = t('auth.phoneInvalid')
+      ElMessage.warning(t('auth.phoneInvalid'))
+      return
+    }
+    phoneError.value = ''
+    
+    await sendSmsVerificationCode({
+      phone
+    })
+    
+    ElMessage.success(t('auth.smsCodeSent'))
+    
+    // 开始倒计时
+    smsCodeCountdown.value = 60
+    if (smsCodeTimer) {
+      clearInterval(smsCodeTimer)
+    }
+    smsCodeTimer = setInterval(() => {
+      smsCodeCountdown.value--
+      if (smsCodeCountdown.value <= 0) {
+        clearInterval(smsCodeTimer)
+        smsCodeTimer = null
+      }
+    }, 1000)
+    
   } catch (error) {
-    console.error('获取验证码失败:', error)
+    console.error('发送短信验证码失败:', error)
+    if (!error._messageShown) {
+      const errorMessage = error.response?.data?.message || t('auth.smsCodeSendFailed')
+      ElMessage.error(errorMessage)
+    }
   }
 }
 
 // 组件挂载时初始化
-onMounted(async () => {
-  clearFormValues(false)
-  await refreshCaptcha()
-  await nextTick()
-  // 避免浏览器自动填充继承登录信息
-  requestAnimationFrame(() => {
-    clearFormValues(true)
-  })
+onMounted(() => {
+  clearFormValues()
 })
 
 onUnmounted(() => {
   if (emailCodeTimer) {
     clearInterval(emailCodeTimer)
     emailCodeTimer = null
+  }
+  if (smsCodeTimer) {
+    clearInterval(smsCodeTimer)
+    smsCodeTimer = null
   }
 })
 </script>
@@ -339,49 +502,74 @@ onUnmounted(() => {
 .reset-form {
   width: 100%;
   
-  .captcha-container {
-    display: flex;
-    gap: var(--gap-sm);
+  .reset-tabs {
+    margin-bottom: 20px;
     
-    .el-input {
-      flex: 1;
+    :deep(.el-tabs__header) {
+      margin-bottom: 20px;
     }
     
-    .captcha-image {
-      width: 120px;
-      height: 40px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      background: var(--bg);
+    :deep(.el-tabs__nav-wrap::after) {
+      height: 0;
+    }
+    
+    :deep(.el-tabs__item) {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-2);
       
-      img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        border-radius: var(--radius-sm);
-      }
-      
-      span {
-        font-size: 12px;
-        color: var(--text-3);
+      &.is-active {
+        color: var(--color-primary);
+        font-weight: 600;
       }
       
       &:hover {
-        border-color: var(--color-primary);
+        color: var(--color-primary);
       }
+    }
+    
+    :deep(.el-tabs__active-bar) {
+      height: 3px;
+      border-radius: 2px;
+      background-color: var(--color-primary);
     }
   }
   
+  .phone-input {
+    :deep(.el-input__prefix) {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  }
+  
+  .phone-icon {
+    color: var(--el-text-color-placeholder);
+    font-size: 16px;
+  }
+  
+  .phone-prefix {
+    display: inline-flex;
+    align-items: center;
+    padding-right: 8px;
+    border-right: 1px solid var(--el-border-color);
+    margin-right: 8px;
+    color: var(--el-text-color-placeholder);
+    font-size: 14px;
+  }
+  
+  .sms-code-container,
   .email-code-container {
     display: flex;
     gap: var(--gap-sm);
     
     .el-input {
       flex: 1;
+    }
+    
+    :deep(.base-button) {
+      min-width: 130px;
+      flex-shrink: 0;
     }
   }
   
@@ -390,12 +578,6 @@ onUnmounted(() => {
     height: 48px;
     font-size: 16px;
     font-weight: 600;
-  }
-  
-  .login-link {
-    text-align: center;
-    color: var(--text-2);
-    font-size: 14px;
   }
 }
 </style>

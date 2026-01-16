@@ -1,6 +1,6 @@
 package com.sciz.server.domain.pojo.dto.request.user;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -15,18 +15,38 @@ import lombok.Data;
 public class LoginReq {
 
     /**
-     * 用户名或邮箱
+     * 登录类型（password: 账号密码登录, sms: 短信验证码登录）
+     * 默认为 sms（短信登录）
      */
-    @NotBlank(message = "用户名不能为空")
-    @Size(min = 3, max = 50, message = "用户名长度必须在3-50个字符之间")
+    private String loginType = "sms";
+
+    /**
+     * 账号（密码登录时必填）
+     * 支持三种格式：
+     * - 用户名（3-20位，字母、数字、下划线）
+     * - 手机号（11位数字，支持 +86 前缀）
+     * - 邮箱（标准邮箱格式）
+     */
+    @Size(min = 3, max = 100, message = "账号长度必须在3-100个字符之间")
     private String username;
 
     /**
-     * 密码
+     * 密码（密码登录时必填）
      */
-    @NotBlank(message = "密码不能为空")
     @Size(min = 5, max = 20, message = "密码长度必须在6-20个字符之间")
     private String password;
+
+    /**
+     * 手机号（短信登录时必填）
+     */
+    @Pattern(regexp = "^\\+?[0-9]{6,20}$", message = "手机号格式不正确")
+    private String phone;
+
+    /**
+     * 短信验证码（短信登录时必填）
+     */
+    @Size(max = 6, message = "短信验证码长度不能超过6个字符")
+    private String smsCode;
 
     /**
      * 记住我

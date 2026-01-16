@@ -1,0 +1,51 @@
+# Java
+*.class
+*.log
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+target/
+*.iml
+.idea/
+.classpath
+.project
+.settings/
+bin/
+*.swp
+*.swo
+*~
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+.cache/
+.temp/
+*.pid
+*.seed
+*.pid.lock
+
+# IDE
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# 生产环境配置文件（包含敏感信息，不应提交到公网仓库）
+# 注意：GitLab（内网）可以提交，但 GitHub（公网）会泄露
+sci-z-server/src/main/resources/config/production.env.properties

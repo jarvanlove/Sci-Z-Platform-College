@@ -26,17 +26,34 @@
             <!-- 表单区域 -->
             <div class="form-section">
               <LoginForm 
+                ref="loginFormRef"
+                :active-tab="activeTab"
+                :sms-agreement="smsAgreement"
+                @update:active-tab="activeTab = $event"
                 @login-success="handleLoginSuccess"
                 @forgot-password="handleForgotPassword"
+                @tab-change="handleTabChange"
+                @sms-login-attempt="handleSmsLoginAttempt"
               />
             </div>
             
-            <!-- 底部区域 -->
+            <!-- 底部区域 - 根据当前 Tab 显示不同内容 -->
             <div class="register-section">
-              <span>{{ $t('auth.noAccount') }}</span>
-              <el-button type="text" @click="handleGoToRegister">
-                {{ $t('auth.registerNow') }}
-              </el-button>
+              <!-- 短信登录时显示：用户协议和隐私政策 -->
+              <template v-if="activeTab === 'sms'">
+                <AgreementNotice
+                  v-model="smsAgreement"
+                  @view-user-agreement="showUserAgreement"
+                  @view-privacy-policy="showPrivacyPolicy"
+                />
+              </template>
+              <!-- 账号登录时显示：还没有账号？立即注册 -->
+              <template v-else>
+                <span>{{ $t('auth.noAccount') }}</span>
+                <el-button type="text" @click="handleGoToRegister">
+                  {{ $t('auth.registerNow') }}
+                </el-button>
+              </template>
             </div>
           </div>
         </div>
@@ -46,16 +63,17 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { Teleport, Transition } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close } from '@element-plus/icons-vue'
 import { LoginForm } from '@/components/Business/Auth'
+import AgreementNotice from '@/components/Common/AgreementNotice.vue'
 import { useAuthStore } from '@/store/modules/auth'
 import { useIndustryStore } from '@/store/modules/industry'
-import { useLoginModal } from '@/composables/useLoginModal'
+import { useAuthModal } from '@/composables/useAuthModal'
 
 const props = defineProps({
   modelValue: {
@@ -70,7 +88,14 @@ const router = useRouter()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const industryStore = useIndustryStore()
-const { closeLoginModal } = useLoginModal()
+const { closeLoginModal, openRegisterModal, openResetPasswordModal } = useAuthModal()
+
+// 当前激活的 Tab（默认短信登录）
+const activeTab = ref('sms')
+const loginFormRef = ref(null)
+
+// 短信登录时的协议勾选状态
+const smsAgreement = ref(false)
 
 // 控制弹窗显示
 const visible = computed({
@@ -121,13 +146,54 @@ const handleLoginSuccess = async (userData) => {
 // 处理忘记密码
 const handleForgotPassword = () => {
   handleClose()
-  router.push('/reset-password')
+  // 更新路由并打开重置密码弹窗
+  router.push('/reset-password').then(() => {
+    openResetPasswordModal()
+  })
+}
+
+// 处理 Tab 切换
+const handleTabChange = (tabName) => {
+  activeTab.value = tabName
+  // 切换 Tab 时重置协议勾选状态
+  if (tabName === 'sms') {
+    smsAgreement.value = false
+  }
+}
+
+// 处理短信登录尝试（检查协议）
+const handleSmsLoginAttempt = () => {
+  // 协议校验在 SmsLoginForm 中通过 props 进行，这里不需要额外处理
+  // 如果协议未勾选，SmsLoginForm 会显示提示并阻止登录
+}
+
+// 查看用户协议
+const showUserAgreement = () => {
+  ElMessageBox.alert(t('legal.userAgreementContent'), t('legal.userAgreement'), {
+    confirmButtonText: t('common.confirm'),
+    customClass: 'agreement-modal',
+    dangerouslyUseHTMLString: true,
+    callback: () => {}
+  })
+}
+
+// 查看隐私政策
+const showPrivacyPolicy = () => {
+  ElMessageBox.alert(t('legal.privacyPolicyContent'), t('legal.privacyPolicy'), {
+    confirmButtonText: t('common.confirm'),
+    customClass: 'agreement-modal',
+    dangerouslyUseHTMLString: true,
+    callback: () => {}
+  })
 }
 
 // 处理跳转到注册
 const handleGoToRegister = () => {
   handleClose()
-  router.push('/register')
+  // 更新路由并打开注册弹窗
+  router.push('/register').then(() => {
+    openRegisterModal()
+  })
 }
 </script>
 
@@ -197,6 +263,10 @@ const handleGoToRegister = () => {
   border: 1px solid rgba(255, 255, 255, 0.3);
   position: relative;
   transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
   
   &:hover {
     transform: translateY(-2px);
@@ -229,15 +299,21 @@ const handleGoToRegister = () => {
 }
 
 .form-section {
-  margin-bottom: 24px;
+  margin-bottom: 0;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 8px;
 }
 
 .register-section {
   text-align: center;
-  padding-top: 24px;
+  padding-top: 20px;
+  margin-top: 20px;
   border-top: 1px solid #e5e7eb;
   color: #6b7280;
   font-size: 14px;
+  flex-shrink: 0;
   
   .el-button {
     color: #1e3a8a;
