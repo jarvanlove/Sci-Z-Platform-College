@@ -642,7 +642,7 @@ public class ProjectServiceImpl implements ProjectService {
                 projectProgressRepo.updateById(existingMilestone);
 
                 // 更新里程碑文档关联
-                updateMilestoneDocuments(existingMilestone.getId(), milestoneReq.documents(), projectId);
+                updateMilestoneDocuments(existingMilestone.getId(), milestoneReq.documents(), projectId, milestoneReq.name(), userId);
             } else {
                 // 新增里程碑
                 var newMilestone = new ProjectProgress();
@@ -769,14 +769,16 @@ public class ProjectServiceImpl implements ProjectService {
      * @param milestoneId  里程碑ID
      * @param documentReqs 文档更新请求列表
      * @param projectId    项目ID（用于更新知识库文件数量）
+     * @param milestoneName 里程碑名称（用于匹配待关联文件）
+     * @param userId       用户ID（用于更新关联记录）
      */
     private void updateMilestoneDocuments(Long milestoneId, List<MilestoneDocumentUpdateReq> documentReqs,
-            Long projectId) {
+            Long projectId, String milestoneName, Long userId) {
         if (CollectionUtils.isEmpty(documentReqs)) {
             return;
         }
 
-        // 1. 查询现有文档关联（使用里程碑ID查询，因为里程碑文件上传时关联ID用的是里程碑ID）
+        // 1. 查询现有文档关联（使用里程碑ID查询）
         var existingAttachmentIds = sysAttachmentRelationRepo.findAttachmentIds(
                 AttachmentRelationStatus.PROJECT.getCode(), milestoneId);
 
@@ -786,16 +788,70 @@ public class ProjectServiceImpl implements ProjectService {
                 .filter(id -> id != null)
                 .collect(Collectors.toSet());
 
-        // 3. 删除不在请求中的关联（同时删除知识库文件关联）
+        // 3. 处理待关联的文件（relationId=0）：根据 relationName 匹配并更新 relationId
+        // 这些文件是刚上传的，relationId=0，需要通过 relationName 匹配
+        if (projectId != null && StringUtils.hasText(milestoneName)) {
+            try {
+                var project = projectRepo.findById(projectId);
+                if (project != null && StringUtils.hasText(project.getNumber())) {
+                    // 构建 relationName：项目编号/里程碑名称（与上传时的格式一致）
+                    var relationName = String.format("%s/%s", project.getNumber(), milestoneName);
+
+                    // 查询待关联的附件关联记录（relationId=0，relationName 匹配）
+                    var pendingRelations = sysAttachmentRelationRepo.findPendingRelations(
+                            AttachmentRelationStatus.PROJECT.getCode(),
+                            relationName);
+
+                    if (!pendingRelations.isEmpty()) {
+                        // 获取待关联文件的附件ID列表
+                        var pendingAttachmentIds = pendingRelations.stream()
+                                .map(relation -> relation.getAttachmentId())
+                                .collect(Collectors.toSet());
+
+                        // 过滤出在请求中的待关联文件（需要关联到当前里程碑）
+                        var toLinkAttachmentIds = pendingAttachmentIds.stream()
+                                .filter(requestAttachmentIds::contains)
+                                .collect(Collectors.toList());
+
+                        if (!toLinkAttachmentIds.isEmpty()) {
+                            // 获取对应的关联记录ID
+                            var relationIds = pendingRelations.stream()
+                                    .filter(relation -> toLinkAttachmentIds.contains(relation.getAttachmentId()))
+                                    .map(relation -> relation.getId())
+                                    .collect(Collectors.toList());
+
+                            // 批量更新 relationId 为里程碑ID
+                            var updated = sysAttachmentRelationRepo.updateRelationIds(relationIds, milestoneId, userId);
+                            if (updated) {
+                                log.info(String.format("更新待关联附件成功: projectId=%s, milestoneId=%s, milestoneName=%s, count=%s",
+                                        projectId, milestoneId, milestoneName, relationIds.size()));
+
+                                // 将已关联的文件ID添加到 existingAttachmentIds 中，避免后续重复处理
+                                existingAttachmentIds.addAll(toLinkAttachmentIds);
+                            } else {
+                                log.warn(String.format("更新待关联附件失败: projectId=%s, milestoneId=%s, milestoneName=%s",
+                                        projectId, milestoneId, milestoneName));
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error(String.format("处理待关联文件异常: projectId=%s, milestoneId=%s, milestoneName=%s, err=%s",
+                        projectId, milestoneId, milestoneName, e.getMessage()), e);
+                // 不抛出异常，避免影响主流程
+            }
+        }
+
+        // 4. 删除不在请求中的关联（同时删除知识库文件关联）
         var deletedAttachmentIds = existingAttachmentIds.stream()
                 .filter(id -> !requestAttachmentIds.contains(id))
                 .toList();
 
         if (!deletedAttachmentIds.isEmpty()) {
-            // 3.1. 删除附件关联
+            // 4.1. 删除附件关联
             deletedAttachmentIds.forEach(sysAttachmentRelationRepo::deleteByAttachmentId);
 
-            // 3.2. 删除知识库文件关联并更新文件数量
+            // 4.2. 删除知识库文件关联并更新文件数量
             Long knowledgeId = null;
             if (projectId != null) {
                 var project = projectRepo.findById(projectId);

@@ -49,6 +49,28 @@ service.interceptors.response.use(
     // 统一处理业务错误
     if (data.code && data.code !== 200) {
       const error = new Error(data.message || '请求失败')
+      
+      // 🔥 修复：对于401业务错误（未授权访问），需要特殊处理，避免在退出登录后或公开页面显示错误
+      if (data.code === 401) {
+        const authStore = useAuthStore()
+        // 如果正在退出登录，静默处理
+        if (authStore.isLoggingOut) {
+          error._messageShown = true
+          return Promise.reject(error)
+        }
+        
+        // 对于公开页面（如 /ai/chat），如果用户未登录，401 错误应该静默处理
+        const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
+        const publicPages = ['/ai/chat',  '/login', '/register', '/reset-password']
+        const isPublicPage = publicPages.includes(currentPath)
+        
+        if (isPublicPage && !authStore.isLoggedIn) {
+          // 在公开页面且用户未登录时，401 错误是正常的（可能是退出登录后的残留请求），静默处理
+          error._messageShown = true
+          return Promise.reject(error)
+        }
+      }
+      
       // 🔥 标记：表示错误信息已经在拦截器中显示，组件中不需要再次显示
       error._messageShown = true
       ElMessage.error(data.message || '请求失败')

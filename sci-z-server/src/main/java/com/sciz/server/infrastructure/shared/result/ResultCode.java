@@ -441,6 +441,16 @@ public enum ResultCode {
     SMS_CODE_RATE_LIMITED(9012, "短信验证码发送频繁，请稍后再试"),
 
     /**
+     * 短信验证码10分钟内发送次数超限
+     */
+    SMS_CODE_10MIN_LIMIT_EXCEEDED(9017, "10分钟内发送次数过多，请稍后再试"),
+
+    /**
+     * 短信验证码一天内发送次数超限
+     */
+    SMS_CODE_DAY_LIMIT_EXCEEDED(9018, "今日发送次数已达上限，请明天再试"),
+
+    /**
      * 短信验证码发送失败
      */
     SMS_CODE_SEND_FAILED(9013, "短信验证码发送失败"),

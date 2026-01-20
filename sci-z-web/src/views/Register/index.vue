@@ -127,8 +127,8 @@ const handleGoToLogin = () => {
   margin-bottom: 22px;
 
   img {
-    width: 80px;
-    height: 80px;
+    width: 160px;
+    height: auto;
     margin-bottom: 14px;
   }
 

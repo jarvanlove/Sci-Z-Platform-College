@@ -43,6 +43,7 @@
               <template v-if="activeTab === 'sms'">
                 <AgreementNotice
                   v-model="smsAgreement"
+                  :is-sms-login="true"
                   @view-user-agreement="showUserAgreement"
                   @view-privacy-policy="showPrivacyPolicy"
                 />
@@ -65,7 +66,7 @@
 <script setup>
 import { computed, watch, ref } from 'vue'
 import { Teleport, Transition } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close } from '@element-plus/icons-vue'
@@ -85,6 +86,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const industryStore = useIndustryStore()
@@ -114,6 +116,12 @@ watch(() => authStore.isLoggedIn, (isLoggedIn) => {
 const handleClose = () => {
   visible.value = false
   closeLoginModal()
+  // 🔥 修复：如果当前路由是 /login 且用户未登录，跳转到 AI 对话页面（避免停留在登录页面）
+  if (route.path === '/login' && !authStore.isLoggedIn) {
+    router.push('/ai/chat').catch(() => {
+      // 忽略路由冗余导航错误
+    })
+  }
 }
 
 // 处理登录成功
@@ -131,9 +139,14 @@ const handleLoginSuccess = async (userData) => {
     // 关闭弹窗
     handleClose()
     
+    // 🔥 修复：登录成功后跳转到 AI 对话页面
+    const redirect = route.query.redirect
+    const targetPath = redirect && redirect !== '/login' ? redirect : '/ai/chat'
+    await router.push(targetPath)
+    
     // 打印调试信息（开发环境）
     if (import.meta.env.DEV) {
-      console.log('✅ 登录成功，弹窗已关闭')
+      console.log('✅ 登录成功，已跳转到:', targetPath)
       console.log('📊 用户权限:', authStore.permissions)
       console.log('📋 用户菜单:', authStore.menus)
     }
@@ -279,7 +292,7 @@ const handleGoToRegister = () => {
   margin-bottom: 32px;
   
   img {
-    width: 120px;
+    width: 160px;
     height: auto;
     margin-bottom: 16px;
   }
@@ -349,7 +362,7 @@ const handleGoToRegister = () => {
   
   .logo-section {
     img {
-      width: 80px;
+      width: 120px;
     }
     
     h1 {

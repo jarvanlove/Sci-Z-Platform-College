@@ -6,42 +6,46 @@
  */
 -->
 <template>
-  <BaseScrollbar class="login-page-scrollbar" size="medium">
-    <div class="login-container">
-      <!-- 科技感背景 -->
-      <div class="bg-scape"></div>
-      
-      <!-- 登录卡片 -->
-      <BaseCard class="login-card">
-        <!-- Logo 区域 -->
-        <div class="logo-section">
-              <img src="@/assets/images/logo.svg" alt="Logo" />
-          <h1>{{ $t('app.title') }}</h1>
-          <p>{{ $t('auth.welcomeBack') }}</p>
-        </div>
+  <!-- 🔥 修复：在 TOC 布局下不显示内容（弹窗会通过 App.vue 的监听器打开） -->
+  <div v-if="!isTocLayout" class="login-page-wrapper">
+    <BaseScrollbar class="login-page-scrollbar" size="medium">
+      <div class="login-container">
+        <!-- 科技感背景 -->
+        <div class="bg-scape"></div>
         
-        <!-- 表单区域 -->
-        <div class="form-section">
-          <LoginForm 
-            @login-success="handleLoginSuccess"
-            @forgot-password="handleForgotPassword"
-          />
-        </div>
-        
-        <!-- 底部区域 -->
-        <div class="register-section">
-          <span>{{ $t('auth.noAccount') }}</span>
-          <el-button type="text" @click="handleGoToRegister">
-            {{ $t('auth.registerNow') }}
-          </el-button>
-        </div>
-      </BaseCard>
-    </div>
-  </BaseScrollbar>
+        <!-- 登录卡片 -->
+        <BaseCard class="login-card">
+          <!-- Logo 区域 -->
+          <div class="logo-section">
+                <img src="@/assets/images/logo.svg" alt="Logo" />
+            <h1>{{ $t('app.title') }}</h1>
+            <p>{{ $t('auth.welcomeBack') }}</p>
+          </div>
+          
+          <!-- 表单区域 -->
+          <div class="form-section">
+            <LoginForm 
+              @login-success="handleLoginSuccess"
+              @forgot-password="handleForgotPassword"
+            />
+          </div>
+          
+          <!-- 底部区域 -->
+          <div class="register-section">
+            <span>{{ $t('auth.noAccount') }}</span>
+            <el-button type="text" @click="handleGoToRegister">
+              {{ $t('auth.registerNow') }}
+            </el-button>
+          </div>
+        </BaseCard>
+      </div>
+    </BaseScrollbar>
+  </div>
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { BaseCard, BaseScrollbar } from '@/components/Common'
@@ -51,9 +55,13 @@ import { useIndustryStore } from '@/store/modules/industry'
 
 // 路由和国际化
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const industryStore = useIndustryStore()
+
+// 🔥 修复：检查是否在 TOC 布局下（弹窗模式）
+const isTocLayout = computed(() => route.meta?.layout === 'toc')
 
 // 处理登录成功
 const handleLoginSuccess = async (userData) => {
@@ -221,7 +229,7 @@ const handleGoToRegister = () => {
   margin-bottom: var(--gap-xl);
   
   img {
-    width: 120px;
+    width: 160px;
     height: auto;
     margin-bottom: var(--gap-md);
   }

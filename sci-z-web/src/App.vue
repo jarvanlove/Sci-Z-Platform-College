@@ -64,8 +64,8 @@ const getLayout = (route) => {
     return route.meta.layout
   }
   
-  // 登录、注册、重置密码页面不使用布局
-  const noLayoutPages = ['/login', '/register', '/reset-password']
+  // 注册、重置密码页面不使用布局（登录页面使用 TOC 布局显示弹窗）
+  const noLayoutPages = ['/register', '/reset-password']
   if (noLayoutPages.includes(route.path)) {
     return null
   }

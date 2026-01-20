@@ -210,7 +210,7 @@
                 {{ userInfo?.username?.charAt(0)?.toUpperCase() || 'U' }}
               </el-avatar>
               <div class="user-details" v-show="!isCollapsed">
-                <div class="username">{{ userInfo?.username || 'User' }}</div>
+                <div class="username" :title="userInfo?.username || 'User'">{{ displayUsername }}</div>
               </div>
               <el-icon class="dropdown-icon" v-show="!isCollapsed">
                 <ArrowUp v-if="isDropdownOpen" />
@@ -339,6 +339,7 @@ import {
   updateAiConversationPinnedStatus
 } from '@/api/AI/ai'
 import { ElMessageBox } from 'element-plus'
+import { formatPhoneDisplay, validateEmail, validatePhone } from '@/utils/validate'
 
 const route = useRoute()
 const router = useRouter()
@@ -398,6 +399,46 @@ const mainMenus = computed(() => {
 // 用户信息
 const userInfo = computed(() => authStore.userInfo)
 const avatarUrl = computed(() => userInfo.value?.avatar || '')
+
+// 🔥 格式化用户名显示（处理用户名/手机号/邮箱过长问题）
+const displayUsername = computed(() => {
+  const username = userInfo.value?.username || 'User'
+  if (!username || username === 'User') return username
+  
+  // 判断是否为手机号
+  if (validatePhone(username)) {
+    return formatPhoneDisplay(username)
+  }
+  
+  // 判断是否为邮箱
+  if (validateEmail(username)) {
+    // 邮箱过长时截断显示：显示前部分 + ...
+    const maxLength = 20
+    if (username.length > maxLength) {
+      const atIndex = username.indexOf('@')
+      if (atIndex > 0 && atIndex < maxLength - 5) {
+        // 如果@符号在合理位置，显示@前部分 + @ + 域名前几个字符
+        const prefix = username.substring(0, Math.min(atIndex, 12))
+        const domain = username.substring(atIndex + 1)
+        const domainPrefix = domain.substring(0, 5)
+        return `${prefix}...@${domainPrefix}...`
+      } else {
+        // 否则直接截断
+        return username.substring(0, maxLength - 3) + '...'
+      }
+    }
+    return username
+  }
+  
+  // 普通用户名，如果过长则截断
+  const maxLength = 16
+  if (username.length > maxLength) {
+    return username.substring(0, maxLength - 3) + '...'
+  }
+  
+  return username
+})
+
 const isAdmin = computed(() => {
   // 🔥 修复：接口返回的 roles 是字符串数组，如 ["admin"]
   return authStore.roles?.includes('admin') || false
@@ -435,8 +476,9 @@ const handleMenuClick = async (menu) => {
 
 // 创建新对话
 const createNewChat = async () => {
-  // 如果未登录，显示登录弹窗
+  // 🔥 修复：如果未登录，提示并显示登录弹窗
   if (!authStore.isLoggedIn) {
+    ElMessage.warning(t('user.pleaseLogin'))
     openLoginModal()
     return
   }
@@ -530,6 +572,17 @@ const loadChatHistory = async () => {
     return
   }
 
+  // 🔥 修复：如果正在加载（本地或全局），跳过重复调用
+  if (isLoadingChatHistory.value || window.__isLoadingConversations) {
+    console.debug('[ToCSidebar] 对话历史正在加载中，跳过重复调用', { 
+      local: isLoadingChatHistory.value, 
+      global: window.__isLoadingConversations 
+    })
+    return
+  }
+
+  isLoadingChatHistory.value = true
+  window.__isLoadingConversations = true
   try {
     const response = await pageAiConversations({ pageNo: 1, pageSize: 100, sortBy: 'pinned', sortOrder: 'DESC' })
     if (response.code === 200 && response.data) {
@@ -558,6 +611,10 @@ const loadChatHistory = async () => {
   } catch (error) {
     console.error('加载对话历史失败', error)
     chatHistory.value = []
+  } finally {
+    // 🔥 修复：清除加载标记（本地和全局）
+    isLoadingChatHistory.value = false
+    window.__isLoadingConversations = false
   }
 }
 
@@ -749,7 +806,13 @@ const handleUserCommand = (command) => {
 
 // 显示登录弹窗
 const goToLogin = () => {
-  openLoginModal()
+  // 🔥 修复：更新路由并打开登录弹窗（与 ToCLayout.vue 保持一致）
+  router.push('/login').then(() => {
+    openLoginModal()
+  }).catch(() => {
+    // 如果路由已经是 /login 或路由守卫重定向了，直接打开弹窗
+    openLoginModal()
+  })
 }
 
 // 🔥 修复：监听 sessionStorage 变化，更新当前对话ID和响应式ref
@@ -780,10 +843,30 @@ setInterval(() => {
   checkConversationId()
 }, 500)
 
+// 标记是否已经初始化过（避免重复加载）
+const hasInitializedSidebar = ref(false)
+// 标记是否正在加载对话历史（避免重复调用）
+const isLoadingChatHistory = ref(false)
+
+// 🔥 修复：创建全局共享的加载状态，避免 ToCSidebar 和 AIChat 同时调用接口
+if (!window.__isLoadingConversations) {
+  window.__isLoadingConversations = false
+}
+
 // 🔥 修复：监听登录状态，只在真正登录成功时清除对话ID，刷新页面时保留
 watch(() => authStore.isLoggedIn, (isLoggedIn, wasLoggedIn) => {
   if (isLoggedIn) {
-    loadChatHistory()
+    // 🔥 修复：只有在组件未初始化或真正登录成功时才加载，避免重复调用
+    // immediate: true 时 wasLoggedIn 是 undefined，此时如果已初始化则跳过
+    // wasLoggedIn === false 表示真正登录成功，需要加载
+    if (!hasInitializedSidebar.value) {
+      hasInitializedSidebar.value = true
+      loadChatHistory()
+    } else if (wasLoggedIn === false) {
+      // 真正登录成功（从未登录变为已登录），需要重新加载
+      loadChatHistory()
+    }
+    
     // 🔥 修复：只有在真正登录成功时（从未登录变为已登录）才清除对话ID
     // 刷新页面时 wasLoggedIn 可能是 undefined，不应该清除
     // 只有当 wasLoggedIn 明确为 false 时，才是真正的登录成功
@@ -805,6 +888,7 @@ watch(() => authStore.isLoggedIn, (isLoggedIn, wasLoggedIn) => {
     }
     // 🔥 修复：刷新页面时（wasLoggedIn 可能是 undefined），不执行任何操作，保留 sessionStorage 中的状态
   } else {
+    hasInitializedSidebar.value = false // 重置初始化标记
     chatHistory.value = []
     currentChatId.value = null
     sessionStorage.removeItem('currentConversationId')
@@ -864,7 +948,12 @@ onMounted(() => {
     html.setAttribute('data-theme', 'light')
   }
   
-  if (authStore.isLoggedIn) {
+  // 🔥 修复：onMounted 中的加载由 watch 的 immediate: true 处理，避免重复调用
+  // watch 会在组件挂载时立即执行，所以这里不需要再次调用
+  // 如果 watch 的 immediate 没有触发（理论上不会发生），这里作为备用
+  // 注意：watch 的 immediate: true 会在 onMounted 之前执行，所以这里通常不会执行
+  if (authStore.isLoggedIn && !hasInitializedSidebar.value) {
+    hasInitializedSidebar.value = true
     loadChatHistory()
   }
   
@@ -897,7 +986,7 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .toc-sidebar {
-  width: 280px;
+  width: 300px; // 🔥 调整：从 280px 增加到 300px，提供更宽的显示空间
   height: 100vh;
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -983,7 +1072,7 @@ onUnmounted(() => {
 
 .logo-img {
   width: auto;
-  height: 32px;
+  height: 42px;
   max-width: 100%;
   object-fit: contain;
 }

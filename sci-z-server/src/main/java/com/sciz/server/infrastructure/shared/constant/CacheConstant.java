@@ -251,6 +251,41 @@ public class CacheConstant {
      */
     public static final Long AUTH_SMS_VERIFICATION_CODE_INTERVAL = 60L;
 
+    /**
+     * 短信验证码10分钟内发送次数限制键
+     * 格式：auth:verification:sms:count:10min:{phone}
+     */
+    public static final String AUTH_SMS_VERIFICATION_COUNT_10MIN_KEY = "auth:verification:sms:count:10min:%s";
+
+    /**
+     * 短信验证码一天内发送次数限制键
+     * 格式：auth:verification:sms:count:day:{phone}:{date}
+     */
+    public static final String AUTH_SMS_VERIFICATION_COUNT_DAY_KEY = "auth:verification:sms:count:day:%s:%s";
+
+    /**
+     * 短信验证码10分钟内最大发送次数
+     * 默认：5次
+     */
+    public static final int AUTH_SMS_VERIFICATION_MAX_COUNT_10MIN = 5;
+
+    /**
+     * 短信验证码一天内最大发送次数
+     * 默认：20次
+     */
+    public static final int AUTH_SMS_VERIFICATION_MAX_COUNT_DAY = 20;
+
+    /**
+     * 10分钟时间窗口（秒）
+     * 与验证码有效期保持一致，用于限制10分钟内的发送次数
+     */
+    public static final Long AUTH_SMS_VERIFICATION_10MIN_WINDOW = 10L * 60L;
+
+    /**
+     * 一天时间窗口（秒）
+     */
+    public static final Long AUTH_SMS_VERIFICATION_DAY_WINDOW = 24L * 60L * 60L;
+
     // ==================== 行业配置相关缓存常量 ====================
     /**
      * 行业配置缓存命名空间

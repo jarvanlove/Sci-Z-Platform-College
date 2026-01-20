@@ -281,7 +281,7 @@ const handleLogout = async () => {
     }
 
     .header-logo {
-      height: 30px;
+      height: 42px;
       width: auto;
       display: block;
       object-fit: contain;

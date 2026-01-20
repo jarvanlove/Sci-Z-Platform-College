@@ -102,11 +102,11 @@ const handleRegisterSuccess = (userData) => {
 // 处理跳转到登录
 const handleGoToLogin = () => {
   handleClose()
-  // 跳转到登录路由并打开登录弹窗
+  // 🔥 修复：跳转到 /login 路由并打开登录弹窗（与登录按钮行为一致）
   router.push('/login').then(() => {
     openLoginModal()
   }).catch(() => {
-    // 如果路由已经是 /login，直接打开弹窗
+    // 如果路由跳转失败，直接打开弹窗
     openLoginModal()
   })
 }
@@ -195,8 +195,8 @@ const handleGoToLogin = () => {
   flex-shrink: 0;
   
   img {
-    width: 120px;
-    height: 120px;
+    width: 160px;
+    height: auto;
     margin-bottom: 14px;
   }
   
@@ -265,8 +265,8 @@ const handleGoToLogin = () => {
   
   .logo-section {
     img {
-      width: 100px;
-      height: 100px;
+      width: 140px;
+      height: auto;
     }
     
     h1 {

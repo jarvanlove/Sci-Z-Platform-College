@@ -145,7 +145,7 @@ const handleGoToLogin = () => {
   margin-bottom: var(--gap-xl);
   
   img {
-    width: 120px;
+    width: 160px;
     height: auto;
     margin-bottom: var(--gap-md);
   }

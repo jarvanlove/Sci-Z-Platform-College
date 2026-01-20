@@ -124,18 +124,11 @@
                   </button>
                   <button
                     class="action-icon"
-                    @click="triggerKbUpload"
+                    @click="openUploadDialog"
                     :title="$t('knowledge.uploadLocalFile')"
                   >
                     <el-icon><Upload /></el-icon>
                   </button>
-                  <input
-                    ref="kbUploadInput"
-                    type="file"
-                    multiple
-                    style="display: none"
-                    @change="handleKbUpload"
-                  />
                 </div>
               </div>
 
@@ -163,8 +156,15 @@
               </div>
 
               <div class="content-list">
-                <template v-for="item in currentKbDisplayItems" :key="item.id">
-                  <div class="content-item" v-if="item.type === 'file'">
+                <div
+                  v-for="item in currentKbDisplayItems"
+                  :key="item.id"
+                  class="content-item"
+                  :class="{ 'file-item': item.type === 'file', 'folder-item': item.type !== 'file' }"
+                  @click="item.type !== 'file' ? enterFolder(item) : null"
+                >
+                  <!-- 文件类型 -->
+                  <template v-if="item.type === 'file'">
                     <div class="content-item-icon">
                       <el-icon><Document /></el-icon>
                     </div>
@@ -221,9 +221,10 @@
                         </template>
                       </el-dropdown>
                     </div>
-                  </div>
+                  </template>
 
-                  <div class="content-item" v-else @click="enterFolder(item)">
+                  <!-- 文件夹类型 -->
+                  <template v-else>
                     <div class="content-item-icon folder-icon">
                       <el-icon><Folder /></el-icon>
                     </div>
@@ -272,8 +273,8 @@
                         </template>
                       </el-dropdown>
                     </div>
-                  </div>
-                </template>
+                  </template>
+                </div>
               </div>
 
               <div
@@ -526,6 +527,43 @@
       :file-info="previewFileInfo"
       @close="closePreview"
     />
+
+    <!-- 文件上传对话框 -->
+    <el-dialog
+      v-model="showUploadDialog"
+      :title="$t('knowledge.uploadLocalFile')"
+      width="700px"
+      :close-on-click-modal="false"
+      @close="closeUploadDialog"
+    >
+      <!-- Dify 知识库不支持的文件类型提示 -->
+      <el-alert
+        :title="$t('knowledge.unsupportedFileTypesTitle')"
+        :description="$t('knowledge.unsupportedFileTypesDescription')"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      />
+      <FileUpload
+        v-model="pendingUploadFiles"
+        :mode="'batch'"
+        :max-batch-count="10"
+        :multiple="true"
+        :drag="true"
+        :show-file-list="true"
+        :show-tips="true"
+        :max-size="200"
+        :button-text="$t('knowledge.selectFiles')"
+        :upload-tip="$t('knowledge.uploadTip')"
+        :tips-title="$t('knowledge.uploadTipsTitle')"
+        :tips-description="$t('knowledge.uploadTipsDescription')"
+        @batch-upload="handleBatchUpload"
+      />
+      <template #footer>
+        <el-button @click="closeUploadDialog">{{ $t('common.cancel') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -555,6 +593,7 @@ import {
   Warning
 } from '@element-plus/icons-vue'
 import FilePreview from '@/components/Common/FilePreview.vue'
+import { FileUpload } from '@/components/Business/Form'
 import {
   getKnowledgeList,
   createKnowledge,
@@ -591,6 +630,10 @@ const currentFolder = ref(null)
 const kbSearchQuery = ref('')
 const showSearch = ref(false)
 const kbUploadInput = ref(null)
+
+// 文件上传对话框相关
+const showUploadDialog = ref(false)
+const pendingUploadFiles = ref([])
 
 // 创建知识库相关
 const showCreateDialog = ref(false)
@@ -981,13 +1024,70 @@ const createFolder = () => {
   ElMessage.info(t('knowledge.createFolderPending'))
 }
 
-const triggerKbUpload = () => {
-  kbUploadInput.value && kbUploadInput.value.click()
+// 打开上传对话框
+const openUploadDialog = () => {
+  if (!selectedKnowledgeBase.value) {
+    ElMessage.warning(t('knowledge.selectKbFirst'))
+    return
+  }
+  pendingUploadFiles.value = []
+  showUploadDialog.value = true
 }
 
-const handleKbUpload = async (e) => {
-  const files = e.target.files || []
-  if (!files.length || !selectedKnowledgeBase.value) return
+// 关闭上传对话框
+const closeUploadDialog = () => {
+  showUploadDialog.value = false
+  pendingUploadFiles.value = []
+}
+
+// Dify 知识库不支持的文件扩展名
+const unsupportedFileExtensions = [
+  // PPT 文件
+  'ppt', 'pptx',
+  // 图片文件
+  'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico', 'tiff', 'tif'
+]
+
+// 获取文件扩展名
+const getFileExtension = (fileName) => {
+  if (!fileName) return ''
+  const parts = fileName.split('.')
+  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : ''
+}
+
+// 处理批量上传（使用封装好的 FileUpload 组件）
+const handleBatchUpload = async (files) => {
+  if (!files.length || !selectedKnowledgeBase.value) {
+    ElMessage.warning('请选择要上传的文件')
+    return
+  }
+
+  // 验证文件类型：检查是否包含不支持的文件类型
+  const unsupportedFiles = []
+  const validFiles = []
+
+  files.forEach(file => {
+    const ext = getFileExtension(file.name)
+    if (unsupportedFileExtensions.includes(ext)) {
+      unsupportedFiles.push(file.name)
+    } else {
+      validFiles.push(file)
+    }
+  })
+
+  // 如果有不支持的文件类型，提示用户
+  if (unsupportedFiles.length > 0) {
+    const unsupportedTypes = [...new Set(unsupportedFiles.map(name => getFileExtension(name)))]
+    ElMessage.warning(t('knowledge.unsupportedFilesWarning', {
+      types: unsupportedTypes.map(ext => `.${ext}`).join(', ')
+    }))
+  }
+
+  // 如果没有有效文件可上传，直接返回
+  if (validFiles.length === 0) {
+    ElMessage.warning(t('knowledge.noValidFilesToUpload'))
+    return
+  }
 
   // 获取当前文件夹ID（如果有），确保是数字类型
   const folderId = currentFolder.value ? Number(currentFolder.value.id) : 0
@@ -995,27 +1095,29 @@ const handleKbUpload = async (e) => {
 
   try {
     logger.info('开始批量上传文件', { 
-      fileCount: files.length, 
+      fileCount: validFiles.length,
+      unsupportedCount: unsupportedFiles.length,
       knowledgeId,
       folderId
     })
 
-    // 使用批量上传接口（后端已处理文件关联的创建）
-    const response = await uploadFilesToKnowledge(knowledgeId, files, folderId)
+    // 使用批量上传接口（后端已处理文件关联的创建），只上传有效文件
+    const response = await uploadFilesToKnowledge(knowledgeId, validFiles, folderId)
     
     if (response.code === 200) {
-      ElMessage.success(t('knowledge.uploadSuccess', { count: files.length }))
-      logger.info('文件批量上传成功', { fileCount: files.length })
+      ElMessage.success(t('knowledge.uploadSuccess', { count: validFiles.length }))
+      logger.info('文件批量上传成功', { fileCount: validFiles.length })
       // 上传成功后刷新文件列表
       await loadKnowledgeFiles(Number(selectedKnowledgeBase.value.id), folderId || null)
+      // 清空待上传文件列表并关闭对话框
+      pendingUploadFiles.value = []
+      showUploadDialog.value = false
     } else {
       throw new Error(response.message || t('knowledge.uploadFailed'))
     }
   } catch (error) {
     logger.error('批量上传文件失败', error)
     ElMessage.error(error.message || t('knowledge.uploadFailedRetry'))
-  } finally {
-    e.target.value = ''
   }
 }
 

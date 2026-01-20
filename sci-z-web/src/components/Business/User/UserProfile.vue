@@ -31,7 +31,7 @@
       >
         <!-- 用户名（只读） -->
         <el-form-item :label="t('user.profile.username')" prop="username">
-          <el-input v-model="formData.username" readonly class="readonly-input">
+          <el-input :value="displayUsername" readonly class="readonly-input">
             <template #suffix>
               <el-tooltip :content="t('user.profile.usernameTip')" placement="top">
                 <el-icon><InfoFilled /></el-icon>
@@ -86,7 +86,9 @@
         <!-- 手机号 -->
         <el-form-item :label="t('user.profile.phone')" prop="phone">
           <el-input
-            v-model="formData.phone"
+            v-model="phoneModel"
+            @focus="phoneFocused = true"
+            @blur="handlePhoneBlur"
             :placeholder="t('user.profile.phonePlaceholder')"
             clearable
             maxlength="11"
@@ -200,51 +202,53 @@
       </div>
     </BaseCard>
   </div>
-</div>
 
-<el-dialog
-  v-model="cropperVisible"
-  width="480px"
-  :close-on-click-modal="false"
-  :destroy-on-close="true"
-  class="avatar-crop-dialog"
-  :title="t('user.profile.avatarCropTitle')"
->
-  <div class="avatar-cropper">
-    <div class="avatar-cropper__preview" ref="cropperContainerRef">
-      <img v-if="cropperImageSrc" :src="cropperImageSrc" alt="avatar preview" />
+  <!-- 头像裁剪对话框 -->
+  <el-dialog
+    v-model="cropperVisible"
+    width="480px"
+    :close-on-click-modal="false"
+    :destroy-on-close="true"
+    class="avatar-crop-dialog"
+    :title="t('user.profile.avatarCropTitle')"
+  >
+    <div class="avatar-cropper">
+      <div class="avatar-cropper__preview" ref="cropperContainerRef">
+        <img v-if="cropperImageSrc" :src="cropperImageSrc" alt="avatar preview" />
+      </div>
+      <div class="avatar-cropper__controls">
+        <el-button :icon="ZoomOut" circle @click="handleCropZoom(-0.1)" />
+        <el-button :icon="ZoomIn" circle @click="handleCropZoom(0.1)" />
+      </div>
+      <p class="avatar-cropper__tips">{{ t('user.profile.avatarCropTips') }}</p>
     </div>
-    <div class="avatar-cropper__controls">
-      <el-button :icon="ZoomOut" circle @click="handleCropZoom(-0.1)" />
-      <el-button :icon="ZoomIn" circle @click="handleCropZoom(0.1)" />
+    <template #footer>
+      <div class="avatar-cropper__actions">
+        <el-button type="primary" @click="handleCropConfirm">
+          {{ t('user.profile.cropConfirm') }}
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+
+  <!-- 头像预览对话框 -->
+  <el-dialog
+    v-model="previewVisible"
+    width="420px"
+    :destroy-on-close="true"
+    class="avatar-preview-dialog"
+    :title="t('user.profile.avatarPreviewTitle')"
+  >
+    <div class="avatar-preview-wrapper">
+      <img :src="avatarPreview || defaultAvatar" alt="avatar preview" />
     </div>
-    <p class="avatar-cropper__tips">{{ t('user.profile.avatarCropTips') }}</p>
-  </div>
-  <template #footer>
-    <div class="avatar-cropper__actions">
-      <el-button type="primary" @click="handleCropConfirm">
-        {{ t('user.profile.cropConfirm') }}
+    <template #footer>
+      <el-button type="primary" @click="previewVisible = false">
+        {{ t('common.confirm') }}
       </el-button>
-    </div>
-  </template>
-</el-dialog>
-
-<el-dialog
-  v-model="previewVisible"
-  width="420px"
-  :destroy-on-close="true"
-  class="avatar-preview-dialog"
-  :title="t('user.profile.avatarPreviewTitle')"
->
-  <div class="avatar-preview-wrapper">
-    <img :src="avatarPreview || defaultAvatar" alt="avatar preview" />
-  </div>
-  <template #footer>
-    <el-button type="primary" @click="previewVisible = false">
-      {{ t('common.confirm') }}
-    </el-button>
-  </template>
-</el-dialog>
+    </template>
+  </el-dialog>
+</div>
 </template>
 
 <script setup>
@@ -257,7 +261,7 @@ import { getUserInfo, updateUserInfo, getProfileFields, uploadAvatar } from '@/a
 import { previewFile } from '@/api/File'
 import { useAuthStore } from '@/store/modules/auth'
 import { useIndustryStore } from '@/store/modules/industry'
-import { validateChineseName, validateEmail, validatePhone } from '@/utils/validate'
+import { validateChineseName, validateEmail, validatePhone, formatPhoneDisplay } from '@/utils/validate'
 import { createLogger } from '@/utils/simpleLogger'
 import { setUserInfo } from '@/utils/auth'
 import {
@@ -326,6 +330,35 @@ const departmentPlaceholder = computed(() => {
 const key = industryStore.departmentPlaceholderKey
 return key ? t(key) : t('user.profile.departmentPlaceholder')
 })
+
+// 🔥 格式化用户名显示（如果是手机号，则隐藏中间部分）
+const displayUsername = computed(() => {
+  return formatPhoneDisplay(formData.username)
+})
+
+// 🔥 手机号聚焦状态
+const phoneFocused = ref(false)
+
+// 🔥 手机号双向绑定（使用计算属性的 getter/setter）
+const phoneModel = computed({
+  get() {
+    if (phoneFocused.value) {
+      // 聚焦时显示完整手机号，方便编辑
+      return formData.phone
+    }
+    // 未聚焦时显示脱敏手机号
+    return formatPhoneDisplay(formData.phone)
+  },
+  set(value) {
+    // 用户输入时，直接更新原始数据
+    formData.phone = value
+  }
+})
+
+// 🔥 处理手机号失去焦点
+const handlePhoneBlur = () => {
+  phoneFocused.value = false
+}
 
 const emailReady = computed(() => validateEmail(formData.email) && !verification.email.loading)
 const phoneReady = computed(() => validatePhone(formData.phone) && !verification.phone.loading)

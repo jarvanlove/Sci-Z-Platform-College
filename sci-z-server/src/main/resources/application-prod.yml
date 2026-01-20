@@ -2,8 +2,13 @@
 spring: # Spring 生产环境配置
   config:
     import: optional:classpath:config/production.env.properties # 生产占位符属性
+    # 🔥 修复：指定 properties 文件使用 UTF-8 编码读取（解决中文乱码问题）
+    encoding:
+      charset: UTF-8
+      enabled: true
   datasource:
-    url: jdbc:postgresql://localhost:5438/sci-z-college # 数据库 URL（建议改为生产地址）
+    url: jdbc:postgresql://localhost:5432/postgres # 数据库 URL（建议改为生产地址）
+    #url: jdbc:postgresql://localhost:5438/sci-z-college # 数据库 URL（建议改为生产地址）
     username: ${DB_USERNAME:postgres} # 数据库用户名（支持环境变量覆盖）
     password: ${DB_PASSWORD:password} # 数据库密码（支持环境变量覆盖）
     driver-class-name: org.postgresql.Driver # PostgreSQL 驱动
@@ -83,7 +88,7 @@ sms: # 短信服务配置
     region-id: ${SMS_ALIYUN_REGION_ID:cn-hangzhou} # 区域ID
     access-key-id: ${SMS_ALIYUN_ACCESS_KEY_ID:} # 阿里云 AccessKey ID
     access-key-secret: ${SMS_ALIYUN_ACCESS_KEY_SECRET:} # 阿里云 AccessKey Secret
-    sign-name: ${SMS_ALIYUN_SIGN_NAME:SCI-Z} # 短信签名名称
+    sign-name: ${SMS_ALIYUN_SIGN_NAME:上海中域工业互联网研究院} # 短信签名名称
     template-code: ${SMS_ALIYUN_TEMPLATE_CODE:} # 短信模板代码
     template-param-name: ${SMS_ALIYUN_TEMPLATE_PARAM_NAME:code} # 模板参数名称
 

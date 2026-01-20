@@ -12,11 +12,11 @@
     class="password-login-form"
     @submit.prevent="handleLogin"
   >
-    <!-- 用户名输入 -->
+    <!-- 用户名/手机号/邮箱输入 -->
     <el-form-item prop="username">
       <el-input
         v-model="loginForm.username"
-        :placeholder="$t('auth.username')"
+        :placeholder="$t('auth.usernamePlaceholder') || $t('authPages.loginPage.usernamePlaceholder') || '请输入用户名/手机号/邮箱'"
         size="large"
         prefix-icon="User"
         clearable
@@ -91,6 +91,7 @@ import { getCaptcha } from '@/api/Auth'
 import { useAuthStore } from '@/store/modules/auth'
 import { getLastUsername } from '@/utils/auth'
 import { createLogger } from '@/utils/simpleLogger'
+import { validateUsername, validatePhone, validateEmail } from '@/utils/validate'
 
 // 创建日志器
 const authLogger = createLogger('PasswordLoginForm')
@@ -120,14 +121,60 @@ const loginForm = reactive({
   username: '',
   password: '',
   captcha: '',
-  rememberMe: false
+  rememberMe: true // 🔥 修复：记住我默认勾选
 })
+
+// 🔥 自定义校验函数：根据输入内容自动判断是用户名、手机号还是邮箱
+const validateLoginAccount = (rule, value, callback) => {
+  if (!value) {
+    callback(new Error(t('auth.username')))
+    return
+  }
+  
+  const trimmedValue = value.trim()
+  
+  // 判断是否为手机号（11位数字，以1开头）
+  if (validatePhone(trimmedValue)) {
+    callback()
+    return
+  }
+  
+  // 判断是否为邮箱
+  if (validateEmail(trimmedValue)) {
+    callback()
+    return
+  }
+  
+  // 判断是否为用户名（字母数字下划线，3-20位）
+  if (validateUsername(trimmedValue)) {
+    callback()
+    return
+  }
+  
+  // 如果都不符合，根据输入内容给出相应提示
+  if (/^\d+$/.test(trimmedValue)) {
+    // 纯数字但不是手机号
+    callback(new Error('请输入正确的手机号格式（11位，以1开头）'))
+  } else if (trimmedValue.includes('@')) {
+    // 包含@但不是有效邮箱
+    callback(new Error('请输入正确的邮箱格式'))
+  } else if (trimmedValue.length < 3) {
+    // 长度不足
+    callback(new Error('用户名长度至少3个字符'))
+  } else if (trimmedValue.length > 20) {
+    // 长度过长
+    callback(new Error('用户名长度不能超过20个字符'))
+  } else {
+    // 用户名格式不正确
+    callback(new Error('用户名只能包含字母、数字和下划线'))
+  }
+}
 
 // 表单验证规则
 const loginRules = {
   username: [
     { required: true, message: t('auth.username'), trigger: 'blur' },
-    { min: 3, max: 20, message: '用户名长度为3-20个字符', trigger: 'blur' }
+    { validator: validateLoginAccount, trigger: ['blur', 'change'] }
   ],
   password: [
     { required: true, message: t('auth.password'), trigger: 'blur' },
@@ -220,10 +267,9 @@ onMounted(() => {
     authLogger.info('已自动填充上次登录的用户名', { username: lastUsername })
   }
   
-  const rememberedFlag = localStorage.getItem('auth_remember_me')
-  const defaultRemember = rememberedFlag === null ? true : rememberedFlag === '1'
-  loginForm.rememberMe = authStore.rememberMe ?? defaultRemember
-  authStore.rememberMe = loginForm.rememberMe
+  // 🔥 修复：记住我始终默认勾选（不管 localStorage 中的值是什么）
+  loginForm.rememberMe = true
+  authStore.rememberMe = true
   
   // 为表单添加键盘事件监听
   document.addEventListener('keydown', handleKeyDown)
@@ -247,7 +293,8 @@ defineExpose({
     loginForm.username = ''
     loginForm.password = ''
     loginForm.captcha = ''
-    loginForm.rememberMe = false
+    // 🔥 修复：重置表单时保持记住我默认勾选
+    loginForm.rememberMe = true
     showCaptcha.value = false
     loginFailCount.value = 0
     captchaUrl.value = ''

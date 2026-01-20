@@ -511,7 +511,7 @@ public class FileServiceImpl implements FileService {
                 ? SystemConstant.DEFAULT_PREVIEW_EXPIRE_SECONDS
                 : expireSeconds;
 
-        // 3. 生成预签名链接（参考preview方法的实现）
+        // 3. 生成预签名链接
         ensureBucket();
         try {
             return MinioUtil.presignedGetUrl(minioClient, bucketName, filePath, effectiveExpire);

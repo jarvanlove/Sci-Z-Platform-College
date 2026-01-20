@@ -127,6 +127,7 @@ export default {
     logout: '退出登录',
     registerAction: '注册',
     username: '用户名/手机号/邮箱',
+    usernamePlaceholder: '请输入用户名/手机号/邮箱',
     password: '密码',
     email: '邮箱',
     phone: '手机号',
@@ -265,6 +266,7 @@ export default {
 
   legal: {
     agreePrefix: '我已阅读并同意',
+    smsAgreePrefix: '未注册的手机号验证并登录后将自动完成注册。注册即代表您同意并接受',
     and: '和',
     userAgreement: '《用户协议》',
     privacyPolicy: '《隐私政策》',
@@ -1037,6 +1039,14 @@ export default {
     uploadSuccess: '成功上传 {count} 个文件',
     uploadFailed: '上传文件失败',
     uploadFailedRetry: '上传文件失败，请稍后重试',
+    selectFiles: '选择文件',
+    uploadTip: '支持拖拽上传，可批量上传多个文件',
+    uploadTipsTitle: '上传说明',
+    uploadTipsDescription: '支持常见文件格式，单个文件不超过200MB，单次最多上传10个文件',
+    unsupportedFileTypesTitle: '不支持的文件类型',
+    unsupportedFileTypesDescription: '当前暂不支持上传 PPT 和图片类型文件（如 .ppt, .pptx, .jpg, .png, .gif 等）',
+    unsupportedFilesWarning: '以下文件类型不支持上传：{types}',
+    noValidFilesToUpload: '没有可上传的有效文件',
     deleted: '已删除',
     deleteFolderPending: '删除文件夹功能待后端接口实现',
     deleteFailed: '删除失败',
@@ -1094,6 +1104,14 @@ export default {
       inputPlaceholderWithKb: '＠知识库或直接提问',
       inputPlaceholderGuest: '尽管问',
       attachmentTitle: '添加附件',
+      attachmentTooltip: {
+        supportUpload: '支持上传个人知识库与本地文件',
+        maxFiles: '文件数量:最多支持10个',
+        fileTypes: '文件类型: 支持pdf、doc、docx、ppt、pptx、xls、xlsx、csv、md, txt',
+        maxKbFiles: '知识库文件:最多支持3个'
+      },
+      attachmentLocalFile: '本地文件',
+      attachmentKnowledgeFile: '知识库文件',
       aiContentHint: '内容由AI生成仅供参考',
       editTitle: '编辑标题',
       enterNewTitle: '请输入新的对话标题',
@@ -1112,6 +1130,21 @@ export default {
       copyFailed: '复制失败',
       switchedTo: '已切换到{model}',
       history: '历史对话',
+      // 模型选项
+      models: {
+        qwen3Max: {
+          name: 'Qwen3-Max',
+          description: '通义千问最新模型，擅长中文理解和生成'
+        },
+        deepseekV31: {
+          name: 'Deepseek-V3.1',
+          description: '深度求索V3.1，强大的代码和推理能力'
+        },
+        deepseekR1: {
+          name: 'Deepseek-R1',
+          description: '深度求索R1，强化学习模型'
+        }
+      },
       justNow: '刚刚',
       noHistory: '暂无对话历史',
       rename: '重命名',
@@ -1121,7 +1154,26 @@ export default {
       operationFailed: '操作失败',
       deleteFailed: '删除失败',
       chatPinned: '对话已置顶',
-      chatUnpinned: '已取消置顶'
+      chatUnpinned: '已取消置顶',
+      // 知识库选择弹窗
+      selectKnowledgeBase: '选择知识库',
+      noKnowledgeBase: '暂无知识库',
+      pleaseSelectKnowledgeBase: '请选择知识库',
+      // 文档选择弹窗
+      selectDocument: '选择文档',
+      knowledgeBaseLabel: '知识库：',
+      noDocumentsInKb: '该知识库暂无文档',
+      maxKbFilesHint: '知识库文件最多只能选择3个',
+      unnamedDocument: '未命名文档',
+      selectedDocumentsCount: '已选择 {count} 个文档',
+      limitReached: '（已达上限）',
+      pleaseSelectAtLeastOneDocument: '请至少选择一个文档',
+      maxKbFilesWarning: '知识库文件最多只能选择3个，当前已有{current}个，本次最多只能选择{remaining}个',
+      maxKbFilesWarningSimple: '知识库文件最多只能选择3个',
+      documentsAdded: '已添加 {count} 个文档',
+      loadKnowledgeListFailed: '加载知识库列表失败',
+      loadDocumentListFailed: '加载文档列表失败',
+      knowledgeBaseSelected: '已选择知识库：{name}'
     },
     knowledge: {
       searchKb: '搜索知识库',
@@ -1564,6 +1616,11 @@ export default {
     pptViewerErrorTitle: 'PPT 预览服务不可用',
     pptViewerErrorMessage: 'Office Online Viewer 服务可能已达到使用限额。如需升级 Pro+ 版本以获得更好的预览体验，请联系系统管理员。',
     pptViewerFailed: 'PPT 在线预览服务暂时不可用，可能是由于服务限额或网络问题。请尝试下载文件后使用本地应用打开查看，或联系管理员升级服务。如需升级 Pro+ 版本以获得更好的预览体验，请联系系统管理员。',
+    officeLocalhostTitle: '无法在线预览',
+    officeLocalhostNotSupported: '文件位于本地服务器，无法在线预览。请下载文件后使用本地 Office 软件打开查看。',
+    officeViewerErrorTitle: 'Office 文档预览服务不可用',
+    officeViewerErrorMessage: 'Office Online Viewer 服务可能已达到使用限额。如需升级 Pro+ 版本以获得更好的预览体验，请联系系统管理员。',
+    officePreviewFailed: 'Office 文档预览失败，请尝试下载后查看',
     iframeLoadFailed: '预览加载失败'
   },
 

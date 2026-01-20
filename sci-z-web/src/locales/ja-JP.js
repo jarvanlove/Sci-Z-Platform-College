@@ -261,6 +261,7 @@ export default {
   // 法務関連
   legal: {
     agreePrefix: '以下の内容に同意します',
+    smsAgreePrefix: '未登録の電話番号は、認証とログイン後に自動的に登録されます。登録は、以下に同意し、受け入れることを意味します',
     and: 'および',
     userAgreement: '「ユーザー規約」',
     privacyPolicy: '「プライバシーポリシー」',
@@ -433,7 +434,10 @@ export default {
       operatingSystem: 'OS',
       loginStatus: 'ステータス',
       loadLogsError: 'ログイン履歴の取得に失敗しました'
-    }
+    },
+    login: 'ログイン',
+    logout: 'ログアウト',
+    pleaseLogin: 'まずログインしてください'
   },
 
   // 申請
@@ -988,6 +992,14 @@ export default {
     uploadSuccess: '{count}個のファイルを正常にアップロードしました',
     uploadFailed: 'ファイルのアップロードに失敗しました',
     uploadFailedRetry: 'ファイルのアップロードに失敗しました。後でもう一度お試しください',
+    selectFiles: 'ファイルを選択',
+    uploadTip: 'ドラッグ&ドロップでアップロードをサポート、複数ファイルを一括アップロード可能',
+    uploadTipsTitle: 'アップロード説明',
+    uploadTipsDescription: '一般的なファイル形式をサポート、単一ファイル最大200MB、1回あたり最大10ファイル',
+    unsupportedFileTypesTitle: 'サポートされていないファイルタイプ',
+    unsupportedFileTypesDescription: '現在PPTおよび画像ファイルタイプ（.ppt、.pptx、.jpg、.png、.gifなど）はサポートされていません',
+    unsupportedFilesWarning: '以下のファイルタイプはサポートされていません：{types}',
+    noValidFilesToUpload: 'アップロード可能な有効なファイルがありません',
     deleted: '削除されました',
     deleteFolderPending: 'フォルダ削除機能はバックエンドAPIの実装待ちです',
     deleteFailed: '削除に失敗しました',
@@ -1077,6 +1089,14 @@ export default {
       inputPlaceholderWithKb: '＠ナレッジベースを入力するか、直接質問してください',
       inputPlaceholderGuest: '何でも聞いてください',
       attachmentTitle: '添付ファイルを追加',
+      attachmentTooltip: {
+        supportUpload: '個人ナレッジベースとローカルファイルのアップロードをサポート',
+        maxFiles: 'ファイル数: 最大10個',
+        fileTypes: 'ファイルタイプ: pdf、doc、docx、ppt、pptx、xls、xlsx、csv、md、txtをサポート',
+        maxKbFiles: 'ナレッジベースファイル: 最大3個'
+      },
+      attachmentLocalFile: 'ローカルファイル',
+      attachmentKnowledgeFile: 'ナレッジベースファイル',
       aiContentHint: 'AIが生成した内容は参考のみ',
       editTitle: 'タイトルを編集',
       enterNewTitle: '新しい対話タイトルを入力してください',
@@ -1095,6 +1115,21 @@ export default {
       copyFailed: 'コピーに失敗しました',
       switchedTo: '{model}に切り替えました',
       history: '対話履歴',
+      // モデルオプション
+      models: {
+        qwen3Max: {
+          name: 'Qwen3-Max',
+          description: '通義千問最新モデル、中国語の理解と生成に優れている'
+        },
+        deepseekV31: {
+          name: 'Deepseek-V3.1',
+          description: 'Deepseek V3.1、強力なコードと推論能力'
+        },
+        deepseekR1: {
+          name: 'Deepseek-R1',
+          description: 'Deepseek R1、強化学習モデル'
+        }
+      },
       justNow: 'たった今',
       noHistory: '対話履歴がありません',
       rename: '名前変更',
@@ -1104,7 +1139,26 @@ export default {
       operationFailed: '操作に失敗しました',
       deleteFailed: '削除に失敗しました',
       chatPinned: '対話をピン留めしました',
-      chatUnpinned: 'ピン留めを解除しました'
+      chatUnpinned: 'ピン留めを解除しました',
+      // ナレッジベース選択ダイアログ
+      selectKnowledgeBase: 'ナレッジベースを選択',
+      noKnowledgeBase: 'ナレッジベースがありません',
+      pleaseSelectKnowledgeBase: 'ナレッジベースを選択してください',
+      // ドキュメント選択ダイアログ
+      selectDocument: 'ドキュメントを選択',
+      knowledgeBaseLabel: 'ナレッジベース：',
+      noDocumentsInKb: 'このナレッジベースにドキュメントがありません',
+      maxKbFilesHint: 'ナレッジベースファイルは最大3つまで選択できます',
+      unnamedDocument: '名前なしドキュメント',
+      selectedDocumentsCount: '{count} 個のドキュメントを選択しました',
+      limitReached: '（上限に達しました）',
+      pleaseSelectAtLeastOneDocument: '少なくとも1つのドキュメントを選択してください',
+      maxKbFilesWarning: 'ナレッジベースファイルは最大3つまで選択できます。現在{current}個選択済み、あと{remaining}個まで選択可能です',
+      maxKbFilesWarningSimple: 'ナレッジベースファイルは最大3つまで選択できます',
+      documentsAdded: '{count} 個のドキュメントを追加しました',
+      loadKnowledgeListFailed: 'ナレッジベースリストの読み込みに失敗しました',
+      loadDocumentListFailed: 'ドキュメントリストの読み込みに失敗しました',
+      knowledgeBaseSelected: 'ナレッジベースを選択しました：{name}'
     },
     knowledge: {
       searchKb: 'ナレッジベースを検索',
@@ -1513,6 +1567,11 @@ export default {
     pptViewerErrorTitle: 'PPTプレビューサービスが利用できません',
     pptViewerErrorMessage: 'Office Online Viewerサービスが使用制限に達している可能性があります。より良いプレビュー体験のためにPro+バージョンにアップグレードする必要がある場合は、システム管理者に連絡してください。',
     pptViewerFailed: 'PPTオンラインプレビューサービスは一時的に利用できません。サービス制限またはネットワークの問題が原因である可能性があります。ファイルをダウンロードしてローカルアプリケーションで開いて表示するか、管理者に連絡してサービスをアップグレードしてください。より良いプレビュー体験のためにPro+バージョンにアップグレードする必要がある場合は、システム管理者に連絡してください。',
+    officeLocalhostTitle: 'オンラインプレビューできません',
+    officeLocalhostNotSupported: 'ファイルはローカルサーバー上にあり、オンラインプレビューできません。ファイルをダウンロードしてローカルのOfficeアプリケーションで開いて表示してください。',
+    officeViewerErrorTitle: 'Officeドキュメントプレビューサービスが利用できません',
+    officeViewerErrorMessage: 'Office Online Viewerサービスが使用制限に達している可能性があります。より良いプレビュー体験のためにPro+バージョンにアップグレードする必要がある場合は、システム管理者に連絡してください。',
+    officePreviewFailed: 'Officeドキュメントのプレビューに失敗しました。ダウンロードして表示してください',
     iframeLoadFailed: 'プレビューの読み込みに失敗しました'
   },
 

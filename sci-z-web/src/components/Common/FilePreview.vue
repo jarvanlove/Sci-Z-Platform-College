@@ -65,14 +65,14 @@
         
         <!-- Word 文档预览 - 使用 docx-preview 在浏览器中直接渲染 -->
         <div
-          v-else-if="previewType === 'office' && previewUrl"
+          v-else-if="previewType === 'word' && previewUrl"
           class="preview-office-container"
         >
           <div ref="docxPreviewContainer" class="docx-preview-wrapper"></div>
         </div>
 
-        <!-- PPT/PPTX 预览 - 使用 Office Online Viewer -->
-        <div v-else-if="previewType === 'ppt' && previewUrl" class="preview-iframe-container">
+        <!-- Excel/Word(.doc)/PPT 预览 - 使用 Office Online Viewer -->
+        <div v-else-if="(previewType === 'excel' || previewType === 'word-old' || previewType === 'ppt') && previewUrl" class="preview-iframe-container">
           <iframe
             :src="previewUrl"
             class="preview-iframe"
@@ -143,6 +143,7 @@ const logger = createLogger('FilePreview')
 const loading = ref(false)
 const error = ref('')
 const previewUrl = ref('')
+const originalFileUrl = ref('') // 保存原始文件 URL，用于下载
 const previewType = ref('')
 const iframeLoaded = ref(false)
 const textContent = ref('')
@@ -150,6 +151,7 @@ const docxPreviewContainer = ref(null) // docx-preview 渲染容器
 const pptViewerError = ref(false) // PPT 预览器错误状态
 const pptViewerErrorTitle = ref('') // PPT 预览器错误标题
 const pptViewerErrorMessage = ref('') // PPT 预览器错误消息
+const isDownloading = ref(false) // 防止重复下载标记
 
 // 根据文件名或 URL 判断文件类型
 const detectFileType = (fileName, fileUrl = '') => {
@@ -168,10 +170,18 @@ const detectFileType = (fileName, fileUrl = '') => {
       return 'image'
     }
     
-    // Word 文档（使用 docx-preview 渲染）
-    const wordExts = ['.doc', '.docx']
-    if (wordExts.some(ext => name.endsWith(ext))) {
-      return 'office'
+    // Word 文档
+    if (name.endsWith('.docx')) {
+      return 'word' // 新版 Word，使用 docx-preview 渲染
+    }
+    if (name.endsWith('.doc')) {
+      return 'word-old' // 旧版 Word，使用 Office Online Viewer
+    }
+
+    // Excel 文档（使用 Office Online Viewer 预览）
+    const excelExts = ['.xls', '.xlsx']
+    if (excelExts.some(ext => name.endsWith(ext))) {
+      return 'excel'
     }
 
     // PPT 文档（使用 Office Online 预览）
@@ -198,15 +208,18 @@ const detectFileType = (fileName, fileUrl = '') => {
       
       if (ext === 'pdf') return 'pdf'
       if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)) return 'image'
-      if (['doc', 'docx'].includes(ext)) return 'office'
+      if (ext === 'docx') return 'word'
+      if (ext === 'doc') return 'word-old'
+      if (['xls', 'xlsx'].includes(ext)) return 'excel'
       if (['ppt', 'pptx'].includes(ext)) return 'ppt'
       if (['txt', 'md', 'json', 'xml', 'csv'].includes(ext)) return 'text'
     }
     
     // 检查 URL 中是否包含文件类型关键词
     if (url.includes('.pdf') || url.includes('application/pdf')) return 'pdf'
-    if (url.includes('.doc') || url.includes('.docx') || url.includes('word') || url.includes('application/vnd.openxmlformats-officedocument.wordprocessingml')) return 'office'
-    if (url.includes('.xls') || url.includes('.xlsx') || url.includes('excel') || url.includes('application/vnd.openxmlformats-officedocument.spreadsheetml')) return 'office'
+    if (url.includes('.docx') || url.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) return 'word'
+    if (url.includes('.doc') || (url.includes('word') && !url.includes('.docx'))) return 'word-old'
+    if (url.includes('.xls') || url.includes('.xlsx') || url.includes('excel') || url.includes('application/vnd.openxmlformats-officedocument.spreadsheetml')) return 'excel'
     if (url.includes('.ppt') || url.includes('.pptx') || url.includes('powerpoint') || url.includes('application/vnd.openxmlformats-officedocument.presentationml')) return 'ppt'
     if (url.includes('image/')) return 'image'
   }
@@ -224,8 +237,10 @@ const loadPreview = async () => {
   loading.value = true
   error.value = ''
   previewUrl.value = ''
+  originalFileUrl.value = '' // 清空原始文件 URL
   iframeLoaded.value = false
   textContent.value = ''
+  isDownloading.value = false // 重置下载标记
   
   // 清空 docx-preview 容器
   if (docxPreviewContainer.value) {
@@ -248,6 +263,8 @@ const loadPreview = async () => {
     }
     
     previewUrl.value = response.data
+    // 保存原始文件 URL，用于下载
+    originalFileUrl.value = response.data
     // 从文件名和 URL 中判断文件类型
     previewType.value = detectFileType(props.fileInfo.name, previewUrl.value)
     
@@ -257,8 +274,8 @@ const loadPreview = async () => {
       type: previewType.value 
     })
     
-    // 如果是 Word 文档，使用 docx-preview 在浏览器中直接渲染
-    if (previewType.value === 'office') {
+    // 如果是 Word 文档（.docx），使用 docx-preview 在浏览器中直接渲染
+    if (previewType.value === 'word') {
       try {
         // 先关闭 loading，让容器显示在 DOM 中
         loading.value = false
@@ -269,13 +286,18 @@ const loadPreview = async () => {
         // 额外等待一帧，确保 Vue 完成条件渲染
         await new Promise(resolve => requestAnimationFrame(resolve))
         
-        // 检查容器是否存在
+        // 再次检查容器是否存在
         if (!docxPreviewContainer.value) {
-          throw new Error('Preview container not found in DOM')
+          // 如果容器还不存在，再等待一段时间
+          await new Promise(resolve => setTimeout(resolve, 100))
+          if (!docxPreviewContainer.value) {
+            throw new Error('Preview container not found in DOM')
+          }
         }
         
         logger.info('Container found, downloading file for docx-preview', {
           containerExists: !!docxPreviewContainer.value,
+          containerElement: docxPreviewContainer.value?.tagName,
           url: previewUrl.value
         })
         
@@ -286,7 +308,14 @@ const loadPreview = async () => {
         }
         const arrayBuffer = await fileResponse.arrayBuffer()
         
-        logger.info('File downloaded, rendering Word document with docx-preview')
+        logger.info('File downloaded, rendering Word document with docx-preview', {
+          fileSize: arrayBuffer.byteLength
+        })
+        
+        // 确保容器仍然存在（防止异步操作期间被移除）
+        if (!docxPreviewContainer.value) {
+          throw new Error('Preview container was removed from DOM')
+        }
         
         // 使用 docx-preview 渲染
         await renderAsync(arrayBuffer, docxPreviewContainer.value, undefined, {
@@ -315,10 +344,11 @@ const loadPreview = async () => {
       return
     }
 
-    // PPT/PPTX 使用 Office Online Viewer 进行预览
-    if (previewType.value === 'ppt') {
+    // Excel/旧版 Word(.doc)/PPT/PPTX 使用 Office Online Viewer 进行预览
+    if (previewType.value === 'excel' || previewType.value === 'word-old' || previewType.value === 'ppt') {
       try {
         const originalUrl = previewUrl.value
+        const fileTypeName = previewType.value === 'excel' ? 'Excel' : previewType.value === 'word-old' ? 'Word' : 'PPT'
         
         // 重置错误状态
         pptViewerError.value = false
@@ -332,46 +362,66 @@ const loadPreview = async () => {
         
         if (isLocalhost || isPrivateIP) {
           // 本地或内网地址，无法使用在线预览服务
-          logger.warn('PPT file URL is localhost or private IP, cannot use Office Online Viewer', {
+          logger.warn(`${fileTypeName} file URL is localhost or private IP, cannot use Office Online Viewer`, {
             originalUrl,
             isLocalhost,
-            isPrivateIP
+            isPrivateIP,
+            fileType: previewType.value
           })
           pptViewerError.value = true
-          pptViewerErrorTitle.value = t('filePreview.pptLocalhostTitle')
-          pptViewerErrorMessage.value = t('filePreview.pptLocalhostNotSupported')
+          pptViewerErrorTitle.value = t('filePreview.officeLocalhostTitle') || `${fileTypeName} 预览服务不可用`
+          pptViewerErrorMessage.value = t('filePreview.officeLocalhostNotSupported') || `由于文件地址为本地或内网地址，无法使用在线预览服务。请下载文件后使用本地 Office 软件打开查看。`
           loading.value = false
           return
         }
         
         // 将文件 URL 编码后，使用 Office Online Viewer 服务进行预览
-        // Office Online Viewer 可以预览 PPT/PPTX 文件，避免浏览器直接下载
+        // Office Online Viewer 可以预览 Excel、Word、PPT 文件
         const encodedUrl = encodeURIComponent(originalUrl)
         previewUrl.value = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`
-        logger.info('PPT preview URL generated with Office Online Viewer', {
+        logger.info(`${fileTypeName} preview URL generated with Office Online Viewer`, {
           originalUrl,
-          viewerUrl: previewUrl.value
+          viewerUrl: previewUrl.value,
+          fileType: previewType.value
         })
         loading.value = false
       } catch (err) {
-        logger.error('Failed to generate PPT preview URL', err)
+        logger.error(`Failed to generate ${previewType.value} preview URL`, err)
         pptViewerError.value = true
-        pptViewerErrorTitle.value = t('filePreview.pptViewerErrorTitle') || 'PPT 预览服务不可用'
-        pptViewerErrorMessage.value = t('filePreview.pptPreviewFailed') || 'PPT 预览失败，请尝试下载后查看'
+        const fileTypeName = previewType.value === 'excel' ? 'Excel' : previewType.value === 'word-old' ? 'Word' : 'PPT'
+        pptViewerErrorTitle.value = t('filePreview.officeViewerErrorTitle') || `${fileTypeName} 预览服务不可用`
+        pptViewerErrorMessage.value = t('filePreview.officePreviewFailed') || `${fileTypeName} 预览失败，请尝试下载后查看`
         loading.value = false
       }
       return
     }
     
-    // 如果无法识别文件类型，但 URL 存在，默认尝试作为 Office 文档处理
+    // 如果无法识别文件类型，但 URL 存在，尝试使用 Office Online Viewer
     if (previewType.value === 'unsupported' && previewUrl.value) {
-      logger.warn('File type cannot be detected, defaulting to office type', {
+      logger.warn('File type cannot be detected, trying Office Online Viewer', {
         fileName: props.fileInfo.name,
         url: previewUrl.value
       })
-      previewType.value = 'office' // 默认尝试作为 Office 文档预览
-      // 重新加载预览
-      await loadPreview()
+      // 尝试使用 Office Online Viewer 预览（适用于未知的 Office 文档类型）
+      const originalUrl = previewUrl.value
+      const isLocalhost = /^(https?:\/\/)?(localhost|127\.0\.0\.1|0\.0\.0\.0|::1)/i.test(originalUrl)
+      const isPrivateIP = /^(https?:\/\/)?(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/i.test(originalUrl)
+      
+      if (!isLocalhost && !isPrivateIP) {
+        try {
+          const encodedUrl = encodeURIComponent(originalUrl)
+          previewUrl.value = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`
+          previewType.value = 'ppt' // 使用相同的预览逻辑
+          loading.value = false
+          return
+        } catch (err) {
+          logger.error('Failed to use Office Online Viewer for unknown file type', err)
+        }
+      }
+      
+      // 如果无法使用在线预览，显示不支持提示
+      error.value = t('filePreview.unsupportedType') || '不支持预览此文件类型'
+      loading.value = false
       return
     }
     
@@ -402,9 +452,9 @@ const handleIframeLoad = () => {
   iframeLoaded.value = true
   logger.info('Iframe loaded successfully')
   
-  // 对于 PPT 预览，延迟检查 iframe 内容是否真正加载成功
+  // 对于 Office 文档预览（Excel/Word/PPT），延迟检查 iframe 内容是否真正加载成功
   // Office Online Viewer 可能会显示错误页面（如限额提示）
-  if (previewType.value === 'ppt') {
+  if (previewType.value === 'excel' || previewType.value === 'word-old' || previewType.value === 'ppt') {
     // 延迟检查，等待 iframe 内容完全加载
     setTimeout(() => {
       // 由于跨域限制，无法直接访问 iframe 内容
@@ -428,30 +478,116 @@ const handleIframeLoad = () => {
 const handleIframeError = () => {
   logger.error('Iframe load failed')
   
-  // 如果是 PPT 预览失败，提供更详细的错误信息
-  if (previewType.value === 'ppt') {
+  // 如果是 Office 文档预览失败，提供更详细的错误信息
+  if (previewType.value === 'excel' || previewType.value === 'word-old' || previewType.value === 'ppt') {
     pptViewerError.value = true
-    pptViewerErrorTitle.value = t('filePreview.pptViewerErrorTitle') || 'PPT 预览服务不可用'
-    pptViewerErrorMessage.value = t('filePreview.pptViewerErrorMessage') || 'Office Online Viewer 服务可能已达到使用限额。如需升级 Pro+ 版本以获得更好的预览体验，请联系系统管理员。'
+    const fileTypeName = previewType.value === 'excel' ? 'Excel' : previewType.value === 'word-old' ? 'Word' : 'PPT'
+    pptViewerErrorTitle.value = t('filePreview.officeViewerErrorTitle') || `${fileTypeName} 预览服务不可用`
+    pptViewerErrorMessage.value = t('filePreview.officeViewerErrorMessage') || 'Office Online Viewer 服务可能已达到使用限额。如需升级 Pro+ 版本以获得更好的预览体验，请联系系统管理员。'
   } else {
     error.value = t('filePreview.iframeLoadFailed') || '预览加载失败'
   }
 }
 
-// 下载文件
-const handleDownloadFile = () => {
-  if (previewUrl.value) {
-    // 如果是 Office Online Viewer 的 URL，需要获取原始文件 URL
-    const originalUrl = previewUrl.value.includes('view.officeapps.live.com') 
-      ? previewUrl.value.match(/src=([^&]+)/)?.[1] 
-      : previewUrl.value
-    if (originalUrl) {
-      window.open(decodeURIComponent(originalUrl), '_blank')
-    } else {
-      window.open(previewUrl.value, '_blank')
-    }
-  } else {
+// 下载文件（防止重复下载，无闪烁）
+const handleDownloadFile = async () => {
+  // 防止重复点击下载按钮
+  if (isDownloading.value) {
+    logger.warn('Download already in progress, ignoring duplicate request')
+    return
+  }
+  
+  // 优先使用保存的原始文件 URL
+  const downloadUrl = originalFileUrl.value || previewUrl.value
+  
+  if (!downloadUrl) {
     ElMessage.warning(t('filePreview.downloadUrlNotReady') || '下载链接未就绪')
+    return
+  }
+  
+  // 如果是 Office Online Viewer 的 URL，需要获取原始文件 URL
+  let finalUrl = downloadUrl
+  if (downloadUrl.includes('view.officeapps.live.com')) {
+    const match = downloadUrl.match(/src=([^&]+)/)
+    if (match && match[1]) {
+      finalUrl = decodeURIComponent(match[1])
+    }
+  }
+  
+  // 设置下载标记
+  isDownloading.value = true
+  
+  try {
+    const fileName = props.fileInfo?.name || 'download'
+    
+    // 方法1：优先尝试直接使用 <a> 标签下载（不打开新窗口，无闪烁）
+    // 注意：如果 URL 跨域且服务器没有设置正确的 CORS 头，download 属性可能不生效
+    try {
+      const link = document.createElement('a')
+      link.href = finalUrl
+      link.download = fileName
+      // 不设置 target="_blank"，避免打开新窗口
+      link.style.display = 'none'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      logger.info('File download initiated via anchor tag', {
+        url: finalUrl,
+        fileName
+      })
+      
+      // 延迟重置下载标记
+      setTimeout(() => {
+        isDownloading.value = false
+      }, 1000)
+      return
+    } catch (anchorError) {
+      logger.warn('Anchor tag download failed, trying fetch method', anchorError)
+    }
+    
+    // 方法2：如果直接下载失败（可能是跨域问题），使用 fetch 下载后创建 blob URL
+    try {
+      const response = await fetch(finalUrl)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = fileName
+      link.style.display = 'none'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // 释放 blob URL 内存
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl)
+      }, 100)
+      
+      logger.info('File download initiated via fetch + blob', {
+        url: finalUrl,
+        fileName,
+        blobSize: blob.size
+      })
+    } catch (fetchError) {
+      logger.error('Fetch download failed, falling back to window.open', fetchError)
+      // 方法3：最后的回退方案，使用 window.open（可能会闪烁，但至少能下载）
+      // 这种情况应该很少发生
+      window.open(finalUrl, '_blank')
+    }
+  } catch (err) {
+    logger.error('Failed to download file', err)
+    ElMessage.error(t('filePreview.downloadFailed') || '下载失败，请稍后重试')
+  } finally {
+    // 延迟重置下载标记，防止快速重复点击
+    setTimeout(() => {
+      isDownloading.value = false
+    }, 1000)
   }
 }
 
@@ -474,6 +610,7 @@ const handleClose = () => {
   // 清理状态
   setTimeout(() => {
     previewUrl.value = ''
+    originalFileUrl.value = ''
     previewType.value = ''
     error.value = ''
     iframeLoaded.value = false
@@ -481,6 +618,7 @@ const handleClose = () => {
     pptViewerError.value = false
     pptViewerErrorTitle.value = ''
     pptViewerErrorMessage.value = ''
+    isDownloading.value = false
     // 清空 docx-preview 容器
     if (docxPreviewContainer.value) {
       docxPreviewContainer.value.innerHTML = ''

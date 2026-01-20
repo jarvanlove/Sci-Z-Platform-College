@@ -261,6 +261,7 @@ export default {
   // 법률 관련
   legal: {
     agreePrefix: '다음 약관에 동의합니다',
+    smsAgreePrefix: '미등록 전화번호는 인증 및 로그인 후 자동으로 등록됩니다. 등록은 다음에 동의하고 수락함을 의미합니다',
     and: '및',
     userAgreement: '《이용약관》',
     privacyPolicy: '《개인정보 처리방침》',
@@ -431,7 +432,10 @@ export default {
       operatingSystem: '운영체제',
       loginStatus: '상태',
       loadLogsError: '로그인 기록을 불러오지 못했습니다'
-    }
+    },
+    login: '로그인',
+    logout: '로그아웃',
+    pleaseLogin: '먼저 로그인하세요'
   },
 
   // 신청
@@ -1020,6 +1024,14 @@ export default {
     uploadSuccess: '{count}개의 파일을 성공적으로 업로드했습니다',
     uploadFailed: '파일 업로드에 실패했습니다',
     uploadFailedRetry: '파일 업로드에 실패했습니다. 나중에 다시 시도해주세요',
+    selectFiles: '파일 선택',
+    uploadTip: '드래그 앤 드롭 업로드 지원, 여러 파일 일괄 업로드 가능',
+    uploadTipsTitle: '업로드 안내',
+    uploadTipsDescription: '일반적인 파일 형식 지원, 단일 파일 최대 200MB, 1회당 최대 10개 파일',
+    unsupportedFileTypesTitle: '지원되지 않는 파일 유형',
+    unsupportedFileTypesDescription: '인해 현재 PPT 및 이미지 파일 유형(.ppt, .pptx, .jpg, .png, .gif 등)은 지원되지 않습니다',
+    unsupportedFilesWarning: '다음 파일 유형은 지원되지 않습니다: {types}',
+    noValidFilesToUpload: '업로드할 유효한 파일이 없습니다',
     deleted: '삭제되었습니다',
     deleteFolderPending: '폴더 삭제 기능은 백엔드 API 구현 대기 중입니다',
     deleteFailed: '삭제에 실패했습니다',
@@ -1076,6 +1088,14 @@ export default {
       inputPlaceholderWithKb: '＠지식베이스를 입력하거나 직접 질문하세요',
       inputPlaceholderGuest: '자유롭게 질문하세요',
       attachmentTitle: '첨부 파일 추가',
+      attachmentTooltip: {
+        supportUpload: '개인 지식베이스 및 로컬 파일 업로드 지원',
+        maxFiles: '파일 수: 최대 10개',
+        fileTypes: '파일 유형: pdf, doc, docx, ppt, pptx, xls, xlsx, csv, md, txt 지원',
+        maxKbFiles: '지식베이스 파일: 최대 3개'
+      },
+      attachmentLocalFile: '로컬 파일',
+      attachmentKnowledgeFile: '지식베이스 파일',
       aiContentHint: 'AI가 생성한 내용은 참고용입니다',
       editTitle: '제목 편집',
       enterNewTitle: '새 대화 제목을 입력하세요',
@@ -1094,6 +1114,21 @@ export default {
       copyFailed: '복사에 실패했습니다',
       switchedTo: '{model}로 전환되었습니다',
       history: '대화 기록',
+      // 모델 옵션
+      models: {
+        qwen3Max: {
+          name: 'Qwen3-Max',
+          description: '통의천문 최신 모델, 중국어 이해 및 생성에 뛰어남'
+        },
+        deepseekV31: {
+          name: 'Deepseek-V3.1',
+          description: 'Deepseek V3.1, 강력한 코드 및 추론 능력'
+        },
+        deepseekR1: {
+          name: 'Deepseek-R1',
+          description: 'Deepseek R1, 강화 학습 모델'
+        }
+      },
       justNow: '방금',
       noHistory: '대화 기록이 없습니다',
       rename: '이름 변경',
@@ -1103,7 +1138,26 @@ export default {
       operationFailed: '작업에 실패했습니다',
       deleteFailed: '삭제에 실패했습니다',
       chatPinned: '대화가 고정되었습니다',
-      chatUnpinned: '고정이 해제되었습니다'
+      chatUnpinned: '고정이 해제되었습니다',
+      // 지식베이스 선택 대화상자
+      selectKnowledgeBase: '지식베이스 선택',
+      noKnowledgeBase: '사용 가능한 지식베이스가 없습니다',
+      pleaseSelectKnowledgeBase: '지식베이스를 선택하세요',
+      // 문서 선택 대화상자
+      selectDocument: '문서 선택',
+      knowledgeBaseLabel: '지식베이스:',
+      noDocumentsInKb: '이 지식베이스에 문서가 없습니다',
+      maxKbFilesHint: '지식베이스 파일은 최대 3개까지만 선택할 수 있습니다',
+      unnamedDocument: '이름 없는 문서',
+      selectedDocumentsCount: '{count}개의 문서를 선택했습니다',
+      limitReached: '（한도 도달）',
+      pleaseSelectAtLeastOneDocument: '최소한 하나의 문서를 선택하세요',
+      maxKbFilesWarning: '지식베이스 파일은 최대 3개까지만 선택할 수 있습니다. 현재 {current}개 선택됨, 추가로 {remaining}개만 선택 가능합니다',
+      maxKbFilesWarningSimple: '지식베이스 파일은 최대 3개까지만 선택할 수 있습니다',
+      documentsAdded: '{count}개의 문서를 추가했습니다',
+      loadKnowledgeListFailed: '지식베이스 목록 로드 실패',
+      loadDocumentListFailed: '문서 목록 로드 실패',
+      knowledgeBaseSelected: '지식베이스를 선택했습니다: {name}'
     },
     knowledge: {
       searchKb: '지식베이스 검색',
@@ -1517,6 +1571,11 @@ export default {
     pptViewerErrorTitle: 'PPT 미리보기 서비스를 사용할 수 없습니다',
     pptViewerErrorMessage: 'Office Online Viewer 서비스가 사용 한도에 도달했을 수 있습니다. 더 나은 미리보기 경험을 위해 Pro+ 버전으로 업그레이드하려면 시스템 관리자에게 문의하세요',
     pptViewerFailed: 'PPT 온라인 미리보기 서비스를 일시적으로 사용할 수 없습니다. 서비스 한도 또는 네트워크 문제일 수 있습니다. 파일을 다운로드한 후 로컬 애플리케이션으로 열어보거나 관리자에게 서비스 업그레이드를 문의하세요. 더 나은 미리보기 경험을 위해 Pro+ 버전으로 업그레이드하려면 시스템 관리자에게 문의하세요',
+    officeLocalhostTitle: '온라인 미리보기 불가',
+    officeLocalhostNotSupported: '파일이 로컬 서버에 있어 온라인 미리보기를 할 수 없습니다. 파일을 다운로드한 후 로컬 Office 애플리케이션으로 열어보세요',
+    officeViewerErrorTitle: 'Office 문서 미리보기 서비스를 사용할 수 없습니다',
+    officeViewerErrorMessage: 'Office Online Viewer 서비스가 사용 한도에 도달했을 수 있습니다. 더 나은 미리보기 경험을 위해 Pro+ 버전으로 업그레이드하려면 시스템 관리자에게 문의하세요',
+    officePreviewFailed: 'Office 문서 미리보기에 실패했습니다. 다운로드 후 확인해보세요',
     iframeLoadFailed: '미리보기 로드에 실패했습니다'
   },
 

@@ -147,7 +147,7 @@ const smsLoginForm = reactive({
   phone: '',
   smsCode: '',
   captcha: '',
-  rememberMe: false
+  rememberMe: true // 🔥 修复：记住我默认勾选
 })
 
 // 手机号验证规则
@@ -323,10 +323,9 @@ const handleKeyDown = (event) => {
 
 // 组件挂载时初始化
 onMounted(() => {
-  const rememberedFlag = localStorage.getItem('auth_remember_me')
-  const defaultRemember = rememberedFlag === null ? true : rememberedFlag === '1'
-  smsLoginForm.rememberMe = authStore.rememberMe ?? defaultRemember
-  authStore.rememberMe = smsLoginForm.rememberMe
+  // 🔥 修复：记住我始终默认勾选（不管 localStorage 中的值是什么）
+  smsLoginForm.rememberMe = true
+  authStore.rememberMe = true
   
   // 为表单添加键盘事件监听
   document.addEventListener('keydown', handleKeyDown)
@@ -347,7 +346,8 @@ defineExpose({
     smsLoginForm.phone = ''
     smsLoginForm.smsCode = ''
     smsLoginForm.captcha = ''
-    smsLoginForm.rememberMe = false
+    // 🔥 修复：重置表单时保持记住我默认勾选
+    smsLoginForm.rememberMe = true
     showCaptchaForSms.value = false
     smsFailCount.value = 0
     smsCountdown.value = 0

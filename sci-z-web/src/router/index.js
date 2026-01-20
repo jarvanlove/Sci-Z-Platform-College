@@ -12,7 +12,7 @@ const routes = [
     path: '/login',
     name: 'Login',
     component: () => import('@/views/Login/index.vue'),
-    meta: { title: '登录', requiresAuth: false }
+    meta: { title: '登录', requiresAuth: false, layout: 'toc' } // 🔥 修复：使用 TOC 布局，显示弹窗而不是旧页面
   },
   {
     path: '/register',
@@ -486,14 +486,16 @@ router.beforeEach(async (to, from, next) => {
     }
   }
 
-  // 🔥 修改：未登录用户访问登录页面，也重定向到AI对话页面（在AI对话页面进行登录）
+  // 🔥 修复：允许 /login 路由存在，通过 App.vue 的监听器打开弹窗，但不立即重定向（保持 /login 路由）
+  // 用户希望看到 /login 路由，所以不重定向
   if (to.path === '/login') {
     if (authStore.isLoggedIn) {
       routerLogger.info('已登录用户访问登录页面，重定向到AI对话页面')
       return next('/ai/chat')
     } else {
-      routerLogger.info('未登录用户访问登录页面，重定向到AI对话页面')
-      return next('/ai/chat')
+      // 🔥 修复：允许路由保持在 /login，不重定向
+      routerLogger.info('未登录用户访问登录页面，打开弹窗，保持 /login 路由', { path: to.path })
+      return next()
     }
   }
   
@@ -510,6 +512,8 @@ router.beforeEach(async (to, from, next) => {
 
 // 路由解析完成后的日志
 router.afterEach((to, from, failure) => {
+  // 🔥 修复：不再在 afterEach 中重定向 /login，保持路由为 /login
+  
   if (failure) {
     // 🔥 修复：过滤冗余导航错误，这是 Vue Router 的正常优化行为，不应该记录为错误
     const isRedundantNavigation = failure.message?.includes('Avoided redundant navigation') ||

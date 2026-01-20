@@ -17,7 +17,7 @@
         <div v-if="!currentChat" class="empty-state">
           <div class="empty-greeting">
             <span class="greeting-text">{{ $t('ai.chat.greeting') }}</span>
-            <img src="@/assets/images/logo.svg" alt="Sci-Z Platform" class="greeting-logo" />
+            <img src="@/assets/images/logo_sciz.svg" alt="Sci-Z Platform" class="greeting-logo" />
           </div>
           
           <!-- 空状态时，输入框居中显示 -->
@@ -438,18 +438,21 @@
                   effect="light"
                   :show-after="300"
                   :hide-after="0"
+                  :disabled="showAttachmentDropdown"
+                  trigger="hover"
                 >
                   <template #content>
                     <div class="attachment-tooltip-content">
-                      <div class="tooltip-item">• 支持上传个人知识库与本地文件</div>
-                      <div class="tooltip-item">• 文件数量:最多支持10个</div>
-                      <div class="tooltip-item">• 文件类型: 支持pdf、doc、docx、ppt、pptx、xls、xlsx、csv、md, txt</div>
-                      <div class="tooltip-item">• 知识库文件:最多支持3个</div>
+                      <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.supportUpload') }}</div>
+                      <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.maxFiles') }}</div>
+                      <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.fileTypes') }}</div>
+                      <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.maxKbFiles') }}</div>
                     </div>
                   </template>
                   <el-dropdown
                     trigger="click"
                     @command="handleAttachmentCommand"
+                    @visible-change="handleAttachmentDropdownVisible"
                     placement="top-end"
                   >
                     <button
@@ -461,11 +464,11 @@
                       <el-dropdown-menu>
                         <el-dropdown-item command="local">
                           <el-icon><Folder /></el-icon>
-                          <span style="margin-left: 8px">本地文件</span>
+                          <span style="margin-left: 8px">{{ $t('ai.chat.attachmentLocalFile') }}</span>
                         </el-dropdown-item>
                         <el-dropdown-item command="knowledge">
                           <el-icon><Document /></el-icon>
-                          <span style="margin-left: 8px">知识库文件</span>
+                          <span style="margin-left: 8px">{{ $t('ai.chat.attachmentKnowledgeFile') }}</span>
                         </el-dropdown-item>
                       </el-dropdown-menu>
                     </template>
@@ -520,13 +523,13 @@
     <!-- 知识库选择对话框 -->
     <el-dialog
       v-model="showKnowledgeDialog"
-      title="选择知识库"
+      :title="t('ai.chat.selectKnowledgeBase')"
       width="600px"
       :close-on-click-modal="false"
     >
       <div v-loading="loadingKnowledgeList" class="knowledge-dialog-content">
         <div v-if="knowledgeListForSelect.length === 0 && !loadingKnowledgeList" class="empty-state">
-          <el-empty description="暂无知识库" />
+          <el-empty :description="t('ai.chat.noKnowledgeBase')" />
         </div>
         <div v-else class="knowledge-list">
           <div
@@ -546,13 +549,13 @@
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="showKnowledgeDialog = false">取消</el-button>
+          <el-button @click="showKnowledgeDialog = false">{{ t('common.cancel') }}</el-button>
           <el-button
             type="primary"
             @click="confirmKnowledgeSelection"
             :disabled="!selectedKnowledgeForFile"
           >
-            确定
+            {{ t('common.confirm') }}
           </el-button>
         </div>
       </template>
@@ -561,22 +564,23 @@
     <!-- 文档选择对话框 -->
     <el-dialog
       v-model="showDocumentDialog"
-      title="选择文档"
+      :title="t('ai.chat.selectDocument')"
       width="800px"
       :close-on-click-modal="false"
+      @close="handleDocumentDialogClose"
     >
       <div v-loading="loadingDocuments" class="document-dialog-content">
         <div v-if="selectedKnowledgeForFile" class="selected-knowledge-info">
           <el-icon><Document /></el-icon>
-          <span>知识库：{{ selectedKnowledgeForFile.name }}</span>
+          <span>{{ t('ai.chat.knowledgeBaseLabel') }}{{ selectedKnowledgeForFile.name }}</span>
         </div>
         <div v-if="documentList.length === 0 && !loadingDocuments" class="empty-state">
-          <el-empty description="该知识库暂无文档" />
+          <el-empty :description="t('ai.chat.noDocumentsInKb')" />
         </div>
         <div v-else class="document-list">
           <div class="document-limit-hint">
             <el-icon><InfoFilled /></el-icon>
-            <span>知识库文件最多只能选择3个</span>
+            <span>{{ t('ai.chat.maxKbFilesHint') }}</span>
           </div>
           <el-checkbox-group v-model="selectedDocuments" :max="3">
             <div
@@ -586,7 +590,7 @@
             >
               <el-checkbox :label="doc.id" class="document-checkbox" :disabled="selectedDocuments.length >= 3 && !selectedDocuments.includes(doc.id)">
                 <div class="document-info">
-                  <div class="document-name">{{ doc.fileName || doc.name || '未命名文档' }}</div>
+                  <div class="document-name">{{ doc.fileName || doc.name || t('ai.chat.unnamedDocument') }}</div>
                   <div v-if="doc.fileSize" class="document-size">{{ formatFileSize(doc.fileSize) }}</div>
                 </div>
               </el-checkbox>
@@ -597,17 +601,17 @@
       <template #footer>
         <div class="dialog-footer">
           <span class="selected-count">
-            已选择 {{ selectedDocuments.length }} 个文档
-            <span v-if="selectedDocuments.length >= 3" class="limit-warning">（已达上限）</span>
+            {{ t('ai.chat.selectedDocumentsCount', { count: selectedDocuments.length }) }}
+            <span v-if="selectedDocuments.length >= 3" class="limit-warning">{{ t('ai.chat.limitReached') }}</span>
           </span>
           <div>
-            <el-button @click="showDocumentDialog = false">取消</el-button>
+            <el-button @click="handleDocumentDialogCancel">{{ t('common.cancel') }}</el-button>
             <el-button
               type="primary"
               @click="confirmDocumentSelection"
               :disabled="selectedDocuments.length === 0"
             >
-              确定
+              {{ t('common.confirm') }}
             </el-button>
           </div>
         </div>
@@ -691,6 +695,13 @@ const isCurrentChatEmpty = () => {
 // 提供创建新对话的方法给侧边栏使用
 const handleCreateNewChatFromSidebar = async () => {
   try {
+    // 🔥 修复：检查用户是否已登录
+    if (!authStore.isLoggedIn) {
+      ElMessage.warning(t('user.pleaseLogin'))
+      openLoginModal()
+      return
+    }
+    
     // 🔥 修复：检查是否已经是新建对话状态（与侧边栏的 isNewChatActive 逻辑一致）
     // 条件：currentChat为null 且 没有消息 且 sessionStorage中没有对话ID
     const storedId = sessionStorage.getItem('currentConversationId')
@@ -776,6 +787,8 @@ const kbSearchQuery = ref('')
 // 附件功能
 const attachments = ref([])
 const fileInput = ref(null)
+// 🔥 修复：跟踪附件下拉菜单的显示状态，用于控制 tooltip 的显示
+const showAttachmentDropdown = ref(false)
 
 // 知识库文件选择功能
 const showKnowledgeDialog = ref(false)
@@ -790,21 +803,22 @@ const selectedDocuments = ref([])
 // 模型选择
 const showModelDropdown = ref(false)
 const selectedModel = ref('qwen3-max')
-const modelOptions = ref([
+// 🔥 修复：使用 computed 属性根据当前语言返回翻译后的模型选项
+const modelOptions = computed(() => [
   {
     value: 'qwen3-max',
-    name: 'Qwen3-Max',
-    description: '通义千问最新模型，擅长中文理解和生成'
+    name: t('ai.chat.models.qwen3Max.name'),
+    description: t('ai.chat.models.qwen3Max.description')
   },
   {
     value: 'deepseek-v3.1',
-    name: 'Deepseek-V3.1',
-    description: '深度求索V3.1，强大的代码和推理能力'
+    name: t('ai.chat.models.deepseekV31.name'),
+    description: t('ai.chat.models.deepseekV31.description')
   },
   {
     value: 'deepseek-r1',
-    name: 'Deepseek-R1',
-    description: '深度求索R1，强化学习模型'
+    name: t('ai.chat.models.deepseekR1.name'),
+    description: t('ai.chat.models.deepseekR1.description')
   }
 ])
 
@@ -881,10 +895,22 @@ const loadChats = async () => {
     return
   }
 
+  // 🔥 修复：如果正在加载（本地或全局），跳过重复调用
+  if (isLoadingChats.value || window.__isLoadingConversations) {
+    logger.debug('对话列表正在加载中，跳过重复调用', { 
+      local: isLoadingChats.value, 
+      global: window.__isLoadingConversations 
+    })
+    return
+  }
+
+  isLoadingChats.value = true
+  window.__isLoadingConversations = true
   try {
     logger.info('加载对话列表')
-    // 使用新接口：分页查询会话列表
-    const response = await pageAiConversations({ pageNo: 1, pageSize: 100 })
+    // 🔥 优化：使用与 ToCSidebar 相同的接口（带 sortBy: 'pinned' 参数），避免重复调用
+    // 虽然客户端也会排序，但使用服务端排序可以减少客户端处理
+    const response = await pageAiConversations({ pageNo: 1, pageSize: 100, sortBy: 'pinned', sortOrder: 'DESC' })
     if (response.code === 200 && response.data) {
       chats.value = response.data.records || response.data.list || []
       // 按置顶状态和更新时间排序
@@ -931,6 +957,10 @@ const loadChats = async () => {
       logger.error('使用旧接口加载对话列表也失败', fallbackError)
       chats.value = []
     }
+  } finally {
+    // 🔥 修复：清除加载标记（本地和全局）
+    isLoadingChats.value = false
+    window.__isLoadingConversations = false
   }
 }
 
@@ -951,6 +981,13 @@ const loadKnowledgeBases = async () => {
     return
   }
 
+  // 🔥 修复：如果正在加载，跳过重复调用
+  if (isLoadingKnowledgeBases.value) {
+    logger.debug('知识库列表正在加载中，跳过重复调用')
+    return
+  }
+
+  isLoadingKnowledgeBases.value = true
   try {
     logger.info('加载知识库列表')
     const response = await getKnowledgeList({ page: 1, size: 100 })
@@ -983,6 +1020,9 @@ const loadKnowledgeBases = async () => {
     // 其他错误才记录为错误日志
     logger.error('加载知识库列表失败', error)
     knowledgeBaseList.value = []
+  } finally {
+    // 🔥 修复：清除加载标记
+    isLoadingKnowledgeBases.value = false
   }
 }
 
@@ -2793,7 +2833,7 @@ const selectKnowledgeBase = (kb) => {
   
   showKnowledgeBaseList.value = false
   selectedKbIndex.value = -1
-  ElMessage.success(`已选择知识库：${kb.name}`)
+  ElMessage.success(t('ai.chat.knowledgeBaseSelected', { name: kb.name }))
 }
 
 const isKbSelected = (kbId) => {
@@ -2974,7 +3014,33 @@ const selectModel = (model) => {
 }
 
 // 附件相关方法
+const handleAttachmentClick = () => {
+  // 🔥 修复：检查用户是否已登录
+  if (!authStore.isLoggedIn) {
+    ElMessage.warning(t('user.pleaseLogin'))
+    openLoginModal()
+    return
+  }
+  // 如果已登录，直接触发文件选择
+  fileInput.value && fileInput.value.click()
+}
+
+// 🔥 修复：处理附件下拉菜单的显示状态变化
+const handleAttachmentDropdownVisible = (visible) => {
+  showAttachmentDropdown.value = visible
+}
+
 const handleAttachmentCommand = (command) => {
+  // 🔥 修复：检查用户是否已登录
+  if (!authStore.isLoggedIn) {
+    ElMessage.warning(t('user.pleaseLogin'))
+    openLoginModal()
+    return
+  }
+  
+  // 🔥 修复：关闭下拉菜单
+  showAttachmentDropdown.value = false
+  
   if (command === 'local') {
     // 选择本地文件
     fileInput.value && fileInput.value.click()
@@ -3006,7 +3072,7 @@ const loadKnowledgeListForSelect = async () => {
     }
   } catch (error) {
     logger.error('加载知识库列表失败', error)
-    ElMessage.error('加载知识库列表失败')
+    ElMessage.error(t('ai.chat.loadKnowledgeListFailed'))
     knowledgeListForSelect.value = []
   } finally {
     loadingKnowledgeList.value = false
@@ -3021,7 +3087,7 @@ const selectKnowledgeForFile = (kb) => {
 // 确认知识库选择，打开文档选择对话框
 const confirmKnowledgeSelection = async () => {
   if (!selectedKnowledgeForFile.value) {
-    ElMessage.warning('请选择知识库')
+    ElMessage.warning(t('ai.chat.pleaseSelectKnowledgeBase'))
     return
   }
   
@@ -3048,17 +3114,36 @@ const loadDocumentsForKnowledge = async (knowledgeId) => {
     }
   } catch (error) {
     logger.error('加载文档列表失败', error)
-    ElMessage.error('加载文档列表失败')
+    ElMessage.error(t('ai.chat.loadDocumentListFailed'))
     documentList.value = []
   } finally {
     loadingDocuments.value = false
   }
 }
 
+// 处理文档选择弹窗关闭（返回知识库选择弹窗）
+const handleDocumentDialogClose = () => {
+  // 如果知识库选择弹窗已经关闭，说明是确认操作，不需要返回
+  if (!showKnowledgeDialog.value) {
+    return
+  }
+  // 关闭文档选择弹窗，返回到知识库选择弹窗
+  showDocumentDialog.value = false
+  selectedDocuments.value = []
+  // 不清空 selectedKnowledgeForFile，以便用户可以重新选择文档
+  // 重新打开知识库选择弹窗
+  showKnowledgeDialog.value = true
+}
+
+// 处理文档选择弹窗取消按钮点击
+const handleDocumentDialogCancel = () => {
+  handleDocumentDialogClose()
+}
+
 // 确认文档选择
 const confirmDocumentSelection = () => {
   if (selectedDocuments.value.length === 0) {
-    ElMessage.warning('请至少选择一个文档')
+    ElMessage.warning(t('ai.chat.pleaseSelectAtLeastOneDocument'))
     return
   }
   
@@ -3067,7 +3152,10 @@ const confirmDocumentSelection = () => {
   const newKnowledgeFileCount = selectedDocuments.value.length
   
   if (currentKnowledgeFileCount + newKnowledgeFileCount > 3) {
-    ElMessage.warning(`知识库文件最多只能选择3个，当前已有${currentKnowledgeFileCount}个，本次最多只能选择${3 - currentKnowledgeFileCount}个`)
+    ElMessage.warning(t('ai.chat.maxKbFilesWarning', {
+      current: currentKnowledgeFileCount,
+      remaining: 3 - currentKnowledgeFileCount
+    }))
     return
   }
   
@@ -3093,13 +3181,13 @@ const confirmDocumentSelection = () => {
       // 再次检查知识库文件数量限制
       const currentKbCount = attachments.value.filter(att => att.type === 'knowledge').length
       if (currentKbCount >= 3) {
-        ElMessage.warning('知识库文件最多只能选择3个')
+        ElMessage.warning(t('ai.chat.maxKbFilesWarningSimple'))
         return
       }
       
       attachments.value.push({
         id: doc.id,
-        name: doc.fileName || doc.name || '未命名文档',
+        name: doc.fileName || doc.name || t('ai.chat.unnamedDocument'),
         size: doc.fileSize ? formatFileSize(doc.fileSize) : '未知大小',
         type: 'knowledge', // 标记为知识库文件
         knowledgeId: selectedKnowledgeForFile.value.id,
@@ -3111,12 +3199,14 @@ const confirmDocumentSelection = () => {
     }
   })
   
+  // 关闭所有弹窗（先关闭知识库选择弹窗，再关闭文档选择弹窗，避免触发返回逻辑）
+  showKnowledgeDialog.value = false
   showDocumentDialog.value = false
   selectedDocuments.value = []
   selectedKnowledgeForFile.value = null
   
   if (addedCount > 0) {
-    ElMessage.success(`已添加 ${addedCount} 个文档`)
+    ElMessage.success(t('ai.chat.documentsAdded', { count: addedCount }))
   }
 }
 
@@ -3317,6 +3407,18 @@ const handleClickOutside = (event) => {
   }
 }
 
+// 标记是否已经初始化过（避免重复加载）
+const hasInitialized = ref(false)
+// 标记是否正在加载对话列表（避免重复调用）
+const isLoadingChats = ref(false)
+// 标记是否正在加载知识库列表（避免重复调用）
+const isLoadingKnowledgeBases = ref(false)
+
+// 🔥 修复：创建全局共享的加载状态，避免 ToCSidebar 和 AIChat 同时调用接口
+if (!window.__isLoadingConversations) {
+  window.__isLoadingConversations = false
+}
+
 // 生命周期钩子
 onMounted(async () => {
   try {
@@ -3327,6 +3429,9 @@ onMounted(async () => {
     
     // 只有登录用户才加载对话列表和知识库
     if (authStore.isLoggedIn) {
+      // 标记已初始化，避免 watch 中重复调用
+      hasInitialized.value = true
+      
       // 加载对话列表（先尝试本地存储，再尝试API）
       loadChatsFromStorage()
       
@@ -3352,14 +3457,6 @@ onMounted(async () => {
           knowledgeBaseList.value = []
         })
       ])
-      
-      // 🔥 修复：确保知识库列表已加载（如果之前失败，再次尝试）
-      if (!knowledgeBaseList.value || knowledgeBaseList.value.length === 0) {
-        logger.info('知识库列表为空，再次尝试加载')
-        await loadKnowledgeBases().catch(err => {
-          logger.warn('再次加载知识库列表失败', err)
-        })
-      }
       
       logger.info('对话列表和知识库列表加载完成', {
         chatsCount: chats.value.length,
@@ -3500,6 +3597,7 @@ onMounted(async () => {
 watch(() => authStore.isLoggedIn, async (isLoggedIn, wasLoggedIn) => {
   if (!isLoggedIn) {
     // 用户退出登录，清除当前对话和消息
+    hasInitialized.value = false // 重置初始化标记
     currentChat.value = null
     messages.value = []
     chats.value = []
@@ -3527,33 +3625,30 @@ watch(() => authStore.isLoggedIn, async (isLoggedIn, wasLoggedIn) => {
       logger.info('用户登录成功，保留 sessionStorage 中的对话ID（可能是刷新页面）', storedId)
     }
     
-    // 🔥 修复：登录成功后立即加载知识库列表和对话列表
-    logger.info('用户登录成功，立即加载知识库列表和对话列表')
-    try {
-      await Promise.all([
-        loadKnowledgeBases().catch(err => {
-          logger.warn('登录后加载知识库列表失败', err)
-          knowledgeBaseList.value = []
-        }),
-        loadChats().catch(err => {
-          logger.warn('登录后加载对话列表失败', err)
+    // 🔥 修复：只有在组件未初始化时才加载数据，避免重复调用
+    if (!hasInitialized.value) {
+      hasInitialized.value = true
+      logger.info('用户登录成功，立即加载知识库列表和对话列表')
+      try {
+        await Promise.all([
+          loadKnowledgeBases().catch(err => {
+            logger.warn('登录后加载知识库列表失败', err)
+            knowledgeBaseList.value = []
+          }),
+          loadChats().catch(err => {
+            logger.warn('登录后加载对话列表失败', err)
+          })
+        ])
+        
+        logger.info('登录后知识库列表和对话列表加载完成', {
+          kbCount: knowledgeBaseList.value.length,
+          chatsCount: chats.value.length
         })
-      ])
-      
-      // 🔥 修复：如果知识库列表仍然为空，再次尝试加载
-      if (!knowledgeBaseList.value || knowledgeBaseList.value.length === 0) {
-        logger.info('登录后知识库列表仍然为空，再次尝试加载')
-        await loadKnowledgeBases().catch(err => {
-          logger.warn('再次加载知识库列表失败', err)
-        })
+      } catch (error) {
+        logger.error('登录后加载数据失败', error)
       }
-      
-      logger.info('登录后知识库列表和对话列表加载完成', {
-        kbCount: knowledgeBaseList.value.length,
-        chatsCount: chats.value.length
-      })
-    } catch (error) {
-      logger.error('登录后加载数据失败', error)
+    } else {
+      logger.info('组件已初始化，跳过重复加载')
     }
   }
   // 🔥 修复：刷新页面时（wasLoggedIn 可能是 undefined），不执行任何操作，保留 sessionStorage 中的状态

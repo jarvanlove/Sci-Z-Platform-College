@@ -1088,7 +1088,18 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
             role: roleText
           }
         }),
-        milestones: milestones.value
+        // 转换里程碑数据，将 documents 转换为后端期望的格式 [{ id: ... }]
+        milestones: milestones.value.map(milestone => ({
+          id: milestone.id || null, // 新增的里程碑 id 为 null
+          name: milestone.name,
+          description: milestone.description || '',
+          startTime: milestone.startTime,
+          endTime: milestone.endTime,
+          // 将文档列表转换为后端期望的格式：只包含 id 字段
+          documents: (milestone.documents || []).map(doc => ({
+            id: doc.fileInfo?.id || doc.id
+          })).filter(doc => doc.id != null) // 过滤掉没有 id 的文档（理论上不应该出现）
+        }))
       }
       
       const response = await updateProject(project.value.id, updateData)

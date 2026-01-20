@@ -81,6 +81,26 @@ public final class RedisUtil {
     }
 
     /**
+     * 自增计数（如果key不存在则设置初始值和过期时间）
+     *
+     * @param template   StringRedisTemplate Redis模板
+     * @param key        String 键
+     * @param delta      long 增量
+     * @param ttlSeconds long 过期时间（秒）
+     * @return Long 结果
+     */
+    public static Long incrByWithExpire(StringRedisTemplate template, String key, long delta, long ttlSeconds) {
+        // 先检查key是否存在
+        Boolean exists = template.hasKey(key);
+        Long result = template.opsForValue().increment(key, delta);
+        // 如果key不存在，设置过期时间
+        if (Boolean.FALSE.equals(exists) && result != null) {
+            template.expire(key, ttlSeconds, TimeUnit.SECONDS);
+        }
+        return result;
+    }
+
+    /**
      * Hash 设置
      *
      * @param template  StringRedisTemplate Redis模板

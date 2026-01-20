@@ -60,7 +60,9 @@ import com.sciz.server.interfaces.converter.AuthConverter;
 
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.ZoneId;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -911,32 +913,93 @@ public class AuthServiceImpl implements AuthService {
 
     /**
      * 校验短信验证码发送频率
+     * 包括：60秒间隔限制、验证码有效期内的重复发送检查、10分钟内最多5次、一天内最多20次
      *
      * @param phone String 手机号
      */
     private void ensureSmsVerificationRateLimit(String phone) {
+        // 1. 检查60秒间隔限制
         var limitKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_RATE_LIMIT_KEY, phone);
         var exists = RedisUtil.get(stringRedisTemplate, limitKey);
         if (StringUtils.hasText(exists)) {
-            log.warn(String.format("短信验证码发送频繁: phone=%s", phone));
+            log.warn(String.format("短信验证码发送频繁（60秒间隔）: phone=%s", phone));
             throw BusinessException.of(ResultCode.SMS_CODE_RATE_LIMITED);
+        }
+
+        // 2. 检查验证码是否还在有效期内（10分钟）
+        // 如果验证码还在有效期内，不允许重复发送，避免浪费和混淆
+        var cacheKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_CODE_KEY, phone);
+        var cachedCode = RedisUtil.get(stringRedisTemplate, cacheKey);
+        if (StringUtils.hasText(cachedCode)) {
+            // 获取验证码的剩余过期时间
+            Long ttl = stringRedisTemplate.getExpire(cacheKey);
+            if (ttl != null && ttl > 0) {
+                long remainingMinutes = ttl / 60;
+                log.warn(String.format("短信验证码仍在有效期内，不允许重复发送: phone=%s, 剩余有效期=%d分钟", phone, remainingMinutes));
+                throw BusinessException.of(ResultCode.SMS_CODE_RATE_LIMITED, 
+                    String.format("验证码仍在有效期内（剩余%d分钟），请勿重复发送", remainingMinutes));
+            }
+        }
+
+        // 3. 检查10分钟内发送次数限制
+        var count10MinKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_COUNT_10MIN_KEY, phone);
+        var count10Min = RedisUtil.get(stringRedisTemplate, count10MinKey);
+        if (StringUtils.hasText(count10Min)) {
+            try {
+                int count = Integer.parseInt(count10Min);
+                if (count >= CacheConstant.AUTH_SMS_VERIFICATION_MAX_COUNT_10MIN) {
+                    log.warn(String.format("短信验证码10分钟内发送次数超限: phone=%s, count=%d", phone, count));
+                    throw BusinessException.of(ResultCode.SMS_CODE_10MIN_LIMIT_EXCEEDED);
+                }
+            } catch (NumberFormatException e) {
+                log.warn(String.format("解析10分钟发送次数失败: phone=%s, value=%s", phone, count10Min));
+            }
+        }
+
+        // 4. 检查一天内发送次数限制
+        var today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        var countDayKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_COUNT_DAY_KEY, phone, today);
+        var countDay = RedisUtil.get(stringRedisTemplate, countDayKey);
+        if (StringUtils.hasText(countDay)) {
+            try {
+                int count = Integer.parseInt(countDay);
+                if (count >= CacheConstant.AUTH_SMS_VERIFICATION_MAX_COUNT_DAY) {
+                    log.warn(String.format("短信验证码一天内发送次数超限: phone=%s, count=%d", phone, count));
+                    throw BusinessException.of(ResultCode.SMS_CODE_DAY_LIMIT_EXCEEDED);
+                }
+            } catch (NumberFormatException e) {
+                log.warn(String.format("解析一天发送次数失败: phone=%s, value=%s", phone, countDay));
+            }
         }
     }
 
     /**
-     * 缓存短信验证码
+     * 缓存短信验证码并记录发送次数
      *
      * @param phone   String 手机号
      * @param smsCode String 验证码
      */
     private void cacheSmsVerificationCode(String phone, String smsCode) {
+        // 1. 缓存验证码
         var cacheKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_CODE_KEY, phone);
         RedisUtil.set(stringRedisTemplate, cacheKey, smsCode,
                 Duration.ofSeconds(CacheConstant.AUTH_SMS_VERIFICATION_CODE_EXPIRE));
 
+        // 2. 设置60秒间隔限制
         var limitKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_RATE_LIMIT_KEY, phone);
         RedisUtil.set(stringRedisTemplate, limitKey, "1",
                 Duration.ofSeconds(CacheConstant.AUTH_SMS_VERIFICATION_CODE_INTERVAL));
+
+        // 3. 记录10分钟内发送次数
+        var count10MinKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_COUNT_10MIN_KEY, phone);
+        RedisUtil.incrByWithExpire(stringRedisTemplate, count10MinKey, 1,
+                CacheConstant.AUTH_SMS_VERIFICATION_10MIN_WINDOW);
+
+        // 4. 记录一天内发送次数（使用日期作为key的一部分，每天自动重置）
+        var today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        var countDayKey = String.format(CacheConstant.AUTH_SMS_VERIFICATION_COUNT_DAY_KEY, phone, today);
+        RedisUtil.incrByWithExpire(stringRedisTemplate, countDayKey, 1,
+                CacheConstant.AUTH_SMS_VERIFICATION_DAY_WINDOW);
     }
 
     /**
