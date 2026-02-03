@@ -226,8 +226,8 @@ export const validateFileCount = (files, maxCount = 5) => {
   return Array.isArray(files) && files.length <= maxCount
 }
 
-// 格式化手机号显示（前3位 + 中间隐藏 + 后4位）
-// 例如：15969144248 -> 159****4248
+// 格式化手机号显示（前3位 + 中间隐藏 + 后3位）
+// 例如：15969144248 -> 159***424
 export const formatPhoneDisplay = (phone) => {
   if (!phone || typeof phone !== 'string') {
     return phone
@@ -236,8 +236,8 @@ export const formatPhoneDisplay = (phone) => {
   // 判断是否为手机号（11位数字，以1开头）
   const phoneRegex = /^1[3-9]\d{9}$/
   if (phoneRegex.test(phone)) {
-    // 前3位 + 中间4个* + 后4位
-    return phone.substring(0, 3) + '****' + phone.substring(phone.length - 4)
+    // 前3位 + 中间3个* + 后3位（更紧凑的显示，适合在较窄的宽度下完整显示）
+    return phone.substring(0, 3) + '***' + phone.substring(phone.length - 3)
   }
   
   // 如果不是手机号，直接返回原值

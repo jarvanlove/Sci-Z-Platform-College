@@ -103,12 +103,18 @@ public class BusinessException extends RuntimeException {
     // ==================== 工具方法 ====================
 
     /**
-     * 是否为客户端错误（4xx）
+     * 是否为客户端错误（4xx 或业务错误码 1000-9999）
+     * 
+     * <p>
+     * 业务错误码（1000-9999）通常表示用户输入或操作导致的错误，
+     * 应该返回 400 状态码而不是 500，以便前端正确显示错误信息。
+     * </p>
      *
      * @return boolean 是否为客户端错误
      */
     public boolean isClientError() {
-        return code >= 400 && code < 500;
+        // HTTP 4xx 错误码或业务错误码（1000-9999）都视为客户端错误
+        return (code >= 400 && code < 500) || (code >= 1000 && code < 10000);
     }
 
     /**

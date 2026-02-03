@@ -58,6 +58,7 @@
                 @keydown.escape="hideKnowledgeBaseList"
                 @keydown.backspace="handleBackspace"
                 @input="handleInputChange"
+                @focus="handleInputFocus"
                 ref="messageInput"
               ></textarea>
 
@@ -69,7 +70,25 @@
                 <div class="kb-dropdown-header">
                   <span class="kb-dropdown-title">{{ $t('knowledge.sharedKnowledgeBase') }}</span>
                 </div>
-                <div class="kb-dropdown-section">
+                <!-- 🔥 新增：搜索框 -->
+                <div class="kb-dropdown-search">
+                  <span class="search-left-icon">
+                    <el-icon><Search /></el-icon>
+                  </span>
+                  <input
+                    class="form-input"
+                    v-model="kbSearchQuery"
+                    :placeholder="$t('knowledge.searchPlaceholder')"
+                    style="width: 100%; padding: 10px 40px 10px 36px"
+                    @input="handleKbSearchInput"
+                  />
+                </div>
+                <!-- 🔥 修改：添加滚动监听和加载更多 -->
+                <div 
+                  class="kb-dropdown-section"
+                  @scroll="handleKbDropdownScroll"
+                  ref="kbDropdownSectionRef"
+                >
                   <div class="kb-list">
                     <div
                       v-for="(kb, index) in filteredKnowledgeBases"
@@ -78,9 +97,27 @@
                       :class="{ selected: selectedKbIndex === index }"
                       @click="selectKnowledgeBase(kb)"
                     >
-                      <div class="kb-icon">{{ getKbIcon(kb) }}</div>
+                      <!-- 🔥 新增：显示知识库封面 -->
+                      <div class="kb-item-icon">
+                        <img
+                          v-if="getKbCoverUrl(kb)"
+                          :src="getKbCoverUrl(kb)"
+                          alt="cover"
+                          class="kb-cover-img"
+                        />
+                        <div v-else class="kb-item-icon-default">
+                          <el-icon><Collection /></el-icon>
+                        </div>
+                      </div>
                       <div class="kb-name">{{ kb.name }}</div>
                       <div v-if="isKbSelected(kb.id)" class="kb-selected-mark">✓</div>
+                    </div>
+                    <!-- 🔥 新增：加载更多提示 -->
+                    <div v-if="kbListPagination.loading" class="kb-loading-more">
+                      {{ $t('common.loading') }}...
+                    </div>
+                    <div v-else-if="!kbListPagination.hasMore && knowledgeBaseList.length > 0" class="kb-no-more">
+                      {{ $t('common.noMoreData') }}
                     </div>
                   </div>
                 </div>
@@ -118,34 +155,73 @@
                 </div>
 
                 <div class="kb-right-controls">
-                  <!-- 附件按钮 -->
+                  <!-- 联网搜索开关 -->
                   <el-tooltip
-                    :content="$t('ai.chat.attachmentTitle')"
-                    placement="right"
-                    :offset="10"
+                    placement="top"
+                    effect="light"
+                    :show-after="300"
                     :hide-after="0"
-                    :show-after="200"
-                    :teleported="true"
-                    :popper-options="{
-                      modifiers: [
-                        {
-                          name: 'eventListeners',
-                          options: {
-                            scroll: false,
-                            resize: false
-                          }
-                        }
-                      ]
-                    }"
+                    trigger="hover"
                   >
+                    <template #content>
+                      <div class="attachment-tooltip-content">
+                        {{ enableSearch ? '已开启联网搜索' : '已关闭联网搜索' }}
+                      </div>
+                    </template>
                     <button
-                      class="kb-attachment-btn"
-                      @click="handleAttachmentClick"
+                      class="kb-enable-search-btn"
+                      :class="{ active: enableSearch }"
+                      @click.stop="toggleEnableSearch"
                     >
-                      <svg class="attachment-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M16.5 6v11.5a4.5 4.5 0 0 1-9 0V5a2.5 2.5 0 0 1 5 0v10.5a1.5 1.5 0 0 1-3 0V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                      </svg>
+                      <img
+                        :src="enableSearch ? iconSearchOn : iconSearchOff"
+                        alt="联网搜索"
+                        class="search-icon"
+                      />
                     </button>
+                  </el-tooltip>
+
+                  <!-- 附件按钮（和历史对话一样的下拉菜单形式和悬浮主题） -->
+                  <el-tooltip
+                    placement="top"
+                    effect="light"
+                    :show-after="300"
+                    :hide-after="0"
+                    :disabled="showAttachmentDropdown"
+                    trigger="hover"
+                  >
+                    <template #content>
+                      <div class="attachment-tooltip-content">
+                        <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.supportUpload') }}</div>
+                        <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.maxFiles') }}</div>
+                        <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.fileTypes') }}</div>
+                        <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.maxKbFiles') }}</div>
+                      </div>
+                    </template>
+                    <el-dropdown
+                      trigger="click"
+                      @command="handleAttachmentCommand"
+                      @visible-change="handleAttachmentDropdownVisible"
+                      placement="top-end"
+                    >
+                      <button
+                        class="kb-attachment-btn"
+                      >
+                        <el-icon><Paperclip /></el-icon>
+                      </button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="local">
+                            <el-icon><Folder /></el-icon>
+                            <span style="margin-left: 8px">{{ $t('ai.chat.attachmentLocalFile') }}</span>
+                          </el-dropdown-item>
+                          <el-dropdown-item command="knowledge">
+                            <el-icon><Document /></el-icon>
+                            <span style="margin-left: 8px">{{ $t('ai.chat.attachmentKnowledgeFile') }}</span>
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
                   </el-tooltip>
 
                   <!-- 隐藏的文件输入 -->
@@ -206,10 +282,15 @@
             <template v-if="uniqueMessages.length > 0">
               <div class="kb-messages">
                 <div
-                  v-for="msg in uniqueMessages"
+                  v-for="(msg, index) in uniqueMessages"
                   :key="msg.id"
                   class="kb-message"
-                  :class="msg.type"
+                  :class="[
+                    msg.type,
+                    {
+                      'is-last-ai-message': msg.type === 'ai' && isLastAiMessage(msg, index, uniqueMessages)
+                    }
+                  ]"
                   :data-message-id="msg.id"
                 >
                   <div class="kb-message-bubble">
@@ -260,7 +341,7 @@
                             @keydown.enter.ctrl.prevent="confirmEditUserMessage(msg)"
                             @keydown.escape.prevent="cancelEditUserMessage(msg)"
                             ref="editContentRef"
-                          >{{ msg.editContent }}</div>
+                          ></div>
                           <!-- 编辑操作按钮 - 显示在框内右下角 -->
                           <div class="kb-edit-actions-inline">
                             <button
@@ -372,6 +453,7 @@
               @keydown.escape="hideKnowledgeBaseList"
               @keydown.backspace="handleBackspace"
               @input="handleInputChange"
+              @focus="handleInputFocus"
               ref="messageInput"
             ></textarea>
 
@@ -383,7 +465,25 @@
               <div class="kb-dropdown-header">
                 <span class="kb-dropdown-title">{{ $t('knowledge.sharedKnowledgeBase') }}</span>
               </div>
-              <div class="kb-dropdown-section">
+              <!-- 🔥 新增：搜索框 -->
+              <div class="kb-dropdown-search">
+                <span class="search-left-icon">
+                  <el-icon><Search /></el-icon>
+                </span>
+                <input
+                  class="form-input"
+                  v-model="kbSearchQuery"
+                  :placeholder="$t('knowledge.searchPlaceholder')"
+                  style="width: 100%; padding: 10px 40px 10px 36px"
+                  @input="handleKbSearchInput"
+                />
+              </div>
+              <!-- 🔥 修改：添加滚动监听和加载更多 -->
+              <div 
+                class="kb-dropdown-section"
+                @scroll="handleKbDropdownScroll"
+                ref="kbDropdownSectionRef2"
+              >
                 <div class="kb-list">
                   <div
                     v-for="(kb, index) in filteredKnowledgeBases"
@@ -392,9 +492,27 @@
                     :class="{ selected: selectedKbIndex === index }"
                     @click="selectKnowledgeBase(kb)"
                   >
-                    <div class="kb-icon">{{ getKbIcon(kb) }}</div>
+                    <!-- 🔥 新增：显示知识库封面 -->
+                    <div class="kb-item-icon">
+                      <img
+                        v-if="getKbCoverUrl(kb)"
+                        :src="getKbCoverUrl(kb)"
+                        alt="cover"
+                        class="kb-cover-img"
+                      />
+                      <div v-else class="kb-item-icon-default">
+                        <el-icon><Collection /></el-icon>
+                      </div>
+                    </div>
                     <div class="kb-name">{{ kb.name }}</div>
                     <div v-if="isKbSelected(kb.id)" class="kb-selected-mark">✓</div>
+                  </div>
+                  <!-- 🔥 新增：加载更多提示 -->
+                  <div v-if="kbListPagination.loading" class="kb-loading-more">
+                    {{ $t('common.loading') }}...
+                  </div>
+                  <div v-else-if="!kbListPagination.hasMore && knowledgeBaseList.length > 0" class="kb-no-more">
+                    {{ $t('common.noMoreData') }}
                   </div>
                 </div>
               </div>
@@ -432,6 +550,32 @@
               </div>
 
               <div class="kb-right-controls">
+                <!-- 联网搜索开关 -->
+                <el-tooltip
+                  placement="top"
+                  effect="light"
+                  :show-after="300"
+                  :hide-after="0"
+                  trigger="hover"
+                >
+                  <template #content>
+                    <div class="attachment-tooltip-content">
+                      {{ enableSearch ? '已开启联网搜索' : '已关闭联网搜索' }}
+                    </div>
+                  </template>
+                  <button
+                    class="kb-enable-search-btn"
+                    :class="{ active: enableSearch }"
+                    @click.stop="toggleEnableSearch"
+                  >
+                    <img
+                      :src="enableSearch ? iconSearchOn : iconSearchOff"
+                      alt="联网搜索"
+                      class="search-icon"
+                    />
+                  </button>
+                </el-tooltip>
+
                 <!-- 附件按钮 -->
                 <el-tooltip
                   placement="top"
@@ -508,7 +652,7 @@
             </div>
           </div>
           <div class="input-footer">{{ $t('ai.chat.aiContentHint') }}</div>
-          <!-- 🔥 修复：滚动到底部按钮 - 在输入框区域右下角 -->
+          <!-- 🔥 修复：滚动到底部按钮 - 在输入框区域右下角（还原到原始位置） -->
           <button
             v-if="showScrollToBottom"
             class="scroll-to-bottom-btn-input"
@@ -528,21 +672,60 @@
       :close-on-click-modal="false"
     >
       <div v-loading="loadingKnowledgeList" class="knowledge-dialog-content">
-        <div v-if="knowledgeListForSelect.length === 0 && !loadingKnowledgeList" class="empty-state">
-          <el-empty :description="t('ai.chat.noKnowledgeBase')" />
+        <!-- 🔥 新增：搜索框 -->
+        <div class="search-input-wrap" style="margin: 0 0 12px 0">
+          <span class="search-left-icon">
+            <el-icon><Search /></el-icon>
+          </span>
+          <input
+            class="form-input"
+            v-model="kbSelectSearchQuery"
+            :placeholder="$t('knowledge.searchPlaceholder')"
+            style="width: 100%; padding: 10px 40px 10px 36px"
+            @input="handleKbSelectSearchInput"
+          />
         </div>
-        <div v-else class="knowledge-list">
-          <div
-            v-for="kb in knowledgeListForSelect"
-            :key="kb.id"
-            class="knowledge-item"
-            :class="{ selected: selectedKnowledgeForFile?.id === kb.id }"
-            @click="selectKnowledgeForFile(kb)"
-          >
-            <div class="knowledge-icon">📚</div>
-            <div class="knowledge-info">
-              <div class="knowledge-name">{{ kb.name }}</div>
-              <div v-if="kb.description" class="knowledge-desc">{{ kb.description }}</div>
+        <!-- 🔥 修改：添加滚动监听和加载更多 -->
+        <div 
+          class="knowledge-list-scroll"
+          @scroll="handleKbSelectScroll"
+          style="max-height: 400px; overflow-y: auto;"
+        >
+          <div v-if="knowledgeListForSelect.length === 0 && !loadingKnowledgeList" class="empty-state">
+            <el-empty :description="t('ai.chat.noKnowledgeBase')" />
+          </div>
+          <div v-else class="knowledge-list">
+            <div
+              v-for="kb in knowledgeListForSelect"
+              :key="kb.id"
+              class="knowledge-item"
+              :class="{ selected: selectedKnowledgeForFile?.id === kb.id }"
+              @click="selectKnowledgeForFile(kb)"
+              @dblclick="handleKnowledgeItemDoubleClick(kb)"
+            >
+              <!-- 🔥 修改：显示知识库封面 -->
+              <div class="knowledge-item-icon">
+                <img
+                  v-if="getKbCoverUrl(kb)"
+                  :src="getKbCoverUrl(kb)"
+                  alt="cover"
+                  class="kb-cover-img"
+                />
+                <div v-else class="knowledge-item-icon-default">
+                  <el-icon><Collection /></el-icon>
+                </div>
+              </div>
+              <div class="knowledge-info">
+                <div class="knowledge-name">{{ kb.name }}</div>
+                <div v-if="kb.description" class="knowledge-desc">{{ kb.description }}</div>
+              </div>
+            </div>
+            <!-- 🔥 新增：加载更多提示 -->
+            <div v-if="kbSelectPagination.loading" class="kb-loading-more">
+              {{ $t('common.loading') }}...
+            </div>
+            <div v-else-if="!kbSelectPagination.hasMore && knowledgeListForSelect.length > 0" class="kb-no-more">
+              {{ $t('common.noMoreData') }}
             </div>
           </div>
         </div>
@@ -555,7 +738,7 @@
             @click="confirmKnowledgeSelection"
             :disabled="!selectedKnowledgeForFile"
           >
-            {{ t('common.confirm') }}
+            {{ $t('common.confirm') }}
           </el-button>
         </div>
       </template>
@@ -644,10 +827,13 @@ import {
   Paperclip,
   Folder,
   Check,
-  InfoFilled
+  InfoFilled,
+  Search,
+  Collection
 } from '@element-plus/icons-vue'
 import {
   getKnowledgeList,
+  getKnowledgeListPage,
   getKnowledgeFileRelationList
 } from '@/api/Knowledge/knowledge'
 import {
@@ -674,6 +860,10 @@ import {
   getConversationMessages
 } from '@/api/AI/ai'
 import { createLogger } from '@/utils/simpleLogger'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import iconSearchOn from '@/assets/images/open_connect.png'
+import iconSearchOff from '@/assets/images/close_connect.png'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -681,6 +871,14 @@ const router = useRouter()
 const authStore = useAuthStore()
 const logger = createLogger('AIChat')
 const { openLoginModal } = useLoginModal()
+
+// 配置 marked 选项
+marked.setOptions({
+  breaks: true, // 支持 GitHub 风格的换行
+  gfm: true, // 启用 GitHub Flavored Markdown
+  headerIds: false, // 不生成标题 ID
+  mangle: false // 不混淆邮箱地址
+})
 
 // 提供判断当前对话是否为空的方法给侧边栏使用
 const isCurrentChatEmpty = () => {
@@ -783,6 +981,15 @@ const selectedKnowledgeBases = ref([])
 const selectedKbIndex = ref(-1)
 const knowledgeBaseList = ref([])
 const kbSearchQuery = ref('')
+// 🔥 新增：知识库列表分页相关（用于@符号下拉框）
+const kbListPagination = ref({
+  pageNo: 1,
+  pageSize: 10,
+  total: 0,
+  hasMore: true,
+  loading: false
+})
+const kbListSearchTimer = ref(null)
 
 // 附件功能
 const attachments = ref([])
@@ -793,8 +1000,20 @@ const showAttachmentDropdown = ref(false)
 // 知识库文件选择功能
 const showKnowledgeDialog = ref(false)
 const showDocumentDialog = ref(false)
+// 🔥 新增：标记是否正在确认文档选择（用于区分确认和取消操作）
+const isConfirmingDocumentSelection = ref(false)
 const knowledgeListForSelect = ref([])
 const loadingKnowledgeList = ref(false)
+// 🔥 新增：附件按钮知识库选择的分页相关
+const kbSelectPagination = ref({
+  pageNo: 1,
+  pageSize: 10,
+  total: 0,
+  hasMore: true,
+  loading: false
+})
+const kbSelectSearchQuery = ref('')
+const kbSelectSearchTimer = ref(null)
 const selectedKnowledgeForFile = ref(null)
 const documentList = ref([])
 const loadingDocuments = ref(false)
@@ -803,6 +1022,9 @@ const selectedDocuments = ref([])
 // 模型选择
 const showModelDropdown = ref(false)
 const selectedModel = ref('qwen3-max')
+
+// 联网搜索开关
+const enableSearch = ref(false)
 // 🔥 修复：使用 computed 属性根据当前语言返回翻译后的模型选项
 const modelOptions = computed(() => [
   {
@@ -823,13 +1045,10 @@ const modelOptions = computed(() => [
 ])
 
 // 计算属性
+// 🔥 修改：移除前端过滤，因为搜索已由后端接口处理
 const filteredKnowledgeBases = computed(() => {
   // 过滤掉无效的元素（防止 undefined 或 null）
-  const validKbList = knowledgeBaseList.value.filter((kb) => kb && kb.name)
-  if (!kbSearchQuery.value.trim()) return validKbList
-  return validKbList.filter((kb) =>
-    kb.name.toLowerCase().includes(kbSearchQuery.value.toLowerCase())
-  )
+  return knowledgeBaseList.value.filter((kb) => kb && kb.name)
 })
 
 const hasKnowledgeBaseSelected = computed(() => {
@@ -887,7 +1106,44 @@ const uniqueMessages = computed(() => {
   return result
 })
 
+// 🔥 修复：判断是否是最后一条AI消息
+const isLastAiMessage = (msg, currentIndex, allMessages) => {
+  if (msg.type !== 'ai') {
+    return false
+  }
+  // 从当前位置往后查找，看是否还有AI消息
+  for (let i = currentIndex + 1; i < allMessages.length; i++) {
+    if (allMessages[i].type === 'ai') {
+      return false
+    }
+  }
+  return true
+}
+
 // 方法
+
+/**
+ * 更新本地对话列表中的对话信息（不调用API）
+ * @param {string|number} conversationId 对话ID
+ * @param {object} updates 要更新的字段（如 lastMessage, updatedAt 等）
+ */
+const updateLocalChat = (conversationId, updates = {}) => {
+  if (!conversationId) return
+  
+  const chatIndex = chats.value.findIndex(c => String(c.id) === String(conversationId))
+  if (chatIndex !== -1) {
+    // 更新对话信息
+    Object.assign(chats.value[chatIndex], updates)
+    // 重新排序（确保更新的对话排在前面）
+    sortChats()
+    // 保存到本地存储
+    saveChatsToStorage()
+    logger.debug('本地更新对话信息', { conversationId, updates })
+  } else {
+    logger.debug('对话不存在于列表中，跳过本地更新', { conversationId })
+  }
+}
+
 const loadChats = async () => {
   // 未登录用户不需要加载对话列表，静默跳过
   if (!authStore.isLoggedIn) {
@@ -974,7 +1230,7 @@ const sortChats = () => {
   })
 }
 
-const loadKnowledgeBases = async () => {
+const loadKnowledgeBases = async (isLoadMore = false) => {
   // 未登录用户不需要加载知识库列表，静默跳过
   if (!authStore.isLoggedIn) {
     knowledgeBaseList.value = []
@@ -982,19 +1238,56 @@ const loadKnowledgeBases = async () => {
   }
 
   // 🔥 修复：如果正在加载，跳过重复调用
-  if (isLoadingKnowledgeBases.value) {
+  if (isLoadingKnowledgeBases.value || kbListPagination.value.loading) {
     logger.debug('知识库列表正在加载中，跳过重复调用')
     return
   }
 
   isLoadingKnowledgeBases.value = true
+  kbListPagination.value.loading = true
+  
+  if (!isLoadMore) {
+    // 重置分页
+    kbListPagination.value.pageNo = 1
+    kbListPagination.value.hasMore = true
+    knowledgeBaseList.value = []
+  }
+
   try {
-    logger.info('加载知识库列表')
-    const response = await getKnowledgeList({ page: 1, size: 100 })
+    logger.info('加载知识库列表', {
+      pageNo: kbListPagination.value.pageNo,
+      pageSize: kbListPagination.value.pageSize,
+      keyword: kbSearchQuery.value,
+      isLoadMore
+    })
+    
+    // 🔥 替换为新接口：使用分页查询接口
+    const response = await getKnowledgeListPage({
+      pageNo: kbListPagination.value.pageNo,
+      pageSize: kbListPagination.value.pageSize,
+      keyword: kbSearchQuery.value || undefined
+    })
+    
     if (response.code === 200 && response.data) {
-      knowledgeBaseList.value = response.data.records || response.data.list || []
+      const list = response.data.records || response.data.list || []
+      
+      if (isLoadMore) {
+        // 追加数据
+        knowledgeBaseList.value.push(...list)
+      } else {
+        // 替换数据
+        knowledgeBaseList.value = list
+      }
+      
+      // 更新分页信息
+      kbListPagination.value.total = response.data.total || 0
+      kbListPagination.value.hasMore = 
+        knowledgeBaseList.value.length < kbListPagination.value.total
+      
       logger.info('知识库列表加载成功', {
         count: knowledgeBaseList.value.length,
+        total: kbListPagination.value.total,
+        hasMore: kbListPagination.value.hasMore,
         items: knowledgeBaseList.value.map(kb => ({
           id: kb.id,
           name: kb.name,
@@ -1003,6 +1296,9 @@ const loadKnowledgeBases = async () => {
       })
     } else {
       logger.warn('知识库列表响应异常', { code: response.code, data: response.data })
+      if (!isLoadMore) {
+        knowledgeBaseList.value = []
+      }
     }
   } catch (error) {
     // 如果是401未授权错误，静默处理（未登录用户正常情况）
@@ -1019,10 +1315,13 @@ const loadKnowledgeBases = async () => {
     
     // 其他错误才记录为错误日志
     logger.error('加载知识库列表失败', error)
-    knowledgeBaseList.value = []
+    if (!isLoadMore) {
+      knowledgeBaseList.value = []
+    }
   } finally {
     // 🔥 修复：清除加载标记
     isLoadingKnowledgeBases.value = false
+    kbListPagination.value.loading = false
   }
 }
 
@@ -1187,6 +1486,7 @@ const loadMessages = async (chatId, forceLoadFromApi = false) => {
               id: msg.id,
               type: msg.role === 'user' ? 'user' : 'ai',
               content: msg.content || '',
+              originalContent: msg.content || '', // 🔥 修复：保存原始内容，用于编辑时正确显示
               timestamp: new Date(msg.created_time || msg.createdTime || msg.createdAt || msg.timestamp),
               documents: documents,
               conversationId: msg.conversationId
@@ -1311,16 +1611,85 @@ const loadChatsFromStorage = () => {
   }
 }
 
-// 格式化消息内容
+// 格式化消息内容 - 使用 marked + DOMPurify 专业 Markdown 渲染
 const formatKbContent = (content) => {
   if (!content || typeof content !== 'string') {
     return ''
   }
-  return content
-    .replace(/\n/g, '<br>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`(.*?)`/g, '<code>$1</code>')
+  
+  try {
+    // 使用 marked 将 Markdown 转换为 HTML
+    const rawHtml = marked.parse(content)
+    
+    // 使用 DOMPurify 清理 HTML，防止 XSS 攻击
+    const cleanHtml = DOMPurify.sanitize(rawHtml, {
+      ALLOWED_TAGS: [
+        'p', 'br', 'strong', 'em', 'u', 's', 'del', 'code', 'pre',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'ul', 'ol', 'li',
+        'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        'blockquote', 'hr', 'a', 'img'
+      ],
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class'],
+      ALLOW_DATA_ATTR: false
+    })
+    
+    // 为 HTML 元素添加自定义类名，以便应用样式
+    // 先临时标记代码块，避免影响行内代码处理
+    const codeBlockPlaceholder = '___CODE_BLOCK_PLACEHOLDER___'
+    const codeBlocks = []
+    let styledHtml = cleanHtml.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (match, code) => {
+      const placeholder = `${codeBlockPlaceholder}${codeBlocks.length}`
+      codeBlocks.push(match.replace(/<pre><code>/, '<pre class="md-code-block"><code>'))
+      return placeholder
+    })
+    
+    // 处理其他元素
+    styledHtml = styledHtml
+      // 表格包装和类名
+      .replace(/<table>/g, '<div class="markdown-table-wrapper"><table class="markdown-table">')
+      .replace(/<\/table>/g, '</table></div>')
+      .replace(/<th>/g, '<th class="table-header">')
+      .replace(/<td>/g, '<td class="table-cell">')
+      // 标题类名
+      .replace(/<h1>/g, '<h1 class="md-heading h1">')
+      .replace(/<h2>/g, '<h2 class="md-heading h2">')
+      .replace(/<h3>/g, '<h3 class="md-heading h3">')
+      // 行内代码（此时代码块已被替换为占位符）
+      .replace(/<code>/g, '<code class="md-inline-code">')
+      // 文本格式
+      .replace(/<strong>/g, '<strong class="md-bold">')
+      .replace(/<em>/g, '<em class="md-italic">')
+      .replace(/<del>/g, '<del class="md-strikethrough">')
+      // 列表
+      .replace(/<ul>/g, '<ul class="md-list">')
+      .replace(/<li>/g, '<li class="md-list-item">')
+      // 分隔线
+      .replace(/<hr>/g, '<hr class="md-divider">')
+    
+    // 恢复代码块
+    codeBlocks.forEach((codeBlock, index) => {
+      styledHtml = styledHtml.replace(`${codeBlockPlaceholder}${index}`, codeBlock)
+    })
+    
+    // 为表格行添加交替行类名
+    styledHtml = styledHtml.replace(/<tbody>([\s\S]*?)<\/tbody>/g, (match, tbodyContent) => {
+      const rows = tbodyContent.match(/<tr>[\s\S]*?<\/tr>/g) || []
+      return '<tbody>' + rows.map((row, index) => 
+        row.replace(/<tr>/, `<tr class="${index % 2 === 0 ? 'odd-row' : 'even-row'}">`)
+      ).join('') + '</tbody>'
+    })
+    
+    return styledHtml
+  } catch (error) {
+    logger.error('Markdown 渲染错误', error)
+    // 失败时回退到基础处理
+    return content
+      .replace(/\n/g, '<br>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`(.*?)`/g, '<code>$1</code>')
+  }
 }
 
 const formatTime = (date) => {
@@ -1659,6 +2028,7 @@ const sendKbMessage = async () => {
     id: userMessageId,
     type: 'user',
     content: userMessageContent,
+    originalContent: userMessageContent, // 🔥 修复：保存原始内容，用于编辑时正确显示
     timestamp: new Date(),
     attachments: attachments.value.length > 0 ? [...attachments.value] : [],
     conversationId: conversationId
@@ -1731,33 +2101,24 @@ const sendKbMessage = async () => {
     
     saveChatsToStorage()
     
-    // 刷新对话列表，更新最后一条消息和更新时间
-    try {
-      const currentChatId = currentChat.value?.id
-      await loadChats()
-      // 刷新后，如果当前对话还在，重新选中它（保持选中状态，但不重新加载消息）
-      if (currentChatId && conversationId) {
-        const refreshedChat = chats.value.find(c => c.id === conversationId || c.id === currentChatId)
-        if (refreshedChat) {
-          // 只更新对话对象，不重新加载消息（避免重复加载）
-          currentChat.value = { ...refreshedChat, messages: currentChat.value?.messages || [] }
-        }
+    // 🔥 优化：本地更新对话信息，不调用API刷新整个列表
+    if (conversationId) {
+      updateLocalChat(conversationId, {
+        lastMessage: text,
+        updatedAt: new Date()
+      })
+    }
+    
+    // 🔥 修复：如果创建了新对话，通知侧边栏刷新对话列表并更新选中状态
+    if (isNewConversationCreated && conversationId) {
+      // 使用 sessionStorage 存储当前对话ID
+      sessionStorage.setItem('currentConversationId', String(conversationId))
+      // 触发自定义事件，通知侧边栏刷新对话列表并更新选中状态
+      window.dispatchEvent(new CustomEvent('chatCreated', { detail: { conversationId } }))
+      // 清除URL中的conversationId参数
+      if (route.query.conversationId) {
+        router.replace({ path: '/ai/chat', query: {} })
       }
-      
-      // 🔥 修复：如果创建了新对话，通知侧边栏刷新对话列表并更新选中状态
-      if (isNewConversationCreated && conversationId) {
-        // 使用 sessionStorage 存储当前对话ID
-        sessionStorage.setItem('currentConversationId', String(conversationId))
-        // 触发自定义事件，通知侧边栏刷新对话列表并更新选中状态
-        window.dispatchEvent(new CustomEvent('chatCreated', { detail: { conversationId } }))
-        // 清除URL中的conversationId参数
-        if (route.query.conversationId) {
-          router.replace({ path: '/ai/chat', query: {} })
-        }
-      }
-    } catch (error) {
-      logger.warn('刷新对话列表失败', error)
-      // 即使刷新失败，也不影响主流程
     }
   }
 
@@ -1845,6 +2206,7 @@ const sendKbMessage = async () => {
       files: filesToUpload || undefined, // 可选：本地文件列表（不传则不执行工作流）
       attachmentIds: knowledgeFileAttachmentIds.length > 0 ? knowledgeFileAttachmentIds : undefined, // 可选：知识库文件 attachmentId 列表
       conversationId: currentConversationId.value || conversationId || undefined, // 可选：会话ID
+      enableSearch: enableSearch.value, // 是否启用联网搜索
       onMessage: (answer) => {
         // 追加回答内容
         const message = messages.value.find(m => m.id === aiMessageId)
@@ -2010,39 +2372,29 @@ const sendKbMessage = async () => {
           }
         }
         
-        // 🔥 修复：刷新对话列表，更新最后一条消息和更新时间，并通知侧边栏刷新
-        try {
-          await loadChats()
-          // 🔥 修复：确保 conversationId 存在（优先使用 currentChat 的ID）
-          const finalConversationId = conversationId || currentChat.value?.id || data.conversationId
+        // 🔥 优化：本地更新对话信息，不调用API刷新整个列表
+        const finalConversationId = conversationId || currentChat.value?.id || data.conversationId
+        
+        if (finalConversationId) {
+          // 获取最后一条AI消息作为最后一条消息
+          const lastAiMessage = messages.value.filter(m => m.type === 'ai').pop()
+          const lastMessageText = lastAiMessage?.content || currentChat.value?.lastMessage || ''
           
-          if (finalConversationId) {
-            // 刷新后，如果当前对话还在，重新选中它（保持选中状态）
-            if (currentChat.value) {
-              const refreshedChat = chats.value.find(c => String(c.id) === String(finalConversationId) || String(c.id) === String(currentChat.value.id))
-              if (refreshedChat) {
-                currentChat.value = refreshedChat
-              }
-            }
-            
-            // 🔥 修复：无论当前对话是否存在，都要通知侧边栏刷新并选中
-            sessionStorage.setItem('currentConversationId', String(finalConversationId))
-            // 触发自定义事件，通知侧边栏刷新对话列表并更新选中状态
-            window.dispatchEvent(new CustomEvent('chatCreated', { detail: { conversationId: finalConversationId } }))
-            logger.info('流式问答完成，已通知侧边栏刷新对话列表', { conversationId: finalConversationId })
-            
-            // 清除URL中的conversationId参数
-            if (route.query.conversationId) {
-              router.replace({ path: '/ai/chat', query: {} })
-            }
-          }
-        } catch (error) {
-          logger.warn('刷新对话列表失败', error)
-          // 即使刷新失败，也尝试通知侧边栏（如果有conversationId）
-          const finalConversationId = conversationId || currentChat.value?.id || data.conversationId
-          if (finalConversationId) {
-            sessionStorage.setItem('currentConversationId', String(finalConversationId))
-            window.dispatchEvent(new CustomEvent('chatCreated', { detail: { conversationId: finalConversationId } }))
+          // 本地更新对话信息
+          updateLocalChat(finalConversationId, {
+            lastMessage: lastMessageText,
+            updatedAt: new Date()
+          })
+          
+          // 🔥 修复：通知侧边栏刷新并选中
+          sessionStorage.setItem('currentConversationId', String(finalConversationId))
+          // 触发自定义事件，通知侧边栏刷新对话列表并更新选中状态
+          window.dispatchEvent(new CustomEvent('chatCreated', { detail: { conversationId: finalConversationId } }))
+          logger.info('流式问答完成，已更新本地对话信息并通知侧边栏', { conversationId: finalConversationId })
+          
+          // 清除URL中的conversationId参数
+          if (route.query.conversationId) {
+            router.replace({ path: '/ai/chat', query: {} })
           }
         }
         
@@ -2096,10 +2448,16 @@ const sendKbMessage = async () => {
         if (message) {
           if (error.code === 'CHATBOT_NOT_CREATED') {
             message.content = error.hint || t('ai.chat.chatbotNotCreated')
-            ElMessage.warning(error.message || t('ai.chat.chatbotNotCreatedShort'))
+            // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+            if (!error._messageShown) {
+              ElMessage.warning(error.message || t('ai.chat.chatbotNotCreatedShort'))
+            }
           } else {
             message.content = t('ai.chat.responseFailed')
-            ElMessage.error(error.message || t('ai.chat.responseFailedShort'))
+            // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+            if (!error._messageShown) {
+              ElMessage.error(error.message || t('ai.chat.responseFailedShort'))
+            }
           }
           message.streaming = false
         }
@@ -2153,7 +2511,10 @@ const sendKbMessage = async () => {
     }
     
     logger.error('流式问答异常', error)
-    ElMessage.error(error.message || t('ai.chat.responseFailedShort'))
+    // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+    if (!error._messageShown) {
+      ElMessage.error(error.message || t('ai.chat.responseFailedShort'))
+    }
     nextTick(scrollKbToBottom)
   }
 }
@@ -2179,8 +2540,39 @@ const copyKbMessage = async (content) => {
   try {
     // 移除HTML标签，获取纯文本
     const textContent = content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/<br>/g, '\n')
-    await navigator.clipboard.writeText(textContent)
-    ElMessage.success(t('ai.chat.copiedToClipboard'))
+    
+    // 🔥 修复：添加降级方案，兼容非HTTPS环境
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      // 优先使用现代 Clipboard API
+      try {
+        await navigator.clipboard.writeText(textContent)
+        ElMessage.success(t('ai.chat.copiedToClipboard'))
+        return
+      } catch (clipboardError) {
+        logger.warn('Clipboard API 失败，尝试降级方案', clipboardError)
+      }
+    }
+    
+    // 降级方案：使用传统的 execCommand 方法
+    const textArea = document.createElement('textarea')
+    textArea.value = textContent
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-999999px'
+    textArea.style.top = '-999999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    
+    try {
+      const successful = document.execCommand('copy')
+      if (successful) {
+        ElMessage.success(t('ai.chat.copiedToClipboard'))
+      } else {
+        throw new Error('execCommand copy 失败')
+      }
+    } finally {
+      document.body.removeChild(textArea)
+    }
   } catch (error) {
     ElMessage.error(t('ai.chat.copyFailed'))
     logger.error('复制失败', error)
@@ -2188,17 +2580,24 @@ const copyKbMessage = async (content) => {
 }
 
 // 重试消息（基于原用户消息重新生成，不重复创建用户消息）
+// 🔥 增强：参考 Grok/Kimi 的重新生成逻辑，删除当前消息及其之后的所有消息
 const retryKbMessage = async (msg) => {
-  // 找到对应的用户消息
+  // 找到当前消息在数组中的索引
   const messageIndex = messages.value.findIndex(m => m.id === msg.id)
+  if (messageIndex < 0) {
+    logger.warn('无法找到对应的消息', { messageId: msg.id })
+    return
+  }
+  
+  // 找到对应的用户消息（当前消息的前一条）
   if (messageIndex <= 0) {
-    logger.warn('无法找到对应的用户消息', { aiMessageId: msg.id })
+    logger.warn('无法找到对应的用户消息', { messageId: msg.id })
     return
   }
   
   const userMessage = messages.value[messageIndex - 1]
   if (!userMessage || userMessage.type !== 'user') {
-    logger.warn('前一条消息不是用户消息', { aiMessageId: msg.id, prevMessageType: userMessage?.type })
+    logger.warn('前一条消息不是用户消息', { messageId: msg.id, prevMessageType: userMessage?.type })
     return
   }
   
@@ -2208,15 +2607,33 @@ const retryKbMessage = async (msg) => {
     return
   }
   
-  // 移除当前AI回复
-  messages.value.splice(messageIndex, 1)
+  // 🔥 增强：删除从当前消息开始到数组末尾的所有消息（包括当前消息）
+  // 计算需要删除的消息数量
+  const messagesToDelete = messages.value.length - messageIndex
+  const deletedMessages = messages.value.splice(messageIndex, messagesToDelete)
   
-  // 同时从持久化存储中移除
+  logger.info('重新生成：删除当前消息及其之后的所有消息', { 
+    messageIndex, 
+    deletedCount: deletedMessages.length,
+    deletedMessageIds: deletedMessages.map(m => m.id)
+  })
+  
+  // 🔥 增强：同时从持久化存储中移除这些消息
   if (currentChat.value && currentChat.value.messages) {
-    const persistentIndex = currentChat.value.messages.findIndex(m => m.id === msg.id)
-    if (persistentIndex !== -1) {
-      currentChat.value.messages.splice(persistentIndex, 1)
-      saveChatsToStorage()
+    // 找到第一个要删除的消息在持久化存储中的索引
+    const firstDeletedId = deletedMessages[0]?.id
+    if (firstDeletedId) {
+      const persistentStartIndex = currentChat.value.messages.findIndex(m => m.id === firstDeletedId)
+      if (persistentStartIndex !== -1) {
+        // 删除从该索引开始到末尾的所有消息
+        const persistentDeletedCount = currentChat.value.messages.length - persistentStartIndex
+        currentChat.value.messages.splice(persistentStartIndex, persistentDeletedCount)
+        saveChatsToStorage()
+        logger.info('重新生成：从持久化存储中删除消息', { 
+          persistentStartIndex, 
+          persistentDeletedCount 
+        })
+      }
     }
   }
   
@@ -2299,6 +2716,7 @@ const retryKbMessage = async (msg) => {
       files: filesToUpload || undefined,
       attachmentIds: knowledgeFileAttachmentIds.length > 0 ? knowledgeFileAttachmentIds : undefined,
       conversationId: conversationId || undefined,
+      enableSearch: enableSearch.value, // 是否启用联网搜索
       onMessage: (answer) => {
         const message = messages.value.find(m => m.id === aiMessageId)
         if (message) {
@@ -2464,8 +2882,41 @@ const autoResizeEditBox = (element) => {
 const startEditUserMessage = (msg) => {
   if (msg.type !== 'user') return
   
-  // 移除HTML标签，获取纯文本
-  const textContent = msg.content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/<br>/g, '\n')
+  // 🔥 修复：正确提取原始消息内容
+  // 1. 如果消息有原始内容字段，优先使用
+  // 2. 否则从 content 中提取纯文本（移除所有HTML标签和格式化）
+  let textContent = ''
+  
+  // 优先使用原始内容（如果存在）
+  if (msg.originalContent && typeof msg.originalContent === 'string') {
+    textContent = msg.originalContent
+  } else if (msg.content && typeof msg.content === 'string') {
+    // 创建一个临时DOM元素来提取纯文本，这样可以正确处理所有HTML实体和标签
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = msg.content
+    textContent = tempDiv.textContent || tempDiv.innerText || ''
+    
+    // 如果提取失败，使用正则表达式作为后备方案
+    if (!textContent || textContent.trim() === '') {
+      textContent = msg.content
+        .replace(/<[^>]*>/g, '') // 移除HTML标签
+        .replace(/&nbsp;/g, ' ') // 替换 &nbsp; 为空格
+        .replace(/&amp;/g, '&') // 替换 &amp; 为 &
+        .replace(/&lt;/g, '<') // 替换 &lt; 为 <
+        .replace(/&gt;/g, '>') // 替换 &gt; 为 >
+        .replace(/&quot;/g, '"') // 替换 &quot; 为 "
+        .replace(/&#39;/g, "'") // 替换 &#39; 为 '
+        .replace(/<br\s*\/?>/gi, '\n') // 替换 <br> 为换行
+        .replace(/\n+/g, '\n') // 合并多个换行
+        .trim()
+    }
+  }
+  
+  // 保存原始内容（如果还没有保存）
+  if (!msg.originalContent) {
+    msg.originalContent = textContent
+  }
+  
   msg.editing = true
   msg.editContent = textContent
   
@@ -2475,18 +2926,46 @@ const startEditUserMessage = (msg) => {
     if (messageElement) {
       const editContent = messageElement.querySelector('.kb-edit-content')
       if (editContent) {
+        // 🔥 修复：使用 textContent 设置内容，而不是 Vue 插值
+        // 这样可以确保内容正确显示，不会受到HTML转义的影响
+        editContent.textContent = textContent
+        
         // 重置样式，确保自适应
         editContent.style.height = 'auto'
         editContent.style.maxHeight = 'none'
         editContent.style.overflowY = 'hidden'
         
         editContent.focus()
-        // 选中所有文本
-        const range = document.createRange()
-        range.selectNodeContents(editContent)
-        const selection = window.getSelection()
-        selection.removeAllRanges()
-        selection.addRange(range)
+        // 🔥 修复：不选中所有文本，只将光标定位到文本末尾（更好的用户体验）
+        // 对于 contenteditable 元素，使用更简单的方法将光标定位到末尾
+        try {
+          const selection = window.getSelection()
+          const range = document.createRange()
+          
+          // 将光标定位到文本末尾（不选中文本）
+          if (editContent.childNodes.length > 0) {
+            // 如果有子节点，定位到最后一个文本节点的末尾
+            const lastNode = editContent.childNodes[editContent.childNodes.length - 1]
+            if (lastNode.nodeType === Node.TEXT_NODE) {
+              range.setStart(lastNode, lastNode.textContent?.length || 0)
+              range.collapse(true)
+            } else {
+              // 如果最后一个节点不是文本节点，定位到元素末尾
+              range.selectNodeContents(editContent)
+              range.collapse(false)
+            }
+          } else {
+            // 如果没有子节点，直接定位到元素末尾
+            range.selectNodeContents(editContent)
+            range.collapse(false)
+          }
+          
+          selection.removeAllRanges()
+          selection.addRange(range)
+        } catch (error) {
+          // 如果设置光标位置失败，至少确保元素获得焦点
+          console.warn('设置光标位置失败', error)
+        }
         
         // 自动调整高度
         autoResizeEditBox(editContent)
@@ -2507,8 +2986,9 @@ const confirmEditUserMessage = async (msg) => {
   
   const newContent = msg.editContent.trim()
   
-  // 更新消息内容
+  // 🔥 修复：更新消息内容和原始内容
   msg.content = newContent
+  msg.originalContent = newContent // 保存原始内容，确保下次编辑时能正确读取
   msg.editing = false
   msg.editContent = ''
   
@@ -2517,6 +2997,7 @@ const confirmEditUserMessage = async (msg) => {
     const persistentMsg = currentChat.value.messages.find(m => m.id === msg.id)
     if (persistentMsg) {
       persistentMsg.content = newContent
+      persistentMsg.originalContent = newContent // 同时保存原始内容
       saveChatsToStorage()
     }
   }
@@ -2611,6 +3092,7 @@ const confirmEditUserMessage = async (msg) => {
       workflowId: undefined,
       files: undefined,
       conversationId: conversationId || undefined,
+      enableSearch: enableSearch.value, // 是否启用联网搜索
       onMessage: (answer) => {
         const message = messages.value.find(m => m.id === aiMessageId)
         if (message) {
@@ -2732,10 +3214,27 @@ const confirmEditUserMessage = async (msg) => {
   }
 }
 
+// 🔥 修复：处理输入框获得焦点事件，如果存在正在编辑的消息，自动取消编辑状态
+const handleInputFocus = () => {
+  // 如果用户在对话框中获得焦点，且存在正在编辑的消息，自动取消编辑状态
+  const editingMessage = messages.value.find(m => m.editing && m.type === 'user')
+  if (editingMessage) {
+    // 用户开始输入新消息，取消编辑状态
+    cancelEditUserMessage(editingMessage)
+  }
+}
+
 // @知识库选择相关方法
 const handleInputChange = (event) => {
   // 自动调整输入框高度
   autoResizeInput(event)
+  
+  // 🔥 修复：如果用户在对话框中输入消息，且存在正在编辑的消息，自动取消编辑状态
+  const editingMessage = messages.value.find(m => m.editing && m.type === 'user')
+  if (editingMessage && event.target.value.trim()) {
+    // 用户开始输入新消息，取消编辑状态
+    cancelEditUserMessage(editingMessage)
+  }
   
   // 未登录用户不显示知识库列表
   if (!authStore.isLoggedIn) {
@@ -2777,6 +3276,10 @@ const handleInputChange = (event) => {
           validKbCount: validKbList.length,
           items: validKbList.map(kb => ({ id: kb.id, name: kb.name }))
         })
+        // 🔥 修复：如果知识库列表为空，先加载
+        if (knowledgeBaseList.value.length === 0) {
+          loadKnowledgeBases(false)
+        }
         showKnowledgeBaseList.value = true
         selectedKbIndex.value = 0 // 默认选中第一个
       } else {
@@ -2843,6 +3346,74 @@ const isKbSelected = (kbId) => {
 const getKbIcon = (kb) => {
   // 可以根据知识库类型返回不同的图标
   return kb.icon || '📚'
+}
+
+// 🔥 新增：获取知识库封面URL（复用KnowledgeList.vue的逻辑）
+const getKbCoverUrl = (kb) => {
+  if (!kb) return null
+  
+  const coverUrl = kb.coverUrl
+  const coverFileId = kb.coverFileId
+  
+  // 如果有完整的 URL（http/https），直接使用
+  if (coverUrl && (coverUrl.startsWith('http://') || coverUrl.startsWith('https://'))) {
+    return coverUrl
+  }
+  
+  // 如果是相对路径（以 / 开头），直接使用
+  if (coverUrl && coverUrl.startsWith('/')) {
+    return coverUrl
+  }
+  
+  // 如果有文件 ID，使用预览接口
+  if (coverFileId) {
+    return `/api/file/preview/${coverFileId}`
+  }
+  
+  // 如果 coverUrl 是纯数字，可能是文件 ID
+  if (coverUrl && /^\d+$/.test(String(coverUrl))) {
+    return `/api/file/preview/${coverUrl}`
+  }
+  
+  // 如果 coverUrl 是 MinIO 路径格式（bucketName/filePath），使用预览接口
+  if (coverUrl && coverUrl.includes('/') && !coverUrl.startsWith('/')) {
+    if (coverFileId) {
+      return `/api/file/preview/${coverFileId}`
+    }
+  }
+  
+  return null
+}
+
+// 🔥 新增：处理知识库搜索输入（防抖）
+const handleKbSearchInput = () => {
+  if (kbListSearchTimer.value) {
+    clearTimeout(kbListSearchTimer.value)
+  }
+  
+  kbListSearchTimer.value = setTimeout(() => {
+    // 重置分页并重新加载
+    kbListPagination.value.pageNo = 1
+    loadKnowledgeBases()
+  }, 500) // 500ms 防抖
+}
+
+// 🔥 新增：处理知识库下拉框滚动事件（滚动加载更多）
+const kbDropdownSectionRef = ref(null)
+const kbDropdownSectionRef2 = ref(null)
+const handleKbDropdownScroll = (event) => {
+  const target = event.target
+  const scrollTop = target.scrollTop
+  const scrollHeight = target.scrollHeight
+  const clientHeight = target.clientHeight
+  
+  // 距离底部50px时加载更多
+  if (scrollHeight - scrollTop - clientHeight < 50) {
+    if (kbListPagination.value.hasMore && !kbListPagination.value.loading && !isLoadingKnowledgeBases.value) {
+      kbListPagination.value.pageNo++
+      loadKnowledgeBases(true) // 传递isLoadMore=true
+    }
+  }
 }
 
 // 键盘导航知识库列表
@@ -2954,6 +3525,12 @@ const autoResizeInput = (event) => {
 }
 
 // 🔥 修复：模型选择器相关方法 - 有消息时向上显示，没消息时向下显示
+// 切换联网搜索开关
+const toggleEnableSearch = () => {
+  enableSearch.value = !enableSearch.value
+  logger.info('切换联网搜索', { enableSearch: enableSearch.value })
+}
+
 const toggleModelDropdown = () => {
   showModelDropdown.value = !showModelDropdown.value
   
@@ -3055,26 +3632,108 @@ const openKnowledgeDialog = async () => {
   showKnowledgeDialog.value = true
   selectedKnowledgeForFile.value = null
   
-  // 如果知识库列表为空，加载知识库列表
-  if (knowledgeListForSelect.value.length === 0) {
-    await loadKnowledgeListForSelect()
+  // 重置搜索和分页
+  kbSelectSearchQuery.value = ''
+  kbSelectPagination.value.pageNo = 1
+  
+  // 加载知识库列表
+  await loadKnowledgeListForSelect(false)
+}
+
+// 🔥 新增：处理附件按钮知识库选择的搜索输入（防抖）
+const handleKbSelectSearchInput = () => {
+  if (kbSelectSearchTimer.value) {
+    clearTimeout(kbSelectSearchTimer.value)
+  }
+  
+  kbSelectSearchTimer.value = setTimeout(() => {
+    // 重置分页并重新加载
+    kbSelectPagination.value.pageNo = 1
+    loadKnowledgeListForSelect(false)
+  }, 500) // 500ms 防抖
+}
+
+// 🔥 新增：处理附件按钮知识库选择对话框的滚动事件（滚动加载更多）
+const handleKbSelectScroll = (event) => {
+  const target = event.target
+  const scrollTop = target.scrollTop
+  const scrollHeight = target.scrollHeight
+  const clientHeight = target.clientHeight
+  
+  // 距离底部50px时加载更多
+  if (scrollHeight - scrollTop - clientHeight < 50) {
+    if (kbSelectPagination.value.hasMore && !kbSelectPagination.value.loading && !loadingKnowledgeList.value) {
+      kbSelectPagination.value.pageNo++
+      loadKnowledgeListForSelect(true) // 传递isLoadMore=true
+    }
   }
 }
 
 // 加载知识库列表（用于文件选择）
-const loadKnowledgeListForSelect = async () => {
+const loadKnowledgeListForSelect = async (isLoadMore = false) => {
+  if (kbSelectPagination.value.loading) {
+    return
+  }
+  
+  kbSelectPagination.value.loading = true
   loadingKnowledgeList.value = true
+  
   try {
-    const response = await getKnowledgeList({ page: 1, size: 100 })
+    if (!isLoadMore) {
+      // 重置分页
+      kbSelectPagination.value.pageNo = 1
+      kbSelectPagination.value.hasMore = true
+      knowledgeListForSelect.value = []
+    }
+    
+    logger.info('加载知识库列表（用于文件选择）', {
+      pageNo: kbSelectPagination.value.pageNo,
+      pageSize: kbSelectPagination.value.pageSize,
+      keyword: kbSelectSearchQuery.value
+    })
+    
+    // 🔥 替换为新接口：使用分页查询接口
+    const response = await getKnowledgeListPage({
+      pageNo: kbSelectPagination.value.pageNo,
+      pageSize: kbSelectPagination.value.pageSize,
+      keyword: kbSelectSearchQuery.value || undefined
+    })
+    
     if (response.code === 200 && response.data) {
-      knowledgeListForSelect.value = response.data.records || response.data.list || []
-      logger.info('知识库列表加载成功', knowledgeListForSelect.value.length)
+      const list = response.data.records || response.data.list || []
+      
+      if (isLoadMore) {
+        // 追加数据
+        knowledgeListForSelect.value.push(...list)
+      } else {
+        // 替换数据
+        knowledgeListForSelect.value = list
+      }
+      
+      // 更新分页信息
+      kbSelectPagination.value.total = response.data.total || 0
+      kbSelectPagination.value.hasMore = 
+        knowledgeListForSelect.value.length < kbSelectPagination.value.total
+      
+      logger.info('知识库列表加载成功（用于文件选择）', {
+        count: knowledgeListForSelect.value.length,
+        total: kbSelectPagination.value.total,
+        hasMore: kbSelectPagination.value.hasMore
+      })
+    } else {
+      logger.warn('知识库列表响应异常', { code: response.code, data: response.data })
+      if (!isLoadMore) {
+        knowledgeListForSelect.value = []
+      }
     }
   } catch (error) {
     logger.error('加载知识库列表失败', error)
     ElMessage.error(t('ai.chat.loadKnowledgeListFailed'))
-    knowledgeListForSelect.value = []
+    if (!isLoadMore) {
+      knowledgeListForSelect.value = []
+    }
   } finally {
+    kbSelectPagination.value.loading = false
     loadingKnowledgeList.value = false
   }
 }
@@ -3084,6 +3743,14 @@ const selectKnowledgeForFile = (kb) => {
   selectedKnowledgeForFile.value = kb
 }
 
+// 🔥 新增：处理知识库项双击事件（等同于点击确认按钮）
+const handleKnowledgeItemDoubleClick = (kb) => {
+  // 先选中该知识库
+  selectKnowledgeForFile(kb)
+  // 然后触发确认操作
+  confirmKnowledgeSelection()
+}
+
 // 确认知识库选择，打开文档选择对话框
 const confirmKnowledgeSelection = async () => {
   if (!selectedKnowledgeForFile.value) {
@@ -3091,6 +3758,7 @@ const confirmKnowledgeSelection = async () => {
     return
   }
   
+  // 关闭知识库选择弹窗，打开文档选择弹窗
   showKnowledgeDialog.value = false
   showDocumentDialog.value = true
   selectedDocuments.value = []
@@ -3123,11 +3791,13 @@ const loadDocumentsForKnowledge = async (knowledgeId) => {
 
 // 处理文档选择弹窗关闭（返回知识库选择弹窗）
 const handleDocumentDialogClose = () => {
-  // 如果知识库选择弹窗已经关闭，说明是确认操作，不需要返回
-  if (!showKnowledgeDialog.value) {
+  // 🔥 修复：如果是确认操作，直接关闭，不返回上一层
+  if (isConfirmingDocumentSelection.value) {
+    isConfirmingDocumentSelection.value = false
     return
   }
-  // 关闭文档选择弹窗，返回到知识库选择弹窗
+  
+  // 点击取消或关闭按钮时，返回到知识库选择弹窗
   showDocumentDialog.value = false
   selectedDocuments.value = []
   // 不清空 selectedKnowledgeForFile，以便用户可以重新选择文档
@@ -3199,6 +3869,8 @@ const confirmDocumentSelection = () => {
     }
   })
   
+  // 🔥 修复：标记为确认操作，然后关闭所有弹窗
+  isConfirmingDocumentSelection.value = true
   // 关闭所有弹窗（先关闭知识库选择弹窗，再关闭文档选择弹窗，避免触发返回逻辑）
   showKnowledgeDialog.value = false
   showDocumentDialog.value = false
@@ -3208,6 +3880,11 @@ const confirmDocumentSelection = () => {
   if (addedCount > 0) {
     ElMessage.success(t('ai.chat.documentsAdded', { count: addedCount }))
   }
+  
+  // 延迟重置标记，确保 close 事件处理完成
+  nextTick(() => {
+    isConfirmingDocumentSelection.value = false
+  })
 }
 
 const handleFileUpload = (event) => {
@@ -3423,6 +4100,11 @@ if (!window.__isLoadingConversations) {
 onMounted(async () => {
   try {
     logger.info('AI对话页面初始化开始')
+    
+    // 🔥 修复：初始化滚动位置检查，确保按钮能正确显示
+    nextTick(() => {
+      checkScrollPosition()
+    })
     
     // 🔥 修复：确保组件容器已渲染
     await nextTick()
@@ -3986,6 +4668,11 @@ onUnmounted(() => {
 .kb-message-bubble {
   max-width: 75%; // 🔥 修复：AI消息气泡宽度适当增加
   position: relative;
+  
+  // 🔥 修复：用户消息气泡宽度更小，文本左对齐
+  .kb-message.user & {
+    max-width: 60%; // 🔥 修复：用户消息气泡宽度缩小到60%
+  }
 }
 
 // 🔥 修复：AI消息气泡向右侧移动一点，大致在对话框中间位置
@@ -4018,6 +4705,10 @@ onUnmounted(() => {
   color: var(--text);
   border-color: var(--border);
   border-radius: 16px 16px 4px 16px;
+  text-align: left; // 🔥 修复：用户消息文本左对齐
+  // 🔥 修复：参考图2设计，减少内边距，让气泡更紧凑，文字垂直居中
+  padding: 8px 14px; // 🔥 修复：减少上下内边距（从14px改为8px），让气泡高度更紧凑
+  line-height: 1.5; // 🔥 修复：调整行高，让文字更紧凑，避免文字靠上
 }
 
 .kb-message.ai .kb-message-content-wrapper {
@@ -4030,6 +4721,14 @@ onUnmounted(() => {
   word-wrap: break-word;
   word-break: break-word;
   overflow: visible;
+  line-height: 1.7;
+  
+  // 🔥 修复：用户消息内容样式，确保文字不靠上
+  .kb-message.user & {
+    line-height: 1.5; // 🔥 修复：用户消息行高更紧凑
+    margin: 0; // 🔥 修复：移除默认margin，避免文字靠上
+    padding: 0; // 🔥 修复：移除默认padding
+  }
 
   :deep(code) {
     background: rgba(0, 0, 0, 0.1);
@@ -4040,6 +4739,164 @@ onUnmounted(() => {
 
   :deep(strong) {
     font-weight: 600;
+  }
+
+  // Markdown 表格样式
+  :deep(.markdown-table-wrapper) {
+    margin: 16px 0;
+    overflow-x: auto;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e5e7eb;
+  }
+
+  :deep(.markdown-table) {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 100%;
+  }
+
+  :deep(.table-header) {
+    padding: 12px 16px;
+    text-align: left;
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    color: #1e40af;
+    font-weight: 600;
+    font-size: 13px;
+    border-right: 1px solid #e5e7eb;
+    border-bottom: 2px solid #3b82f6;
+    white-space: nowrap;
+  }
+
+  :deep(.table-cell) {
+    padding: 12px 16px;
+    text-align: left;
+    background: #ffffff;
+    color: #374151;
+    font-size: 14px;
+    line-height: 1.6;
+    border-right: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    transition: background-color 0.2s ease;
+  }
+
+  :deep(.even-row .table-cell) {
+    background: #fafbfc;
+  }
+
+  :deep(.odd-row .table-cell:hover) {
+    background-color: #f8fafc;
+  }
+
+  // Markdown 标题样式
+  :deep(.md-heading) {
+    font-weight: 700;
+    margin: 18px 0 12px;
+    border-radius: 6px;
+    padding: 12px 16px;
+  }
+
+  :deep(.md-heading.h1) {
+    font-size: 24px;
+    color: #1e3a8a;
+    background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
+    border-left: 6px solid #2563eb;
+  }
+
+  :deep(.md-heading.h2) {
+    font-size: 20px;
+    color: #1e40af;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-bottom: 3px solid #3b82f6;
+    padding-bottom: 8px;
+  }
+
+  :deep(.md-heading.h3) {
+    font-size: 18px;
+    color: #374151;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-left: 4px solid #06b6d4;
+  }
+
+  // Markdown 文本格式
+  :deep(.md-bold) {
+    font-weight: 700;
+    color: #1f2937;
+    background: rgba(30, 58, 138, 0.08);
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+
+  :deep(.md-italic) {
+    font-style: italic;
+    color: #6b7280;
+    background: rgba(156, 163, 175, 0.05);
+    padding: 1px 3px;
+    border-radius: 3px;
+  }
+
+  :deep(.md-strikethrough) {
+    text-decoration: line-through;
+    color: #9ca3af;
+    background: rgba(156, 163, 175, 0.08);
+    padding: 1px 3px;
+    border-radius: 3px;
+  }
+
+  // Markdown 代码块
+  :deep(.md-code-block) {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: #38bdf8;
+    padding: 16px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 12px 0;
+    border-left: 4px solid #f97316;
+    overflow-x: auto;
+    display: block;
+  }
+
+  :deep(.md-code-block code) {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    color: inherit;
+  }
+
+  :deep(.md-inline-code) {
+    background: #f3f4f6;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    color: #d6336c;
+    border: 1px solid #e5e7eb;
+    margin: 0 2px;
+  }
+
+  // Markdown 列表
+  :deep(.md-list) {
+    margin: 12px 0;
+    padding-left: 24px;
+    list-style-type: disc;
+  }
+
+  :deep(.md-list-item) {
+    margin: 6px 0;
+    line-height: 1.6;
+  }
+
+  // Markdown 分隔线
+  :deep(.md-divider) {
+    border: none;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #93c5fd 50%, transparent 100%);
+    margin: 24px 0;
+    border-radius: 1px;
   }
 }
 
@@ -4109,6 +4966,33 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  
+  // 🔥 修复：用户消息的按钮默认隐藏，鼠标悬浮时才显示
+  .kb-message.user & {
+    opacity: 0; // 🔥 修复：默认隐藏
+    transition: opacity 0.2s ease; // 🔥 修复：添加过渡效果
+  }
+  
+  // 🔥 修复：鼠标悬浮在用户消息气泡上时显示按钮
+  .kb-message.user:hover & {
+    opacity: 1; // 🔥 修复：显示按钮
+  }
+  
+  // 🔥 修复：AI消息的按钮，非最后一条默认隐藏，鼠标悬浮时才显示
+  .kb-message.ai:not(.is-last-ai-message) & {
+    opacity: 0; // 🔥 修复：非最后一条AI消息的按钮默认隐藏
+    transition: opacity 0.2s ease; // 🔥 修复：添加过渡效果
+  }
+  
+  // 🔥 修复：鼠标悬浮在非最后一条AI消息气泡上时显示按钮
+  .kb-message.ai:not(.is-last-ai-message):hover & {
+    opacity: 1; // 🔥 修复：显示按钮
+  }
+  
+  // 🔥 修复：最后一条AI消息的按钮始终显示
+  .kb-message.ai.is-last-ai-message & {
+    opacity: 1; // 🔥 修复：最后一条AI消息的按钮始终显示
+  }
 }
 
 .kb-copy-btn,
@@ -4350,7 +5234,7 @@ onUnmounted(() => {
 }
 
 .kb-input-container {
-  position: relative; // 🔥 修复：添加 position: relative，让知识库下拉框可以正确绝对定位
+  position: relative; // 🔥 修复：添加 position: relative，让知识库下拉框和滚动按钮可以正确绝对定位
   display: flex;
   flex-direction: column;
   background: var(--hover-light);
@@ -4363,12 +5247,12 @@ onUnmounted(() => {
 
 .kb-message-input {
   width: 100%;
-  min-height: 44px;
+  min-height: 40px; // 适中的高度
   max-height: 200px;
-  padding: 12px 16px 8px 16px;
+  padding: 8px 14px; // ，适中的内边距，确保文本垂直居中且美观
   border: none;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 24px; // 🔥 修复：设置行高为24px，配合40px高度和8px上下padding，实现完美的垂直居中
   resize: none;
   outline: none;
   background: transparent;
@@ -4377,9 +5261,11 @@ onUnmounted(() => {
   font-family: inherit;
   word-wrap: break-word;
   white-space: pre-wrap;
+  box-sizing: border-box; 
 
   &::placeholder {
     color: var(--text-3);
+    line-height: 24px; // 🔥 修复：占位符也使用相同的行高
   }
 }
 
@@ -4474,7 +5360,9 @@ onUnmounted(() => {
   z-index: 1002;
   margin-bottom: 8px;
   max-height: 300px;
-  overflow-y: auto;
+  overflow: hidden; // 🔥 修复：移除外层滚动，只保留内层滚动
+  display: flex;
+  flex-direction: column;
 }
 
 .kb-dropdown-header {
@@ -4492,6 +5380,10 @@ onUnmounted(() => {
 
 .kb-dropdown-section {
   padding: 8px 0;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0; // 🔥 修复：允许 flex 子元素缩小
 }
 
 .kb-list {
@@ -4501,7 +5393,7 @@ onUnmounted(() => {
 .kb-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   padding: 8px 12px;
   margin: 2px 0;
   border-radius: 8px;
@@ -4525,6 +5417,7 @@ onUnmounted(() => {
 .kb-icon {
   width: 24px;
   height: 24px;
+  min-width: 24px;
   background: var(--color-primary);
   border-radius: 6px;
   display: flex;
@@ -4539,6 +5432,11 @@ onUnmounted(() => {
   color: var(--text);
   font-weight: 500;
   flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .kb-selected-mark {
@@ -4652,6 +5550,51 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+// 联网搜索按钮
+.kb-enable-search-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #ffffff;
+  color: var(--text-3);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    background: #ffffff;
+    color: var(--text);
+  }
+
+  &:active {
+    background: #ffffff;
+  }
+
+  &.active {
+    background: #ffffff;
+    color: var(--surface);
+
+    &:hover {
+      background: #ffffff;
+      opacity: 0.9;
+    }
+  }
+
+  .el-icon {
+    font-size: 16px;
+  }
+
+  .search-icon {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
+}
+
 // 附件按钮
 .kb-attachment-btn {
   width: 32px;
@@ -4746,10 +5689,10 @@ onUnmounted(() => {
   padding: 0 20px; // 🔥 修复：添加内边距，与输入框对齐
 }
 
-// 🔥 修复：滚动到底部按钮样式 - 在输入框区域右下角
+// 🔥 修复：滚动到底部按钮样式 - 在输入框区域右下角（还原到原始位置）
 .scroll-to-bottom-btn-input {
   position: absolute; // 🔥 修复：使用absolute定位，相对于输入框区域
-  bottom: 180px; // 🔥 修复：距离底部60px，往上移动一点
+  bottom: 180px; // 🔥 修复：距离底部180px，往上移动一点
   right: calc(50% - 500px + 20px); // 🔥 修复：根据输入框容器最大宽度1000px，居中后右边距20px
   width: 40px;
   height: 40px;
@@ -4788,6 +5731,7 @@ onUnmounted(() => {
   }
 }
 
+
 // 知识库选择对话框样式
 .knowledge-dialog-content {
   max-height: 500px;
@@ -4824,6 +5768,159 @@ onUnmounted(() => {
 .knowledge-icon {
   font-size: 24px;
   flex-shrink: 0;
+}
+
+// 🔥 新增：知识库封面图标样式
+.knowledge-item-icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+  
+  .kb-cover-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .knowledge-item-icon-default {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    .el-icon {
+      font-size: 20px;
+      color: var(--color-primary);
+    }
+  }
+}
+
+// 🔥 新增：@符号下拉框中的封面图标样式
+.kb-item-icon {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+  
+  .kb-cover-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .kb-item-icon-default {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    .el-icon {
+      font-size: 16px;
+      color: var(--color-primary);
+    }
+  }
+}
+
+// 🔥 新增：搜索框样式（复用KnowledgeList.vue的样式）
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  
+  .search-left-icon {
+    position: absolute;
+    left: 12px;
+    z-index: 1;
+    color: var(--text-3);
+    display: flex;
+    align-items: center;
+  }
+  
+  .form-input {
+    width: 100%;
+    padding: 10px 40px 10px 36px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--surface);
+    color: var(--text);
+    transition: all 0.2s ease;
+    
+    &:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+      outline: none;
+    }
+  }
+}
+
+// 🔥 修复：确保搜索框在 kb-dropdown-search 中也有正确的样式
+.kb-dropdown-search .form-input {
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+  
+  &:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+    outline: none;
+  }
+}
+
+// 🔥 新增：下拉框搜索区域样式
+.kb-dropdown-search {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  flex-shrink: 0; // 🔥 修复：防止搜索框被压缩
+  
+  .search-left-icon {
+    position: absolute;
+    left: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1;
+    color: var(--text-3);
+    display: flex;
+    align-items: center;
+  }
+  
+  // 🔥 修复：搜索框边框颜色使用主题色
+  .form-input {
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+    
+    &:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+      outline: none;
+    }
+  }
+}
+
+// 🔥 新增：加载更多和没有更多提示样式
+.kb-loading-more,
+.kb-no-more {
+  text-align: center;
+  padding: 12px;
+  color: var(--text-3);
+  font-size: 12px;
 }
 
 .knowledge-info {

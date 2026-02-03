@@ -20,12 +20,12 @@ export const getUserInfo = () => {
 /**
  * 更新用户信息
  * @param {Object} data - 用户信息数据
+ * @param {string} data.username - 用户名
  * @param {string} data.realName - 真实姓名
  * @param {string} data.email - 邮箱
  * @param {string} data.phone - 手机号
  * @param {string} data.department - 所属院系
  * @param {string} data.title - 职称/职务
- * @param {string} data.industryCode - 行业编码
  * @returns {Promise} 更新用户信息响应
  */
 export const updateUserInfo = (data) => {

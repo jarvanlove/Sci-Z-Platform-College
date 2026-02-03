@@ -16,6 +16,8 @@
   <description>Sci-Z College Platform Server</description>
 
   <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <java.version>21</java.version>
     <mapstruct.version>1.5.5.Final</mapstruct.version>
     <mybatis.plus.version>3.5.6</mybatis.plus.version>
@@ -239,6 +241,7 @@
           <source>${java.version}</source>
           <target>${java.version}</target>
           <release>${java.version}</release>
+          <encoding>UTF-8</encoding>
           <annotationProcessorPaths>
             <path>
               <groupId>org.projectlombok</groupId>

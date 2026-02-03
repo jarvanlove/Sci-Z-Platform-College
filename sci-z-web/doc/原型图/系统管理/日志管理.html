@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>日志管理 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.3.14/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3.2.47/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.3.14"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.iife.js"></script>
+    <script src="https://unpkg.com/element-plus@2.3.14/dist/locale/zh-cn.min.js"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .log-management-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+      }
+
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0;
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 12px;
+      }
+
+      .content-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+      }
+
+      /* 筛选区域 */
+      .filter-section {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      /* 日志级别标签 */
+      .level-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .level-info {
+        background: #dbeafe;
+        color: #2563eb;
+      }
+
+      .level-warn {
+        background: #fef3c7;
+        color: #f59e0b;
+      }
+
+      .level-error {
+        background: #fee2e2;
+        color: #dc2626;
+      }
+
+      /* Loading 样式 */
+      .loading-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        color: #6b7280;
+        font-size: 14px;
+        gap: 12px;
+      }
+
+      .loading-container .el-icon {
+        font-size: 24px;
+      }
+
+      /* 表格样式 */
+      .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        margin-top: 20px;
+      }
+
+      .native-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #ffffff;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .native-table thead {
+        background: #f8fafc;
+      }
+
+      .native-table th {
+        padding: 14px 16px;
+        text-align: left;
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 2px solid #e5e7eb;
+        white-space: nowrap;
+      }
+
+      .native-table tbody tr {
+        transition: background-color 0.2s;
+      }
+
+      .native-table tbody tr:nth-child(even) {
+        background: #f9fafb;
+      }
+
+      .native-table tbody tr:hover {
+        background: #f0f9ff;
+      }
+
+      .native-table td {
+        padding: 12px 16px;
+        font-size: 14px;
+        color: #4b5563;
+        border-bottom: 1px solid #e5e7eb;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .native-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      /* 操作按钮 */
+      .action-btn {
+        padding: 5px 12px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: none;
+        white-space: nowrap;
+      }
+
+      .btn-primary-link {
+        color: #1e3a8a;
+        border: none;
+        padding: 0;
+        text-decoration: underline;
+      }
+
+      .btn-primary-link:hover {
+        color: #1e40af;
+        text-decoration: none;
+      }
+
+      /* 操作按钮 */
+      .action-btns {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+
+      /* 统一弹窗样式 - 圆角设计 */
+      .el-dialog {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-dialog__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-dialog__title {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #1e3a8a !important;
+      }
+
+      .el-dialog__headerbtn {
+        top: 20px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-dialog__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-dialog__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-dialog__body {
+        padding: 20px 24px !important;
+        max-height: 600px;
+        overflow-y: auto;
+      }
+
+      .el-dialog__footer {
+        padding: 16px 24px 20px 24px !important;
+        border-top: 1px solid #f0f0f0 !important;
+      }
+
+      /* 统一 MessageBox 样式 */
+      .el-message-box {
+        border-radius: 12px !important;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      }
+
+      .el-message-box__header {
+        padding: 20px 24px 16px 24px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #1e3a8a !important;
+        line-height: 1.5 !important;
+      }
+
+      .el-message-box__headerbtn {
+        top: 16px !important;
+        right: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
+      }
+
+      .el-message-box__close {
+        color: #9ca3af !important;
+        font-size: 16px !important;
+      }
+
+      .el-message-box__close:hover {
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__content {
+        padding: 20px 24px !important;
+        background: #ffffff !important;
+      }
+
+      .el-message-box__message {
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: #374151 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .el-message-box__btns {
+        padding: 16px 24px 20px 24px !important;
+        background: #ffffff !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 12px !important;
+      }
+
+      /* 现代化按钮样式 */
+      .el-message-box__btns .el-button,
+      .el-dialog__footer .el-button {
+        padding: 8px 20px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        border: 1px solid !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .el-message-box__btns .el-button--default,
+      .el-dialog__footer .el-button--default {
+        background: #ffffff !important;
+        border-color: #d1d5db !important;
+        color: #6b7280 !important;
+      }
+
+      .el-message-box__btns .el-button--default:hover,
+      .el-dialog__footer .el-button--default:hover {
+        background: #f9fafb !important;
+        border-color: #9ca3af !important;
+        color: #374151 !important;
+      }
+
+      .el-message-box__btns .el-button--primary,
+      .el-dialog__footer .el-button--primary {
+        background: #1e3a8a !important;
+        border-color: #1e3a8a !important;
+        color: #ffffff !important;
+      }
+
+      .el-message-box__btns .el-button--primary:hover,
+      .el-dialog__footer .el-button--primary:hover {
+        background: #1e40af !important;
+        border-color: #1e40af !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+      }
+
+      .el-message-box__btns .el-button--primary:active,
+      .el-dialog__footer .el-button--primary:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+      }
+
+      /* 警告类型弹窗的特殊样式 */
+      .el-message-box--warning .el-message-box__content {
+        position: relative;
+      }
+
+      .el-message-box--warning .el-message-box__message::before {
+        content: "⚠️";
+        font-size: 18px !important;
+        margin-right: 8px !important;
+        vertical-align: -0.15em !important;
+        display: inline-block !important;
+      }
+
+      /* 日志详情 */
+      .log-detail {
+        font-size: 14px;
+        line-height: 1.8;
+      }
+
+      .detail-row {
+        display: flex;
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .detail-row:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .detail-label {
+        width: 120px;
+        font-weight: 600;
+        color: #1e3a8a;
+        flex-shrink: 0;
+      }
+
+      .detail-value {
+        flex: 1;
+        color: #6b7280;
+        word-break: break-all;
+      }
+
+      .code-block {
+        background: #f9fafb;
+        padding: 12px;
+        border-radius: 6px;
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        overflow-x: auto;
+      }
+
+      /* 分页容器 */
+      .pagination-wrapper {
+        margin-top: 20px;
+        display: flex;
+        justify-content: flex-end;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="log-management-container">
+        <!-- 页面头部 -->
+        <div class="page-header">
+          <h1 class="page-title">系统日志</h1>
+          <div class="header-actions">
+            <el-button @click="handleExport" :loading="exporting">
+              <el-icon><Download /></el-icon>
+              导出日志
+            </el-button>
+            <el-button type="danger" @click="handleClear">
+              <el-icon><Delete /></el-icon>
+              清空日志
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 内容卡片 -->
+        <div class="content-card">
+          <!-- 筛选区域 -->
+          <div class="filter-section">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span style="color: #6b7280; font-size: 14px; white-space: nowrap"
+                >日志级别</span
+              >
+              <el-select
+                v-model="searchForm.level"
+                placeholder="全部"
+                style="width: 150px"
+                @change="handleSearch"
+              >
+                <el-option label="全部" value=""></el-option>
+                <el-option label="INFO" value="INFO"></el-option>
+                <el-option label="WARN" value="WARN"></el-option>
+                <el-option label="ERROR" value="ERROR"></el-option>
+              </el-select>
+            </div>
+
+            <el-date-picker
+              v-model="searchForm.dateRange"
+              type="daterange"
+              range-separator="至"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              value-format="YYYY-MM-DD"
+              style="width: 300px"
+              @change="handleSearch"
+            />
+
+            <el-input
+              v-model="searchForm.user"
+              placeholder="请输入用户名"
+              clearable
+              style="width: 200px"
+              @clear="handleSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+
+            <el-button type="primary" @click="handleSearch"> 搜索 </el-button>
+
+            <el-button @click="handleReset"> 重置 </el-button>
+          </div>
+
+          <!-- 日志列表表格 -->
+          <div v-if="loading" class="loading-container">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>加载中...</span>
+          </div>
+
+          <!-- 原生HTML表格 -->
+          <div v-else class="table-wrapper">
+            <table class="native-table">
+              <thead>
+                <tr>
+                  <th style="width: 180px">时间</th>
+                  <th style="width: 100px">级别</th>
+                  <th style="width: 120px">用户</th>
+                  <th style="width: 200px">操作</th>
+                  <th style="width: 150px">IP 地址</th>
+                  <th style="min-width: 250px">详情</th>
+                  <th style="width: 100px">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="log in filteredLogs" :key="log.id">
+                  <td>{{ log.timestamp }}</td>
+                  <td style="text-align: center">
+                    <span class="level-tag" :class="getLevelClass(log.level)">
+                      {{ log.level }}
+                    </span>
+                  </td>
+                  <td style="text-align: center">{{ log.user }}</td>
+                  <td :title="log.operation">{{ log.operation }}</td>
+                  <td style="text-align: center">{{ log.ip }}</td>
+                  <td :title="log.detail">{{ log.detail }}</td>
+                  <td style="text-align: center">
+                    <button
+                      class="action-btn btn-primary-link"
+                      @click="handleViewDetail(log)"
+                    >
+                      查看详情
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页 -->
+          <div v-if="logs.length > 0" class="pagination-container">
+            <!-- 通用分页组件 -->
+            <div id="pagination-component"></div>
+          </div>
+        </div>
+
+        <!-- 日志详情对话框 -->
+        <el-dialog
+          v-model="showDetailDialog"
+          title="日志详情"
+          width="700px"
+          @close="handleDetailDialogClose"
+        >
+          <div class="log-detail" v-if="currentLog">
+            <div class="detail-row">
+              <div class="detail-label">时间：</div>
+              <div class="detail-value">{{ currentLog.timestamp }}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">日志级别：</div>
+              <div class="detail-value">
+                <span
+                  class="level-tag"
+                  :class="getLevelClass(currentLog.level)"
+                >
+                  {{ currentLog.level }}
+                </span>
+              </div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">操作用户：</div>
+              <div class="detail-value">{{ currentLog.user }}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">操作内容：</div>
+              <div class="detail-value">{{ currentLog.operation }}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">IP 地址：</div>
+              <div class="detail-value">{{ currentLog.ip }}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">用户代理：</div>
+              <div class="detail-value">{{ currentLog.userAgent }}</div>
+            </div>
+            <div class="detail-row" v-if="currentLog.requestParams">
+              <div class="detail-label">请求参数：</div>
+              <div class="detail-value">
+                <div class="code-block">{{ currentLog.requestParams }}</div>
+              </div>
+            </div>
+            <div class="detail-row" v-if="currentLog.response">
+              <div class="detail-label">响应结果：</div>
+              <div class="detail-value">
+                <div class="code-block">{{ currentLog.response }}</div>
+              </div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">详细信息：</div>
+              <div class="detail-value">{{ currentLog.detail }}</div>
+            </div>
+          </div>
+
+          <template #footer>
+            <el-button @click="showDetailDialog = false">关闭</el-button>
+          </template>
+        </el-dialog>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, computed, onMounted } = Vue;
+      const { ElMessage, ElMessageBox } = ElementPlus;
+      const { Search, Download, Delete } = ElementPlusIconsVue;
+
+      const app = createApp({
+        components: {
+          Search,
+          Download,
+          Delete,
+        },
+        setup() {
+          const loading = ref(false);
+          const exporting = ref(false);
+          const showDetailDialog = ref(false);
+          const currentLog = ref(null);
+
+          // 搜索表单
+          const searchForm = reactive({
+            dateRange: [],
+            level: "",
+            user: "",
+          });
+
+          // 分页
+          const pagination = reactive({
+            current: 1,
+            size: 20,
+            total: 0,
+          });
+
+          // 日志列表数据
+          const logs = ref([
+            {
+              id: 1,
+              timestamp: "2024-12-18 10:25:30",
+              level: "INFO",
+              user: "admin",
+              operation: "用户登录",
+              ip: "192.168.1.100",
+              userAgent:
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+              detail: "管理员 admin 登录系统成功",
+              requestParams: '{"username": "admin", "loginType": "password"}',
+              response: '{"code": 200, "message": "登录成功"}',
+            },
+            {
+              id: 2,
+              timestamp: "2024-12-18 10:30:15",
+              level: "INFO",
+              user: "admin",
+              operation: "创建用户",
+              ip: "192.168.1.100",
+              userAgent:
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+              detail: "创建新用户 zhang_prof",
+              requestParams:
+                '{"username": "zhang_prof", "role": "teacher", "email": "zhang@university.edu.cn"}',
+              response: '{"code": 200, "message": "用户创建成功", "userId": 2}',
+            },
+            {
+              id: 3,
+              timestamp: "2024-12-18 11:15:42",
+              level: "WARN",
+              user: "li_student",
+              operation: "修改项目",
+              ip: "192.168.1.105",
+              userAgent:
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+              detail: "尝试修改无权限的项目",
+              requestParams: '{"projectId": 10, "action": "edit"}',
+              response: '{"code": 403, "message": "无权限执行此操作"}',
+            },
+            {
+              id: 4,
+              timestamp: "2024-12-18 14:20:08",
+              level: "ERROR",
+              user: "wang_prof",
+              operation: "上传文件",
+              ip: "192.168.1.110",
+              userAgent:
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+              detail: "文件上传失败：文件大小超过限制",
+              requestParams:
+                '{"fileName": "project_report.pdf", "fileSize": 15728640}',
+              response: '{"code": 400, "message": "文件大小超过10MB限制"}',
+            },
+            {
+              id: 5,
+              timestamp: "2024-12-18 15:45:22",
+              level: "INFO",
+              user: "admin",
+              operation: "修改系统配置",
+              ip: "192.168.1.100",
+              userAgent:
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+              detail: "修改邮件配置",
+              requestParams:
+                '{"smtpHost": "smtp.qq.com", "smtpPort": 465, "enableSSL": true}',
+              response: '{"code": 200, "message": "配置更新成功"}',
+            },
+            {
+              id: 6,
+              timestamp: "2024-12-18 16:30:55",
+              level: "INFO",
+              user: "zhang_prof",
+              operation: "创建项目",
+              ip: "192.168.1.108",
+              userAgent:
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+              detail: "创建新项目：AI 辅助教学平台研发",
+              requestParams:
+                '{"projectName": "AI 辅助教学平台研发", "projectType": "applied", "budget": 500000}',
+              response:
+                '{"code": 200, "message": "项目创建成功", "projectId": 15}',
+            },
+            {
+              id: 7,
+              timestamp: "2024-12-18 17:10:33",
+              level: "WARN",
+              user: "system",
+              operation: "系统备份",
+              ip: "127.0.0.1",
+              userAgent: "System",
+              detail: "自动备份警告：磁盘空间不足",
+              requestParams: '{"backupType": "auto", "backupPath": "/backup"}',
+              response: '{"code": 500, "message": "磁盘空间不足，备份失败"}',
+            },
+            {
+              id: 8,
+              timestamp: "2024-12-18 18:05:18",
+              level: "ERROR",
+              user: "li_student",
+              operation: "访问报告",
+              ip: "192.168.1.105",
+              userAgent:
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+              detail: "访问被拒绝：项目报告不存在",
+              requestParams: '{"reportId": 999, "action": "view"}',
+              response: '{"code": 404, "message": "报告不存在"}',
+            },
+          ]);
+
+          // 过滤日志列表
+          const filteredLogs = computed(() => {
+            let filtered = [...logs.value];
+
+            // 日期筛选
+            if (searchForm.dateRange && searchForm.dateRange.length === 2) {
+              const [startDate, endDate] = searchForm.dateRange;
+              filtered = filtered.filter((log) => {
+                const logDate = log.timestamp.split(" ")[0];
+                return logDate >= startDate && logDate <= endDate;
+              });
+            }
+
+            // 级别筛选
+            if (searchForm.level) {
+              filtered = filtered.filter(
+                (log) => log.level === searchForm.level
+              );
+            }
+
+            // 用户筛选
+            if (searchForm.user) {
+              const user = searchForm.user.toLowerCase();
+              filtered = filtered.filter((log) =>
+                log.user.toLowerCase().includes(user)
+              );
+            }
+
+            pagination.total = filtered.length;
+
+            // 应用分页
+            const start = (pagination.current - 1) * pagination.size;
+            const end = start + pagination.size;
+            return filtered.slice(start, end);
+          });
+
+          // 获取级别样式类
+          const getLevelClass = (level) => {
+            return `level-${level.toLowerCase()}`;
+          };
+
+          // 搜索
+          const handleSearch = () => {
+            pagination.current = 1;
+            Vue.nextTick(() => {
+              initPagination();
+            });
+          };
+
+          // 重置
+          const handleReset = () => {
+            searchForm.dateRange = [];
+            searchForm.level = "";
+            searchForm.user = "";
+            pagination.current = 1;
+            ElMessage.success("重置完成");
+            Vue.nextTick(() => {
+              initPagination();
+            });
+          };
+
+          // 查看详情
+          const handleViewDetail = (log) => {
+            currentLog.value = { ...log };
+            showDetailDialog.value = true;
+          };
+
+          // 详情对话框关闭
+          const handleDetailDialogClose = () => {
+            currentLog.value = null;
+          };
+
+          // 导出日志
+          const handleExport = async () => {
+            try {
+              await ElMessageBox.confirm(
+                "确定要导出当前筛选条件下的日志吗？",
+                "导出日志",
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+
+              exporting.value = true;
+
+              // 模拟导出
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+
+              ElMessage.success("日志导出成功");
+              exporting.value = false;
+            } catch (error) {
+              exporting.value = false;
+              // 用户取消
+            }
+          };
+
+          // 清空日志
+          const handleClear = async () => {
+            try {
+              await ElMessageBox.confirm(
+                "确定要清空所有日志吗？此操作不可恢复，清空后将无法找回历史日志数据。",
+                "清空日志",
+                {
+                  confirmButtonText: "确定",
+                  cancelButtonText: "取消",
+                  type: "warning",
+                }
+              );
+
+              loading.value = true;
+
+              // 模拟清空
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
+              logs.value = [];
+              ElMessage.success("日志已清空");
+              loading.value = false;
+            } catch (error) {
+              loading.value = false;
+              // 用户取消
+            }
+          };
+
+          // 初始化分页组件
+          const initPagination = () => {
+            const paginationContainer = document.getElementById(
+              "pagination-component"
+            );
+            if (paginationContainer) {
+              // 创建分页组件HTML
+              const paginationHTML = `
+                <div class="pagination-wrapper">
+                  <!-- 总数信息 -->
+                  <div class="pagination-info">
+                    共 ${pagination.total} 条记录
+                  </div>
+
+                  <!-- 每页显示数量 -->
+                  <div class="page-size-selector">
+                    每页显示
+                    <select id="page-size-select" class="page-size-select">
+                      <option value="10" ${
+                        pagination.size === 10 ? "selected" : ""
+                      }>10</option>
+                      <option value="20" ${
+                        pagination.size === 20 ? "selected" : ""
+                      }>20</option>
+                      <option value="50" ${
+                        pagination.size === 50 ? "selected" : ""
+                      }>50</option>
+                      <option value="100" ${
+                        pagination.size === 100 ? "selected" : ""
+                      }>100</option>
+                    </select>
+                    条
+                  </div>
+
+                  <!-- 分页控制器 -->
+                  <div class="pagination-controls">
+                    <!-- 上一页按钮 -->
+                    <a href="javascript:void(0)" class="page-btn ${
+                      pagination.current === 1 ? "disabled" : ""
+                    }" id="prev-btn">
+                      上一页
+                    </a>
+
+                    <!-- 页码按钮 -->
+                    <div class="page-nav" id="page-nav">
+                      ${generatePageButtons()}
+                    </div>
+
+                    <!-- 下一页按钮 -->
+                    <a href="javascript:void(0)" class="page-btn ${
+                      pagination.current ===
+                      Math.ceil(pagination.total / pagination.size)
+                        ? "disabled"
+                        : ""
+                    }" id="next-btn">
+                      下一页
+                    </a>
+                  </div>
+
+                  <!-- 快速跳转 -->
+                  <div class="page-jumper">
+                    跳至
+                    <input type="number" id="jump-input" value="${
+                      pagination.current
+                    }" min="1" max="${Math.ceil(
+                pagination.total / pagination.size
+              )}">
+                    页
+                    <button class="jump-btn" id="jump-btn">确定</button>
+                  </div>
+                </div>
+              `;
+
+              paginationContainer.innerHTML = paginationHTML;
+
+              // 绑定事件
+              bindPaginationEvents();
+            }
+          };
+
+          // 生成页码按钮
+          const generatePageButtons = () => {
+            const totalPages = Math.ceil(pagination.total / pagination.size);
+            const current = pagination.current;
+            const pagerCount = 7; // 显示的页码数量
+
+            let buttons = "";
+
+            if (totalPages <= pagerCount) {
+              // 总页数小于等于显示数量,显示所有页码
+              for (let i = 1; i <= totalPages; i++) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  i === current ? "active" : ""
+                }" data-page="${i}">${i}</a>`;
+              }
+            } else {
+              // 计算中间页码范围
+              const half = Math.floor(pagerCount / 2);
+              let start = Math.max(1, current - half);
+              let end = Math.min(totalPages, start + pagerCount - 1);
+
+              // 调整起始位置
+              if (end - start + 1 < pagerCount) {
+                start = Math.max(1, end - pagerCount + 1);
+              }
+
+              // 第一页
+              if (start > 1) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  1 === current ? "active" : ""
+                }" data-page="1">1</a>`;
+                if (start > 2) {
+                  buttons += '<span class="page-ellipsis">...</span>';
+                }
+              }
+
+              // 中间页码
+              for (let i = start; i <= end; i++) {
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  i === current ? "active" : ""
+                }" data-page="${i}">${i}</a>`;
+              }
+
+              // 最后一页
+              if (end < totalPages) {
+                if (end < totalPages - 1) {
+                  buttons += '<span class="page-ellipsis">...</span>';
+                }
+                buttons += `<a href="javascript:void(0)" class="page-btn ${
+                  totalPages === current ? "active" : ""
+                }" data-page="${totalPages}">${totalPages}</a>`;
+              }
+            }
+
+            return buttons;
+          };
+
+          // 绑定分页事件
+          const bindPaginationEvents = () => {
+            // 每页显示数量变化
+            const pageSizeSelect = document.getElementById("page-size-select");
+            if (pageSizeSelect) {
+              pageSizeSelect.addEventListener("change", (e) => {
+                pagination.size = parseInt(e.target.value);
+                pagination.current = 1;
+                initPagination();
+              });
+            }
+
+            // 上一页
+            const prevBtn = document.getElementById("prev-btn");
+            if (prevBtn) {
+              prevBtn.addEventListener("click", () => {
+                if (pagination.current > 1) {
+                  pagination.current--;
+                  initPagination();
+                }
+              });
+            }
+
+            // 下一页
+            const nextBtn = document.getElementById("next-btn");
+            if (nextBtn) {
+              nextBtn.addEventListener("click", () => {
+                const totalPages = Math.ceil(
+                  pagination.total / pagination.size
+                );
+                if (pagination.current < totalPages) {
+                  pagination.current++;
+                  initPagination();
+                }
+              });
+            }
+
+            // 页码点击
+            const pageNav = document.getElementById("page-nav");
+            if (pageNav) {
+              pageNav.addEventListener("click", (e) => {
+                if (
+                  e.target.classList.contains("page-btn") &&
+                  !e.target.classList.contains("active")
+                ) {
+                  const page = parseInt(e.target.getAttribute("data-page"));
+                  if (page) {
+                    pagination.current = page;
+                    initPagination();
+                  }
+                }
+              });
+            }
+
+            // 快速跳转
+            const jumpBtn = document.getElementById("jump-btn");
+            const jumpInput = document.getElementById("jump-input");
+            if (jumpBtn && jumpInput) {
+              jumpBtn.addEventListener("click", () => {
+                const page = parseInt(jumpInput.value);
+                const totalPages = Math.ceil(
+                  pagination.total / pagination.size
+                );
+                if (page >= 1 && page <= totalPages) {
+                  pagination.current = page;
+                  initPagination();
+                } else {
+                  ElMessage.warning("请输入有效的页码");
+                }
+              });
+
+              // 回车跳转
+              jumpInput.addEventListener("keyup", (e) => {
+                if (e.key === "Enter") {
+                  jumpBtn.click();
+                }
+              });
+            }
+          };
+
+          // 页面挂载后初始化分页
+          onMounted(() => {
+            pagination.total = logs.value.length;
+            Vue.nextTick(() => {
+              initPagination();
+            });
+          });
+
+          return {
+            loading,
+            exporting,
+            showDetailDialog,
+            currentLog,
+            searchForm,
+            pagination,
+            logs,
+            filteredLogs,
+            getLevelClass,
+            handleSearch,
+            handleReset,
+            handleViewDetail,
+            handleDetailDialogClose,
+            handleExport,
+            handleClear,
+          };
+        },
+      });
+
+      // 注册 Element Plus Icons
+      for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+        app.component(key, component);
+      }
+
+      // 配置 Element Plus 中文
+      app.use(ElementPlus, {
+        locale: ElementPlusLocaleZhCn,
+      });
+
+      app.mount("#app");
+    </script>
+  </body>
+</html>

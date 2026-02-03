@@ -40,6 +40,11 @@ public class KnowledgeFileRelationResp {
     private String fileName;
 
     /**
+     * 文件大小（字节）
+     */
+    private Long fileSize;
+
+    /**
      * 排序号
      */
     private Integer sortOrder;

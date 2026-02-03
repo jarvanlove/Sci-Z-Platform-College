@@ -10,7 +10,7 @@
       <h1 class="page-title">{{ t('system.logs.title') }}</h1>
     </div>
 
-    <BaseCard>
+    <BaseCard class="content-card">
       <div class="filter-section">
         <!-- 🔥 用户名输入框移到最左边 -->
         <el-input
@@ -398,18 +398,38 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .log-management-container {
+  padding: var(--gap-lg);
+  background: var(--bg-secondary);
+  min-height: calc(100vh - 56px);
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden; // 🔥 适配 TOC 布局：避免横向溢出
   display: flex;
   flex-direction: column;
   gap: 20px;
 
   .page-header {
-    margin-bottom: 20px;
+    margin-bottom: var(--gap-lg);
 
     .page-title {
       margin: 0;
       font-size: 24px;
       font-weight: 600;
       color: var(--color-primary); // 🔥 主题颜色
+    }
+  }
+
+  .content-card {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+
+    :deep(.base-card__content) {
+      padding: 0;
+      width: 100%;
     }
   }
 

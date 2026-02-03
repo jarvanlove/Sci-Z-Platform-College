@@ -117,4 +117,27 @@ public class SysKnowledgeFileRelationRepoImpl implements SysKnowledgeFileRelatio
                         SysKnowledgeFileRelation::getKnowledgeId,
                         Collectors.mapping(SysKnowledgeFileRelation::getAttachmentId, Collectors.toList())));
     }
+
+    @Override
+    public List<SysKnowledgeFileRelation> findByKnowledgeId(Long knowledgeId) {
+        if (knowledgeId == null) {
+            return List.of();
+        }
+        return new LambdaQueryChainWrapper<>(mapper)
+                .eq(SysKnowledgeFileRelation::getKnowledgeId, knowledgeId)
+                .eq(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .orderByAsc(SysKnowledgeFileRelation::getSortOrder)
+                .orderByDesc(SysKnowledgeFileRelation::getCreatedTime)
+                .list();
+    }
+
+    @Override
+    public Long countByFolderId(Long folderId) {
+        if (folderId == null) {
+            return 0L;
+        }
+        return mapper.selectCount(new LambdaQueryWrapper<SysKnowledgeFileRelation>()
+                .eq(SysKnowledgeFileRelation::getFolderId, folderId)
+                .eq(SysKnowledgeFileRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode()));
+    }
 }

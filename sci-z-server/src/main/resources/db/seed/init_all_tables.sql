@@ -746,6 +746,7 @@ CREATE TABLE IF NOT EXISTS sys_knowledge_base (
     dify_kb_id VARCHAR(100),
     dify_knowdata_id VARCHAR(100),
     callback TEXT,
+    kb_type VARCHAR(20) NOT NULL DEFAULT 'personal',
     is_shared SMALLINT DEFAULT 0,
     status VARCHAR(20) DEFAULT 'active',
     file_count INT DEFAULT 0,
@@ -767,7 +768,8 @@ COMMENT ON COLUMN sys_knowledge_base.project_name IS '关联项目名称';
 COMMENT ON COLUMN sys_knowledge_base.dify_kb_id IS 'Dify知识库ID';
 COMMENT ON COLUMN sys_knowledge_base.dify_knowdata_id IS 'Dify知识库数据ID（Dify返回的id字段）';
 COMMENT ON COLUMN sys_knowledge_base.callback IS '回调数据（Dify API返回的完整JSON数据）';
-COMMENT ON COLUMN sys_knowledge_base.is_shared IS '是否共享';
+COMMENT ON COLUMN sys_knowledge_base.kb_type IS '知识库类型：personal=个人知识库，project=项目知识库';
+COMMENT ON COLUMN sys_knowledge_base.is_shared IS '是否共享：0：私有，1：共享';
 COMMENT ON COLUMN sys_knowledge_base.status IS '状态';
 COMMENT ON COLUMN sys_knowledge_base.file_count IS '文件数量';
 COMMENT ON COLUMN sys_knowledge_base.folder_count IS '文件夹数量';
@@ -776,6 +778,7 @@ COMMENT ON COLUMN sys_knowledge_base.created_time IS '创建时间';
 COMMENT ON COLUMN sys_knowledge_base.updated_time IS '更新时间';
 CREATE INDEX IF NOT EXISTS idx_sys_knowledge_base_owner_id ON sys_knowledge_base(owner_id);
 CREATE INDEX IF NOT EXISTS idx_sys_knowledge_base_project_id ON sys_knowledge_base(project_id);
+CREATE INDEX IF NOT EXISTS idx_sys_knowledge_base_kb_type ON sys_knowledge_base(kb_type);
 CREATE INDEX IF NOT EXISTS idx_sys_knowledge_base_is_shared ON sys_knowledge_base(is_shared);
 CREATE INDEX IF NOT EXISTS idx_sys_knowledge_base_is_deleted ON sys_knowledge_base(is_deleted);
 

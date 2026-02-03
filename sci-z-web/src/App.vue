@@ -40,13 +40,25 @@ const { showLoginModal, showRegisterModal, showResetPasswordModal, closeAllModal
 watch(() => authStore.isLoggedIn, (isLoggedIn) => {
   if (isLoggedIn) {
     closeAllModals()
+    // 🔥 修复：如果用户是在 /login 弹窗页完成登录，必须跳转到默认首页
+    // 否则 Login/index.vue 在 toc 布局下不渲染内容，会出现“右侧空白、地址仍是 /login”
+    if (route.path === '/login') {
+      router.replace('/ai/chat').catch(() => {
+        // 忽略路由冗余/竞态错误
+      })
+    }
   }
 })
 
 // 监听路由变化，当路由变化到 /login、/register 或 /reset-password 时，打开对应的弹窗
 watch(() => route.path, (newPath) => {
   if (newPath === '/login') {
-    // 如果路由是 /login，打开登录弹窗
+    // 🔥 已登录用户不应该停留在 /login（该页在 TOC 布局下会是空白容器）
+    if (authStore.isLoggedIn) {
+      router.replace('/ai/chat').catch(() => {})
+      return
+    }
+    // 未登录：如果路由是 /login，打开登录弹窗
     openLoginModal()
   } else if (newPath === '/register') {
     // 如果路由是 /register，打开注册弹窗

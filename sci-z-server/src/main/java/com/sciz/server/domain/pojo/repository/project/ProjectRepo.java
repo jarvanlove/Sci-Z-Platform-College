@@ -45,6 +45,38 @@ public interface ProjectRepo {
             List<Long> declarationIds);
 
     /**
+     * 根据项目ID列表查询关联的申报ID列表（用于申报列表权限：项目成员/负责人可见其项目关联的申报）
+     *
+     * @param projectIds 项目ID列表
+     * @return 申报ID列表，无重复
+     */
+    List<Long> findDeclarationIdsByProjectIds(List<Long> projectIds);
+
+    /**
+     * 根据项目负责人用户ID查询其负责的项目ID列表（用于申报列表权限：负责人可见其负责项目关联的申报）
+     *
+     * @param managerId 项目负责人用户ID
+     * @return 项目ID列表
+     */
+    List<Long> findProjectIdsByManagerId(Long managerId);
+
+    /**
+     * 根据项目创建人用户ID查询其创建的项目ID列表（用于申报详情权限：创建人可见其创建项目关联的申报）
+     *
+     * @param createdBy 项目创建人用户ID
+     * @return 项目ID列表
+     */
+    List<Long> findProjectIdsByCreatedBy(Long createdBy);
+
+    /**
+     * 根据申报ID查询关联的项目（一对一，用于申报附件权限：项目负责人/成员可访问该申报的附件）
+     *
+     * @param declarationId 申报ID
+     * @return 项目实体，无则 null
+     */
+    Project findByDeclarationId(Long declarationId);
+
+    /**
      * 更新项目
      *
      * @param entity Project 实体

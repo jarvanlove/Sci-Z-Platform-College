@@ -76,7 +76,7 @@ export const PROJECT_API = {
   PROGRESS: (id) => buildApiUrl(`/project/progress/${id}`), // 获取项目进度
   ADD_PROGRESS: buildApiUrl('/project/progress/add'), // 添加项目进度
   STATISTICS: buildApiUrl('/project/statistics'), // 获取项目统计信息
-  MILESTONE_DOCUMENT: buildApiUrl('/project/milestone/document'), // 里程碑文档上传
+  MILESTONE_DOCUMENT: buildApiUrl('/project/milestone/document'), // 里程碑文档上传（支持进度返回）
   MILESTONE_DOCUMENT_DELETE: buildApiUrl('/project/milestone/document/delete'), // 删除里程碑文档
   MILESTONE_COMPLETE: (milestoneId) => buildApiUrl(`/project/milestone/${milestoneId}/complete`), // 完成里程碑
   MILESTONE_CANCEL_COMPLETE: (milestoneId) => buildApiUrl(`/project/milestone/${milestoneId}/cancel-complete`), // 取消完成里程碑
@@ -147,14 +147,18 @@ export const AI_API = {
 export const KNOWLEDGE_API = {
   BASE_PATH: buildApiUrl('/knowledge'),
   LIST: buildApiUrl('/knowledge'), // GET /api/knowledge?page=1&size=10
+  LIST_PAGE: buildApiUrl('/knowledge/list'), // POST /api/knowledge/list
   CREATE: buildApiUrl('/knowledge'), // POST /api/knowledge
   DETAIL: (id) => buildApiUrl(`/knowledge/detail/${id}`),
-  UPDATE: (id) => buildApiUrl(`/knowledge/update/${id}`),
+  UPDATE: (id) => buildApiUrl(`/knowledge/${id}`), // PUT /api/knowledge/{id}
   DELETE: (id) => buildApiUrl(`/knowledge/${id}`), // DELETE /api/knowledge/{id}
-  FOLDERS: (id) => buildApiUrl(`/knowledge/folders/${id}`),
-  CREATE_FOLDER: buildApiUrl('/knowledge/folders'),
-  UPDATE_FOLDER: (id) => buildApiUrl(`/knowledge/folders/${id}`),
-  DELETE_FOLDER: (id) => buildApiUrl(`/knowledge/folders/${id}`),
+  UPLOAD_COVER: (id) => buildApiUrl(`/knowledge/${id}/cover`), // POST /api/knowledge/{id}/cover
+  FOLDERS_TREE: (id) => buildApiUrl(`/knowledge/file-relation/knowledge/${id}/folders/tree`), // GET /api/knowledge/file-relation/knowledge/{id}/folders/tree
+  FOLDERS: (id) => buildApiUrl(`/knowledge/file-relation/knowledge/${id}/folders`), // GET /api/knowledge/file-relation/knowledge/{id}/folders?parentId=0
+  CREATE_FOLDER: (id) => buildApiUrl(`/knowledge/file-relation/knowledge/${id}/folders`), // POST /api/knowledge/file-relation/knowledge/{id}/folders
+  FOLDER_DETAIL: (folderId) => buildApiUrl(`/knowledge/file-relation/folders/${folderId}`), // GET /api/knowledge/file-relation/folders/{folderId}
+  UPDATE_FOLDER: (folderId) => buildApiUrl(`/knowledge/file-relation/folders/${folderId}`), // PUT /api/knowledge/file-relation/folders/{folderId}
+  DELETE_FOLDER: (folderId) => buildApiUrl(`/knowledge/file-relation/folders/${folderId}`), // DELETE /api/knowledge/file-relation/folders/{folderId}
   UPLOAD_FILE: buildApiUrl('/knowledge/files/upload'),
   UPLOAD: (id) => buildApiUrl(`/knowledge/${id}/upload`), // POST /api/knowledge/{difyKbId}/upload (单文件)
   UPLOAD_BATCH: (id) => buildApiUrl(`/knowledge/${id}/upload/batch`), // POST /api/knowledge/{id}/upload/batch (多文件)
@@ -173,6 +177,7 @@ export const KNOWLEDGE_API = {
   FILE_RELATION_DELETE: (id) => buildApiUrl(`/knowledge/file-relation/${id}`), // DELETE /api/knowledge/file-relation/{id}
   FILE_RELATION_DETAIL: (id) => buildApiUrl(`/knowledge/file-relation/${id}`), // GET /api/knowledge/file-relation/{id}
   FILE_RELATION_LIST: buildApiUrl('/knowledge/file-relation'), // GET /api/knowledge/file-relation?knowledgeId=1&folderId=0&page=1&size=10
+  FOLDERS_FILES: (knowledgeId) => buildApiUrl(`/knowledge/file-relation/knowledge/${knowledgeId}/folders-files`), // GET /api/knowledge/file-relation/knowledge/{knowledgeId}/folders-files
   COLLECT_FROM_PDF_URL: (id) => buildApiUrl(`/knowledge/${id}/collect-from-pdf-url`) // POST /api/knowledge/{id}/collect-from-pdf-url
 }
 
@@ -195,12 +200,22 @@ export const FILE_API = {
   BASE_PATH: buildApiUrl('/file'), // 文件管理模块基础路径
   UPLOAD: buildApiUrl('/file/upload'), // 上传文件
   BATCH_UPLOAD: buildApiUrl('/file/batch-upload'), // 批量上传文件
+  BATCH_UPLOAD_WITH_PROGRESS: buildApiUrl('/file/batch-upload-with-progress'), // 批量上传文件（支持进度返回）
   LIST: buildApiUrl('/file/list'), // 获取文件列表
   DOWNLOAD: (id) => buildApiUrl(`/file/download/${id}`), // 下载文件
   PREVIEW: (id) => buildApiUrl(`/file/preview/${id}`), // 预览文件
   DELETE: (id) => buildApiUrl(`/file/delete/${id}`), // 删除文件
   CHECK_DUPLICATE: buildApiUrl('/file/check-duplicate'), // 检查文件是否重复
   SYNC_DIFY: buildApiUrl('/file/sync-dify') // 同步Dify文件
+}
+
+// ================================
+// 10.5. 代理服务模块 API 路径
+// ================================
+
+export const PROXY_API = {
+  BASE_PATH: buildApiUrl('/proxy'), // 代理服务模块基础路径
+  PDF_CACHE: buildApiUrl('/proxy/pdf/cache') // PDF代理下载并缓存
 }
 
 // ================================
@@ -319,6 +334,7 @@ export default {
   KNOWLEDGE_API,
   LITERATURE_API,
   FILE_API,
+  PROXY_API,
   SYSTEM_API,
   USER_API,
   

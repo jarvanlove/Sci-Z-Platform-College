@@ -56,10 +56,16 @@ public class Declaration extends BaseEntity {
     private String department;
 
     /**
-     * 项目负责人
+     * 项目负责人（姓名，展示用）
      */
     @TableField("project_leader")
     private String projectLeader;
+
+    /**
+     * 项目负责人用户ID（用于权限：指定负责人与创建人等价权限）
+     */
+    @TableField("project_leader_id")
+    private Long projectLeaderId;
 
     /**
      * 红头文件发布时间

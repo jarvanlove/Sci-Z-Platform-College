@@ -1,6 +1,8 @@
 package com.sciz.server.application.task;
 
+import com.sciz.server.application.service.declaration.DeclarationService;
 import com.sciz.server.application.service.file.FileService;
+import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationUpdateStatusReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.entity.declaration.Declaration;
 import com.sciz.server.domain.pojo.entity.file.SysAttachmentRelation;
@@ -19,8 +21,8 @@ import com.sciz.server.infrastructure.shared.utils.DateUtil;
 import com.sciz.server.infrastructure.shared.utils.JsonUtil;
 import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
 import com.sciz.server.domain.pojo.dto.response.user.LoginUserContext;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -46,15 +48,44 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class DeclarationWorkflowTask {
 
     private final DifyWorkflowService difyWorkflowService;
     private final DeclarationRepo declarationRepo;
+    private final DeclarationService declarationService;
     private final FileService fileService;
     private final SysAttachmentRelationRepo sysAttachmentRelationRepo;
     private final SysUserRepo sysUserRepo;
     private final EventPublisher eventPublisher;
+
+    /**
+     * 构造函数
+     * 使用 @Lazy 延迟注入 DeclarationService，避免与 DeclarationServiceImpl 的循环依赖
+     *
+     * @param difyWorkflowService          Dify工作流服务
+     * @param declarationRepo               申报仓储
+     * @param declarationService            申报服务（延迟注入，避免循环依赖）
+     * @param fileService                   文件服务
+     * @param sysAttachmentRelationRepo     附件关联仓储
+     * @param sysUserRepo                   用户仓储
+     * @param eventPublisher                事件发布器
+     */
+    public DeclarationWorkflowTask(
+            DifyWorkflowService difyWorkflowService,
+            DeclarationRepo declarationRepo,
+            @Lazy DeclarationService declarationService,
+            FileService fileService,
+            SysAttachmentRelationRepo sysAttachmentRelationRepo,
+            SysUserRepo sysUserRepo,
+            EventPublisher eventPublisher) {
+        this.difyWorkflowService = difyWorkflowService;
+        this.declarationRepo = declarationRepo;
+        this.declarationService = declarationService;
+        this.fileService = fileService;
+        this.sysAttachmentRelationRepo = sysAttachmentRelationRepo;
+        this.sysUserRepo = sysUserRepo;
+        this.eventPublisher = eventPublisher;
+    }
 
     /**
      * 处理申报工作流（同步调试版本）
@@ -119,10 +150,21 @@ public class DeclarationWorkflowTask {
             // 10. 记录申报书生成步骤
             addWorkflowStep(declarationId, "申报书生成", "success");
 
-            // 11. 更新工作流状态为"已完成"，申报状态为"申报成功"
-            updateWorkflowStatus(declarationId, WorkflowStatus.COMPLETED, fileUrl);
+            // 11. 记录项目创建步骤（标记为"进行中"，实际创建由事件处理器完成）
+            addWorkflowStep(declarationId, "项目创建", "running");
+            log.info(String.format("项目创建步骤已记录，等待事件处理器创建项目: declarationId=%s", declarationId));
 
-            // 12. 发布申报更新事件
+            // 12. 保持工作流状态为"处理中"，等待所有步骤（包括项目创建）完成后，由事件处理器更新为"已完成"
+            // 注意：不要在这里更新为 COMPLETED，因为项目创建步骤还是 "running" 状态
+            // 当项目创建步骤完成后，DeclarationEventHandler 会检查所有步骤状态并更新工作流状态
+            updateWorkflowStatus(declarationId, WorkflowStatus.RUNNING, fileUrl);
+
+            // 13. 工作流执行成功，自动更新申报状态为"申报已提交"（状态2）
+            // 注意：updateStatus 会发布 DeclarationSuccessEvent 事件，事件处理器会创建项目和知识库
+            updateDeclarationStatus(declarationId, DeclarationStatus.SUCCESS);
+            log.info(String.format("工作流执行成功，自动更新申报状态为申报已提交: declarationId=%s", declarationId));
+
+            // 14. 发布申报更新事件
             var declaration = declarationRepo.findById(declarationId);
             if (declaration != null) {
                 var event = new DeclarationUpdatedEvent(
@@ -151,6 +193,10 @@ public class DeclarationWorkflowTask {
 
             // 记录失败步骤
             addWorkflowStep(declarationId, "申报书生成", "failed");
+
+            // 工作流执行失败，自动更新申报状态为"申报未通过"（状态3）
+            updateDeclarationStatus(declarationId, DeclarationStatus.FAILED);
+            log.info(String.format("工作流执行失败，自动更新申报状态为申报未通过: declarationId=%s", declarationId));
         }
     }
 
@@ -235,10 +281,21 @@ public class DeclarationWorkflowTask {
             // 10. 记录申报书生成步骤
             addWorkflowStep(declarationId, "申报书生成", "success");
 
-            // 11. 更新工作流状态为"已完成"，申报状态为"申报成功"
-            updateWorkflowStatus(declarationId, WorkflowStatus.COMPLETED, fileUrl);
+            // 11. 记录项目创建步骤（标记为"进行中"，实际创建由事件处理器完成）
+            addWorkflowStep(declarationId, "项目创建", "running");
+            log.info(String.format("项目创建步骤已记录，等待事件处理器创建项目: declarationId=%s", declarationId));
 
-            // 12. 发布申报更新事件
+            // 12. 保持工作流状态为"处理中"，等待所有步骤（包括项目创建）完成后，由事件处理器更新为"已完成"
+            // 注意：不要在这里更新为 COMPLETED，因为项目创建步骤还是 "running" 状态
+            // 当项目创建步骤完成后，DeclarationEventHandler 会检查所有步骤状态并更新工作流状态
+            updateWorkflowStatus(declarationId, WorkflowStatus.RUNNING, fileUrl);
+
+            // 13. 工作流执行成功，自动更新申报状态为"申报已提交"（状态2）
+            // 注意：updateStatus 会发布 DeclarationSuccessEvent 事件，事件处理器会创建项目和知识库
+            updateDeclarationStatus(declarationId, DeclarationStatus.SUCCESS);
+            log.info(String.format("工作流执行成功，自动更新申报状态为申报已提交: declarationId=%s", declarationId));
+
+            // 14. 发布申报更新事件
             var declaration = declarationRepo.findById(declarationId);
             if (declaration != null) {
                 var event = new DeclarationUpdatedEvent(
@@ -267,6 +324,13 @@ public class DeclarationWorkflowTask {
 
             // 记录失败步骤
             addWorkflowStep(declarationId, "申报书生成", "failed");
+
+            // 工作流执行失败，自动更新申报状态为"申报未通过"（状态3）
+            updateDeclarationStatus(declarationId, DeclarationStatus.FAILED);
+            log.info(String.format("工作流执行失败，自动更新申报状态为申报未通过: declarationId=%s", declarationId));
+        } finally {
+            // 清理异步用户上下文（防止内存泄漏）
+            AsyncUserContext.clear();
         }
     }
 
@@ -711,15 +775,16 @@ public class DeclarationWorkflowTask {
 
     /**
      * 更新申报状态
+     * 调用 DeclarationService.updateStatus 执行完整的业务逻辑（包括事件发布等）
+     *
+     * @param declarationId 申报ID
+     * @param status        申报状态
      */
     private void updateDeclarationStatus(Long declarationId, DeclarationStatus status) {
         try {
-            var success = declarationRepo.updateStatus(declarationId, String.valueOf(status.getCode()));
-            if (success) {
-                log.info(String.format("更新申报状态成功: declarationId=%s, status=%s", declarationId, status.getCode()));
-            } else {
-                log.warn(String.format("更新申报状态失败: declarationId=%s, status=%s", declarationId, status.getCode()));
-            }
+            var req = new DeclarationUpdateStatusReq(declarationId, status.getCode());
+            declarationService.updateStatus(req);
+            log.info(String.format("更新申报状态成功: declarationId=%s, status=%s", declarationId, status.getCode()));
         } catch (Exception e) {
             log.error(String.format("更新申报状态异常: declarationId=%s, err=%s", declarationId, e.getMessage()), e);
         }

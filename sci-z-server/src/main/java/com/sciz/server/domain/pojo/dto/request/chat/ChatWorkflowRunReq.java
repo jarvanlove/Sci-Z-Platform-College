@@ -60,6 +60,12 @@ public class ChatWorkflowRunReq {
      */
     @Schema(description = "附件ID列表（最多3个）", example = "123,456,789")
     private List<Long> attachmentIds;
+
+    /**
+     * 是否启用联网搜索（可选，默认false）
+     */
+    @Schema(description = "是否启用联网搜索", example = "false")
+    private Boolean enableSearch;
 }
 
 

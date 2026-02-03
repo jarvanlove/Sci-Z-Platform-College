@@ -230,12 +230,9 @@ const handleLogout = async () => {
     // 显示退出成功消息
     ElMessage.success(t('auth.logoutSuccess'))
     
-    // 保持在当前页面或跳转到AI对话页面（公开页面）
-    const currentPath = router.currentRoute.value.path
-    const publicPages = ['/ai/chat', '/literature/search']
-    if (!publicPages.includes(currentPath)) {
-      await router.push('/ai/chat')
-    }
+    // 🔥 修复：退出登录后统一跳转到AI对话页面，确保路由更新和页面刷新
+    // 使用 replace 而不是 push，避免用户通过后退按钮回到需要登录的页面
+    await router.replace({ path: '/ai/chat', query: {} })
     
     // 开发环境日志
     if (import.meta.env.DEV) {

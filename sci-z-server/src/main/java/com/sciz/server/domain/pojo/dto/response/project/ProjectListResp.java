@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
  * @param difyKnowledgeId         String Dify知识库ID
  * @param createdTime             LocalDateTime 创建时间
  * @param updatedTime             LocalDateTime 更新时间
+ * @param canDelete               Boolean 当前用户是否可取消该项目（创建人或项目成员为 true）
  * @author JiaWen.Wu
  * @className ProjectListResp
  * @date 2025-11-24 16:00
@@ -41,5 +42,6 @@ public record ProjectListResp(
                 String projectLeader,
                 String difyKnowledgeId,
                 LocalDateTime createdTime,
-                LocalDateTime updatedTime) {
+                LocalDateTime updatedTime,
+                Boolean canDelete) {
 }

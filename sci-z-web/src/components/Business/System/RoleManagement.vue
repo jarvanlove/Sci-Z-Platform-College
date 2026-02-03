@@ -1344,8 +1344,11 @@ onMounted(() => {
 <style lang="scss" scoped>
 .role-management-container {
   padding: var(--gap-lg);
-  background: var(--bg);
+  background: var(--bg-secondary);
   min-height: calc(100vh - 56px);
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden; // 🔥 适配 TOC 布局：避免横向溢出
 }
 
 .page-header {
@@ -1368,7 +1371,17 @@ onMounted(() => {
 }
 
 .content-card {
-  margin-top: var(--gap-lg);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+
+  :deep(.base-card__content) {
+    padding: 0;
+    width: 100%;
+  }
 }
 
 .filter-section {

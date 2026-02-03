@@ -7,6 +7,7 @@ import com.sciz.server.domain.pojo.dto.request.file.FileListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.file.FileDuplicateCheckResp;
 import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
+import com.sciz.server.domain.pojo.dto.response.file.FileUploadResp;
 import com.sciz.server.domain.pojo.dto.response.file.FileDownloadContext;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.Result;
@@ -62,6 +63,13 @@ public class FileController {
     public Result<List<FileInfoResp>> batchUpload(@Valid @ModelAttribute FileBatchUploadReq req) {
         List<FileInfoResp> respList = fileService.uploadBatch(req);
         return Result.success(respList, ResultCode.FILE_UPLOAD_SUCCESS.getMessage());
+    }
+
+    @Operation(summary = "批量文件上传（支持进度返回）", description = "多文件上传，支持部分成功，返回每个文件的上传进度和状态")
+    @PostMapping("/batch-upload-with-progress")
+    public Result<List<FileUploadResp>> batchUploadWithProgress(@Valid @ModelAttribute FileBatchUploadReq req) {
+        List<FileUploadResp> results = fileService.uploadBatchWithProgress(req);
+        return Result.success(results);
     }
 
     @Operation(summary = "文件列表", description = "分页查询文件列表")

@@ -76,4 +76,10 @@ public class Project extends BaseEntity {
      */
     @TableField("dify_knowledge_id")
     private String difyKnowledgeId;
+
+    /**
+     * 项目负责人用户ID（与申报同步，用于权限：创建人+当前负责人均有负责人权限）
+     */
+    @TableField("manager_id")
+    private Long managerId;
 }

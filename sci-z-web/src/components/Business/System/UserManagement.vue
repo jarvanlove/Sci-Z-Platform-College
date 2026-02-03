@@ -194,7 +194,6 @@
         <el-form-item :label="t('system.user.username')" prop="username">
           <el-input
             v-model="formData.username"
-            :disabled="isEdit"
             :placeholder="t('system.user.usernamePlaceholder')"
           />
         </el-form-item>
@@ -1126,6 +1125,7 @@ const handleSubmit = async () => {
       const departmentPayload = resolveDepartmentPayload()
       const submitData = {
         id: userId, // 必须与路径参数一致，且必须是数字
+        username: formData.username, // 🔥 添加用户名字段，允许编辑时修改用户名
         realName: formData.realName,
         email: formData.email,
         phone: formData.phone,
@@ -1387,12 +1387,13 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 .user-management-container {
-  padding: 0;
-  background: var(--bg);
-  min-height: calc(100vh - 60px);
+  padding: var(--gap-lg);
+  background: var(--bg-secondary);
+  min-height: calc(100vh - 56px);
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  overflow-x: hidden; // 🔥 适配 TOC 布局：避免横向溢出导致表格“挤/错位”
 }
 
 .page-header {

@@ -14,6 +14,7 @@ export { default as BaseScrollbar } from './BaseScrollbar.vue'
 export { default as BaseDatePicker } from './BaseDatePicker.vue'
 export { default as BaseSwitch } from './BaseSwitch.vue'
 export { default as BaseTooltip } from './BaseTooltip.vue'
+export { default as FileTypeIcon } from './FileTypeIcon.vue'
 
 // 功能组件
 export { default as AgreementNotice } from './AgreementNotice.vue'

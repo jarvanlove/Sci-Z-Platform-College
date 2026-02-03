@@ -1,0 +1,167 @@
+---
+description: "通用组件目录与使用方式、文件上传规范"
+alwaysApply: false
+globs: ["**/components/**/*.vue", "**/constants/**", "**/composables/**"]
+---
+
+# 组件目录与文件上传规范
+
+## 通用组件 (Common) 一览
+
+以下为 `src/components/Common/` 下全部通用组件，**项目内必须通过 `@/components/Common` 或按名导入使用**，禁止复制实现。
+
+| 组件名 | 用途 | 导入方式 |
+|--------|------|----------|
+| BackButton | 返回/返回列表按钮（左箭头图标） | `import BackButton from '@/components/Common/BackButton.vue'` 或 `import { BackButton } from '@/components/Common'` |
+| BaseButton | 统一主按钮（封装 el-button，type/size/loading） | `import { BaseButton } from '@/components/Common'` |
+| BaseCard | 卡片容器（标题、内容、footer、可选 hover/border/shadow） | `import { BaseCard } from '@/components/Common'` |
+| BaseDialog | 统一弹窗（标题、宽度、关闭行为、滚动内容区、footer 插槽） | `import { BaseDialog } from '@/components/Common'` |
+| BaseTable | 表格+分页（列配置、选择列、序号列、操作列、loading） | `import { BaseTable } from '@/components/Common'` |
+| BasePagination | 分页（当前页、每页条数、总数、切换事件） | `import { BasePagination } from '@/components/Common'` |
+| BaseScrollbar | 自定义滚动条（size: small/medium/large，可包弹窗内容） | `import { BaseScrollbar } from '@/components/Common'` |
+| BaseDatePicker | 统一日期选择（与项目主题一致） | `import { BaseDatePicker } from '@/components/Common'` |
+| BaseSwitch | 统一开关 | `import { BaseSwitch } from '@/components/Common'` |
+| BaseTooltip | 统一提示 | `import { BaseTooltip } from '@/components/Common'` |
+| FileTypeIcon | 按文件类型/扩展名显示图标 | `import { FileTypeIcon } from '@/components/Common'` |
+| AgreementNotice | 协议/须知展示（如注册、隐私） | `import { AgreementNotice } from '@/components/Common'` |
+| LanguageSwitcher | 语言切换（ zh-CN / en-US / ja-JP / ko-KR） | `import LanguageSwitcher from '@/components/Common/LanguageSwitcher.vue'` 或 `import { LanguageSwitcher } from '@/components/Common'` |
+| FilePreview | 文件预览弹窗（PDF、图片、Word 等，需 fileInfo） | `import { FilePreview } from '@/components/Common'` |
+| ExternalFilePreview | 外链/外部文件预览 | `import { ExternalFilePreview } from '@/components/Common'` |
+| ProjectProgressBar | 项目进度条展示 | `import { ProjectProgressBar } from '@/components/Common'` |
+
+---
+
+## 项目内如何使用通用组件
+
+### 1. 统一导入入口
+
+优先从 `@/components/Common` 一次导入多个：
+
+```javascript
+import { BaseCard, BaseTable, BasePagination, BaseButton, BackButton } from '@/components/Common'
+```
+
+若某组件仅默认导出，可：
+
+```javascript
+import LanguageSwitcher from '@/components/Common/LanguageSwitcher.vue'
+```
+
+### 2. BaseCard
+
+- **用途**：页面内区块、统计卡、表单分组。
+- **常用 Props**：`title`（标题）、`hoverable`、`bordered`、`shadow`（sm/md/lg/none）。
+- **插槽**：默认插槽（内容）、`header`、`actions`（标题右侧）、`footer`。
+- **示例**：
+
+```vue
+<BaseCard title="申报列表">
+  <template #actions>
+    <BaseButton type="primary" @click="handleCreate">{{ $t('common.add') }}</BaseButton>
+  </template>
+  <DeclarationList />
+</BaseCard>
+```
+
+### 3. BaseTable + BasePagination
+
+- **用途**：列表页表格与分页，与后端分页参数对齐。
+- **BaseTable 常用 Props**：`data`、`columns`（prop/label/width/minWidth/sortable/align）、`loading`、`pagination`（{ current, size, total }）、`showPagination`、`rowKey`、`selectable`、`showIndex`。
+- **插槽**：`toolbar`（表格上方）、`[column.prop]`（自定义列）、`actions`（行操作，slot 参数 row、index）。
+- **示例**：
+
+```vue
+<BaseTable
+  :data="tableData"
+  :columns="columns"
+  :loading="loading"
+  :pagination="pagination"
+  show-pagination
+  @page-change="handlePageChange"
+>
+  <template #actions="{ row }">
+    <el-button link @click="handleEdit(row)">{{ $t('common.edit') }}</el-button>
+  </template>
+</BaseTable>
+```
+
+### 4. BaseDialog
+
+- **用途**：表单弹窗、确认弹窗、详情浮层。
+- **常用 Props**：`modelValue`（v-model）、`title`、`width`、`closeOnClickModal`、`showClose`。
+- **插槽**：默认（内容）、`footer`（底部按钮区）。内容区已包 `BaseScrollbar`，长内容可放心使用。
+
+```vue
+<BaseDialog v-model="dialogVisible" :title="$t('declaration.add')" width="640px">
+  <DeclarationForm @submit="handleSubmit" />
+  <template #footer>
+    <BaseButton @click="dialogVisible = false">{{ $t('common.cancel') }}</BaseButton>
+    <BaseButton type="primary" @click="handleSubmit">{{ $t('common.confirm') }}</BaseButton>
+  </template>
+</BaseDialog>
+```
+
+### 5. BaseScrollbar
+
+- **用途**：侧边栏、弹窗内容、固定高度区域的滚动。
+- **Props**：`size`（small/medium/large）、`customClass`、`customStyle`、`autoHide`。
+- **示例**：ToCSidebar 内历史对话列表即用 `<BaseScrollbar size="small">` 包裹。
+
+### 6. BackButton
+
+- **用途**：详情/表单页返回列表。
+- **Props**：`tooltip`、`disabled`。**事件**：`@click`。
+- **示例**：`<BackButton @click="router.push('/declaration/list')" />`
+
+### 7. LanguageSwitcher
+
+- **用途**：顶部或侧边栏语言切换，支持四语言。
+- **Props**：`compact`（true 时紧凑显示，用于 ToCSidebar 内）。
+- **示例**：`<LanguageSwitcher />` 或 `<LanguageSwitcher :compact="true" />`
+
+### 8. FilePreview
+
+- **用途**：根据附件信息在弹窗内预览（PDF、图片、Office 等）。
+- **Props**：`modelValue`、`file-info`（含 `name`、`attachmentId` 等，与后端附件一致）。
+- **示例**：`<FilePreview v-model="previewVisible" :file-info="currentFile" />`
+
+### 9. FileTypeIcon
+
+- **用途**：列表/附件列表中按扩展名或类型显示图标。
+- **用法**：传入文件名或类型，组件内部解析扩展名并展示对应图标。
+
+### 10. 其他
+
+- **BaseButton**：与 el-button 用法一致，统一 type/size；**BaseDatePicker**、**BaseSwitch**、**BaseTooltip**：替换 el 对应组件以保持主题一致。  
+- **AgreementNotice**：用于注册/协议页的条款展示。  
+- **ExternalFilePreview**：外链或非本系统附件的预览。  
+- **ProjectProgressBar**：项目进度展示，在项目相关业务组件中使用。
+
+---
+
+## 业务组件目录（按功能分类）
+
+- **components/Business/Detail/**：详情页通用块（时间轴、进度条、信息卡、附件列表等）。
+- **components/Business/Form/**：表单流程（区块、按钮区、通用文件上传、工作流选择等）。
+- **components/Business/List/**：列表（筛选、表格、状态标签、行内操作）。
+- **components/Business/Legacy/**：旧版仪表盘/统计，逐步迁移后可复用部分。
+- 其他 **Dashboard/**、**Declaration/**、**Project/**、**Report/**、**User/**、**AI/**、**Knowledge/**、**System/**、**Auth/** 等为按模块划分的业务组件，从 `@/components/Business` 或对应子路径按需导入。
+
+---
+
+## 文件上传
+
+- **枚举**：统一使用 `src/constants/attachment.js` 的 `ATTACHMENT_RELATION`、`ATTACHMENT_CATEGORY`、`SUPPORTED_FILE_EXTENSIONS`、`SUPPORTED_MIME_TYPES`，与后端一致；禁止在业务代码中写字符串常量。
+- **relationType**：文件挂载到业务对象时必传，取值 `ATTACHMENT_RELATION`（如 PROJECT、DECLARATION、REPORT、USER、KNOWLEDGE）；纯个人临时上传可空。
+- **attachmentType**：按内容选 document/image/export/other，与 `ATTACHMENT_CATEGORY` 对齐。
+- **relationId / relationName**：有业务关联时传；无则不要提交。
+- **上传请求**：FormData 传 `file`，按业务补充 `isPublic` 等字段。
+- **流程**：使用 `useFileUpload` 统一处理校验（默认 150MB）、MD5 去重（`/api/file/check-duplicate`）、上传与复用提示。  
+  - 用法：`const uploader = useFileUpload({ ... })` → `await uploader.uploadWithCheck(file)` 返回 `{ fileInfo, reused }`。  
+- **业务上传 UI**：使用 `components/Business/Form/FileUpload.vue` 或 Knowledge 下的上传进度列表等，与 `useFileUpload` 和 `attachment.js` 配合。
+
+---
+
+## 组件化原则
+
+- 能复用则放入 Common 或 Business 下合适子目录；单一职责；配置与枚举集中（如 attachment.js、locales）；后端做兜底校验。

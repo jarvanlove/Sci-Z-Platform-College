@@ -17,12 +17,12 @@ public interface DifyApiKeyService extends BaseService<DifyApiKey> {
     /**
      * 根据用户ID、资源ID和密钥类型获取API密钥
      *
-     * @param userId     用户ID
+
      * @param resourceId 资源ID
      * @param keyType    密钥类型
      * @return API密钥
      */
-    String getApiKey(Long userId, String resourceId, String keyType);
+    String getApiKey(String resourceId, String keyType);
 
     /**
      * 保存或更新API密钥

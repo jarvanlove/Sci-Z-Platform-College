@@ -29,15 +29,13 @@
         class="profile-form"
         :disabled="loading"
       >
-        <!-- 用户名（只读） -->
+        <!-- 用户名（可编辑） -->
         <el-form-item :label="t('user.profile.username')" prop="username">
-          <el-input :value="displayUsername" readonly class="readonly-input">
-            <template #suffix>
-              <el-tooltip :content="t('user.profile.usernameTip')" placement="top">
-                <el-icon><InfoFilled /></el-icon>
-              </el-tooltip>
-            </template>
-          </el-input>
+          <el-input
+            v-model="formData.username"
+            :placeholder="t('user.profile.usernamePlaceholder')"
+            clearable
+          />
         </el-form-item>
 
         <!-- 真实姓名 -->
@@ -55,32 +53,7 @@
             v-model="formData.email"
             :placeholder="t('user.profile.emailPlaceholder')"
             clearable
-          >
-            <template #append>
-              <el-button
-                :disabled="!emailReady"
-                :loading="verification.email.loading"
-                @click="handleSendEmail"
-              >
-                {{ t('user.profile.emailVerify') }}
-              </el-button>
-            </template>
-          </el-input>
-          <div class="field-status">
-            <el-icon
-              v-if="verification.email.loading"
-              class="is-loading"
-            ><Loading /></el-icon>
-            <span v-if="verification.email.loading">
-              {{ t('user.profile.emailValidating') }}
-            </span>
-            <span v-else-if="verification.email.success" class="status-success">
-              {{ t('user.profile.emailSent') }}
-            </span>
-            <span v-else-if="verification.email.error" class="status-error">
-              {{ verification.email.message }}
-            </span>
-          </div>
+          />
         </el-form-item>
 
         <!-- 手机号 -->
@@ -89,34 +62,36 @@
             v-model="phoneModel"
             @focus="phoneFocused = true"
             @blur="handlePhoneBlur"
+            @input="handlePhoneChange"
             :placeholder="t('user.profile.phonePlaceholder')"
             clearable
             maxlength="11"
-          >
-            <template #append>
-              <el-button
-                :disabled="!phoneReady"
-                :loading="verification.phone.loading"
-                @click="handleSendSms"
-              >
-                {{ t('user.profile.phoneVerify') }}
-              </el-button>
-            </template>
-          </el-input>
-          <div class="field-status">
-            <el-icon
-              v-if="verification.phone.loading"
-              class="is-loading"
-            ><Loading /></el-icon>
-            <span v-if="verification.phone.loading">
-              {{ t('user.profile.phoneValidating') }}
-            </span>
-            <span v-else-if="verification.phone.success" class="status-success">
-              {{ t('user.profile.phoneSent') }}
-            </span>
-            <span v-else-if="verification.phone.error" class="status-error">
-              {{ verification.phone.message }}
-            </span>
+          />
+        </el-form-item>
+        
+        <!-- 手机验证码（与登录页验证码设计一致：输入框+按钮并排，对齐美观） -->
+        <el-form-item 
+          v-if="phoneChanged" 
+          :label="t('user.profile.smsCode')" 
+          prop="smsCode"
+        >
+          <div class="sms-code-container">
+            <el-input
+              v-model="formData.smsCode"
+              :placeholder="t('user.profile.smsCodePlaceholder')"
+              clearable
+              maxlength="6"
+              class="sms-code-input"
+            />
+            <el-button
+              type="primary"
+              :disabled="smsCountdown > 0 || sendingSmsCode"
+              :loading="sendingSmsCode"
+              class="send-sms-button"
+              @click="handleSendSmsCode"
+            >
+              {{ smsCountdown > 0 ? `${smsCountdown}秒` : t('user.profile.sendSmsCode') }}
+            </el-button>
           </div>
         </el-form-item>
 
@@ -255,10 +230,11 @@
 import { computed, reactive, ref, onMounted, nextTick, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { InfoFilled, Upload, Loading, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
+import { Upload, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
 import { BaseButton, BaseCard } from '@/components/Common'
 import { getUserInfo, updateUserInfo, getProfileFields, uploadAvatar } from '@/api/User'
 import { previewFile } from '@/api/File'
+import { sendSmsVerificationCode } from '@/api/Auth/auth'
 import { useAuthStore } from '@/store/modules/auth'
 import { useIndustryStore } from '@/store/modules/industry'
 import { validateChineseName, validateEmail, validatePhone, formatPhoneDisplay } from '@/utils/validate'
@@ -298,13 +274,23 @@ phone: '',
 department: '',
 title: '',
 avatar: '',
-avatarFileId: null
+avatarFileId: null,
+smsCode: '' // 🔥 手机验证码
 })
 
-const verification = reactive({
-email: { loading: false, success: false, error: false, message: '' },
-phone: { loading: false, success: false, error: false, message: '' }
+// 🔥 原始手机号（用于检测是否变化）
+const originalPhone = ref('')
+
+// 🔥 手机号是否变化
+const phoneChanged = computed(() => {
+  return originalPhone.value && formData.phone && formData.phone !== originalPhone.value
 })
+
+// 🔥 短信验证码相关状态
+const sendingSmsCode = ref(false)
+const smsCountdown = ref(0)
+let smsCountdownTimer = null
+
 
 const departmentOptions = ref([])
 
@@ -331,11 +317,6 @@ const key = industryStore.departmentPlaceholderKey
 return key ? t(key) : t('user.profile.departmentPlaceholder')
 })
 
-// 🔥 格式化用户名显示（如果是手机号，则隐藏中间部分）
-const displayUsername = computed(() => {
-  return formatPhoneDisplay(formData.username)
-})
-
 // 🔥 手机号聚焦状态
 const phoneFocused = ref(false)
 
@@ -360,10 +341,30 @@ const handlePhoneBlur = () => {
   phoneFocused.value = false
 }
 
-const emailReady = computed(() => validateEmail(formData.email) && !verification.email.loading)
-const phoneReady = computed(() => validatePhone(formData.phone) && !verification.phone.loading)
+// 🔥 处理手机号变化
+const handlePhoneChange = () => {
+  // 如果手机号变化，清空验证码
+  if (phoneChanged.value) {
+    formData.smsCode = ''
+  }
+}
+
 
 const rules = reactive({
+username: [
+  { required: true, message: t('user.profile.usernameRequired'), trigger: 'blur' },
+  { min: 3, max: 20, message: t('user.profile.usernameLength'), trigger: 'blur' },
+  {
+    validator: (_, value, callback) => {
+      if (!/^[a-zA-Z0-9_]+$/.test(value)) {
+        callback(new Error(t('user.profile.usernameFormat')))
+      } else {
+        callback()
+      }
+    },
+    trigger: 'blur'
+  }
+],
 realName: [
   { required: true, message: t('user.profile.realNameRequired'), trigger: 'blur' },
   {
@@ -403,17 +404,35 @@ phone: [
     trigger: ['blur', 'change']
   }
 ],
+smsCode: [
+  {
+    validator: (_, value, callback) => {
+      // 🔥 如果手机号变化，验证码必填
+      if (phoneChanged.value && !value) {
+        callback(new Error(t('user.profile.smsCodeRequired')))
+      } else {
+        callback()
+      }
+    },
+    trigger: ['blur', 'change']
+  },
+  {
+    validator: (_, value, callback) => {
+      // 🔥 如果手机号变化，验证码格式校验
+      if (phoneChanged.value && value && !/^\d{6}$/.test(value)) {
+        callback(new Error(t('user.profile.smsCodeFormat')))
+      } else {
+        callback()
+      }
+    },
+    trigger: ['blur', 'change']
+  }
+],
 department: [
   { required: true, message: t('user.profile.departmentRequired'), trigger: 'change' }
 ]
 })
 
-const resetVerification = (type) => {
-verification[type].loading = false
-verification[type].success = false
-verification[type].error = false
-verification[type].message = ''
-}
 
 const loadDepartments = async () => {
 try {
@@ -495,18 +514,28 @@ try {
   formData.realName = data.realName || data.name || ''
   formData.email = data.email || ''
   formData.phone = data.phone || data.mobile || ''
+  // 🔥 保存原始手机号，用于检测是否变化
+  originalPhone.value = formData.phone
   formData.department = data.departmentCode || data.department || ''
   formData.title = data.title || data.titleCode || data.position || ''
   formData.avatar = data.avatar || ''
   formData.avatarFileId = data.avatarFileId || data.avatarId || null
+  // 🔥 清空验证码
+  formData.smsCode = ''
 
   syncDepartmentValue()
   syncTitleValue()
 
   avatarPreview.value = formData.avatar
-  resetVerification('email')
-  resetVerification('phone')
   applyFieldDefaults()
+
+  // 同步头像到 authStore，使左侧栏/顶部栏立即显示最新头像，无需重新登录
+  if (authStore.userInfo) {
+    authStore.userInfo.avatar = formData.avatar
+    authStore.userInfo.avatarFileId = formData.avatarFileId ?? authStore.userInfo.avatarFileId
+    setUserInfo(authStore.userInfo)
+    logger.info('个人信息加载完成，已同步头像到全局状态', { hasAvatar: !!formData.avatar, avatarFileId: formData.avatarFileId })
+  }
 } catch (error) {
   logger.error('load profile failed', { error: error.message })
   ElMessage.error(t('user.profile.loadError'))
@@ -533,15 +562,33 @@ try {
   saving.value = true
   // 🔥 修复：只传基本信息，不传头像相关字段（头像通过独立的上传接口更新）
   const payload = {
+    username: formData.username,
     realName: formData.realName,
     email: formData.email,
     phone: formData.phone,
     department: formData.department,
     title: formData.title
   }
+  
+  // 🔥 如果手机号变化，需要传递验证码
+  if (phoneChanged.value) {
+    if (!formData.smsCode) {
+      ElMessage.error(t('user.profile.smsCodeRequired'))
+      saving.value = false
+      return
+    }
+    payload.smsCode = formData.smsCode
+  }
+  
   logger.info('提交个人信息 payload', payload)
   console.table?.(payload)
   await updateUserInfo(payload)
+  
+  // 🔥 更新成功后，更新原始手机号
+  if (phoneChanged.value) {
+    originalPhone.value = formData.phone
+    formData.smsCode = ''
+  }
   await authStore.getUserInfo(true)
   ElMessage.success(t('user.profile.saveSuccess'))
 } catch (error) {
@@ -774,32 +821,6 @@ watch(titleOptions, () => {
 syncTitleValue()
 })
 
-const simulateVerify = async (type, successMessage, errorMessage) => {
-logger.info('执行模拟验证', { type })
-resetVerification(type)
-verification[type].loading = true
-try {
-  // TODO: 替换为真实接口验证逻辑
-  await new Promise((resolve) => setTimeout(resolve, 800))
-  verification[type].success = true
-  verification[type].message = successMessage
-  ElMessage.success(successMessage)
-} catch (error) {
-  verification[type].error = true
-  verification[type].message = errorMessage
-  ElMessage.error(errorMessage)
-} finally {
-  verification[type].loading = false
-}
-}
-
-const handleSendEmail = () => {
-simulateVerify('email', t('user.profile.emailSent'), t('user.profile.emailSendError'))
-}
-
-const handleSendSms = () => {
-simulateVerify('phone', t('user.profile.phoneSent'), t('user.profile.phoneSendError'))
-}
 
 onMounted(() => {
 logger.info('UserProfile component mounted，开始加载数据')
@@ -809,6 +830,10 @@ loadProfile()
 onBeforeUnmount(() => {
 destroyCropper()
 resetPreviewUrl()
+if (smsCountdownTimer) {
+  clearInterval(smsCountdownTimer)
+  smsCountdownTimer = null
+}
 })
 
 const handlePreviewAvatar = async () => {
@@ -919,6 +944,60 @@ if (fallback) {
   formData.title = fallback.value
 }
 }
+
+// 🔥 发送手机验证码
+const handleSendSmsCode = async () => {
+  if (!formData.phone) {
+    ElMessage.warning(t('user.profile.phoneRequired'))
+    return
+  }
+  
+  if (!validatePhone(formData.phone)) {
+    ElMessage.warning(t('user.profile.phoneFormat'))
+    return
+  }
+  
+  try {
+    sendingSmsCode.value = true
+    await sendSmsVerificationCode({
+      phone: formData.phone
+    })
+    ElMessage.success(t('user.profile.smsCodeSent'))
+    startSmsCountdown()
+  } catch (error) {
+    logger.error('发送短信验证码失败', error)
+    if (!error._messageShown) {
+      ElMessage.error(error.response?.data?.message || t('user.profile.smsCodeSendFailed'))
+    }
+  } finally {
+    sendingSmsCode.value = false
+  }
+}
+
+// 🔥 启动短信验证码倒计时
+const startSmsCountdown = () => {
+  smsCountdown.value = 60
+  if (smsCountdownTimer) {
+    clearInterval(smsCountdownTimer)
+  }
+  smsCountdownTimer = setInterval(() => {
+    smsCountdown.value--
+    if (smsCountdown.value <= 0) {
+      clearInterval(smsCountdownTimer)
+      smsCountdownTimer = null
+    }
+  }, 1000)
+}
+
+// 🔥 清理倒计时
+onBeforeUnmount(() => {
+destroyCropper()
+resetPreviewUrl()
+if (smsCountdownTimer) {
+  clearInterval(smsCountdownTimer)
+  smsCountdownTimer = null
+}
+})
 </script>
 
 <style lang="scss" scoped>
@@ -989,6 +1068,13 @@ color: var(--color-primary); // 🔥 与"个人信息"页面标题颜色保持�
 
 .profile-form {
 max-width: 640px;
+  
+  // 🔥 表单项内容区始终占满标签右侧，保证手机验证码行与其它输入列左缘对齐
+  :deep(.el-form-item__content) {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+  }
   
   // 🔥 表单标签样式：按照页面修改.md规范
   :deep(.el-form-item__label) {
@@ -1187,11 +1273,15 @@ display: none;
 .profile-form {
   :deep(.el-form-item) {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
   }
 
   :deep(.el-form-item__label) {
     padding-bottom: 4px;
+  }
+
+  :deep(.el-form-item__content) {
+    width: 100%;
   }
 }
 
@@ -1267,5 +1357,51 @@ img {
   height: 100%;
   object-fit: cover;
 }
+}
+
+// 手机验证码：与登录页（SmsLoginForm）一致——输入框与按钮并排、对齐美观、按钮完整显示
+.sms-code-container {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  
+  .sms-code-input {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .send-sms-button {
+    min-width: 120px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    
+    &:not(:disabled):not(.is-loading):hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+    }
+    
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+  
+  :deep(.el-input__wrapper) {
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    
+    &:hover {
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    }
+    
+    &.is-focus {
+      box-shadow: 0 0 0 2px rgba(var(--el-color-primary-rgb, 59, 130, 246), 0.2);
+    }
+  }
 }
 </style>

@@ -42,13 +42,27 @@
             <div class="info-item">
               <span class="info-label">{{ $t('project.detail.manager') }}</span>
               <template v-if="isEditMode">
-                <el-input
-                  v-model="project.manager"
+                <el-select
+                  v-model="project.managerId"
+                  filterable
+                  clearable
+                  :suffix-icon="ArrowDown"
+                  :loading="managerLoading"
                   :placeholder="$t('project.detail.managerPlaceholder')"
-                />
+                  class="manager-select"
+                  popper-class="project-manager-select-dropdown"
+                  @change="syncManagerNameFromId"
+                >
+                  <el-option
+                    v-for="opt in managerOptions"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
               </template>
               <template v-else>
-                <span class="info-value">{{ project.manager }}</span>
+                <span class="info-value">{{ displayManagerName }}</span>
               </template>
             </div>
             <div class="info-item">
@@ -148,7 +162,7 @@
             <div class="card-header-content">
               <h2 class="card-title">{{ $t('project.detail.members') }}</h2>
               <el-button
-                v-if="isEditMode"
+                v-if="isEditMode && isProjectCreator"
                 type="primary"
                 @click="openMemberDialog"
               >
@@ -170,7 +184,7 @@
                   {{ getRoleText(member) }} · {{ $t('project.detail.joinTime') }}: {{ formatDate(member.joinTime) }}
                 </div>
               </div>
-              <BaseTooltip v-if="isEditMode" :content="$t('common.remove')" placement="top">
+              <BaseTooltip v-if="isEditMode && isProjectCreator" :content="$t('common.remove')" placement="top">
                 <button
                   class="action-btn btn-danger"
                   @click="handleRemoveMember(member.id)"
@@ -273,7 +287,7 @@
                 <span class="milestone-title">{{ $t('project.detail.milestone') }} {{ index + 1 }}</span>
                 <div class="milestone-header-actions">
                   <BaseTooltip
-                    v-if="isEditMode && milestone.id"
+                    v-if="isEditMode && isProjectCreator && milestone.id"
                     :content="milestone.progress === 100 ? $t('project.detail.cancelComplete') : $t('project.detail.complete')"
                     placement="top"
                   >
@@ -285,7 +299,7 @@
                     </button>
                   </BaseTooltip>
                   <BaseTooltip
-                    v-if="isEditMode"
+                    v-if="isEditMode && isProjectCreator"
                     :content="$t('common.delete')"
                     placement="top"
                   >
@@ -349,15 +363,28 @@
               <div class="milestone-documents">
                 <div class="milestone-documents-header">
                   <h4>{{ $t('project.detail.milestoneDocuments') }}</h4>
+                  <!-- 🔥 上传按钮：移动到标题右侧，样式与知识库保持一致 -->
+                  <div v-if="isEditMode" class="milestone-documents-actions">
+                    <BaseTooltip :content="$t('knowledge.uploadLocalFile')" placement="top">
+                      <button
+                        class="action-btn btn-success"
+                        @click="openUploadProgressDialog(index)"
+                      >
+                        <el-icon><Upload /></el-icon>
+                      </button>
+                    </BaseTooltip>
+                  </div>
                 </div>
 
                 <!-- 文档列表 -->
                 <div v-if="milestone.documents && milestone.documents.length > 0" class="document-list">
                   <div v-for="doc in milestone.documents" :key="doc.id" class="document-item">
                     <div class="document-icon">
-                      <el-icon>
-                        <component :is="getDocumentIcon(doc)" />
-                      </el-icon>
+                      <FileTypeIcon
+                        :extension="doc.type || doc.fileInfo?.fileExtension || ''"
+                        :fileName="doc.name || doc.fileInfo?.originalName || doc.fileInfo?.fileName || ''"
+                        size="small"
+                      />
                     </div>
                     <div class="document-info">
                       <div class="document-name">{{ doc.name }}</div>
@@ -383,7 +410,7 @@
                         </button>
                       </BaseTooltip>
                       <BaseTooltip
-                        v-if="isEditMode"
+                        v-if="isEditMode && canDeleteDocument(doc)"
                         :content="$t('common.delete')"
                         placement="top"
                       >
@@ -404,24 +431,6 @@
                   </div>
                   <div class="empty-state-text">{{ $t('project.detail.noDocuments') }}</div>
                   <div class="empty-state-hint">{{ $t('project.detail.uploadDocumentsHint') }}</div>
-                </div>
-
-                <!-- 上传区域（批量模式，使用通用 FileUpload 组件） -->
-                <div v-if="isEditMode" class="upload-section">
-                  <FileUpload
-                    v-model="milestonePendingFiles[index]"
-                    :mode="'batch'"
-                    :max-batch-count="10"
-                    :multiple="true"
-                    :drag="true"
-                    :show-file-list="true"
-                    :show-tips="false"
-                    :allowed-types="allowedFileExtensions"
-                    :max-size="200"
-                    :button-text="$t('project.detail.uploadText')"
-                    :upload-tip="$t('project.detail.uploadHint')"
-                    @batch-upload="(files) => uploadMilestoneFiles(files, index)"
-                  />
                 </div>
               </div>
             </div>
@@ -502,11 +511,49 @@
         </el-dialog>
       </div>
   
-      <!-- 文件预览对话框 -->
-      <FilePreview
+      <!-- 文件预览对话框 - 已改为新窗口打开，保留组件以防需要 -->
+      <!-- <FilePreview
         v-model="showPreviewDialog"
         :file-info="previewFileInfo"
-      />
+      /> -->
+  
+      <!-- 🔥 文件上传进度弹窗（参考知识库实现） -->
+      <el-dialog
+        v-model="showUploadProgressDialog"
+        :title="$t('knowledge.uploadLocalFile')"
+        width="800px"
+        :close-on-click-modal="false"
+        @close="closeUploadProgressDialog"
+      >
+        <!-- 上传进度列表（上传中或上传完成时显示） -->
+        <FileUploadProgressList
+          v-if="showUploadProgress && uploadResults.length > 0"
+          :upload-results="uploadResults"
+          @close="handleUploadProgressClose"
+        />
+        
+        <!-- 文件选择区域（未开始上传时显示） -->
+        <template v-else>
+          <FileUpload
+            v-model="milestonePendingFiles[currentMilestoneIndex]"
+            :mode="'batch'"
+            :max-batch-count="10"
+            :multiple="true"
+            :drag="true"
+            :show-file-list="true"
+            :show-tips="false"
+            :allowed-types="allowedFileExtensions"
+            :max-size="200"
+            :button-text="$t('project.detail.uploadText')"
+            :upload-tip="$t('project.detail.uploadHint')"
+            @batch-upload="(files) => uploadMilestoneFiles(files, currentMilestoneIndex)"
+          />
+        </template>
+        
+        <template #footer>
+          <el-button v-if="!showUploadProgress" @click="closeUploadProgressDialog">{{ $t('common.cancel') }}</el-button>
+        </template>
+      </el-dialog>
   
       <!-- 操作按钮 -->
       <div v-if="isEditMode" class="footer-actions">
@@ -523,21 +570,24 @@ import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPlay, Folder, Close, Delete, Check, CircleCheck, View, Download } from '@element-plus/icons-vue'
-  import { BaseCard, BaseDatePicker, BackButton, FilePreview, BaseTooltip, BaseScrollbar } from '@/components/Common'
+import { Loading, Plus, Search, Upload, UploadFilled, Document, Close, Delete, Check, CircleCheck, View, Download, ArrowDown } from '@element-plus/icons-vue'
+  import { BaseCard, BaseDatePicker, BackButton, BaseTooltip, BaseScrollbar, FileTypeIcon } from '@/components/Common'
   import { FileUpload } from '@/components/Business/Form'
+  import FileUploadProgressList from '@/components/Business/Knowledge/FileUploadProgressList.vue'
   import { PROJECT_STATUS, PROJECT_STATUS_CONFIG, MILESTONE_OPTIONS } from '@/utils/constants'
   import { getProjectDetail, updateProject, uploadMilestoneDocument, completeMilestone, cancelCompleteMilestone, deleteMilestoneDocument } from '@/api/Project'
   import { getUsers } from '@/api/System'
   import { downloadFile } from '@/api/File'
   import { ATTACHMENT_RELATION, ATTACHMENT_CATEGORY, IMAGE_FILE_EXTENSIONS, validateFileSize, validateFileType } from '@/constants/attachment'
-  import { createLogger } from '@/utils/simpleLogger'
-  import { formatFileSize } from '@/utils/file'
+import { createLogger } from '@/utils/simpleLogger'
+import { formatFileSize, openFilePreviewInNewWindow } from '@/utils/file'
+import { useAuthStore } from '@/store/modules/auth'
   
   const router = useRouter()
   const route = useRoute()
   const { t } = useI18n()
   const logger = createLogger('ProjectDetail')
+  const authStore = useAuthStore()
   
   // 响应式数据
   const loading = ref(false)
@@ -545,23 +595,35 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
   const isEditMode = ref(false)
   const milestoneFormRef = ref()
   
+  // 文件上传进度相关
+  const showUploadProgressDialog = ref(false) // 🔥 是否显示上传进度弹窗
+  const showUploadProgress = ref(false) // 是否显示上传进度（弹窗内）
+  const uploadResults = ref([]) // 上传结果列表
+  const currentMilestoneIndex = ref(-1) // 当前上传的里程碑索引
+  
   const project = ref({
     id: 0,
     number: '',
     name: '',
     description: '',
     manager: '',
+    managerId: null, // 项目负责人用户ID（与 createdBy 等价权限：添加/移除成员、里程碑完成/删除等）
     status: PROJECT_STATUS.PROGRESS, // 默认进行中
     statusDescription: '',
     startTime: '',
     endTime: '',
     budget: 0,
     department: '',
-    researchDirection: ''
+    researchDirection: '',
+    createdBy: null // 项目创建人ID，仅创建人可见添加/移除成员、里程碑完成/删除等按钮
   })
   
   const members = ref([])
   const milestones = ref([])
+  
+  // 项目负责人可检索下拉：与申报新建一致，进入页加载一次、前端过滤、排除 admin
+  const managerOptions = ref([])
+  const managerLoading = ref(false)
   
   // 里程碑表单验证规则
   const milestoneRules = reactive({
@@ -681,6 +743,8 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       type: typeLabel,
       // 第二行第二个字段：上传人
       uploader: fileInfo.uploaderName || fileInfo.uploader || '',
+      // 上传人用户ID（项目成员仅可删除自己上传的附件）
+      uploaderId: fileInfo.uploaderId != null ? fileInfo.uploaderId : undefined,
       // 第二行第三个字段：上传日期（已格式化）
       uploadTime: uploadTimeStr,
       // 第二行第四个字段：文件大小（已格式化字符串）
@@ -697,6 +761,7 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
         fileSizeLabel: fileInfo.fileSizeLabel,
         fileUrl: fileInfo.fileUrl,
         previewUrl: fileInfo.previewUrl,
+        uploaderId: fileInfo.uploaderId,
         uploaderName: fileInfo.uploaderName,
         uploadTime: fileInfo.uploadTime,
         difyDocId: fileInfo.difyDocId || '' // 保存 Dify 文档ID，用于删除时传递
@@ -706,22 +771,68 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
     }
   }
 
-  // 根据文件类型选择合适的图标（与上传组件风格保持一致）
-  const getDocumentIcon = (doc) => {
-    const name = (doc.name || doc.fileInfo?.originalName || doc.fileInfo?.fileName || '').toLowerCase()
+  // 是否为项目创建人或 designated 负责人（二者等价权限：添加成员、移除成员、里程碑完成/删除按钮等）
+  const isProjectCreator = computed(() => {
+    const createdBy = project.value?.createdBy
+    const managerId = project.value?.managerId
+    const currentId = authStore.userInfo?.id
+    if (currentId == null) return false
+    return Number(createdBy) === Number(currentId) || Number(managerId) === Number(currentId)
+  })
 
-    if (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.gif') || name.endsWith('.bmp') || name.endsWith('.webp')) {
-      return Picture
+  // 负责人姓名展示：优先从下拉选项根据 managerId 解析，否则用接口返回的 manager
+  const displayManagerName = computed(() => {
+    const mid = project.value?.managerId
+    if (mid != null && managerOptions.value.length) {
+      const opt = managerOptions.value.find(o => o.value === mid)
+      if (opt) return opt.label
     }
-    if (name.endsWith('.mp4') || name.endsWith('.avi') || name.endsWith('.mov') || name.endsWith('.wmv') || name.endsWith('.flv')) {
-      return VideoPlay
-    }
-    if (name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.7z') || name.endsWith('.tar') || name.endsWith('.gz')) {
-      return Folder
-    }
-    return Document
+    return project.value?.manager || ''
+  })
+
+  const syncManagerNameFromId = () => {
+    const mid = project.value?.managerId
+    const opt = mid != null ? managerOptions.value.find(o => o.value === mid) : null
+    if (project.value) project.value.manager = opt ? opt.label : ''
   }
 
+  // 是否允许删除该文档：上传人可删自己的；项目创建人或 designated 负责人可删任意里程碑文档
+  const canDeleteDocument = (doc) => {
+    const currentId = authStore.userInfo?.id
+    if (currentId == null) return false
+    if (isProjectCreator.value) return true // 项目负责人可删任意文档
+    const uploaderId = doc.uploaderId ?? doc.fileInfo?.uploaderId
+    if (uploaderId == null) return false
+    return Number(uploaderId) === Number(currentId)
+  }
+
+  // 🔥 打开上传进度弹窗（点击上传附件按钮时调用）
+  const openUploadProgressDialog = (milestoneIndex) => {
+    currentMilestoneIndex.value = milestoneIndex
+    showUploadProgressDialog.value = true
+    showUploadProgress.value = false
+    uploadResults.value = []
+    // 初始化待上传文件列表
+    if (!milestonePendingFiles[milestoneIndex]) {
+      milestonePendingFiles[milestoneIndex] = []
+    }
+  }
+  
+  // 🔥 关闭上传进度弹窗
+  const closeUploadProgressDialog = () => {
+    // 🔥 修复：允许关闭，但如果是通过X关闭且正在上传，需要清理状态
+    // 如果正在显示上传进度，通过X关闭时也需要清理状态
+    if (showUploadProgress.value) {
+      // 通过X关闭时，也需要清理状态
+      handleUploadProgressClose()
+      return
+    }
+    showUploadProgressDialog.value = false
+    currentMilestoneIndex.value = -1
+    uploadResults.value = []
+  }
+  
+  // 🔥 在弹窗内上传文件（使用旧接口，支持进度监听）
   const uploadMilestoneFiles = async (files, milestoneIndex) => {
     if (!milestones.value[milestoneIndex].documents) {
       milestones.value[milestoneIndex].documents = []
@@ -797,14 +908,20 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       return
     }
     
-    const loadingMessage = ElMessage({
-      message: t('project.detail.uploadingFiles', { count: validFiles.length }),
-      type: 'info',
-      duration: 0,
-      showClose: false
-    })
-    
     try {
+      // 🔥 立即显示上传进度弹窗，初始化上传结果列表
+      showUploadProgress.value = true
+      // 初始化上传结果列表，每个文件都设置为"上传中"状态
+      uploadResults.value = validFiles.map(file => ({
+        fileName: file.name,
+        success: false,
+        errorMessage: null,
+        attachmentId: null,
+        fileSize: file.size || 0,
+        stage: 1, // 初始阶段：MinIO上传中
+        stageDescription: t('knowledge.stageMinIO') || '正在上传到存储...'
+      }))
+      
       // 构建批量上传的表单数据
       const formData = new FormData()
       
@@ -820,39 +937,169 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       formData.append('relationName', `${project.value.number}/${milestone.name}`)
       formData.append('isPublic', '0') // 默认私有
       
-      // 调用批量上传接口
-      const response = await uploadMilestoneDocument(formData)
+      // 🔥 调用旧接口，使用支持进度监听的上传函数
+      const response = await uploadMilestoneDocument(formData, (loaded, total) => {
+        // 进度回调：实时更新上传进度
+        // 计算整体进度百分比
+        const progressPercent = total > 0 ? Math.round((loaded / total) * 100) : 0
+        
+        // 根据进度更新每个文件的状态
+        uploadResults.value = uploadResults.value.map((result, index) => {
+          // 计算当前文件应该处于的阶段
+          let stage = 1
+          let stageDescription = t('knowledge.stageMinIO') || '正在上传到存储...'
+          
+          if (progressPercent >= 100) {
+            // 上传完成，等待后端处理
+            stage = 4
+            stageDescription = t('knowledge.stageProcessing') || '处理中...'
+          } else if (progressPercent >= 80) {
+            stage = 3
+            stageDescription = t('knowledge.stageDify') || '正在上传到Dify...'
+          } else if (progressPercent >= 40) {
+            stage = 2
+            stageDescription = t('knowledge.stageMinIOComplete') || '存储上传完成'
+          }
+          
+          return {
+            ...result,
+            stage,
+            stageDescription
+          }
+        })
+      })
       
       if (response.code === 200 && response.data) {
-        // 兼容后端返回单个对象或数组两种情况
-        const uploadedFiles = Array.isArray(response.data) ? response.data : [response.data]
+        // 🔥 处理后端返回的详细上传结果
+        const results = response.data || []
         
-        // 将上传成功的文件添加到文档列表（统一结构）
-        uploadedFiles
-          .map(normalizeMilestoneDocument)
-          .filter(Boolean)
-          .forEach(newDoc => {
-            milestones.value[milestoneIndex].documents.push(newDoc)
+        // 将后端返回的结果映射到前端格式，并合并到现有的上传结果中
+        // 根据文件名匹配，更新对应的文件状态
+        uploadResults.value = uploadResults.value.map(existingResult => {
+          const backendResult = results.find(r => r.fileName === existingResult.fileName)
+          if (backendResult) {
+            // 如果后端返回了该文件的结果，使用后端的结果
+            return {
+              fileName: backendResult.fileName || existingResult.fileName,
+              success: backendResult.success || false,
+              errorMessage: backendResult.errorMessage || null,
+              attachmentId: backendResult.attachmentId || null,
+              fileSize: backendResult.fileSize || existingResult.fileSize || 0,
+              stage: backendResult.success ? 5 : 0, // 成功为阶段5，失败为阶段0
+              stageDescription: backendResult.stageDescription || (backendResult.success ? t('knowledge.uploadComplete') : t('knowledge.uploadFailed'))
+            }
+          }
+          // 如果后端没有返回该文件的结果，保持原状态（可能是上传中）
+          return existingResult
+        })
+        
+        // 🔥 将上传成功的文件直接添加到对应里程碑的文档列表中（不调用详情接口）
+        const successResults = uploadResults.value.filter(r => r.success && r.attachmentId)
+        if (successResults.length > 0 && milestoneIndex >= 0) {
+          // 确保里程碑的 documents 数组存在
+          if (!milestones.value[milestoneIndex].documents) {
+            milestones.value[milestoneIndex].documents = []
+          }
+          
+          // 将成功的文件转换为文档格式并添加到列表
+          successResults.forEach(result => {
+            // 后端返回的 fileName 就是原始文件名（file.getOriginalFilename()）
+            const originalFileName = result.fileName
+            
+            // 提取文件扩展名
+            const fileExtension = originalFileName.split('.').pop()?.toLowerCase() || ''
+            
+            // 构建文档对象（使用 normalizeMilestoneDocument 的格式）
+            const currentUserId = authStore.userInfo?.id
+            const newDoc = {
+              id: result.attachmentId,
+              name: originalFileName,
+              type: fileExtension,
+              uploader: authStore.userInfo?.realName || authStore.userInfo?.username || '',
+              uploaderId: currentUserId,
+              uploadTime: formatDate(new Date().toISOString()), // 使用当前时间
+              sizeLabel: formatFileSizeDisplay(result.fileSize),
+              size: result.fileSize,
+              fileInfo: {
+                id: result.attachmentId,
+                fileName: originalFileName, // 使用原始文件名
+                originalName: originalFileName,
+                fileType: fileExtension,
+                fileExtension: fileExtension,
+                fileSize: result.fileSize,
+                fileSizeLabel: formatFileSizeDisplay(result.fileSize),
+                uploaderId: currentUserId,
+                uploaderName: authStore.userInfo?.realName || authStore.userInfo?.username || '',
+                uploadTime: new Date().toISOString(),
+                difyDocId: '' // 暂时为空
+              },
+              difyDocId: ''
+            }
+            
+            // 检查是否已存在（避免重复添加）
+            const exists = milestones.value[milestoneIndex].documents.some(
+              doc => doc.fileInfo?.id === result.attachmentId || doc.id === result.attachmentId
+            )
+            if (!exists) {
+              milestones.value[milestoneIndex].documents.push(newDoc)
+            }
           })
+          
+          logger.info('文件已添加到文档列表', { 
+            milestoneIndex,
+            addedCount: successResults.length
+          })
+        }
         
-        ElMessage.success(t('project.detail.documentsAddedSuccess', { 
-          milestoneIndex: milestoneIndex + 1, 
-          count: uploadedFiles.length 
-        }))
+        // 统计成功和失败数量
+        const successCount = uploadResults.value.filter(r => r.success).length
+        const failedCount = uploadResults.value.filter(r => r.errorMessage).length
         
-        // 清空待上传文件列表
-        if (milestonePendingFiles[milestoneIndex]) {
-          milestonePendingFiles[milestoneIndex] = []
+        logger.info('文件批量上传完成', { 
+          total: uploadResults.value.length,
+          success: successCount,
+          failed: failedCount
+        })
+        
+        // 显示结果提示
+        if (failedCount === 0) {
+          ElMessage.success(t('project.detail.documentsAddedSuccess', { 
+            milestoneIndex: milestoneIndex + 1, 
+            count: successCount 
+          }))
+        } else if (successCount === 0) {
+          ElMessage.error(t('project.detail.uploadError'))
+        } else {
+          ElMessage.warning(t('knowledge.uploadPartialSuccess', { success: successCount, total: uploadResults.value.length }))
         }
       } else {
         throw new Error(response.message || '文件上传失败')
       }
     } catch (error) {
       logger.error('Failed to upload milestone files', error)
-      ElMessage.error(error.message || t('project.detail.uploadError'))
-    } finally {
-      loadingMessage.close()
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(error.message || t('project.detail.uploadError'))
+      }
+      // 上传失败时，隐藏进度显示，允许用户重试
+      showUploadProgress.value = false
+      uploadResults.value = []
     }
+  }
+  
+  // 🔥 处理上传进度关闭（弹窗内的确认按钮）
+  const handleUploadProgressClose = () => {
+    // 🔥 修复：不再调用详情接口刷新，文件已在上传成功后直接添加到页面
+    // 清空待上传文件列表
+    if (currentMilestoneIndex.value >= 0 && milestonePendingFiles[currentMilestoneIndex.value]) {
+      milestonePendingFiles[currentMilestoneIndex.value] = []
+    }
+    
+    // 关闭弹窗并重置状态
+    showUploadProgressDialog.value = false
+    showUploadProgress.value = false
+    uploadResults.value = []
+    currentMilestoneIndex.value = -1
   }
   
   // 文件预览相关
@@ -922,20 +1169,22 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       if (response.code === 200 && response.data) {
         const data = response.data
         
-        // 数据映射
+        // 数据映射（createdBy / managerId 用于项目创建人/负责人权限与按钮可见性）
         project.value = {
           id: data.id,
           number: data.number || '',
           name: data.name || '',
           description: data.description || '',
           manager: data.projectLeader || data.managerName || data.manager || '',
+          managerId: data.projectLeaderId ?? data.managerId ?? null,
           status: mapStatus(data.status),
           statusDescription: data.statusDescription || '',
           startTime: data.startTime || data.projectStartTime || '',
           endTime: data.endTime || data.projectEndTime || '',
           budget: data.budget || 0,
           department: data.department || data.declarationInfo?.department || '',
-          researchDirection: data.researchDirection || data.declarationInfo?.researchDirection || ''
+          researchDirection: data.researchDirection || data.declarationInfo?.researchDirection || '',
+          createdBy: data.createdBy ?? null
         }
         
         // 成员数据映射
@@ -984,9 +1233,56 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       }
     } catch (error) {
       logger.error('Failed to load project detail', error)
-      ElMessage.error(error.message || t('project.detail.loadError'))
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(error.message || t('project.detail.loadError'))
+      }
     } finally {
       loading.value = false
+    }
+  }
+  
+  // 项目负责人下拉：进入页加载一次、前端过滤、排除 admin（与申报新建一致）
+  const loadManagerOptions = async () => {
+    managerLoading.value = true
+    try {
+      const response = await getUsers({
+        pageNo: 1,
+        pageSize: 500,
+        sortBy: 'createTime',
+        sortOrder: 'DESC'
+      })
+      const data = response?.data?.data ?? response?.data ?? {}
+      const list = data.records ?? data.list ?? []
+      const options = list
+        .filter(user => {
+          const username = (user.username || '').toLowerCase()
+          return username !== 'admin'
+        })
+        .map(user => {
+          const id = user.id ?? user.userId
+          const label = user.realName || user.name || user.username || ''
+          return id != null && label ? { value: id, label } : null
+        })
+        .filter(Boolean)
+      const seen = new Set()
+      managerOptions.value = options.filter(o => {
+        if (seen.has(o.value)) return false
+        seen.add(o.value)
+        return true
+      })
+      if (project.value.managerId != null && !managerOptions.value.some(o => o.value === project.value.managerId)) {
+        const label = project.value.manager || ''
+        if (label) managerOptions.value = [{ value: project.value.managerId, label }, ...managerOptions.value]
+      }
+    } catch (error) {
+      logger.error('Load manager options failed', error)
+      managerOptions.value = []
+      if (!error._messageShown) {
+        ElMessage.error(t('project.detail.managerLoadError') || '加载负责人列表失败')
+      }
+    } finally {
+      managerLoading.value = false
     }
   }
   
@@ -1052,6 +1348,96 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
     })
   }
   
+  // 🔥 上传待上传的文件（使用原有接口，不显示进度）
+  const uploadPendingFilesForMilestone = async (milestoneIndex) => {
+    // 🔥 修复：安全访问 milestonePendingFiles，避免 undefined 错误
+    const pendingFiles = milestonePendingFiles[milestoneIndex]
+    if (!pendingFiles || !Array.isArray(pendingFiles) || pendingFiles.length === 0) {
+      return []
+    }
+    
+    const milestone = milestones.value[milestoneIndex]
+    if (!milestone.name) {
+      ElMessage.error('里程碑名称不能为空')
+      return []
+    }
+    
+    // 验证项目编号和名称
+    if (!project.value.number || !project.value.name) {
+      ElMessage.error('项目信息不完整，无法上传文件')
+      return []
+    }
+    
+    // 前端校验：文件大小和类型
+    const maxSizeMB = 200
+    const validFiles = []
+    
+    for (const file of pendingFiles) {
+      // 检查是否为图片类型（里程碑文档不支持图片）
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() || ''
+      if (IMAGE_FILE_EXTENSIONS.includes(fileExtension)) {
+        continue
+      }
+      
+      // 文件大小和类型校验
+      const sizeValidation = validateFileSize(file, maxSizeMB)
+      const typeValidation = validateFileType(file, allowedFileExtensions)
+      
+      if (!sizeValidation.passed || !typeValidation.passed) {
+        continue
+      }
+      
+      // 检查是否已存在同名文件
+      const existingDoc = milestones.value[milestoneIndex].documents?.find(
+        doc => doc.name === file.name
+      )
+      
+      if (existingDoc) {
+        continue
+      }
+      
+      validFiles.push(file)
+    }
+    
+    if (validFiles.length === 0) {
+      return []
+    }
+    
+    try {
+      // 构建批量上传的表单数据
+      const formData = new FormData()
+      
+      // 添加文件数组（批量上传）
+      validFiles.forEach(file => {
+        formData.append('files', file)
+      })
+      
+      // 添加其他参数
+      formData.append('relationType', ATTACHMENT_RELATION.PROJECT)
+      formData.append('attachmentType', ATTACHMENT_CATEGORY.DOCUMENT)
+      formData.append('relationId', project.value.id)
+      formData.append('relationName', `${project.value.number}/${milestone.name}`)
+      formData.append('isPublic', '0')
+      
+      // 🔥 使用原有接口上传（不显示进度，静默上传）
+      const response = await uploadMilestoneDocument(formData)
+      
+      if (response.code === 200 && response.data) {
+        // 返回上传成功的文件信息
+        return response.data || []
+      } else {
+        throw new Error(response.message || '文件上传失败')
+      }
+    } catch (error) {
+      logger.error('Failed to upload pending files', error)
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(error.message || '文件上传失败')
+      }
+      return []
+    }
+  }
+  
   // 保存项目
   const handleSave = async () => {
     try {
@@ -1068,38 +1454,69 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       
       saving.value = true
       logger.info('Saving project', { projectId: project.value.id })
+
+      // 🔥 修复：先基于当前状态构建成员列表，避免后续 loadProjectDetail 覆盖用户「移除成员」的修改
+      const membersPayload = members.value.map(m => {
+        const roleText = Array.isArray(m.roleNames) && m.roleNames.length
+          ? m.roleNames.join('、')
+          : (m.role || 'member')
+        return {
+          userId: m.id,
+          role: roleText
+        }
+      })
       
+      // 🔥 先上传所有待上传的文件（使用原有接口，不显示进度）
+      const uploadedFilesMap = {} // milestoneIndex -> uploaded files
+      for (let i = 0; i < milestones.value.length; i++) {
+        // 🔥 修复：安全访问 milestonePendingFiles，避免 undefined 错误
+        const pendingFiles = milestonePendingFiles[i]
+        if (pendingFiles && Array.isArray(pendingFiles) && pendingFiles.length > 0) {
+          const uploadedFiles = await uploadPendingFilesForMilestone(i)
+          if (uploadedFiles.length > 0) {
+            uploadedFilesMap[i] = uploadedFiles
+            // 清空待上传文件列表
+            milestonePendingFiles[i] = []
+          }
+        }
+      }
+      
+      // 🔥 如果有文件上传成功，需要重新加载项目详情以获取最新的文档列表（会覆盖 members/milestones）
+      const hasUploadedFiles = Object.keys(uploadedFilesMap).length > 0
+      if (hasUploadedFiles) {
+        await loadProjectDetail()
+      }
+      
+      // 🔥 使用「点击保存时」的成员列表（membersPayload），不因 loadProjectDetail 覆盖而丢失移除操作
       const updateData = {
         id: project.value.id,
-        // 只提交允许编辑的字段：项目负责人、项目开始时间、项目结束时间、项目预算、项目描述
         manager: project.value.manager,
+        managerId: project.value.managerId ?? undefined,
         startTime: project.value.startTime,
         endTime: project.value.endTime,
         budget: project.value.budget,
         description: project.value.description,
-        // 状态不允许编辑，但需要传递当前状态
         status: mapStatusToBackend(project.value.status),
-        members: members.value.map(m => {
-          const roleText = Array.isArray(m.roleNames) && m.roleNames.length
-            ? m.roleNames.join('、')
-            : (m.role || 'member')
+        members: membersPayload,
+        // 转换里程碑数据（若刚执行过 loadProjectDetail 则用最新 milestones，否则用当前）
+        milestones: milestones.value.map(milestone => {
+          const milestoneDocuments = Array.isArray(milestone.documents) ? milestone.documents : []
+          const documents = milestoneDocuments
+            .map(doc => {
+              const docId = doc.fileInfo?.id || doc.id
+              return docId && typeof docId === 'number' ? docId : (typeof docId === 'string' && !isNaN(Number(docId)) ? Number(docId) : null)
+            })
+            .filter(id => id != null && !isNaN(id))
+            .map(id => ({ id }))
           return {
-            userId: m.id,
-            role: roleText
+            id: milestone.id || null,
+            name: milestone.name,
+            description: milestone.description || '',
+            startTime: milestone.startTime,
+            endTime: milestone.endTime,
+            documents
           }
-        }),
-        // 转换里程碑数据，将 documents 转换为后端期望的格式 [{ id: ... }]
-        milestones: milestones.value.map(milestone => ({
-          id: milestone.id || null, // 新增的里程碑 id 为 null
-          name: milestone.name,
-          description: milestone.description || '',
-          startTime: milestone.startTime,
-          endTime: milestone.endTime,
-          // 将文档列表转换为后端期望的格式：只包含 id 字段
-          documents: (milestone.documents || []).map(doc => ({
-            id: doc.fileInfo?.id || doc.id
-          })).filter(doc => doc.id != null) // 过滤掉没有 id 的文档（理论上不应该出现）
-        }))
+        })
       }
       
       const response = await updateProject(project.value.id, updateData)
@@ -1113,7 +1530,10 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       }
     } catch (error) {
       logger.error('Failed to save project', error)
-      ElMessage.error(error.message || t('project.detail.saveError'))
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(error.message || t('project.detail.saveError'))
+      }
     } finally {
       saving.value = false
     }
@@ -1164,11 +1584,14 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       const data = response?.data?.data || response?.data || {}
       const users = data.records || data.list || []
       
-      // 存储所有用户，过滤掉系统用户（admin 和 user）
+      // 存储所有用户，过滤掉系统用户（admin、user）及当前登录用户（避免把自己加为成员）
+      const currentUserId = authStore.userInfo?.id
       allUsers.value = users
         .filter(user => {
           const username = (user.username || '').toLowerCase()
-          return username !== 'admin' && username !== 'user'
+          const isSystemUser = username === 'admin' || username === 'user'
+          const isCurrentUser = currentUserId != null && Number(user.id) === Number(currentUserId)
+          return !isSystemUser && !isCurrentUser
         })
         .map(user => ({
           id: user.id,
@@ -1182,7 +1605,10 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       logger.info('Loaded all users', { count: allUsers.value.length })
     } catch (error) {
       logger.error('Failed to load users', error)
-      ElMessage.error('加载用户列表失败')
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error('加载用户列表失败')
+      }
       allUsers.value = []
     } finally {
       loadingUsers.value = false
@@ -1440,21 +1866,30 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
         return
       }
       logger.error('Failed to toggle milestone completion', error)
-      ElMessage.error(error.message || t('project.detail.milestoneToggleError'))
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(error.message || t('project.detail.milestoneToggleError'))
+      }
     }
   }
   
-  // 处理里程碑文档预览
-  const handleMilestoneDocPreview = (doc) => {
+  // 处理里程碑文档预览 - 在新窗口打开
+  const handleMilestoneDocPreview = async (doc) => {
     const attachmentId = doc.fileInfo?.id || doc.id
-    if (attachmentId) {
-      previewFileInfo.value = {
-        name: doc.name,
-        attachmentId: attachmentId
-      }
-      showPreviewDialog.value = true
-    } else {
+    if (!attachmentId) {
       ElMessage.warning('文件预览信息不完整')
+      return
+    }
+    
+    try {
+      await openFilePreviewInNewWindow(attachmentId, doc.name)
+      logger.info('里程碑文档预览已在新窗口打开', { attachmentId, fileName: doc.name })
+    } catch (error) {
+      logger.error('打开里程碑文档预览失败', error)
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(error.message || '预览失败，请稍后重试')
+      }
     }
   }
   
@@ -1491,7 +1926,10 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
       }
     } catch (error) {
       logger.error('Failed to download file', error)
-      ElMessage.error(error.message || t('project.detail.downloadError'))
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(error.message || t('project.detail.downloadError'))
+      }
     }
   }
   
@@ -1561,12 +1999,16 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
         return
       }
       logger.error('Failed to delete document', error)
-      ElMessage.error(error.message || t('project.detail.deleteError'))
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(error.message || t('project.detail.deleteError'))
+      }
     }
   }
   
-  onMounted(() => {
-    loadProjectDetail()
+  onMounted(async () => {
+    await loadProjectDetail()
+    loadManagerOptions()
   })
   </script>
   
@@ -1917,6 +2359,9 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
   }
   
   .milestone-documents-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: var(--gap-sm);
   }
   
@@ -1925,6 +2370,13 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
     font-size: 14px;
     font-weight: 600;
     color: var(--color-primary); // 「里程碑文档」标题使用主题色
+  }
+  
+  // 🔥 里程碑文档操作按钮区域（与知识库样式保持一致）
+  .milestone-documents-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
   }
   
   .document-list {
@@ -1976,10 +2428,11 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
   }
 
   // 操作按钮样式，复用申报列表 / 用户管理的细边框主题按钮
+  // 🔥 与知识库按钮样式保持一致
   .action-btn {
-    padding: 4px;
     min-width: 32px;
-    height: 28px;
+    height: 32px;
+    padding: 4px;
     border: 1px solid transparent;
     border-radius: 4px;
     font-size: 13px;
@@ -1994,6 +2447,9 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
   
     .el-icon {
       font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
   
     &:disabled {
@@ -2045,10 +2501,6 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
         color: var(--surface);
       }
     }
-  }
-  
-  .upload-section {
-    margin-top: var(--gap-sm);
   }
   
   .upload-area {
@@ -2140,6 +2592,20 @@ import { Loading, Plus, Search, Upload, UploadFilled, Document, Picture, VideoPl
     .footer-actions {
       flex-direction: column;
       gap: var(--gap-xs);
+    }
+  }
+  
+  .manager-select {
+    width: 100%;
+  }
+  </style>
+  
+  <!-- 项目负责人下拉 popper 样式（挂载在 body，需全局） -->
+  <style lang="scss">
+  .project-manager-select-dropdown {
+    .el-select-dropdown__item {
+      font-size: 14px;
+      padding: 8px 12px;
     }
   }
   </style>

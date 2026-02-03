@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>通用分页组件</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.3.14/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3.2.47/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.3.14"></script>
+    <style>
+      .pagination-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 20px;
+        padding: 16px 0;
+        background-color: #ffffff;
+        border-radius: 6px;
+      }
+
+      .pagination-info {
+        display: flex;
+        align-items: center;
+        margin-right: 20px;
+        font-size: 14px;
+        color: #4b5563;
+      }
+
+      .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .page-size-selector {
+        display: flex;
+        align-items: center;
+        margin-right: 20px;
+        font-size: 14px;
+        color: #4b5563;
+      }
+
+      .page-size-selector select {
+        margin: 0 8px;
+        padding: 4px 8px;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        font-size: 14px;
+        color: #4b5563;
+        background-color: #ffffff;
+        cursor: pointer;
+      }
+
+      .page-size-selector select:hover {
+        border-color: #1e3a8a;
+      }
+
+      .page-size-selector select:focus {
+        outline: none;
+        border-color: #1e3a8a;
+        box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2);
+      }
+
+      .page-nav {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .page-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 8px;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        font-size: 14px;
+        color: #4b5563;
+        background-color: #ffffff;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-decoration: none;
+      }
+
+      .page-btn:hover {
+        color: #1e3a8a;
+        border-color: #1e3a8a;
+        background-color: #eef2ff;
+      }
+
+      .page-btn.disabled {
+        color: #9ca3af;
+        background-color: #ffffff;
+        border-color: #e5e7eb;
+        cursor: not-allowed;
+      }
+
+      .page-btn.disabled:hover {
+        color: #9ca3af;
+        border-color: #e5e7eb;
+        background-color: #ffffff;
+      }
+
+      .page-btn.active {
+        color: #ffffff;
+        background-color: #1e3a8a;
+        border-color: #1e3a8a;
+      }
+
+      .page-btn.active:hover {
+        color: #ffffff;
+        background-color: #1e3a8a;
+        border-color: #1e3a8a;
+      }
+
+      .page-ellipsis {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        color: #9ca3af;
+        font-size: 14px;
+      }
+
+      .page-jumper {
+        display: flex;
+        align-items: center;
+        margin-left: 20px;
+        font-size: 14px;
+        color: #4b5563;
+      }
+
+      .page-jumper input {
+        width: 50px;
+        height: 32px;
+        margin: 0 8px;
+        padding: 0 8px;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        font-size: 14px;
+        text-align: center;
+        color: #4b5563;
+        background-color: #ffffff;
+      }
+
+      .page-jumper input:hover {
+        border-color: #1e3a8a;
+      }
+
+      .page-jumper input:focus {
+        outline: none;
+        border-color: #1e3a8a;
+        box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2);
+      }
+
+      .jump-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 8px;
+        margin-left: 8px;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        font-size: 14px;
+        color: #4b5563;
+        background-color: #ffffff;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+
+      .jump-btn:hover {
+        color: #1e3a8a;
+        border-color: #1e3a8a;
+        background-color: #eef2ff;
+      }
+
+      /* 响应式设计 */
+      @media (max-width: 768px) {
+        .pagination-container {
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .pagination-info,
+        .page-size-selector {
+          margin-right: 0;
+          margin-bottom: 8px;
+        }
+
+        .page-jumper {
+          margin-left: 0;
+        }
+
+        .page-nav {
+          order: -1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="pagination-container">
+        <!-- 分页信息 -->
+        <div class="pagination-info">共 {{ total }} 条记录</div>
+
+        <!-- 每页显示数量选择器 -->
+        <div class="page-size-selector">
+          每页显示
+          <select v-model="pageSize" @change="handlePageSizeChange">
+            <option v-for="size in pageSizes" :key="size" :value="size">
+              {{ size }} 条
+            </option>
+          </select>
+        </div>
+
+        <!-- 分页控制器 -->
+        <div class="pagination-controls">
+          <!-- 上一页按钮 -->
+          <a
+            href="javascript:void(0)"
+            class="page-btn"
+            :class="{ disabled: currentPage === 1 }"
+            @click="handlePrevPage"
+          >
+            上一页
+          </a>
+
+          <!-- 页码按钮 -->
+          <div class="page-nav">
+            <!-- 第一页 -->
+            <a
+              v-if="showFirstPage"
+              href="javascript:void(0)"
+              class="page-btn"
+              :class="{ active: currentPage === 1 }"
+              @click="handlePageChange(1)"
+            >
+              1
+            </a>
+
+            <!-- 前省略号 -->
+            <span v-if="showPrevEllipsis" class="page-ellipsis">...</span>
+
+            <!-- 中间页码 -->
+            <a
+              v-for="page in visiblePages"
+              :key="page"
+              href="javascript:void(0)"
+              class="page-btn"
+              :class="{ active: currentPage === page }"
+              @click="handlePageChange(page)"
+            >
+              {{ page }}
+            </a>
+
+            <!-- 后省略号 -->
+            <span v-if="showNextEllipsis" class="page-ellipsis">...</span>
+
+            <!-- 最后一页 -->
+            <a
+              v-if="showLastPage"
+              href="javascript:void(0)"
+              class="page-btn"
+              :class="{ active: currentPage === totalPages }"
+              @click="handlePageChange(totalPages)"
+            >
+              {{ totalPages }}
+            </a>
+          </div>
+
+          <!-- 下一页按钮 -->
+          <a
+            href="javascript:void(0)"
+            class="page-btn"
+            :class="{ disabled: currentPage === totalPages }"
+            @click="handleNextPage"
+          >
+            下一页
+          </a>
+        </div>
+
+        <!-- 快速跳转 -->
+        <div class="page-jumper">
+          跳至
+          <input
+            v-model.number="jumpPage"
+            type="number"
+            :min="1"
+            :max="totalPages"
+            @keyup.enter="handleJump"
+          />
+          页
+          <button class="jump-btn" @click="handleJump">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, computed, watch } = Vue;
+
+      createApp({
+        props: {
+          // 当前页码
+          current: {
+            type: Number,
+            default: 1,
+          },
+          // 每页显示数量
+          pageSize: {
+            type: Number,
+            default: 10,
+          },
+          // 总记录数
+          total: {
+            type: Number,
+            default: 0,
+          },
+          // 可选的每页显示数量
+          pageSizes: {
+            type: Array,
+            default: () => [10, 20, 50, 100],
+          },
+          // 显示的页码数量（不包括省略号）
+          pagerCount: {
+            type: Number,
+            default: 7,
+          },
+          // 是否显示每页显示数量选择器
+          showSizeSelector: {
+            type: Boolean,
+            default: true,
+          },
+          // 是否显示快速跳转
+          showQuickJumper: {
+            type: Boolean,
+            default: true,
+          },
+        },
+        emits: [
+          "update:current",
+          "update:pageSize",
+          "current-change",
+          "size-change",
+        ],
+        setup(props, { emit }) {
+          // 内部状态
+          const currentPage = ref(props.current);
+          const pageSize = ref(props.pageSize);
+          const jumpPage = ref(props.current);
+
+          // 计算总页数
+          const totalPages = computed(() => {
+            return Math.ceil(props.total / pageSize.value);
+          });
+
+          // 计算显示的页码范围
+          const visiblePages = computed(() => {
+            const total = totalPages.value;
+            const current = currentPage.value;
+            const count = props.pagerCount;
+
+            if (total <= count) {
+              // 总页数小于等于显示数量，显示所有页码
+              return Array.from({ length: total }, (_, i) => i + 1);
+            }
+
+            // 计算中间页码范围
+            const half = Math.floor(count / 2);
+            let start = Math.max(1, current - half);
+            let end = Math.min(total, start + count - 1);
+
+            // 调整起始位置
+            if (end - start + 1 < count) {
+              start = Math.max(1, end - count + 1);
+            }
+
+            return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+          });
+
+          // 是否显示第一页
+          const showFirstPage = computed(() => {
+            return visiblePages.value[0] > 1;
+          });
+
+          // 是否显示前省略号
+          const showPrevEllipsis = computed(() => {
+            return visiblePages.value[0] > 2;
+          });
+
+          // 是否显示最后一页
+          const showLastPage = computed(() => {
+            const lastVisiblePage =
+              visiblePages.value[visiblePages.value.length - 1];
+            return lastVisiblePage < totalPages.value;
+          });
+
+          // 是否显示后省略号
+          const showNextEllipsis = computed(() => {
+            const lastVisiblePage =
+              visiblePages.value[visiblePages.value.length - 1];
+            return lastVisiblePage < totalPages.value - 1;
+          });
+
+          // 处理页码变化
+          const handlePageChange = (page) => {
+            if (
+              page < 1 ||
+              page > totalPages.value ||
+              page === currentPage.value
+            ) {
+              return;
+            }
+
+            currentPage.value = page;
+            jumpPage.value = page;
+            emit("update:current", page);
+            emit("current-change", page);
+          };
+
+          // 处理上一页
+          const handlePrevPage = () => {
+            if (currentPage.value > 1) {
+              handlePageChange(currentPage.value - 1);
+            }
+          };
+
+          // 处理下一页
+          const handleNextPage = () => {
+            if (currentPage.value < totalPages.value) {
+              handlePageChange(currentPage.value + 1);
+            }
+          };
+
+          // 处理每页显示数量变化
+          const handlePageSizeChange = () => {
+            // 计算新的当前页
+            const newCurrentPage = Math.min(
+              Math.ceil(
+                ((currentPage.value - 1) * pageSize.value) / props.pageSize
+              ) + 1,
+              Math.ceil(props.total / pageSize.value)
+            );
+
+            currentPage.value = newCurrentPage;
+            jumpPage.value = newCurrentPage;
+
+            emit("update:pageSize", pageSize.value);
+            emit("update:current", newCurrentPage);
+            emit("size-change", pageSize.value);
+            emit("current-change", newCurrentPage);
+          };
+
+          // 处理快速跳转
+          const handleJump = () => {
+            const page = parseInt(jumpPage.value);
+            if (page && page >= 1 && page <= totalPages.value) {
+              handlePageChange(page);
+            } else {
+              // 重置为当前页
+              jumpPage.value = currentPage.value;
+            }
+          };
+
+          // 监听props变化
+          watch(
+            () => props.current,
+            (newVal) => {
+              currentPage.value = newVal;
+              jumpPage.value = newVal;
+            }
+          );
+
+          watch(
+            () => props.pageSize,
+            (newVal) => {
+              pageSize.value = newVal;
+            }
+          );
+
+          return {
+            currentPage,
+            pageSize,
+            jumpPage,
+            totalPages,
+            visiblePages,
+            showFirstPage,
+            showPrevEllipsis,
+            showLastPage,
+            showNextEllipsis,
+            handlePageChange,
+            handlePrevPage,
+            handleNextPage,
+            handlePageSizeChange,
+            handleJump,
+          };
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>

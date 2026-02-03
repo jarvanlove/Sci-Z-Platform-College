@@ -5,8 +5,12 @@ import com.sciz.server.application.service.project.ProjectService;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeCreateReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectCreateReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectUpdateReq;
+import com.sciz.server.domain.pojo.entity.declaration.Declaration;
+import com.sciz.server.domain.pojo.repository.declaration.DeclarationRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
+import com.sciz.server.infrastructure.shared.utils.JsonUtil;
 import com.sciz.server.infrastructure.shared.enums.ProjectStatus;
+import com.sciz.server.infrastructure.shared.enums.WorkflowStatus;
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationCreatedEvent;
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationSuccessEvent;
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationUpdatedEvent;
@@ -22,6 +26,11 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 申报事件处理器
@@ -39,6 +48,7 @@ public class DeclarationEventHandler {
     private final ProjectService projectService;
     private final KnowledgeService knowledgeService;
     private final SysKnowledgeBaseRepo knowledgeBaseRepo;
+    private final DeclarationRepo declarationRepo;
     private final OperationLogRecorderUtil operationLogRecorderUtil;
 
     /**
@@ -350,6 +360,9 @@ public class DeclarationEventHandler {
             log.info(String.format("项目创建成功: projectId=%s, name=%s, operatorId=%s", projectId, researchTopic,
                     operatorId));
 
+            // 更新工作流步骤状态为"成功"
+            updateWorkflowStepStatus(event.getDeclarationId(), "项目创建", "success");
+
             // 记录操作日志（成功）
             var endTime = DateUtil.now();
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
@@ -362,6 +375,10 @@ public class DeclarationEventHandler {
         } catch (Exception e) {
             log.error(String.format("创建项目失败: declarationId=%s, err=%s",
                     event.getDeclarationId(), e.getMessage()), e);
+            
+            // 更新工作流步骤状态为"失败"
+            updateWorkflowStepStatus(event.getDeclarationId(), "项目创建", "failed");
+            
             // 记录操作日志（失败）
             var endTime = DateUtil.now();
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
@@ -398,6 +415,7 @@ public class DeclarationEventHandler {
             knowledgeCreateReq.setName(uniqueKnowledgeName); // 知识库名称（已确保唯一）
             knowledgeCreateReq.setDescription(researchTopic); // 知识库描述 = 研究课题
             knowledgeCreateReq.setProjectId(projectId); // 关联项目ID
+            knowledgeCreateReq.setProjectName(researchTopic); // 关联项目名称（研究课题）
             // AsyncUserContext 已设置，可以直接使用 create 方法，无需设置 userId
 
             var knowledgeResp = knowledgeService.create(knowledgeCreateReq);
@@ -520,6 +538,7 @@ public class DeclarationEventHandler {
             var updateReq = new ProjectUpdateReq(
                     projectId,
                     null, // manager 不更新
+                    null, // managerId 不更新
                     null, // startTime 不更新
                     null, // endTime 不更新
                     null, // budget 不更新
@@ -527,7 +546,7 @@ public class DeclarationEventHandler {
                     null, // status 不更新
                     difyKnowledgeId, // 只更新 difyKnowledgeId
                     null, // members 不更新
-                    null // milestones 不更新
+                    null  // milestones 不更新
             );
 
             // 更新项目（现在可以正常使用 LoginUserUtil，它会从 AsyncUserContext 获取用户信息）
@@ -567,5 +586,154 @@ public class DeclarationEventHandler {
         } catch (Exception e) {
             log.error(String.format("记录失败日志异常: declarationId=%s, err=%s", declarationId, e.getMessage()), e);
         }
+    }
+
+    /**
+     * 更新工作流步骤状态
+     * 用于在事件处理器中更新工作流步骤的状态（如项目创建成功/失败）
+     *
+     * @param declarationId 申报ID
+     * @param stepName     步骤名称
+     * @param stepStatus   步骤状态（success/failed/running）
+     */
+    private void updateWorkflowStepStatus(Long declarationId, String stepName, String stepStatus) {
+        // 重试机制：如果查询不到申报，可能是事务还没提交，等待后重试
+        int maxRetries = 5;
+        int retryDelayMs = 200; // 每次重试等待 200ms
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                var declaration = declarationRepo.findById(declarationId);
+                if (declaration == null) {
+                    if (attempt < maxRetries) {
+                        log.warn(String.format("申报不存在，等待事务提交后重试: declarationId=%s, stepName=%s, attempt=%d/%d",
+                                declarationId, stepName, attempt, maxRetries));
+                        try {
+                            Thread.sleep(retryDelayMs);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            log.error(String.format("等待重试被中断: declarationId=%s, stepName=%s", declarationId, stepName), e);
+                            return;
+                        }
+                        continue; // 重试
+                    } else {
+                        log.error(String.format("申报不存在（重试%d次后仍失败）: declarationId=%s, stepName=%s",
+                                maxRetries, declarationId, stepName));
+                        return;
+                    }
+                }
+
+                // 获取当前工作流结果
+                var workflowResult = getWorkflowResult(declaration);
+
+                // 获取步骤列表
+                @SuppressWarnings("unchecked")
+                var steps = (List<Map<String, Object>>) workflowResult.getOrDefault("steps", new ArrayList<>());
+
+                // 查找并更新步骤状态
+                boolean stepFound = false;
+                for (var step : steps) {
+                    if (stepName.equals(step.get("name"))) {
+                        step.put("status", stepStatus);
+                        step.put("timestamp", DateUtil.formatDateTime(java.time.LocalDateTime.now()));
+                        stepFound = true;
+                        break;
+                    }
+                }
+
+                // 如果步骤不存在，添加新步骤
+                if (!stepFound) {
+                    var step = new HashMap<String, Object>();
+                    step.put("name", stepName);
+                    step.put("status", stepStatus);
+                    step.put("timestamp", DateUtil.formatDateTime(java.time.LocalDateTime.now()));
+                    steps.add(step);
+                }
+
+                // 更新工作流结果
+                workflowResult.put("steps", steps);
+                
+                // 检查所有步骤是否都完成，决定工作流状态
+                WorkflowStatus newWorkflowStatus = checkAndUpdateWorkflowStatus(steps, declaration.getWorkflowStatus());
+                
+                declarationRepo.updateWorkflowStatus(declarationId,
+                        newWorkflowStatus.getCode(), JsonUtil.toJson(workflowResult));
+
+                log.info(String.format("更新工作流步骤状态成功: declarationId=%s, stepName=%s, stepStatus=%s, workflowStatus=%s",
+                        declarationId, stepName, stepStatus, newWorkflowStatus.getCode()));
+                break; // 成功执行后退出循环
+            } catch (Exception e) {
+                if (attempt < maxRetries) {
+                    log.warn(String.format("更新工作流步骤状态失败，等待后重试: declarationId=%s, stepName=%s, attempt=%d/%d, err=%s",
+                            declarationId, stepName, attempt, maxRetries, e.getMessage()));
+                    try {
+                        Thread.sleep(retryDelayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.error(String.format("等待重试被中断: declarationId=%s, stepName=%s", declarationId, stepName), ie);
+                        return;
+                    }
+                    continue; // 重试
+                } else {
+                    log.error(String.format("更新工作流步骤状态失败（重试%d次后仍失败）: declarationId=%s, stepName=%s, err=%s",
+                            maxRetries, declarationId, stepName, e.getMessage()), e);
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * 获取工作流结果
+     *
+     * @param declaration 申报实体
+     * @return 工作流结果Map
+     */
+    private Map<String, Object> getWorkflowResult(Declaration declaration) {
+        var workflowResultJson = declaration.getWorkflowResult();
+        if (workflowResultJson == null || workflowResultJson.isEmpty()) {
+            return new HashMap<>();
+        }
+        var result = JsonUtil.fromJsonToMap(workflowResultJson);
+        return result != null ? result : new HashMap<>();
+    }
+
+    /**
+     * 检查所有步骤状态，决定工作流状态
+     * <p>
+     * 规则：
+     * 1. 如果所有步骤都是 "success"，返回 COMPLETED
+     * 2. 如果有任何步骤是 "failed"，返回 FAILED
+     * 3. 否则（有步骤是 "running" 或没有步骤），返回 RUNNING
+     *
+     * @param steps           步骤列表
+     * @param currentStatus   当前工作流状态
+     * @return 新的工作流状态
+     */
+    private WorkflowStatus checkAndUpdateWorkflowStatus(List<Map<String, Object>> steps, String currentStatus) {
+        if (steps == null || steps.isEmpty()) {
+            // 没有步骤，保持当前状态或返回 RUNNING
+            return WorkflowStatus.RUNNING;
+        }
+
+        // 检查是否有失败的步骤
+        boolean hasFailed = steps.stream()
+                .anyMatch(step -> "failed".equals(step.get("status")));
+        if (hasFailed) {
+            log.info("检测到失败的步骤，工作流状态更新为 FAILED");
+            return WorkflowStatus.FAILED;
+        }
+
+        // 检查是否所有步骤都成功
+        boolean allSuccess = steps.stream()
+                .allMatch(step -> "success".equals(step.get("status")));
+        if (allSuccess) {
+            log.info("所有步骤都已完成，工作流状态更新为 COMPLETED");
+            return WorkflowStatus.COMPLETED;
+        }
+
+        // 有步骤还在进行中，保持 RUNNING
+        log.info("仍有步骤在进行中，工作流状态保持为 RUNNING");
+        return WorkflowStatus.RUNNING;
     }
 }

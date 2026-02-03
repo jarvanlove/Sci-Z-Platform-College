@@ -1,0 +1,23 @@
+---
+description: "Repository 查询/更新/删除、Service 模式、操作日志"
+alwaysApply: false
+globs: ["**/repository/**/*.java", "**/application/**/*.java"]
+---
+
+# Repository 与 Service 规范
+
+## Repository
+
+- 查询：LambdaQueryChainWrapper，链式，eq(Xxx::getXxx, val)
+- 新增：mapper.insert(entity)
+- 更新：按 ID 整实体 mapper.updateById(entity)；按条件改字段用 LambdaUpdateChainWrapper .set()
+- 软删除：LambdaUpdateChainWrapper 设 is_deleted
+- 批量更新单字段：LambdaUpdateChainWrapper .in(Xxx::getId, ids).set(Xxx::getStatus, status).update()
+
+## Service
+
+- 写操作加 @Transactional(rollbackFor = Exception.class)；编排业务、发事件；不返回 Result，返回领域对象
+
+## 操作日志
+
+- 使用 OperationLogRecorderUtil；操作类型用 OperationLogRecorderStatus 枚举；同步上下文自动取用户，异步上下文需传 userId/username

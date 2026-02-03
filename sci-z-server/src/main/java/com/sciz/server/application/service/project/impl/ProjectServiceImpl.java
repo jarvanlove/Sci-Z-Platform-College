@@ -10,7 +10,7 @@ import com.sciz.server.domain.pojo.dto.request.project.ProjectCreateReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
-import com.sciz.server.domain.pojo.dto.response.project.MilestoneDocumentUploadResp;
+import com.sciz.server.domain.pojo.dto.response.file.FileUploadResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectDetailResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectListResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectProgressResp;
@@ -64,6 +64,7 @@ import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
 import com.sciz.server.infrastructure.shared.event.project.ProjectUpdatedEvent;
 import com.sciz.server.infrastructure.shared.utils.DateUtil;
+import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
 import com.sciz.server.infrastructure.shared.utils.LoginUserUtil;
 import com.sciz.server.infrastructure.shared.utils.OperationLogRecorderUtil;
 import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
@@ -173,6 +174,16 @@ public class ProjectServiceImpl implements ProjectService {
                 throw BusinessException.of(ResultCode.DATABASE_OPERATION_FAILED, "项目保存失败");
             }
 
+            // 4. 从申报表同步项目负责人用户ID到项目（用于权限：创建人+当前负责人均有负责人权限）
+            if (entity.getDeclarationId() != null) {
+                var declaration = declarationRepo.findById(entity.getDeclarationId());
+                if (declaration != null && declaration.getProjectLeaderId() != null) {
+                    entity.setManagerId(declaration.getProjectLeaderId());
+                    entity.setId(projectId);
+                    projectRepo.updateById(entity);
+                }
+            }
+
             log.info(String.format("项目保存成功: projectId=%s, number=%s", projectId, entity.getNumber()));
             return projectId;
 
@@ -192,7 +203,8 @@ public class ProjectServiceImpl implements ProjectService {
         var baseQuery = req.toBaseQuery();
         var page = new Page<Project>(baseQuery.pageNo(), baseQuery.pageSize());
         var asc = "ASC".equalsIgnoreCase(baseQuery.sortOrder());
-        var sortBy = Optional.ofNullable(baseQuery.sortBy()).orElse("createdTime");
+        // 默认按更新时间倒序
+        var sortBy = Optional.ofNullable(baseQuery.sortBy()).orElse("updatedTime");
 
         // 1. 如果提供了时间范围，先查询符合条件的申报ID（性能优化：利用申报表索引）
         List<Long> declarationIds = null;
@@ -221,6 +233,10 @@ public class ProjectServiceImpl implements ProjectService {
                 .toList();
         var declarationMap = declarationRepo.findByIds(projectDeclarationIds);
 
+        // 取消按钮仅项目创建人或管理员可见，项目成员不可见
+        Long currentUserId = LoginUserUtil.getCurrentUser().map(u -> u.userId()).orElse(null);
+        boolean isAdmin = DataPermissionUtil.isAdmin();
+
         // 4. 转换为响应对象，直接使用项目主表的进度值，并设置状态描述和时间信息
         var records = projectPage.getRecords().stream()
                 .map(project -> {
@@ -234,6 +250,10 @@ public class ProjectServiceImpl implements ProjectService {
                     var startTime = declaration != null ? declaration.getProjectStartTime() : null;
                     var estimatedCompletionTime = declaration != null ? declaration.getProjectEndTime() : null;
                     var projectLeader = declaration != null ? declaration.getProjectLeader() : null;
+                    // 项目创建人、项目负责人(manager_id)或管理员可取消项目，项目成员不可见取消按钮
+                    boolean canDelete = isAdmin
+                            || (project.getCreatedBy() != null && project.getCreatedBy().equals(currentUserId))
+                            || (project.getManagerId() != null && project.getManagerId().equals(currentUserId));
                     // 重新创建 Record，更新 progress、statusDescription、时间字段和项目负责人
                     return new ProjectListResp(
                             baseResp.id(),
@@ -250,7 +270,8 @@ public class ProjectServiceImpl implements ProjectService {
                             projectLeader,
                             baseResp.difyKnowledgeId(),
                             baseResp.createdTime(),
-                            baseResp.updatedTime());
+                            baseResp.updatedTime(),
+                            canDelete);
                 })
                 .toList();
 
@@ -282,7 +303,8 @@ public class ProjectServiceImpl implements ProjectService {
         // 5. 获取项目状态描述
         var statusDescription = getProjectStatusDescription(project.getStatus());
 
-        // 6. 构建响应对象
+        // 6. 构建响应对象（createdBy、projectLeaderId 供前端判断是否项目创建人/负责人，以控制添加/移除成员、里程碑完成/删除等按钮）
+        Long projectLeaderId = project.getManagerId() != null ? project.getManagerId() : (declaration != null ? declaration.getProjectLeaderId() : null);
         var resp = new ProjectDetailResp(
                 project.getId(),
                 project.getNumber(),
@@ -293,10 +315,12 @@ public class ProjectServiceImpl implements ProjectService {
                 project.getStatus(),
                 statusDescription,
                 declaration != null ? declaration.getProjectLeader() : null,
+                projectLeaderId,
                 declaration != null ? declaration.getDepartment() : null,
                 declaration != null ? declaration.getProjectStartTime() : null,
                 declaration != null ? declaration.getProjectEndTime() : null,
                 declaration != null ? declaration.getResearchDirection() : null,
+                project.getCreatedBy(),
                 memberRespList,
                 milestoneRespList);
 
@@ -321,6 +345,13 @@ public class ProjectServiceImpl implements ProjectService {
             // 1. 查询项目实体
             var project = Optional.ofNullable(projectRepo.findById(req.id()))
                     .orElseThrow(() -> BusinessException.of(ResultCode.PROJECT_NOT_FOUND));
+
+            // 1.1 权限：仅项目创建人、项目负责人(manager_id)或管理员可更新项目
+            boolean isCreator = project.getCreatedBy() != null && project.getCreatedBy().equals(userId);
+            boolean isManager = project.getManagerId() != null && project.getManagerId().equals(userId);
+            if (!DataPermissionUtil.isAdmin() && !isCreator && !isManager) {
+                throw BusinessException.of(ResultCode.FORBIDDEN, "无权限编辑该项目");
+            }
 
             // 2. 更新项目基本信息
             updateProjectBasicInfo(project, req, userId);
@@ -451,24 +482,33 @@ public class ProjectServiceImpl implements ProjectService {
 
         boolean needUpdate = false;
 
-        // 更新项目负责人
-        if (StringUtils.hasText(req.manager())) {
-            // manager 可能是用户名或ID，需要解析
+        // 更新项目负责人：优先使用 managerId（与前端下拉选中用户一致），否则用 manager 字符串解析
+        if (req.managerId() != null) {
+            var manager = sysUserRepo.findById(req.managerId());
+            if (manager != null) {
+                declaration.setProjectLeader(manager.getRealName());
+                declaration.setProjectLeaderId(req.managerId());
+                project.setManagerId(req.managerId());
+                needUpdate = true;
+            }
+        } else if (StringUtils.hasText(req.manager())) {
             Long managerId = parseManagerId(req.manager());
             if (managerId != null) {
                 var manager = sysUserRepo.findById(managerId);
                 if (manager != null) {
                     declaration.setProjectLeader(manager.getRealName());
+                    declaration.setProjectLeaderId(managerId);
+                    project.setManagerId(managerId);
                     needUpdate = true;
                 }
             } else {
-                // 尝试按用户名查找
                 var manager = sysUserRepo.findByUsername(req.manager());
                 if (manager != null) {
                     declaration.setProjectLeader(manager.getRealName());
+                    declaration.setProjectLeaderId(manager.getId());
+                    project.setManagerId(manager.getId());
                     needUpdate = true;
                 } else {
-                    // 如果找不到，直接使用传入的值
                     declaration.setProjectLeader(req.manager());
                     needUpdate = true;
                 }
@@ -507,70 +547,65 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     /**
-     * 更新项目成员
+     * 更新项目成员（以请求列表为准：请求为空则清空成员，请求有则增/改/删）
      */
     private void updateProjectMembers(Long projectId, List<ProjectMemberUpdateReq> memberReqs, Long userId,
             String realName) {
-        if (CollectionUtils.isEmpty(memberReqs)) {
-            return;
-        }
-
         // 1. 查询现有成员
         var existingMembers = projectMemberRepo.findByProjectId(projectId);
         var existingMemberMap = existingMembers.stream()
                 .collect(Collectors.toMap(ProjectMember::getUserId, member -> member));
 
-        // 2. 处理成员更新
-        var memberUserIds = memberReqs.stream()
-                .map(ProjectMemberUpdateReq::userId)
-                .toList();
+        // 2. 请求非空时：处理成员更新与新增
+        if (!CollectionUtils.isEmpty(memberReqs)) {
+            var memberUserIds = memberReqs.stream()
+                    .map(ProjectMemberUpdateReq::userId)
+                    .toList();
 
-        // 批量查询用户信息
-        var users = sysUserRepo.findByIds(memberUserIds);
-        var userMap = users.stream()
-                .collect(Collectors.toMap(SysUser::getId, user -> user));
+            var users = sysUserRepo.findByIds(memberUserIds);
+            var userMap = users.stream()
+                    .collect(Collectors.toMap(SysUser::getId, user -> user));
 
-        var now = LocalDateTime.now();
+            var now = LocalDateTime.now();
 
-        // 处理成员更新和新增
-        memberReqs.stream()
-                .filter(memberReq -> userMap.containsKey(memberReq.userId()))
-                .forEach(memberReq -> {
-                    var existingMember = existingMemberMap.get(memberReq.userId());
-                    var user = userMap.get(memberReq.userId());
+            memberReqs.stream()
+                    .filter(memberReq -> userMap.containsKey(memberReq.userId()))
+                    .forEach(memberReq -> {
+                        var existingMember = existingMemberMap.get(memberReq.userId());
+                        var user = userMap.get(memberReq.userId());
 
-                    if (existingMember != null) {
-                        // 更新现有成员
-                        existingMember.setRole(memberReq.role());
-                        existingMember.setUpdatedBy(userId);
-                        existingMember.setUpdatedTime(now);
-                        projectMemberRepo.updateById(existingMember);
-                    } else {
-                        // 新增成员
-                        var newMember = new ProjectMember();
-                        newMember.setProjectId(projectId);
-                        newMember.setUserId(memberReq.userId());
-                        newMember.setUserName(user.getRealName());
-                        newMember.setRole(memberReq.role());
-                        newMember.setJoinTime(now);
-                        newMember.setCreatedBy(userId);
-                        newMember.setUpdatedBy(userId);
-                        newMember.setCreatedTime(now);
-                        newMember.setUpdatedTime(now);
-                        newMember.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
-                        projectMemberRepo.save(newMember);
-                    }
-                });
+                        if (existingMember != null) {
+                            existingMember.setRole(memberReq.role());
+                            existingMember.setUpdatedBy(userId);
+                            existingMember.setUpdatedTime(now);
+                            projectMemberRepo.updateById(existingMember);
+                        } else {
+                            var newMember = new ProjectMember();
+                            newMember.setProjectId(projectId);
+                            newMember.setUserId(memberReq.userId());
+                            newMember.setUserName(user.getRealName());
+                            newMember.setRole(memberReq.role());
+                            newMember.setJoinTime(now);
+                            newMember.setCreatedBy(userId);
+                            newMember.setUpdatedBy(userId);
+                            newMember.setCreatedTime(now);
+                            newMember.setUpdatedTime(now);
+                            newMember.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
+                            projectMemberRepo.save(newMember);
+                        }
+                    });
 
-        // 记录不存在的用户
-        memberReqs.stream()
-                .filter(memberReq -> !userMap.containsKey(memberReq.userId()))
-                .forEach(memberReq -> log.warn(String.format("用户不存在: userId=%s", memberReq.userId())));
+            memberReqs.stream()
+                    .filter(memberReq -> !userMap.containsKey(memberReq.userId()))
+                    .forEach(memberReq -> log.warn(String.format("用户不存在: userId=%s", memberReq.userId())));
+        }
 
-        // 3. 删除不在请求中的成员
-        var requestUserIds = memberReqs.stream()
-                .map(ProjectMemberUpdateReq::userId)
-                .collect(Collectors.toSet());
+        // 3. 删除不在请求中的成员（请求为空时 requestUserIds 为空，则删除全部现有成员）
+        var requestUserIds = CollectionUtils.isEmpty(memberReqs)
+                ? Collections.<Long>emptySet()
+                : memberReqs.stream()
+                        .map(ProjectMemberUpdateReq::userId)
+                        .collect(Collectors.toSet());
         var toDeleteIds = existingMembers.stream()
                 .filter(member -> !requestUserIds.contains(member.getUserId()))
                 .map(ProjectMember::getId)
@@ -1039,6 +1074,17 @@ public class ProjectServiceImpl implements ProjectService {
                 throw BusinessException.of(ResultCode.PROJECT_NOT_FOUND);
             }
 
+            // 1.1 权限：仅项目创建人、项目负责人(manager_id)或管理员可取消项目
+            var currentUser = LoginUserUtil.getCurrentUser().orElse(null);
+            if (currentUser != null) {
+                Long userId = currentUser.userId();
+                boolean isCreator = project.getCreatedBy() != null && project.getCreatedBy().equals(userId);
+                boolean isManager = project.getManagerId() != null && project.getManagerId().equals(userId);
+                if (!DataPermissionUtil.isAdmin() && !isCreator && !isManager) {
+                    throw BusinessException.of(ResultCode.FORBIDDEN, "无权限取消该项目");
+                }
+            }
+
             // 2. 检查项目是否已经是已取消状态
             if (ProjectStatus.CANCELLED.getCode().toString().equals(project.getStatus())) {
                 throw BusinessException.of(ResultCode.BAD_REQUEST, "项目已经是已取消状态");
@@ -1128,10 +1174,10 @@ public class ProjectServiceImpl implements ProjectService {
                 .distinct()
                 .toList();
 
-        // 5. 批量查询附件详情（性能优化：一次性查询所有附件）
+        // 5. 批量查询附件详情（使用 findByIdsForRelation：项目成员可见所有里程碑文档，不按上传人过滤）
         final Map<Long, SysAttachment> attachmentMap = allAttachmentIds.isEmpty()
                 ? Map.<Long, SysAttachment>of()
-                : sysAttachmentRepo.findByIds(allAttachmentIds).stream()
+                : sysAttachmentRepo.findByIdsForRelation(allAttachmentIds).stream()
                         .collect(Collectors.toMap(SysAttachment::getId, attachment -> attachment));
 
         // 6. 构建里程碑响应列表（每个里程碑只显示关联到该里程碑的附件）
@@ -1151,6 +1197,7 @@ public class ProjectServiceImpl implements ProjectService {
                                     attachment.getFileExtension(),
                                     attachment.getFileSize(),
                                     formatFileSize(attachment.getFileSize()),
+                                    attachment.getUploaderId(),
                                     attachment.getUploaderName(),
                                     attachment.getUploadTime(),
                                     attachment.getFileUrl(),
@@ -1345,7 +1392,7 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public List<MilestoneDocumentUploadResp> uploadMilestoneDocument(FileBatchUploadReq req) {
+    public List<FileUploadResp> uploadMilestoneDocument(FileBatchUploadReq req) {
         var startTime = DateUtil.now();
         var operationType = OperationLogRecorderStatus.PROJECT_MILESTONE_DOCUMENT_UPLOAD;
         var operation = operationType.getCode();
@@ -1376,26 +1423,45 @@ public class ProjectServiceImpl implements ProjectService {
                     req.attachmentType(),
                     req.isPublic());
 
-            // 4. 调用文件服务批量上传文件到 MinIO
-            List<FileInfoResp> fileInfoRespList = fileService.uploadBatch(uploadReq);
-
-            // 6. 构建响应列表（只返回文件信息，前端根据附件ID调用文件服务的预览、下载、删除接口）
-            var respList = fileInfoRespList.stream()
-                    .map(fileInfoResp -> new MilestoneDocumentUploadResp(
-                            fileInfoResp.id(),
-                            fileInfoResp.fileName(),
-                            fileInfoResp.originalName(),
-                            fileInfoResp.fileType(),
-                            fileInfoResp.fileExtension(),
-                            fileInfoResp.fileSize(),
-                            formatFileSize(fileInfoResp.fileSize()),
-                            fileInfoResp.uploaderName(),
-                            fileInfoResp.uploadTime(),
-                            fileInfoResp.fileUrl(),
-                            fileInfoResp.previewUrl()))
+            // 4. 调用文件服务批量上传文件到 MinIO（使用支持进度的接口）
+            List<FileUploadResp> uploadResults = fileService.uploadBatchWithProgress(uploadReq);
+            
+            // 5. 将 FileUploadResp 转换为 FileInfoResp（用于后续处理）
+            List<FileInfoResp> fileInfoRespList = uploadResults.stream()
+                    .filter(result -> result.getSuccess() != null && result.getSuccess() && result.getAttachmentId() != null)
+                    .map(result -> {
+                        // 从数据库查询完整的文件信息
+                        var attachment = sysAttachmentRepo.findById(result.getAttachmentId());
+                        if (attachment == null) {
+                            return null;
+                        }
+                        // 使用文件服务生成预览链接并构建 FileInfoResp
+                        var previewUrl = fileService.preview(result.getAttachmentId(), SystemConstant.DEFAULT_PREVIEW_EXPIRE_SECONDS);
+                        var fileInfoResp = new FileInfoResp(
+                                attachment.getId(),
+                                attachment.getFileName(),
+                                attachment.getOriginalName(),
+                                attachment.getFileType(),
+                                attachment.getFileExtension(),
+                                attachment.getFileSize(),
+                                attachment.getMimeType(),
+                                attachment.getFileUrl(),
+                                attachment.getFilePath(),
+                                attachment.getMd5Hash(),
+                                attachment.getIsPublic(),
+                                attachment.getDownloadCount(),
+                                attachment.getUploaderId(),
+                                attachment.getUploaderName(),
+                                attachment.getUploadTime(),
+                                null, // bucketName
+                                previewUrl
+                        );
+                        return fileInfoResp;
+                    })
+                    .filter(Objects::nonNull)
                     .toList();
 
-            // 7. 异步上传到 Dify 知识库（不阻塞接口响应）
+            // 6. 异步上传到 Dify 知识库（不阻塞接口响应）
             var currentUser = LoginUserUtil.requireCurrentUser();
             var userId = currentUser.userId();
             var username = currentUser.realName();
@@ -1462,6 +1528,11 @@ public class ProjectServiceImpl implements ProjectService {
 
             log.info(String.format("已提交异步 Dify 上传任务: projectId=%s, fileCount=%s", asyncProjectId, fileDataList.size()));
 
+            // 7. 统计成功数量
+            var successCount = uploadResults.stream()
+                    .filter(result -> result.getSuccess() != null && result.getSuccess())
+                    .count();
+
             // 8. 记录操作日志（成功）
             var endTime = DateUtil.now();
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
@@ -1470,8 +1541,10 @@ public class ProjectServiceImpl implements ProjectService {
             operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
 
             log.info(String.format("批量上传里程碑文档成功: projectId=%s, fileCount=%s, successCount=%s",
-                    projectId, fileCount, respList.size()));
-            return respList;
+                    projectId, fileCount, successCount));
+            
+            // 9. 返回 FileUploadResp 列表（支持进度返回）
+            return uploadResults;
 
         } catch (BusinessException e) {
             // 记录操作日志（失败）
@@ -1498,6 +1571,7 @@ public class ProjectServiceImpl implements ProjectService {
         }
     }
 
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteMilestoneDocument(MilestoneDocumentDeleteReq req) {
@@ -1516,18 +1590,36 @@ public class ProjectServiceImpl implements ProjectService {
             var currentUser = LoginUserUtil.requireCurrentUser();
             Long userId = currentUser.userId();
 
-            // 1. 查询附件信息（用于日志记录）
-            var attachment = Optional.ofNullable(sysAttachmentRepo.findById(attachmentId))
-                    .orElseThrow(() -> BusinessException.of(ResultCode.DATA_NOT_FOUND, "附件不存在"));
+            // 1. 查询附件与项目信息；权限：创建人/designated 负责人可删任意文档，普通成员仅可删自己上传的
+            var project = projectId != null ? projectRepo.findById(projectId) : null;
+            boolean isCreator = project != null && userId.equals(project.getCreatedBy());
+            boolean isManager = project != null && project.getManagerId() != null && userId.equals(project.getManagerId());
+            boolean isMember = project != null && projectMemberRepo.findByProjectIdAndUserId(projectId, userId) != null;
+
+            var attachment = sysAttachmentRepo.findById(attachmentId);
+            if (attachment == null && projectId != null) {
+                var attachmentForRelation = sysAttachmentRepo.findByIdForRelation(attachmentId);
+                if (attachmentForRelation != null && (isCreator || isManager || isMember)) {
+                    attachment = attachmentForRelation;
+                }
+            }
+            if (attachment == null || DeleteStatus.DELETED.getCode().equals(attachment.getIsDeleted())) {
+                throw BusinessException.of(ResultCode.DATA_NOT_FOUND, "附件不存在");
+            }
+            // 删除权限：创建人或 designated 负责人可删任意；否则仅上传人可删自己的
+            boolean canDeleteAny = isCreator || isManager;
+            boolean isUploader = attachment.getUploaderId() != null && userId.equals(attachment.getUploaderId());
+            if (!canDeleteAny && !(isMember && isUploader)) {
+                throw BusinessException.of(ResultCode.FORBIDDEN, "无权限删除该文档");
+            }
 
             // 2. 删除知识库文件关联表（同步删除，避免数据不一致）
             Long knowledgeId = null;
             try {
                 log.info(String.format("开始删除知识库文件关联: attachmentId=%s", attachmentId));
                 // 先通过项目ID获取知识库ID（用于后续更新文件数量）
-                if (projectId != null) {
-                    var project = projectRepo.findById(projectId);
-                    if (project != null && project.getDifyKnowledgeId() != null) {
+                if (projectId != null && project != null) {
+                    if (project.getDifyKnowledgeId() != null) {
                         try {
                             knowledgeId = Long.parseLong(project.getDifyKnowledgeId());
                         } catch (NumberFormatException e) {

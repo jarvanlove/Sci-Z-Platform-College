@@ -11,6 +11,7 @@
   >
     <!-- 页面头部 -->
     <div class="page-header">
+      <BackButton :tooltip="$t('practice.backToPractice')" @click="handleBack" />
       <h1 class="page-title">{{ $t('menu.dashboard') }}</h1>
     </div>
 
@@ -202,7 +203,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Document, Folder, Check, Search, TopRight, Reading } from '@element-plus/icons-vue'
-import { BaseCard, ProjectProgressBar, BaseScrollbar, BaseTooltip } from '@/components/Common'
+import { BaseCard, ProjectProgressBar, BaseScrollbar, BaseTooltip, BackButton } from '@/components/Common'
 import { formatDate } from '@/utils/date'
 import { DECLARATION_STATUS_CONFIG } from '@/utils/constants'
 import { createLogger } from '@/utils/simpleLogger'
@@ -361,6 +362,10 @@ const loadDashboardData = async () => {
 }
 
 // 事件处理
+const handleBack = () => {
+  router.push('/practice')
+}
+
 const handleDeclarationClick = (item) => {
   logger.info('User clicked declaration item', { id: item.id, number: item.number })
   router.push(`/declaration/detail/${item.id}`)
@@ -417,8 +422,9 @@ onMounted(() => {
 
 .page-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 12px;
   margin-bottom: var(--gap-lg);
 }
 

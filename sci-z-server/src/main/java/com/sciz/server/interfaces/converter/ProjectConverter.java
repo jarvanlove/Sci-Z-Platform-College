@@ -39,10 +39,12 @@ public interface ProjectConverter {
 
     /**
      * entity → listResp
+     * canDelete 由列表接口按权限在 Service 层设置，此处默认 true
      *
      * @param entity 实体
      * @return 列表响应
      */
+    @Mapping(target = "canDelete", constant = "true")
     ProjectListResp toListResp(Project entity);
 
     /**

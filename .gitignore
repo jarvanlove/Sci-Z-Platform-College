@@ -30,6 +30,9 @@ dist/
 *.seed
 *.pid.lock
 
+# Cursor 本地配置（不提交，每人可自定义）
+.cursorignore
+
 # IDE
 .vscode/
 *.suo
@@ -41,6 +44,9 @@ dist/
 # Logs
 logs/
 *.log
+
+# Cursor hooks 生成的报告与审计日志（不提交）
+reports/
 
 # Temporary files
 tmp/

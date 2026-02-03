@@ -61,7 +61,7 @@ public class DifyApiService {
     public ResponseEntity<DifyChatbotAppResponse> createChatbotApp(DifyChatbotAppRequest request) {
         try {
             ResponseEntity<String> response = difyApiClient.request("POST", "/console/api/apps", request,
-                    request.getUserId(), request.getResourceId(), request.getKeyType(), 1);
+                      request.getResourceId(), request.getKeyType(), 1);
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
                 return ResponseEntity.status(response.getStatusCode()).body(null);
             }
@@ -100,7 +100,7 @@ public class DifyApiService {
     public ResponseEntity<String> sendChatbotMessage(DifyChatbotMessageRequest request) {
         try {
             return difyApiClient.request("POST", "/chat-messages", request,
-                    request.getUserId(), request.getResourceId(), request.getKeyType());
+                    request.getResourceId(), request.getKeyType());
         } catch (HttpClientErrorException e) {
             log.error("发送 Chatbot 对话失败: {}", e.getMessage());
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
@@ -118,13 +118,13 @@ public class DifyApiService {
             java.util.function.Consumer<String> onData) {
         try {
             log.info(String.format("发送 Chatbot 流式对话请求（实时）: userId=%s, resourceId=%s, query=%s, responseMode=%s",
-                    request.getUserId(), request.getResourceId(), request.getQuery(), request.getResponseMode()));
+                      request.getUserId(), request.getResourceId(), request.getQuery(), request.getResponseMode()));
             // 调用真正的流式请求方法，实时回调
             difyApiClient.requestStreamWithCallback("POST", "/chat-messages", request,
-                    request.getUserId(), request.getResourceId(), request.getKeyType(), onData);
+                      request.getResourceId(), request.getKeyType(), onData);
 
             log.info(String.format("Chatbot 流式对话完成: userId=%s, resourceId=%s",
-                    request.getUserId(), request.getResourceId()));
+                      request.getUserId(), request.getResourceId()));
         } catch (Exception e) {
             log.error(String.format("发送 Chatbot 流式对话失败: err=%s", e.getMessage()), e);
             throw e;
@@ -142,7 +142,7 @@ public class DifyApiService {
                 "POST",
                 "/console/api/apps/" + appResponse.getId() + "/api-keys",
                 payload,
-                request.getUserId(),
+
                 request.getResourceId(),
                 request.getKeyType(),
                 1);
@@ -175,7 +175,7 @@ public class DifyApiService {
             Map<String, Object> params = new HashMap<>();
             params.put("page", page);
             params.put("limit", limit);
-            return difyApiClient.request("GET", "/datasets", params, userId, resourceId, keyType);
+            return difyApiClient.request("GET", "/datasets", params,  resourceId, keyType);
         } catch (HttpClientErrorException e) {
             log.error("Dify API调用失败: {}", e.getMessage());
             // 直接返回Dify的错误响应给前端
@@ -189,7 +189,7 @@ public class DifyApiService {
     public ResponseEntity<String> createDataset(DifyDatasetRequest request, Long userId, String resourceId,
             String keyType) {
         try {
-            return difyApiClient.request("POST", "/datasets", request, userId, resourceId, keyType);
+            return difyApiClient.request("POST", "/datasets", request, resourceId, keyType);
         } catch (HttpClientErrorException e) {
             log.error("Dify API调用失败: {}", e.getMessage());
             // 直接返回Dify的错误响应给前端
@@ -215,7 +215,7 @@ public class DifyApiService {
     public ResponseEntity<String> updateDataset(String datasetId, DifyDatasetRequest request, Long userId,
             String resourceId, String keyType) {
         try {
-            return difyApiClient.request("PUT", "/datasets/" + datasetId, request, userId, resourceId, keyType);
+            return difyApiClient.request("PUT", "/datasets/" + datasetId, request,  resourceId, keyType);
         } catch (HttpClientErrorException e) {
             log.error("Dify API调用失败: {}", e.getMessage());
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
@@ -225,9 +225,9 @@ public class DifyApiService {
     /**
      * 删除数据集
      */
-    public ResponseEntity<String> deleteDataset(String datasetId, Long userId, String resourceId, String keyType) {
+    public ResponseEntity<String> deleteDataset(String datasetId,  String resourceId, String keyType) {
         try {
-            return difyApiClient.request("DELETE", "/datasets/" + datasetId, userId, resourceId, keyType);
+            return difyApiClient.request("DELETE", "/datasets/" + datasetId, resourceId, keyType);
         } catch (HttpClientErrorException e) {
             log.error("Dify API调用失败: {}", e.getMessage());
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
@@ -264,7 +264,7 @@ public class DifyApiService {
     public ResponseEntity<String> retrieveDataset(String datasetId, DifyRetrieveRequest request, Long userId,
             String resourceId, String keyType) {
         try {
-            return difyApiClient.request("POST", "/datasets/" + datasetId + "/retrieve", request, userId, resourceId,
+            return difyApiClient.request("POST", "/datasets/" + datasetId + "/retrieve", request, resourceId,
                     keyType);
         } catch (HttpClientErrorException e) {
             log.error("Dify API调用失败: {}", e.getMessage());
@@ -295,7 +295,7 @@ public class DifyApiService {
             
             // 调用 Dify API 获取文档片段列表
             String endpoint = "/datasets/" + datasetId + "/documents/" + documentId + "/segments";
-            ResponseEntity<String> response = difyApiClient.request("GET", endpoint, params, userId, resourceId, keyType);
+            ResponseEntity<String> response = difyApiClient.request("GET", endpoint, params, resourceId, keyType);
             
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
                 log.warn(String.format("获取文档片段失败: datasetId=%s, documentId=%s, status=%s", 
@@ -745,8 +745,8 @@ public class DifyApiService {
 
             Object body = bodymap;
             // 将 body 作为请求体传递，而不是查询参数
-            ResponseEntity<String> response = difyApiClient.request("POST", endpoint, body,
-                    userId, workflowId, keyType);
+            ResponseEntity<String> response = difyApiClient.request("POST", endpoint, body
+                   , workflowId, keyType);
             log.info("Dify 工作流执行完成（动态密钥），状态码: {}", response.getStatusCode());
             return response;
         } catch (HttpClientErrorException e) {
@@ -806,7 +806,7 @@ public class DifyApiService {
             }
             String endpoint = "/workflows/logs";
             ResponseEntity<String> response = difyApiClient.request("GET", endpoint, params,
-                    userId, workflowId, DifyApiKey.KeyType.WORKFLOW.getCode());
+                     workflowId, DifyApiKey.KeyType.WORKFLOW.getCode());
             log.info("获取工作流日志完成（动态密钥），状态码: {}", response.getStatusCode());
             return response;
         } catch (HttpClientErrorException e) {
@@ -945,7 +945,7 @@ public class DifyApiService {
             String path = "/console/api/apps/" + appId + "/workflows/draft";
             log.info(String.format("获取工作流 Draft 配置: appId=%s", appId));
             // 使用 privateUrl (key=1) 调用 console API，GET 请求 body 和 params 都为 null，不传 userId/resourceId/keyType
-            return difyApiClient.request("GET", path, null, null, null, null, null, 1);
+            return difyApiClient.request("GET", path, null, null, null, null, 1);
         } catch (HttpClientErrorException e) {
             log.error(String.format("获取工作流 Draft 配置失败: appId=%s, err=%s", appId, e.getMessage()), e);
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());

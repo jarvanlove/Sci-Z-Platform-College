@@ -1,29 +1,33 @@
 import { createI18n } from 'vue-i18n'
 import zhCN from './zh-CN.js'
 import enUS from './en-US.js'
-import koKR from './ko-KR.js'
-import jaJP from './ja-JP.js'
+// 暂时注释掉韩语和日语
+// import koKR from './ko-KR.js'
+// import jaJP from './ja-JP.js'
 
 // 静态导入 Element Plus 语言包，避免动态导入警告
 import zhCnLocale from 'element-plus/dist/locale/zh-cn.mjs'
 import enLocale from 'element-plus/dist/locale/en.mjs'
-import koKrLocale from 'element-plus/dist/locale/ko.mjs'
-import jaJpLocale from 'element-plus/dist/locale/ja.mjs'
+// 暂时注释掉韩语和日语的 Element Plus 语言包
+// import koKrLocale from 'element-plus/dist/locale/ko.mjs'
+// import jaJpLocale from 'element-plus/dist/locale/ja.mjs'
 
 // Element Plus 语言包映射
 const elementPlusLocales = {
   'zh-CN': zhCnLocale,
   'en-US': enLocale,
-  'ko-KR': koKrLocale,
-  'ja-JP': jaJpLocale
+  // 暂时注释掉韩语和日语
+  // 'ko-KR': koKrLocale,
+  // 'ja-JP': jaJpLocale
 }
 
 // 支持的语言列表
 export const supportedLocales = [
   { code: 'zh-CN', name: '中文', flag: '🇨🇳' },
   { code: 'en-US', name: 'English', flag: '🇺🇸' },
-  { code: 'ko-KR', name: '한국어', flag: '🇰🇷' },
-  { code: 'ja-JP', name: '日本語', flag: '🇯🇵' }
+  // 暂时注释掉韩语和日语
+  // { code: 'ko-KR', name: '한국어', flag: '🇰🇷' },
+  // { code: 'ja-JP', name: '日本語', flag: '🇯🇵' }
 ]
 
 // 获取默认语言
@@ -53,8 +57,9 @@ const i18n = createI18n({
   messages: {
     'zh-CN': zhCN,
     'en-US': enUS,
-    'ko-KR': koKR,
-    'ja-JP': jaJP
+    // 暂时注释掉韩语和日语
+    // 'ko-KR': koKR,
+    // 'ja-JP': jaJP
   }
 })
 

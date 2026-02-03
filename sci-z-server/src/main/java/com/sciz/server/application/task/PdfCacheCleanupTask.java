@@ -21,17 +21,17 @@ public class PdfCacheCleanupTask {
 
     private final PdfCacheService pdfCacheService;
 
-    /**
-     * 每5分钟执行一次清理任务
-     */
-    @Scheduled(cron = "0 0/5 * * * ?")
-    public void cleanupExpiredCache() {
-        try {
-            log.info("开始执行PDF缓存清理任务");
-            pdfCacheService.cleanupExpiredCache();
-            log.info("PDF缓存清理任务执行完成");
-        } catch (Exception e) {
-            log.error("PDF缓存清理任务执行失败", e);
-        }
-    }
+//    /**
+//     * 每5分钟执行一次清理任务
+//     */
+//    @Scheduled(cron = "0 0/5 * * * ?")
+//    public void cleanupExpiredCache() {
+//        try {
+//            log.debug("开始执行PDF缓存清理任务");
+//            pdfCacheService.cleanupExpiredCache();
+//            log.debug("PDF缓存清理任务执行完成");
+//        } catch (Exception e) {
+//            log.error("PDF缓存清理任务执行失败", e);
+//        }
+//    }
 }

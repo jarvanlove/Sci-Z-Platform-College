@@ -40,7 +40,8 @@ spring: # Spring 开发环境配置
 
 # 本地 MinIO（默认控制台/存储均为本机）
 minio: # MinIO 开发环境配置
-  endpoint: http://localhost:9000
+  endpoint: http://192.168.1.250:9000
+  #endpoint: http://localhost:9000
   access-key: admin
   secret-key: minioadmin
   bucket: sciz-files
@@ -64,14 +65,56 @@ dify:
   retry-count: 3
   enable-retry: true
   default-resource-id: default # 默认资源ID（用于创建知识库时的resourceId参数）
-  chatbot: # Chatbot 模型配置（开发环境）
+  chatbot: # Chatbot 模型配置（本地环境）
+    pre-prompt: "你叫小域，是一位专业、严谨的学术助手，专注于科研与教学支持。请以清晰、准确、逻辑严密的方式回答问题，语言应符合学术规范，避免口语化、夸张或情绪化表达。若涉及数据、方法或结论，请注明假设条件与适用范围；若问题存在歧义或信息不足，请明确指出并请求澄清；优先使用正式术语，必要时可提供定义或简要解释；不使用表情符号、颜文字或非必要的修饰性语言；回答应结构清晰，可适当使用标题、编号或表格以提升可读性，但需保持内容精炼。请根据上述原则，就用户提出的问题提供专业、可靠、有依据的回应。"
+    prompt-type: simple # 提示词类型
+    opening-statement: "" # 开场白
+    suggested-questions: [] # 建议问题列表
+    dataset-query-variable: "" # 数据集查询变量
+    more-like-this: false # 更多类似内容开关
+    speech-to-text: false # 语音转文字开关
+    text-to-speech: false # 文字转语音开关
+    suggested-questions-after-answer: false # 回答后建议问题开关
+    retriever-resource: true # 检索资源开关
+    sensitive-word-avoidance: # 敏感词规避配置
+      enabled: false
+      type: ""
+      configs: []
+    file-upload: # 文件上传配置
+      enabled: false
+      allowed-file-types: []
+      allowed-file-extensions: [".JPG", ".JPEG", ".PNG", ".GIF", ".WEBP", ".SVG", ".MP4", ".MOV", ".MPEG", ".WEBM"]
+      allowed-file-upload-methods: ["remote_url", "local_file"]
+      number-limits: 3
+      image:
+        enabled: false
+        detail: high
+        number-limits: 3
+        transfer-methods: ["remote_url", "local_file"]
+    agent-mode: # Agent模式配置
+      enabled: false
+      max-iteration: 10
+      strategy: function_call
+      tools: []
     model: # 模型配置
       provider: langgenius/tongyi/tongyi # 模型提供商
       name: qwen3-next-80b-a3b-instruct # 模型名称
       mode: chat # 模型模式（chat/completion）
+      completion-params: # 完成参数配置
+        enable-search: false # 是否启用搜索
     reranking-model: # 重排序模型配置
       reranking-provider-name: langgenius/tongyi/tongyi # 重排序提供商名称
       reranking-model-name: gte-rerank # 重排序模型名称
+    dataset-configs: # 数据集配置
+      retrieval-model: multiple # 检索模型
+      top-k: 4 # Top K
+      reranking-mode: reranking_model # 重排序模式
+      reranking-enable: false # 是否启用重排序
+      datasets: # 数据集集合
+        datasets:
+          - dataset:
+              enabled: true
+              id: ""
 
 # LLM 开发环境配置（OpenAI 兼容接口）
 llm: # LLM(OpenAI) 开发环境配置

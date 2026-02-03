@@ -4,6 +4,7 @@ import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationCr
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationQueryReq;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeFileRelationResp;
+import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeFolderWithFilesResp;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 
 /**
@@ -54,5 +55,18 @@ public interface KnowledgeFileRelationService {
      * @return 分页结果
      */
     PageResult<KnowledgeFileRelationResp> page(KnowledgeFileRelationQueryReq req);
+
+    /**
+     * 根据知识库ID分页查询文件夹及文件列表（树形结构）
+     * 只返回有文件的文件夹，没有绑定文件夹的文档会显示在"未分类"文件夹中
+     *
+     * @param knowledgeId 知识库ID
+     * @param folderId 文件夹ID（可选，null或0表示根目录）
+     * @param page 页码（从1开始）
+     * @param size 每页大小
+     * @return 文件夹及文件列表（分页，混合分页：文件夹在前，文件在后）
+     */
+    PageResult<KnowledgeFolderWithFilesResp> listFoldersWithFiles(Long knowledgeId, Long folderId, Integer page, Integer size);
+
 }
 

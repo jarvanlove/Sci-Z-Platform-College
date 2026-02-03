@@ -10,7 +10,8 @@ import java.util.List;
  * 申报创建请求
  *
  * @param department          String 课题发布部门
- * @param projectLeader       String 项目负责人
+ * @param projectLeader       String 项目负责人（姓名，展示用；若传 projectLeaderId 则后端会据此解析姓名）
+ * @param projectLeaderId     Long 项目负责人用户ID（可选，与下拉框选中的用户一致时传此值便于权限与匹配）
  * @param documentPublishTime LocalDate 红头文件发布时间
  * @param projectStartTime    LocalDate 项目开始时间
  * @param projectEndTime      LocalDate 项目结束时间
@@ -25,7 +26,9 @@ import java.util.List;
 public record DeclarationCreateReq(
                 @NotBlank(message = "课题发布部门不能为空") String department,
 
-                @NotBlank(message = "项目负责人不能为空") String projectLeader,
+                String projectLeader,
+
+                Long projectLeaderId,
 
                 @NotNull(message = "红头文件发布时间不能为空") LocalDate documentPublishTime,
 

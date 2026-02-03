@@ -82,4 +82,20 @@ public interface SysKnowledgeFileRelationRepo {
      * @return Map<Long, List<Long>> 知识库ID -> 附件ID列表映射
      */
     Map<Long, List<Long>> findAttachmentIdsByKnowledgeIds(List<Long> knowledgeIds);
+
+    /**
+     * 根据知识库ID查询所有文件关联（不分页）
+     *
+     * @param knowledgeId 知识库ID
+     * @return 文件关联列表
+     */
+    List<SysKnowledgeFileRelation> findByKnowledgeId(Long knowledgeId);
+
+    /**
+     * 根据文件夹ID统计文件数量（未删除的文件）
+     *
+     * @param folderId 文件夹ID
+     * @return 文件数量
+     */
+    Long countByFolderId(Long folderId);
 }

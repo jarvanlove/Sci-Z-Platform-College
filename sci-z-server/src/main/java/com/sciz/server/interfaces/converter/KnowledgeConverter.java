@@ -3,7 +3,6 @@ package com.sciz.server.interfaces.converter;
 import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeResp;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 
 import java.util.List;
 
@@ -23,7 +22,6 @@ public interface KnowledgeConverter {
      * @param entity 知识库实体
      * @return 知识库响应
      */
-    @Mapping(target = "projectName", ignore = true)
     KnowledgeResp toResp(SysKnowledgeBase entity);
 
     /**

@@ -128,7 +128,7 @@ const fillStyle = computed(() => {
         
         // 成功/高进度（>= 60% 或 100%）
         &.progress-fill--success {
-          background: #16a34a; // 绿色
+          background: #1a5f1a; // 🔥 墨绿色
         }
         
         // 警告/中等进度（30% - 60%）
@@ -167,7 +167,7 @@ const fillStyle = computed(() => {
           }
           
           &.progress-fill--success {
-            background: #22c55e; // 暗色主题下的绿色
+            background: #2d5016; // 🔥 暗色主题下的墨绿色
           }
           
           &.progress-fill--warning {

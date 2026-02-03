@@ -8,6 +8,7 @@
   <div class="project-list-container">
     <!-- 页面标题 -->
     <div class="page-header">
+      <BackButton :tooltip="$t('practice.backToPractice')" @click="handleBack" />
       <h1 class="page-title">{{ $t('project.list.title') }}</h1>
       <!-- 注意：原型图中新建项目按钮被注释了，因为项目由申报成功后后台直接生成 -->
     </div>
@@ -164,7 +165,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, DataLine, TopRight, Edit, Close } from '@element-plus/icons-vue'
-import { BaseCard, BaseTable, BaseDatePicker, ProjectProgressBar, BaseTooltip } from '@/components/Common'
+import { BaseCard, BaseTable, BaseDatePicker, ProjectProgressBar, BaseTooltip, BackButton } from '@/components/Common'
 import { PROJECT_STATUS, PROJECT_STATUS_CONFIG } from '@/utils/constants'
 import { getProjectList, cancelProject } from '@/api/Project'
 import { createLogger } from '@/utils/simpleLogger'
@@ -333,8 +334,8 @@ const loadProjects = async () => {
       params.endTime = searchForm.dateRange[1]   // 结束时间：YYYY-MM-DD
     }
     
-    // 排序参数（默认按创建时间倒序）
-    params.sortBy = 'createdTime'
+    // 排序参数：默认按更新时间倒序，便于更新后列表顺序变化
+    params.sortBy = 'updatedTime'
     params.sortOrder = 'DESC'
 
     const response = await getProjectList(params)
@@ -361,7 +362,10 @@ const loadProjects = async () => {
     }
   } catch (error) {
     logger.error('Failed to load project list', error)
-    ElMessage.error(error.message || t('project.list.loadError'))
+    // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+    if (!error._messageShown) {
+      ElMessage.error(error.message || t('project.list.loadError'))
+    }
     projects.value = []
     pagination.total = 0
   } finally {
@@ -427,6 +431,10 @@ const handleCurrentChange = (page) => {
 }
 
 // 操作处理
+const handleBack = () => {
+  router.push('/practice')
+}
+
 const handleView = (project) => {
   router.push(`/project/detail/${project.id}`)
 }
@@ -464,7 +472,10 @@ const handleCancel = async (project) => {
   } catch (error) {
     if (error !== 'cancel') {
       logger.error('Failed to cancel project', error)
-      ElMessage.error(error.message || t('project.list.cancelError'))
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(error.message || t('project.list.cancelError'))
+      }
     }
   }
 }
@@ -486,8 +497,9 @@ onMounted(() => {
 
 .page-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 12px;
   margin-bottom: var(--gap-lg);
 }
 

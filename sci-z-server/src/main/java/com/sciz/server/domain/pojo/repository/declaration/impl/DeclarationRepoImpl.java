@@ -9,6 +9,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.domain.pojo.entity.declaration.Declaration;
 import com.sciz.server.domain.pojo.mapper.declaration.DeclarationMapper;
 import com.sciz.server.domain.pojo.repository.declaration.DeclarationRepo;
+import com.sciz.server.domain.pojo.repository.project.ProjectMemberRepo;
+import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
@@ -18,9 +20,12 @@ import org.springframework.stereotype.Repository;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -34,9 +39,13 @@ import java.util.stream.Collectors;
 public class DeclarationRepoImpl implements DeclarationRepo {
 
     private final DeclarationMapper mapper;
+    private final ProjectRepo projectRepo;
+    private final ProjectMemberRepo projectMemberRepo;
 
-    public DeclarationRepoImpl(DeclarationMapper mapper) {
+    public DeclarationRepoImpl(DeclarationMapper mapper, ProjectRepo projectRepo, ProjectMemberRepo projectMemberRepo) {
         this.mapper = mapper;
+        this.projectRepo = projectRepo;
+        this.projectMemberRepo = projectMemberRepo;
     }
 
     @Override
@@ -51,34 +60,49 @@ public class DeclarationRepoImpl implements DeclarationRepo {
                 .eq(Declaration::getId, id)
                 .eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
-        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 数据权限：admin 看全部；普通用户可见自己创建的或所属/负责项目关联的申报（项目负责人视为拥有全部权限的成员）
         Long userId = DataPermissionUtil.getDataPermissionFilter();
         if (userId != null) {
-            queryWrapper.eq(Declaration::getCreatedBy, userId);
+            List<Long> memberProjectIds = projectMemberRepo.findProjectIdsByUserId(userId);
+            List<Long> managerProjectIds = projectRepo.findProjectIdsByManagerId(userId);
+            List<Long> createdByProjectIds = projectRepo.findProjectIdsByCreatedBy(userId);
+            Set<Long> allProjectIds = new HashSet<>(memberProjectIds);
+            allProjectIds.addAll(managerProjectIds);
+            allProjectIds.addAll(createdByProjectIds);
+            List<Long> declarationIdsFromProjects = projectRepo.findDeclarationIdsByProjectIds(new ArrayList<>(allProjectIds));
+            if (CollectionUtils.isEmpty(declarationIdsFromProjects)) {
+                queryWrapper.eq(Declaration::getCreatedBy, userId);
+            } else {
+                queryWrapper.and(w -> w.eq(Declaration::getCreatedBy, userId).or().in(Declaration::getId, declarationIdsFromProjects));
+            }
         }
 
         return queryWrapper.one();
     }
 
-    /**
-     * 分页查询申报列表
-     *
-     * @param page    Page<Declaration> 分页对象
-     * @param keyword String 搜索关键字（申报编号/申报人/研究方向）
-     * @param status  Integer 申报状态（null表示全部）
-     * @param sortBy  String 排序字段
-     * @param asc     boolean 是否升序
-     * @return IPage<Declaration> 分页结果
-     */
     @Override
     public IPage<Declaration> page(Page<Declaration> page, String keyword, Integer status, String sortBy, boolean asc) {
+        return page(page, keyword, status, sortBy, asc, null);
+    }
+
+    /**
+     * 分页查询申报列表（支持项目成员可见：普通用户可见自己创建的或所属项目关联的申报）
+     */
+    @Override
+    public IPage<Declaration> page(Page<Declaration> page, String keyword, Integer status, String sortBy, boolean asc,
+            List<Long> includeDeclarationIdsForMember) {
         var queryWrapper = new LambdaQueryWrapper<Declaration>();
         queryWrapper.eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
-        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 数据权限：admin 看全部；普通用户可见自己创建的或所属项目关联的申报
         Long userId = DataPermissionUtil.getDataPermissionFilter();
         if (userId != null) {
-            queryWrapper.eq(Declaration::getCreatedBy, userId);
+            if (!CollectionUtils.isEmpty(includeDeclarationIdsForMember)) {
+                queryWrapper.and(w -> w.eq(Declaration::getCreatedBy, userId)
+                        .or().in(Declaration::getId, includeDeclarationIdsForMember));
+            } else {
+                queryWrapper.eq(Declaration::getCreatedBy, userId);
+            }
         }
 
         // 关键字搜索（申报编号/申报人/研究方向）
@@ -181,10 +205,21 @@ public class DeclarationRepoImpl implements DeclarationRepo {
                 .in(Declaration::getId, declarationIds)
                 .eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
-        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 数据权限：admin 看全部；普通用户可见自己创建的或所属/负责项目关联的申报（与 findById 一致，保证项目列表能拿到 projectLeader 等）
         Long userId = DataPermissionUtil.getDataPermissionFilter();
         if (userId != null) {
-            queryWrapper.eq(Declaration::getCreatedBy, userId);
+            List<Long> memberProjectIds = projectMemberRepo.findProjectIdsByUserId(userId);
+            List<Long> managerProjectIds = projectRepo.findProjectIdsByManagerId(userId);
+            List<Long> createdByProjectIds = projectRepo.findProjectIdsByCreatedBy(userId);
+            Set<Long> allProjectIds = new HashSet<>(memberProjectIds);
+            allProjectIds.addAll(managerProjectIds);
+            allProjectIds.addAll(createdByProjectIds);
+            List<Long> declarationIdsFromProjects = projectRepo.findDeclarationIdsByProjectIds(new ArrayList<>(allProjectIds));
+            if (CollectionUtils.isEmpty(declarationIdsFromProjects)) {
+                queryWrapper.eq(Declaration::getCreatedBy, userId);
+            } else {
+                queryWrapper.and(w -> w.eq(Declaration::getCreatedBy, userId).or().in(Declaration::getId, declarationIdsFromProjects));
+            }
         }
 
         return mapper.selectList(queryWrapper).stream()

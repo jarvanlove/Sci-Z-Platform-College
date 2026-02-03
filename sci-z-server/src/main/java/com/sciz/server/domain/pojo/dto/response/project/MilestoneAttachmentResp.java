@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
  * @param fileExtension String 文件扩展名（如 pdf、docx）
  * @param fileSize      Long 文件大小（字节）
  * @param fileSizeLabel String 文件大小展示文本（如 27.71 KB / 3.20 MB）
+ * @param uploaderId    Long 上传人用户ID（用于项目成员仅可删除自己上传的附件）
  * @param uploaderName  String 上传人姓名
  * @param uploadTime    LocalDateTime 上传时间
  * @param fileUrl       String 文件URL
@@ -28,6 +29,7 @@ public record MilestoneAttachmentResp(
         String fileExtension,
         Long fileSize,
         String fileSizeLabel,
+        Long uploaderId,
         String uploaderName,
         LocalDateTime uploadTime,
         String fileUrl,

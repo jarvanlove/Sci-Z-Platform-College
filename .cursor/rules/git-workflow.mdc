@@ -1,0 +1,68 @@
+---
+description: "Git 工作流与提交规范（Conventional Commits + Git Flow）"
+alwaysApply: false
+---
+
+# Git 工作流规范
+
+本规则采用 **Conventional Commits** 与 **Git Flow** 风格，与常见行业实践一致。
+
+---
+
+## 分支命名与流向
+
+| 分支类型 | 命名示例              | 从哪拉出 | 合并到哪       | 用途                     |
+| -------- | --------------------- | -------- | -------------- | ------------------------ |
+| 主分支   | `main` / `master`     | —        | —              | 生产可用，仅通过 PR 合并 |
+| 开发分支 | `develop`             | main     | main（发布时） | 集成日常开发             |
+| 功能分支 | `feature/xxx`         | develop  | develop        | 新功能、需求             |
+| 修复分支 | `bugfix/xxx`          | develop  | develop        | 非紧急 bug               |
+| 热修分支 | `hotfix/xxx`          | main     | main + develop | 生产紧急修复             |
+| 发布准备 | `release/xxx`（可选） | develop  | main + develop | 发布前版本号、收尾       |
+
+- 分支名使用小写、短横线，如 `feature/user-login`、`fix/order-amount`。
+
+---
+
+## 提交信息规范（Conventional Commits）
+
+### 类型（必选）
+
+| 类型              | 说明                             |
+| ----------------- | -------------------------------- |
+| `feat`            | 新功能                           |
+| `fix`             | 修复 bug                         |
+| `docs`            | 仅文档                           |
+| `style`           | 格式、空格、分号等（不改变逻辑） |
+| `refactor`        | 重构（既非新功能也非修 bug）     |
+| `perf`            | 性能优化                         |
+| `test`            | 测试相关                         |
+| `build` / `chore` | 构建、依赖、工具、配置等         |
+
+### 格式
+
+```
+<type>(<scope>): <subject>
+
+[可选正文]
+[可选脚注：BREAKING CHANGE、关联 issue]
+```
+
+- **scope**（可选）：影响范围，如 `api`、`auth`、`deps`。
+- **subject**：简短说明，祈使句、首字母小写、结尾不加句号；建议 ≤50 字符。
+- **破坏性变更**：在 type 或脚注中注明 `BREAKING CHANGE`，或使用 `feat!:` / `fix!:`。
+
+### 示例
+
+- `feat(auth): add login with phone`
+- `fix(api): correct pagination total count`
+- `docs: update README install steps`
+- `chore(deps): upgrade vue to 3.4`
+
+---
+
+## 建议实践
+
+- 每次提交只做一件事，便于回滚与追溯。
+- 合并到 `develop` / `main` 前通过 PR 评审；主分支可配置保护规则。
+- 提交前在本地跑测试（若项目有）；CI 未通过不合并。

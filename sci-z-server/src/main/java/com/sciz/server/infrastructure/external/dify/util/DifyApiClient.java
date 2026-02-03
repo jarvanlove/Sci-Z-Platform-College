@@ -3,6 +3,7 @@ package com.sciz.server.infrastructure.external.dify.util;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sciz.server.infrastructure.external.dify.config.DifyConfig;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiKeyService;
+import com.sciz.server.infrastructure.shared.utils.LoginUserUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
@@ -40,19 +41,18 @@ public class DifyApiClient {
      * @param path       请求路径
      * @param body       请求体 (POST/PUT 时使用，会被序列化为 JSON)
      * @param params     查询参数 (GET 时使用，会拼接到 URL)
-     * @param userId     用户ID
      * @param resourceId 资源ID
      * @param keyType    密钥类型
      * @param key        URL 类型（0=baseUrl, 1=privateUrl）
      * @return 响应结果
      */
     public ResponseEntity<String> request(String method, String path, Object body, Map<String, Object> params,
-            Long userId, String resourceId, String keyType, int key) {
+             String resourceId, String keyType, int key) {
         HttpMethod httpMethod = HttpMethod.valueOf(method.toUpperCase());
         String url = buildUrl(path, params, key);
-        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType, key);
+        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body,  resourceId, keyType, key);
         log.debug("Dify {} 请求: {}, userId={}, resourceId={}, keyType={}, hasBody={}",
-                method, url, userId, resourceId, keyType, body != null);
+                method, url,  resourceId, keyType, body != null);
 
         // 使用 URI.create() 避免 RestTemplate 将 URL 中的 {} 当作 URI 模板变量处理
         try {
@@ -70,13 +70,13 @@ public class DifyApiClient {
      * 
      * @param method     请求类型（通常是 GET）
      * @param path       请求路径
-     * @param userId     用户ID
+
      * @param resourceId 资源ID
      * @param keyType    密钥类型
      * @return 响应结果
      */
-    public ResponseEntity<String> request(String method, String path, Long userId, String resourceId, String keyType) {
-        return request(method, path, null, null, userId, resourceId, keyType, 0);
+    public ResponseEntity<String> request(String method, String path,  String resourceId, String keyType) {
+        return request(method, path, null, null,  resourceId, keyType, 0);
     }
 
     /**
@@ -85,14 +85,14 @@ public class DifyApiClient {
      * @param method     请求类型（通常是 POST）
      * @param path       请求路径
      * @param body       请求体（会被序列化为 JSON 字符串）
-     * @param userId     用户ID
+
      * @param resourceId 资源ID
      * @param keyType    密钥类型
      * @return 响应结果
      */
-    public ResponseEntity<String> request(String method, String path, Object body, Long userId, String resourceId,
+    public ResponseEntity<String> request(String method, String path, Object body,  String resourceId,
             String keyType) {
-        return request(method, path, body, null, userId, resourceId, keyType, 0);
+        return request(method, path, body, null,  resourceId, keyType, 0);
     }
 
     /**
@@ -101,15 +101,15 @@ public class DifyApiClient {
      * @param method     请求类型（通常是 POST）
      * @param path       请求路径
      * @param body       请求体（会被序列化为 JSON 字符串）
-     * @param userId     用户ID
+
      * @param resourceId 资源ID
      * @param keyType    密钥类型
      * @param key        URL 类型（0=baseUrl, 1=privateUrl）
      * @return 响应结果
      */
-    public ResponseEntity<String> request(String method, String path, Object body, Long userId, String resourceId,
+    public ResponseEntity<String> request(String method, String path, Object body, String resourceId,
             String keyType, int key) {
-        return request(method, path, body, null, userId, resourceId, keyType, key);
+        return request(method, path, body, null,  resourceId, keyType, key);
     }
 
     /**
@@ -118,14 +118,14 @@ public class DifyApiClient {
      * @param method     请求类型（通常是 GET）
      * @param path       请求路径
      * @param params     查询参数（会拼接到 URL 的查询字符串）
-     * @param userId     用户ID
+
      * @param resourceId 资源ID
      * @param keyType    密钥类型
      * @return 响应结果
      */
-    public ResponseEntity<String> request(String method, String path, Map<String, Object> params, Long userId,
+    public ResponseEntity<String> request(String method, String path, Map<String, Object> params,
             String resourceId, String keyType) {
-        return request(method, path, null, params, userId, resourceId, keyType, 0);
+        return request(method, path, null, params,  resourceId, keyType, 0);
     }
 
     /**
@@ -144,7 +144,7 @@ public class DifyApiClient {
             Long userId, String resourceId, String keyType) {
         HttpMethod httpMethod = HttpMethod.valueOf(method.toUpperCase());
         String url = difyConfig.getBaseUrl() + path;
-        HttpEntity<?> entity = createFileUploadEntityWithDynamicKey(file, data, userId, resourceId, keyType);
+        HttpEntity<?> entity = createFileUploadEntityWithDynamicKey(file, data,  resourceId, keyType);
 
         log.debug("Dify {} 文件上传请求: {}, userId={}, resourceId={}, keyType={}",
                 method, url, userId, resourceId, keyType);
@@ -203,20 +203,20 @@ public class DifyApiClient {
      * 创建带动态密钥的 HTTP 实体
      * 
      * @param body       请求体（如果不为 null，会被序列化为 JSON 字符串）
-     * @param userId     用户ID
+
      * @param resourceId 资源ID
      * @param keyType    密钥类型
      * @param IsKey      URL 类型（0=baseUrl, 1=privateUrl）
      * @return HTTP 实体
      */
-    private HttpEntity<?> createHttpEntityWithDynamicKey(Object body, Long userId, String resourceId, String keyType,
+    private HttpEntity<?> createHttpEntityWithDynamicKey(Object body,  String resourceId, String keyType,
             int IsKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         // 如果提供了 userId、resourceId、keyType，则使用动态密钥（无论是 baseUrl 还是 privateUrl）
-        if (userId != null && resourceId != null && keyType != null) {
+        if ( resourceId != null && keyType != null) {
             // 动态获取API密钥
-            String apiKey = difyApiKeyService.getApiKey(userId, resourceId, keyType);
+            String apiKey = difyApiKeyService.getApiKey( resourceId, keyType);
             headers.set("Authorization", "Bearer " + apiKey);
         }
 
@@ -238,12 +238,12 @@ public class DifyApiClient {
      * 创建带动态密钥的文件上传 HTTP 实体
      */
     private HttpEntity<?> createFileUploadEntityWithDynamicKey(MultipartFile file, Map<String, Object> data,
-            long userId, String resourceId, String keyType) {
+          String resourceId, String keyType) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
         // 动态获取API密钥
-        String apiKey = difyApiKeyService.getApiKey(userId, resourceId, keyType);
+        String apiKey = difyApiKeyService.getApiKey( resourceId, keyType);
         headers.set("Authorization", "Bearer " + apiKey);
 
         // 构建multipart数据
@@ -277,7 +277,7 @@ public class DifyApiClient {
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
         // 动态获取API密钥
-        String apiKey = difyApiKeyService.getApiKey(userId, resourceId, keyType);
+        String apiKey = difyApiKeyService.getApiKey( resourceId, keyType);
         headers.set("Authorization", "Bearer " + apiKey);
 
         // 构建multipart数据
@@ -318,19 +318,22 @@ public class DifyApiClient {
      * @param method     请求类型 (POST)
      * @param path       请求路径
      * @param body       请求体
-     * @param userId     用户ID
+
      * @param resourceId 资源ID
      * @param keyType    密钥类型
      * @param onData     数据回调函数，每收到一行数据时立即调用
      */
     public void requestStreamWithCallback(String method, String path, Object body,
-            Long userId, String resourceId, String keyType,
+           String resourceId, String keyType,
             java.util.function.Consumer<String> onData) {
         String url = buildUrl(path, null, 0);
-        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType, 0);
+        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body,  resourceId, keyType, 0);
+
+        // 从 SaToken 获取 userId（优先从 AsyncUserContext 获取，如果没有则从 Sa-Token Session 获取）
+        Long userId = LoginUserUtil.getCurrentUserId().orElse(null);
 
         log.debug(String.format("Dify %s 流式请求（实时回调）: %s, userId=%s, resourceId=%s, keyType=%s, hasBody=%s",
-                method, url, userId, resourceId, keyType, body != null));
+                method, url, userId != null ? userId : "N/A", resourceId, keyType, body != null));
 
         try {
             // 构建请求体
@@ -405,7 +408,7 @@ public class DifyApiClient {
     public ResponseEntity<String> requestStream(String method, String path, Object body,
             Long userId, String resourceId, String keyType) {
         String url = buildUrl(path, null, 0);
-        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body, userId, resourceId, keyType, 0);
+        HttpEntity<?> entity = createHttpEntityWithDynamicKey(body,  resourceId, keyType, 0);
 
         log.debug(String.format("Dify %s 流式请求: %s, userId=%s, resourceId=%s, keyType=%s, hasBody=%s",
                 method, url, userId, resourceId, keyType, body != null));

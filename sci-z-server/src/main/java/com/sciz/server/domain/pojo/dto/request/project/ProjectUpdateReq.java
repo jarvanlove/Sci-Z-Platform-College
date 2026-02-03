@@ -11,7 +11,8 @@ import java.util.List;
  * 项目更新请求
  *
  * @param id              Long 项目ID（必填）
- * @param manager         String 项目负责人（用户名或ID）
+ * @param manager         String 项目负责人姓名（展示用；若传 managerId 则后端会据此更新姓名）
+ * @param managerId       Long 项目负责人用户ID（可选，与下拉框选中用户一致时传此值）
  * @param startTime       LocalDate 项目开始时间
  * @param endTime         LocalDate 项目结束时间
  * @param budget          BigDecimal 项目预算
@@ -27,6 +28,7 @@ import java.util.List;
 public record ProjectUpdateReq(
         @NotNull(message = "项目ID不能为空") Long id,
         String manager,
+        Long managerId,
         LocalDate startTime,
         LocalDate endTime,
         @DecimalMin(value = "0.0", message = "项目预算不能为负数") BigDecimal budget,

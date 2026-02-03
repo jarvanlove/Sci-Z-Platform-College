@@ -10,8 +10,14 @@ import com.sciz.server.application.service.knowledge.KnowledgeService;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeChatbotStreamReq;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeCreateReq;
+import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeListQueryReq;
+import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeUpdateReq;
+import com.sciz.server.domain.pojo.dto.request.file.FileBatchUploadReq;
 import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
+import com.sciz.server.domain.pojo.dto.response.file.FileUploadResp;
+import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeFileUploadResp;
 import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeResp;
+import com.sciz.server.infrastructure.shared.utils.FileUtil;
 import com.sciz.server.infrastructure.external.dify.dto.DifyChatbotMessageRequest;
 import com.sciz.server.domain.pojo.entity.file.SysAttachment;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
@@ -20,7 +26,10 @@ import com.sciz.server.domain.pojo.entity.user.SysUser;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeFileRelationRepo;
+import com.sciz.server.domain.pojo.repository.project.ProjectMemberRepo;
+import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
+import com.sciz.server.infrastructure.shared.enums.KnowledgeStatus;
 import com.sciz.server.infrastructure.external.dify.dto.DifyDatasetRequest;
 import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiService;
@@ -32,6 +41,7 @@ import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
 import com.sciz.server.domain.pojo.dto.response.user.LoginUserContext;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
+import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
 import com.sciz.server.interfaces.converter.KnowledgeConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +76,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     private final SysKnowledgeBaseRepo knowledgeBaseRepo;
     private final SysUserRepo userRepo;
+    private final ProjectMemberRepo projectMemberRepo;
+    private final ProjectRepo projectRepo;
     private final DifyApiService difyApiService;
     private final ObjectMapper objectMapper;
     private final DifyApiKeyServiceImpl difyApiKeyService;
@@ -99,11 +111,9 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             log.warn(String.format("知识库名称已存在: name=%s, existingId=%s", req.getName(), existingKnowledge.getId()));
             throw BusinessException.of(ResultCode.KNOWLEDGE_NAME_DUPLICATE, "知识库名称已存在: %s", req.getName());
         }
-
         // 2. 获取用户ID（优先从请求参数获取，否则从上下文获取）
         Long userId = req.getUserId() != null ? req.getUserId() : StpUtil.getLoginIdAsLong();
         log.info(String.format("创建知识库: userId=%s, name=%s", userId, req.getName()));
-
         // 3. 查询用户信息
         SysUser user = userRepo.findById(userId);
         if (user == null) {
@@ -184,6 +194,12 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         entity.setOwnerId(userId);
         entity.setOwnerName(user.getRealName());
         entity.setProjectId(req.getProjectId());
+        entity.setProjectName(req.getProjectName());
+        entity.setKbType(req.getProjectId() != null ? KnowledgeStatus.PROJECT.getCode() : KnowledgeStatus.PERSONAL.getCode());
+        if (req.getProjectId() == null) {
+            entity.setProjectId(null);
+            entity.setProjectName(null);
+        }
         entity.setDifyKbId(difyKnowdataId); // 保留原有字段，兼容旧数据
         entity.setDifyKnowdataId(difyKnowdataId); // 新增字段，存储Dify返回的id
         entity.setCallback(callbackJson); // 存储完整的Dify返回数据
@@ -206,6 +222,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         resp.setOwnerId(entity.getOwnerId());
         resp.setOwnerName(entity.getOwnerName());
         resp.setProjectId(entity.getProjectId());
+        resp.setProjectName(entity.getProjectName());
+        resp.setKbType(entity.getKbType());
         resp.setDifyKbId(entity.getDifyKbId());
         resp.setDifyKnowdataId(entity.getDifyKnowdataId());
         resp.setCallback(entity.getCallback());
@@ -213,6 +231,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         resp.setStatus(entity.getStatus());
         resp.setFileCount(entity.getFileCount());
         resp.setFolderCount(entity.getFolderCount());
+        resp.setCoverFileId(entity.getCoverFileId());
+        resp.setCoverUrl(entity.getCoverUrl());
         resp.setCreatedTime(entity.getCreatedTime());
         resp.setUpdatedTime(entity.getUpdatedTime());
         log.info(String.format("创建知识库成功: id=%s, difyKnowdataId=%s", id, difyKnowdataId));
@@ -241,16 +261,26 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             log.debug("用户未登录，查询所有知识库");
         }
 
-        // 2. 创建分页对象
+        // 2. 判断是否是管理员：管理员可以查看所有知识库，普通用户只能查看自己创建的知识库
+        if (DataPermissionUtil.isAdmin()) {
+            // 管理员：不传递 userId，让 Repository 查询所有知识库
+            userId = null;
+            log.info("管理员查询所有知识库");
+        } else if (userId != null) {
+            // 普通用户：只能查看自己创建的知识库
+            log.info(String.format("普通用户查询自己的知识库: userId=%s", userId));
+        }
+
+        // 3. 创建分页对象
         Page<SysKnowledgeBase> pageParam = new Page<>(page, size);
 
-        // 3. 执行分页查询
+        // 4. 执行分页查询
         var pageResult = knowledgeBaseRepo.pageByCondition(pageParam, userId);
 
-        // 4. 转换为响应DTO列表
+        // 5. 转换为响应DTO列表
         var respList = knowledgeConverter.toRespList(pageResult.getRecords());
 
-        // 5. 构建分页结果
+        // 6. 构建分页结果
         var result = new PageResult<KnowledgeResp>(
                 respList,
                 pageResult.getTotal(),
@@ -259,6 +289,89 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
         log.info(String.format("分页查询知识库成功: total=%s, current=%s, size=%s",
                 result.getTotal(), result.getCurrent(), result.getSize()));
+        return result;
+    }
+
+    /**
+     * 分页查询知识库列表（支持关键字搜索）
+     *
+     * @param req 查询请求（包含分页参数和关键字）
+     * @return 知识库分页结果
+     */
+    @Override
+    public PageResult<KnowledgeResp> pageKnowledgeBases(KnowledgeListQueryReq req) {
+        // 1. 获取当前登录用户ID（如果已登录）
+        Long userId = null;
+        try {
+            if (StpUtil.isLogin()) {
+                userId = StpUtil.getLoginIdAsLong();
+                log.info(String.format("分页查询知识库（支持关键字）: userId=%s, pageNo=%s, pageSize=%s, keyword=%s",
+                        userId, req.pageNo(), req.pageSize(), req.keyword()));
+            } else {
+                log.info(String.format("分页查询知识库（支持关键字，未登录）: pageNo=%s, pageSize=%s, keyword=%s",
+                        req.pageNo(), req.pageSize(), req.keyword()));
+            }
+        } catch (Exception e) {
+            log.debug("用户未登录，查询所有知识库");
+        }
+
+        // 2. 可见性：管理员查全部；普通用户 = 本人创建的 + 作为项目成员或项目负责人可见的项目知识库（负责人视为拥有全部权限的成员）
+        List<Long> memberProjectIds = List.of();
+        if (!DataPermissionUtil.isAdmin() && userId != null) {
+            List<Long> asMember = projectMemberRepo.findProjectIdsByUserId(userId);
+            List<Long> asManager = projectRepo.findProjectIdsByManagerId(userId);
+            List<Long> merged = new ArrayList<>(asMember);
+            for (Long pid : asManager) {
+                if (!merged.contains(pid)) merged.add(pid);
+            }
+            memberProjectIds = merged;
+            log.info(String.format("普通用户查询知识库: userId=%s, kbType=%s, memberProjectCount=%d",
+                    userId, req.kbType(), memberProjectIds.size()));
+        } else if (DataPermissionUtil.isAdmin()) {
+            userId = null;
+            log.info("管理员查询所有知识库");
+        }
+
+        // 3. 创建分页对象
+        Page<SysKnowledgeBase> pageParam = new Page<>(req.pageNo(), req.pageSize());
+
+        // 4. 判断排序方式
+        boolean asc = "ASC".equalsIgnoreCase(req.sortOrder());
+
+        // 5. 执行分页查询（支持类型筛选、关键字、项目成员可见性）
+        var pageResult = knowledgeBaseRepo.pageByCondition(pageParam, userId, memberProjectIds,
+                req.kbType(), req.keyword(), req.sortBy(), asc);
+
+        // 6. 转换为响应DTO列表
+        var respList = knowledgeConverter.toRespList(pageResult.getRecords());
+
+        // 7. 为每个知识库的封面URL生成预签名URL，并设置 canEdit（供前端显示删除按钮等）
+        var records = pageResult.getRecords();
+        for (int i = 0; i < respList.size(); i++) {
+            var resp = respList.get(i);
+            if (resp.getCoverUrl() != null && !resp.getCoverUrl().trim().isEmpty()) {
+                var presignedUrl = fileService.generatePresignedUrlFromFileUrl(resp.getCoverUrl(), null);
+                if (presignedUrl != null) resp.setCoverUrl(presignedUrl);
+            }
+            if (i < records.size()) {
+                var entity = records.get(i);
+                // 可编辑：管理员 / 创建人；个人知识库共享给他人后他人仅查看；项目知识库仅创建人/项目负责人可编辑，项目成员仅查看
+                boolean canEdit = DataPermissionUtil.isAdmin()
+                        || (userId != null && entity.getOwnerId() != null && entity.getOwnerId().equals(userId))
+                        || (entity.getProjectId() != null && userId != null && projectRepo.findProjectIdsByManagerId(userId).contains(entity.getProjectId()));
+                resp.setCanEdit(canEdit);
+            }
+        }
+
+        // 8. 构建分页结果
+        var result = new PageResult<KnowledgeResp>(
+                respList,
+                pageResult.getTotal(),
+                pageResult.getCurrent(),
+                pageResult.getSize());
+
+        log.info(String.format("分页查询知识库成功（支持关键字）: total=%s, current=%s, size=%s, keyword=%s",
+                result.getTotal(), result.getCurrent(), result.getSize(), req.keyword()));
         return result;
     }
 
@@ -277,34 +390,94 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     /**
-     * 上传多个文件到知识库（异步上传）
+     * 上传多个文件到知识库（异步上传，支持部分成功）
      *
      * @param knowledgeId 知识库ID（Dify知识库ID，String类型）
      * @param files       上传的文件列表
      * @param folderId    文件夹ID（可选，0为根目录）
+     * @return 每个文件的上传结果列表（包含成功和失败的详细信息）
      */
     @Transactional(rollbackFor = Exception.class)
-    public void uploadFiles(int knowledgeId, List<MultipartFile> files, Long folderId) {
+    public List<KnowledgeFileUploadResp> uploadFiles(int knowledgeId, List<MultipartFile> files, Long folderId) {
         if (files == null || files.isEmpty()) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "文件列表不能为空");
         }
+        
         // 1. 获取当前登录用户ID
         Long userId = StpUtil.getLoginIdAsLong();
-        log.info(String.format("上传多个文件到知识库: userId=%s, knowledgeId=%s, fileCount=%s, folderId=%s",
+        log.info(String.format("上传多个文件到知识库: userId=%s, knowledgeId=%s, fileCount=%d, folderId=%s",
                 userId, knowledgeId, files.size(), folderId));
+        
         // 2. 根据Dify知识库ID查询知识库信息
         SysKnowledgeBase knowledgeBase = knowledgeBaseRepo.findByDifyKnowdataId(knowledgeId);
         if (knowledgeBase == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND, "知识库不存在");
         }
-        // 3. 使用传入的 knowledgeId 作为 Dify 数据集ID
+        // 2.1 权限：管理员可上传；普通用户 = 创建人 或 项目知识库的项目成员 或 项目负责人（负责人视为拥有全部权限的成员）
+        if (!DataPermissionUtil.isAdmin()) {
+            boolean isOwner = knowledgeBase.getOwnerId().equals(userId);
+            boolean isProjectMember = knowledgeBase.getProjectId() != null
+                    && projectMemberRepo.findByProjectIdAndUserId(knowledgeBase.getProjectId(), userId) != null;
+            boolean isProjectManager = knowledgeBase.getProjectId() != null
+                    && projectRepo.findProjectIdsByManagerId(userId).contains(knowledgeBase.getProjectId());
+            if (!isOwner && !isProjectMember && !isProjectManager) {
+                throw BusinessException.of(ResultCode.FORBIDDEN, "无权向该知识库上传文件");
+            }
+        }
+
+        // 3. 构建文件批量上传请求
+        FileBatchUploadReq batchUploadReq = new FileBatchUploadReq(
+                files.toArray(new MultipartFile[0]),
+                AttachmentRelationStatus.KNOWLEDGE.getCode(),
+                knowledgeBase.getId(),
+                knowledgeBase.getName(),
+                AttachmentCategoryStatus.DOCUMENT.getCode(),
+                0
+        );
+        
+        // 4. 🔥 使用通用的文件服务方法（支持进度返回，支持部分成功）
+        List<FileUploadResp> fileUploadResults = fileService.uploadBatchWithProgress(batchUploadReq);
+        
+        // 5. 将 FileUploadResp 转换为 KnowledgeFileUploadResp，并处理 Dify 上传
+        List<KnowledgeFileUploadResp> results = new ArrayList<>();
+        List<FileUploadResp> minioSuccessResults = new ArrayList<>(); // 成功上传到 MinIO 的文件
+        List<Integer> minioSuccessIndices = new ArrayList<>(); // 成功上传到 MinIO 的文件在 results 中的索引
+        
+        for (int i = 0; i < fileUploadResults.size(); i++) {
+            FileUploadResp fileResult = fileUploadResults.get(i);
+            
+            // 转换为 KnowledgeFileUploadResp
+            KnowledgeFileUploadResp knowledgeResult = KnowledgeFileUploadResp.builder()
+                    .fileName(fileResult.getFileName())
+                    .success(fileResult.getSuccess())
+                    .errorMessage(fileResult.getErrorMessage())
+                    .attachmentId(fileResult.getAttachmentId())
+                    .fileSize(fileResult.getFileSize())
+                    .stage(fileResult.getStage())
+                    .stageDescription(fileResult.getStageDescription())
+                    .build();
+            results.add(knowledgeResult);
+            
+            // 记录成功上传到 MinIO 的文件（stage >= 2，即使最终可能失败）
+            if (fileResult.getStage() != null && fileResult.getStage() >= 2 
+                    && fileResult.getAttachmentId() != null) {
+                minioSuccessResults.add(fileResult);
+                minioSuccessIndices.add(i);
+            }
+        }
+        
+        if (minioSuccessResults.isEmpty()) {
+            log.warn(String.format("所有文件MinIO上传失败: knowledgeId=%s, total=%d",
+                    knowledgeId, files.size()));
+            return results; // 返回所有结果（包含失败信息）
+        }
+        
+        // 6. 获取 Dify 相关配置
         String datasetId = knowledgeBase.getDifyKbId();
-        // 4. 查询用户信息
         SysUser user = userRepo.findById(userId);
         if (user == null) {
             throw new BusinessException(ResultCode.USER_NOT_FOUND);
         }
-        // 5. 获取用户的 data Dify API Key
         DifyApiKey difyApiKey = null;
         QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
         queryWrapper
@@ -312,144 +485,151 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 .eq("is_active", true)
                 .last("LIMIT 1");
         difyApiKey = difyApiKeyService.getOne(queryWrapper);
-        // 6. 确定 resourceId
         String resourceId = Optional.ofNullable(difyApiKey)
                 .map(DifyApiKey::getResourceId)
                 .orElse(defaultResourceId);
-
-        // 7. 先异步批量上传文件到 MinIO
-        log.info(String.format("开始异步上传 %d 个文件到 MinIO", files.size()));
-        // 构建用户上下文，用于异步线程
-        LoginUserContext userContext = LoginUserContext.of(
-                user.getId(),
-                user.getUsername(),
-                user.getRealName() != null ? user.getRealName() : user.getUsername(),
-                null, null, null, null, null);
-        List<CompletableFuture<FileInfoResp>> minioFutures = new ArrayList<>();
-        for (MultipartFile file : files) {
-            CompletableFuture<FileInfoResp> minioFuture = CompletableFuture.supplyAsync(() -> {
-                try {
-                    // 设置异步用户上下文，使 LoginUserUtil 和 DataPermissionUtil 在异步线程中也能正常工作
-                    AsyncUserContext.set(userContext);
-
-                    FileUploadReq fileUploadReq = new FileUploadReq();
-                    fileUploadReq.setFile(file);
-                    fileUploadReq.setRelationType(AttachmentRelationStatus.KNOWLEDGE.getCode());
-                    fileUploadReq.setRelationId(knowledgeBase.getId());
-                    fileUploadReq.setRelationName(knowledgeBase.getName());
-                    fileUploadReq.setAttachmentType(AttachmentCategoryStatus.DOCUMENT.getCode());
-                    fileUploadReq.setIsPublic(0);
-
-                    log.info(String.format("异步上传文件到 MinIO: fileName=%s", file.getOriginalFilename()));
-                    return fileService.upload(fileUploadReq, userId, user.getRealName());
-                } catch (BusinessException e) {
-                    // 如果是业务异常（如文件大小超出限制），直接抛出，保留原始错误信息
-                    log.error(String.format("MinIO上传文件失败（业务异常）: fileName=%s, error=%s",
-                            file.getOriginalFilename(), e.getMessage()), e);
-                    throw e;
-                } catch (Exception e) {
-                    // 其他异常包装成业务异常
-                    log.error(String.format("MinIO上传文件失败: fileName=%s, error=%s",
-                            file.getOriginalFilename(), e.getMessage()), e);
-                    throw new BusinessException(ResultCode.SERVER_ERROR,
-                            String.format("MinIO上传文件失败: %s - %s", file.getOriginalFilename(), e.getMessage()));
-                } finally {
-                    // 清理异步用户上下文（防止内存泄漏）
-                    AsyncUserContext.clear();
+        
+        // 7. 从成功上传的文件中获取 MultipartFile（用于 Dify 上传）
+        List<MultipartFile> difyUploadFiles = new ArrayList<>();
+        for (FileUploadResp fileResult : minioSuccessResults) {
+            // 从原始文件列表中找到对应的文件
+            for (MultipartFile file : files) {
+                if (file.getOriginalFilename().equals(fileResult.getFileName())) {
+                    difyUploadFiles.add(file);
+                    break;
                 }
-            }, globalTaskExecutor);
-            minioFutures.add(minioFuture);
-        }
-
-        // 8. 等待所有 MinIO 上传完成
-        CompletableFuture.allOf(minioFutures.toArray(new CompletableFuture[0])).join();
-
-        // 9. 收集 MinIO 上传结果
-        List<FileInfoResp> minioResults = new ArrayList<>();
-        for (int i = 0; i < minioFutures.size(); i++) {
-            CompletableFuture<FileInfoResp> future = minioFutures.get(i);
-            MultipartFile file = files.get(i);
-            try {
-                FileInfoResp result = future.get();
-                if (result != null && result.id() != null) {
-                    minioResults.add(result);
-                    log.info(String.format("MinIO上传成功: attachmentId=%s", result.id()));
-                } else {
-                    throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED,
-                            String.format("MinIO上传失败: %s - 返回结果为空", file.getOriginalFilename()));
-                }
-            } catch (java.util.concurrent.ExecutionException e) {
-                // 获取异步执行时的异常
-                Throwable cause = e.getCause();
-                if (cause instanceof BusinessException) {
-                    // 如果是业务异常，直接抛出，保留原始错误信息
-                    log.error(String.format("获取MinIO上传结果失败（业务异常）: fileName=%s, error=%s",
-                            file.getOriginalFilename(), cause.getMessage()), cause);
-                    throw (BusinessException) cause;
-                } else {
-                    // 其他异常包装成业务异常
-                    log.error(String.format("获取MinIO上传结果失败: fileName=%s, error=%s",
-                            file.getOriginalFilename(), cause != null ? cause.getMessage() : e.getMessage()), e);
-                    throw new BusinessException(ResultCode.SERVER_ERROR,
-                            String.format("MinIO上传失败: %s - %s",
-                                    file.getOriginalFilename(),
-                                    cause != null ? cause.getMessage() : e.getMessage()));
-                }
-            } catch (Exception e) {
-                log.error(String.format("获取MinIO上传结果失败: fileName=%s, error=%s",
-                        file.getOriginalFilename(), e.getMessage()), e);
-                throw new BusinessException(ResultCode.SERVER_ERROR,
-                        String.format("MinIO上传失败: %s - %s", file.getOriginalFilename(), e.getMessage()));
             }
         }
-        if (minioResults.size() != files.size()) {
-            log.error(String.format("MinIO上传结果数量不匹配: expected=%d, actual=%d",
-                    files.size(), minioResults.size()));
-            throw new BusinessException(ResultCode.SERVER_ERROR, "MinIO上传失败: 结果数量不匹配");
-        }
-        // 10. 异步上传文件到 Dify API
-        log.info(String.format("开始异步上传 %d 个文件到 Dify API", files.size()));
+        
+        // 8. 异步上传文件到 Dify API（只上传成功上传到 MinIO 的文件）
+        log.info(String.format("开始异步上传 %d 个文件到 Dify API", difyUploadFiles.size()));
         CompletableFuture<List<ResponseEntity<String>>> difyUploadFuture = difyApiService.uploadDocumentsAsync(
-                datasetId, files, userId, resourceId, "dataset");
+                datasetId, difyUploadFiles, userId, resourceId, "dataset");
 
-        // 11. 等待 Dify 上传完成并处理结果
+        // 9. 等待 Dify 上传完成并处理结果
         List<ResponseEntity<String>> difyResponses;
         try {
             difyResponses = difyUploadFuture.get();
         } catch (Exception e) {
             log.error(String.format("异步上传文件到Dify失败: knowledgeId=%s, error=%s", knowledgeId, e.getMessage()), e);
-            throw new BusinessException(ResultCode.SERVER_ERROR, "上传文件到Dify失败: " + e.getMessage());
+            // 🔥 优化方案2：Dify 上传失败时，更新所有相关文件的结果
+            for (int i = 0; i < minioSuccessResults.size(); i++) {
+                FileUploadResp fileResult = minioSuccessResults.get(i);
+                int fileResultIndex = minioSuccessIndices.get(i);
+                results.set(fileResultIndex, KnowledgeFileUploadResp.builder()
+                        .fileName(fileResult.getFileName())
+                        .success(false)
+                        .errorMessage("Dify上传失败: " + e.getMessage())
+                        .attachmentId(fileResult.getAttachmentId())
+                        .fileSize(fileResult.getFileSize())
+                        .stage(3)
+                        .stageDescription("Dify上传失败")
+                        .build());
+            }
+            return results;
         }
 
-        if (difyResponses == null || difyResponses.size() != files.size()) {
+        if (difyResponses == null || difyResponses.size() != difyUploadFiles.size()) {
             log.error(String.format("Dify上传结果数量不匹配: expected=%d, actual=%d",
-                    files.size(), difyResponses != null ? difyResponses.size() : 0));
-            throw new BusinessException(ResultCode.SERVER_ERROR, "Dify上传失败: 结果数量不匹配");
+                    difyUploadFiles.size(), difyResponses != null ? difyResponses.size() : 0));
+            // 🔥 优化方案2：结果数量不匹配时，更新所有相关文件的结果
+            for (int i = 0; i < minioSuccessResults.size(); i++) {
+                FileUploadResp fileResult = minioSuccessResults.get(i);
+                int fileResultIndex = minioSuccessIndices.get(i);
+                results.set(fileResultIndex, KnowledgeFileUploadResp.builder()
+                        .fileName(fileResult.getFileName())
+                        .success(false)
+                        .errorMessage("Dify上传失败: 结果数量不匹配")
+                        .attachmentId(fileResult.getAttachmentId())
+                        .fileSize(fileResult.getFileSize())
+                        .stage(3)
+                        .stageDescription("Dify上传失败")
+                        .build());
+            }
+            return results;
         }
-        // 12. 处理每个文件的上传结果
-        List<String> successFiles = new ArrayList<>();
-        List<String> failedFiles = new ArrayList<>();
-        for (int i = 0; i < files.size(); i++) {
-            MultipartFile file = files.get(i);
-            FileInfoResp minioResult = minioResults.get(i);
+        
+        // 10. 🔥 处理每个文件的上传结果，更新详细状态
+        for (int i = 0; i < difyUploadFiles.size(); i++) {
+            MultipartFile file = difyUploadFiles.get(i);
+            FileUploadResp fileResult = minioSuccessResults.get(i);
             ResponseEntity<String> difyResponse = difyResponses.get(i);
+            int fileResultIndex = minioSuccessIndices.get(i);
+            
             try {
+                // 更新阶段：Dify 上传中
+                results.set(fileResultIndex, KnowledgeFileUploadResp.builder()
+                        .fileName(file.getOriginalFilename())
+                        .success(false)
+                        .attachmentId(fileResult.getAttachmentId())
+                        .fileSize(file.getSize())
+                        .stage(3)
+                        .stageDescription("Dify上传中")
+                        .build());
+                
+                // 从数据库查询附件信息
+                SysAttachment attachment = attachmentRepo.findById(fileResult.getAttachmentId());
+                if (attachment == null) {
+                    throw new BusinessException(ResultCode.DATA_NOT_FOUND, "附件不存在");
+                }
+                
+                // 构建 FileInfoResp
+                FileInfoResp minioResult = new FileInfoResp(
+                        attachment.getId(),
+                        attachment.getFileName(),
+                        attachment.getOriginalName(),
+                        attachment.getFileType(),
+                        attachment.getFileExtension(),
+                        attachment.getFileSize(),
+                        attachment.getMimeType(),
+                        attachment.getFileUrl(),
+                        attachment.getFilePath(),
+                        attachment.getMd5Hash(),
+                        attachment.getIsPublic(),
+                        attachment.getDownloadCount(),
+                        attachment.getUploaderId(),
+                        attachment.getUploaderName(),
+                        attachment.getUploadTime(),
+                        null,
+                        null
+                );
+                
                 processSingleFileUpload(knowledgeId, file, folderId, difyResponse, userId, knowledgeBase, minioResult);
-                successFiles.add(file.getOriginalFilename());
-                log.info(String.format("文件上传成功: fileName=%s", file.getOriginalFilename()));
+                
+                // 更新结果：全部完成
+                results.set(fileResultIndex, KnowledgeFileUploadResp.builder()
+                        .fileName(file.getOriginalFilename())
+                        .success(true)
+                        .attachmentId(fileResult.getAttachmentId())
+                        .fileSize(file.getSize())
+                        .stage(5)
+                        .stageDescription("上传完成")
+                        .build());
+                log.info(String.format("文件上传成功: fileName=%s, attachmentId=%s", 
+                        file.getOriginalFilename(), fileResult.getAttachmentId()));
             } catch (Exception e) {
-                failedFiles.add(file.getOriginalFilename());
+                // 更新结果：处理失败
+                results.set(fileResultIndex, KnowledgeFileUploadResp.builder()
+                        .fileName(file.getOriginalFilename())
+                        .success(false)
+                        .errorMessage("处理文件上传结果失败: " + e.getMessage())
+                        .attachmentId(fileResult.getAttachmentId())
+                        .fileSize(file.getSize())
+                        .stage(4)
+                        .stageDescription("处理失败")
+                        .build());
                 log.error(String.format("处理文件上传结果失败: fileName=%s, error=%s",
                         file.getOriginalFilename(), e.getMessage()), e);
             }
         }
+        
+        // 11. 统计并返回结果
+        long successCount = results.stream().filter(r -> r.getSuccess() != null && r.getSuccess()).count();
+        long failedCount = results.stream().filter(r -> r.getSuccess() == null || !r.getSuccess()).count();
         log.info(String.format("批量上传完成: knowledgeId=%s, total=%d, success=%d, failed=%d",
-                knowledgeId, files.size(), successFiles.size(), failedFiles.size()));
-        // 10. 如果有文件上传失败，抛出异常
-        if (!failedFiles.isEmpty()) {
-            throw new BusinessException(ResultCode.SERVER_ERROR,
-                    String.format("部分文件上传失败: %s", String.join(", ", failedFiles)));
-        }
+                knowledgeId, files.size(), successCount, failedCount));
+        
+        return results;
     }
 
     /**
@@ -702,8 +882,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        log.info(String.format("删除知识库: userId=%s, id=%s", userId, id));
+        log.info(String.format("删除知识库: id=%s", id));
 
         // 1. 查询知识库实体
         SysKnowledgeBase entity = knowledgeBaseRepo.findById(id);
@@ -711,18 +890,24 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND, "知识库不存在");
         }
 
-        // 2. 检查权限（只能删除自己创建的知识库）
-        if (!entity.getOwnerId().equals(userId)) {
-            throw new BusinessException(ResultCode.FORBIDDEN, "无权删除该知识库");
+        // 2. 关联项目的知识库不允许删除
+        if (entity.getProjectId() != null) {
+            String projectName = (entity.getProjectName() != null && !entity.getProjectName().trim().isEmpty())
+                    ? entity.getProjectName() : "未知项目";
+            throw BusinessException.of(ResultCode.FORBIDDEN, "当前知识库关联项目名称%s,不允许删除！", projectName);
         }
 
-        // 3. 如果存在 Dify 数据集ID，调用 Dify API 删除数据集
+        // 3. 检查权限：个人知识库仅创建人可删除；项目知识库已在步骤2禁止删除
+        if (!DataPermissionUtil.isAdmin() && !entity.getOwnerId().equals(StpUtil.getLoginIdAsLong())) {
+            throw BusinessException.of(ResultCode.FORBIDDEN, "无权删除该知识库");
+        }
+
+        // 4. 如果存在 Dify 数据集ID，调用 Dify API 删除数据集
         if (entity.getDifyKnowdataId() != null && !entity.getDifyKnowdataId().trim().isEmpty()) {
             try {
                 // 获取用户的 Dify API Key
                 QueryWrapper<DifyApiKey> queryWrapper = new QueryWrapper<>();
-                queryWrapper.eq("user_id", userId)
-                        .eq("key_type", "dataset")
+                queryWrapper.eq("key_type", "dataset")
                         .eq("is_active", true)
                         .last("LIMIT 1");
                 DifyApiKey difyApiKey = difyApiKeyService.getOne(queryWrapper);
@@ -733,7 +918,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
                 // 调用 Dify API 删除数据集
                 ResponseEntity<String> response = difyApiService.deleteDataset(
-                        entity.getDifyKnowdataId(), userId, resourceId, "dataset");
+                        entity.getDifyKnowdataId(),  resourceId, "dataset");
 
                 if (!response.getStatusCode().is2xxSuccessful()) {
                     log.warn(String.format("Dify API删除数据集失败: datasetId=%s, status=%s, body=%s",
@@ -748,11 +933,209 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 // 即使 Dify API 调用异常，也继续删除本地数据（避免数据不一致）
             }
         }
-        // 4. 软删除本地知识库
+        // 5. 软删除本地知识库
         boolean success = knowledgeBaseRepo.deleteById(id);
         if (!success) {
             throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
         }
         log.info(String.format("删除知识库成功: id=%s", id));
+    }
+
+    /**
+     * 更新知识库
+     *
+     * @param id  知识库ID
+     * @param req 更新请求
+     * @return 知识库响应
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public KnowledgeResp update(Long id, KnowledgeUpdateReq req) {
+        Long userId = StpUtil.getLoginIdAsLong();
+        log.info(String.format("更新知识库: userId=%s, id=%s", userId, id));
+
+        // 1. 查询知识库实体
+        SysKnowledgeBase entity = knowledgeBaseRepo.findById(id);
+        if (entity == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND, "知识库不存在");
+        }
+
+        // 2. 检查权限：管理员可更新全部；普通用户 = 创建人 或 项目知识库的项目成员 或 项目负责人
+        if (!DataPermissionUtil.isAdmin()) {
+            boolean isOwner = entity.getOwnerId().equals(userId);
+            boolean isProjectMember = entity.getProjectId() != null
+                    && projectMemberRepo.findByProjectIdAndUserId(entity.getProjectId(), userId) != null;
+            boolean isProjectManager = entity.getProjectId() != null
+                    && projectRepo.findProjectIdsByManagerId(userId).contains(entity.getProjectId());
+            if (!isOwner && !isProjectMember && !isProjectManager) {
+                throw BusinessException.of(ResultCode.FORBIDDEN, "无权更新该知识库");
+            }
+        }
+
+        // 3. 更新字段（只更新非空字段）
+        boolean hasUpdate = false;
+        if (req.getName() != null && !req.getName().trim().isEmpty()) {
+            // 检查名称是否重复（排除自己）
+            var existingKnowledge = knowledgeBaseRepo.findByName(req.getName().trim());
+            if (existingKnowledge != null && !existingKnowledge.getId().equals(id)) {
+                throw BusinessException.of(ResultCode.KNOWLEDGE_NAME_DUPLICATE, "知识库名称已存在: %s", req.getName());
+            }
+            entity.setName(req.getName().trim());
+            hasUpdate = true;
+        }
+        if (req.getDescription() != null) {
+            entity.setDescription(req.getDescription());
+            hasUpdate = true;
+        }
+        if (req.getProjectId() != null) {
+            entity.setProjectId(req.getProjectId());
+            hasUpdate = true;
+        }
+        // 仅个人知识库允许修改 is_shared；项目知识库忽略共享字段
+        if (req.getIsShared() != null && entity.getProjectId() == null) {
+            entity.setIsShared(req.getIsShared());
+            hasUpdate = true;
+        }
+
+        // 4. 如果有更新，保存到数据库
+        if (hasUpdate) {
+            entity.setUpdatedBy(userId);
+            boolean success = knowledgeBaseRepo.updateById(entity);
+            if (!success) {
+                throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+            }
+            log.info(String.format("更新知识库成功: id=%s", id));
+        } else {
+            log.info(String.format("知识库无需更新: id=%s", id));
+        }
+
+        // 5. 构建响应
+        return knowledgeConverter.toResp(entity);
+    }
+
+    @Override
+    public KnowledgeResp getById(Long id) {
+        SysKnowledgeBase entity = knowledgeBaseRepo.findById(id);
+        if (entity == null) {
+            throw BusinessException.of(ResultCode.DATA_NOT_FOUND, "知识库不存在");
+        }
+        Long userId = null;
+        try {
+            if (StpUtil.isLogin()) {
+                userId = StpUtil.getLoginIdAsLong();
+            }
+        } catch (Exception ignored) {
+        }
+        // 可见性：管理员可见全部；否则 = 本人创建的 OR 项目成员/负责人可见的项目知识库 OR 他人公开的个人知识库
+        if (!DataPermissionUtil.isAdmin() && userId != null) {
+            boolean isOwner = entity.getOwnerId().equals(userId);
+            boolean isProjectMember = entity.getProjectId() != null
+                    && projectMemberRepo.findByProjectIdAndUserId(entity.getProjectId(), userId) != null;
+            boolean isProjectManager = entity.getProjectId() != null
+                    && projectRepo.findProjectIdsByManagerId(userId).contains(entity.getProjectId());
+            boolean isSharedPersonal = entity.getProjectId() == null
+                    && Integer.valueOf(1).equals(entity.getIsShared());
+            if (!isOwner && !isProjectMember && !isProjectManager && !isSharedPersonal) {
+                throw BusinessException.of(ResultCode.FORBIDDEN, "无权查看该知识库");
+            }
+        } else if (!DataPermissionUtil.isAdmin() && userId == null) {
+            // 未登录仅允许查看公开个人知识库
+            boolean isSharedPersonal = entity.getProjectId() == null
+                    && Integer.valueOf(1).equals(entity.getIsShared());
+            if (!isSharedPersonal) {
+                throw BusinessException.of(ResultCode.FORBIDDEN, "无权查看该知识库");
+            }
+        }
+        KnowledgeResp resp = knowledgeConverter.toResp(entity);
+        // 可编辑：管理员 / 创建人；个人知识库共享后他人仅查看；项目知识库仅创建人/项目负责人可编辑，项目成员仅查看
+        boolean canEdit = DataPermissionUtil.isAdmin()
+                || (userId != null && entity.getOwnerId() != null && entity.getOwnerId().equals(userId))
+                || (entity.getProjectId() != null && userId != null && projectRepo.findProjectIdsByManagerId(userId).contains(entity.getProjectId()));
+        resp.setCanEdit(canEdit);
+        if (resp.getCoverUrl() != null && !resp.getCoverUrl().trim().isEmpty()) {
+            var presignedUrl = fileService.generatePresignedUrlFromFileUrl(resp.getCoverUrl(), null);
+            if (presignedUrl != null) {
+                resp.setCoverUrl(presignedUrl);
+            }
+        }
+        return resp;
+    }
+
+    /**
+     * 上传知识库封面
+     *
+     * @param knowledgeId 知识库ID
+     * @param file        封面图片文件
+     * @return 知识库响应（包含更新后的封面信息）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public KnowledgeResp uploadCover(Long knowledgeId, MultipartFile file) {
+        // 1. 获取当前登录用户ID
+        Long userId = StpUtil.getLoginIdAsLong();
+        log.info(String.format("上传知识库封面开始: userId=%s, knowledgeId=%s, fileName=%s",
+                userId, knowledgeId, file.getOriginalFilename()));
+
+        // 2. 查询知识库实体
+        SysKnowledgeBase entity = knowledgeBaseRepo.findById(knowledgeId);
+        if (entity == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_FOUND, "知识库不存在");
+        }
+
+        // 3. 检查权限：管理员可更新全部；普通用户 = 创建人 或 项目知识库的项目成员 或 项目负责人
+        if (!DataPermissionUtil.isAdmin()) {
+            boolean isOwner = entity.getOwnerId().equals(userId);
+            boolean isProjectMember = entity.getProjectId() != null
+                    && projectMemberRepo.findByProjectIdAndUserId(entity.getProjectId(), userId) != null;
+            boolean isProjectManager = entity.getProjectId() != null
+                    && projectRepo.findProjectIdsByManagerId(userId).contains(entity.getProjectId());
+            if (!isOwner && !isProjectMember && !isProjectManager) {
+                throw BusinessException.of(ResultCode.FORBIDDEN, "无权更新该知识库");
+            }
+        }
+
+        // 4. 查询用户信息
+        SysUser user = userRepo.findById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.USER_NOT_FOUND);
+        }
+
+        // 5. 调用文件服务上传封面
+        FileUploadReq fileUploadReq = new FileUploadReq();
+        fileUploadReq.setFile(file);
+        fileUploadReq.setRelationType(AttachmentRelationStatus.KNOWLEDGE.getCode());
+        fileUploadReq.setRelationId(knowledgeId);
+        fileUploadReq.setRelationName(entity.getName());
+        fileUploadReq.setAttachmentType(AttachmentCategoryStatus.IMAGE.getCode());
+        fileUploadReq.setIsPublic(0);
+
+        FileInfoResp fileInfo = fileService.upload(fileUploadReq, userId, user.getRealName());
+
+        // 6. 更新知识库封面URL和附件ID（使用fileUrl，存储格式：bucketName/filePath）
+        entity.setCoverUrl(fileInfo.fileUrl());
+        entity.setCoverFileId(fileInfo.id());
+        entity.setUpdatedBy(userId);
+
+        boolean success = knowledgeBaseRepo.updateById(entity);
+        if (!success) {
+            log.error(String.format("更新知识库封面失败: knowledgeId=%s", knowledgeId));
+            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
+        }
+
+        log.info(String.format("上传知识库封面成功: knowledgeId=%s, coverUrl=%s, coverFileId=%s",
+                knowledgeId, fileInfo.fileUrl(), fileInfo.id()));
+
+        // 7. 转换为响应DTO
+        var resp = knowledgeConverter.toResp(entity);
+
+        // 8. 为封面URL生成预签名URL（参考pageKnowledgeBases方法的处理方式）
+        if (resp.getCoverUrl() != null && !resp.getCoverUrl().trim().isEmpty()) {
+            var presignedUrl = fileService.generatePresignedUrlFromFileUrl(resp.getCoverUrl(), null);
+            if (presignedUrl != null) {
+                resp.setCoverUrl(presignedUrl);
+            }
+        }
+
+        return resp;
     }
 }

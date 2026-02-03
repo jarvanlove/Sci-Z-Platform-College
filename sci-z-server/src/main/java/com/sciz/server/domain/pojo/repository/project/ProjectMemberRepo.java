@@ -47,6 +47,14 @@ public interface ProjectMemberRepo {
     ProjectMember findByProjectIdAndUserId(Long projectId, Long userId);
 
     /**
+     * 根据用户ID查询其作为成员的项目ID列表（用于知识库可见性：项目成员可见项目知识库）
+     *
+     * @param userId Long 用户ID
+     * @return 项目ID列表，未删除的成员记录
+     */
+    List<Long> findProjectIdsByUserId(Long userId);
+
+    /**
      * 更新项目成员
      *
      * @param entity ProjectMember 实体

@@ -458,7 +458,7 @@ public class ReportManagementServiceImpl implements ReportManagementService {
         // 注意：必须显式调用带 body 参数的重载方法，避免 Map 类型匹配到 params 参数的重载方法
         log.info(String.format("调用 Dify 工作流（阻塞模式）: workflowId=%s, userId=%s", workflowId, userId));
         ResponseEntity<String> response = difyApiClient.request(
-                "POST", "/workflows/run", (Object) requestBody, userId, workflowId,
+                "POST", "/workflows/run", (Object) requestBody, workflowId,
                 DifyApiKey.KeyType.WORKFLOW.getCode());
         if (!response.getStatusCode().is2xxSuccessful()) {
             log.error(String.format("Dify 工作流执行失败: statusCode=%s, body=%s",

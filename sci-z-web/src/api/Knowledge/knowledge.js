@@ -6,7 +6,7 @@ import { KNOWLEDGE_API, HTTP_METHODS, API_BASE_URL } from '../Common/constants'
  *
  */
 /**
- * 获取知识库列表
+ * 获取知识库列表（旧接口，保留兼容）
  * @param {Object} params - 查询参数
  * @param {number} params.page - 页码，默认1
  * @param {number} params.size - 每页数量，默认10
@@ -19,6 +19,32 @@ export const getKnowledgeList = (params = {}) => {
     params: {
       page: params.page || 1,
       size: params.size || 10
+    }
+  })
+}
+
+/**
+ * 分页查询知识库列表（新接口，支持关键字搜索和滚动加载）
+ * @param {Object} params - 查询参数
+ * @param {number} params.pageNo - 页码，默认1
+ * @param {number} params.pageSize - 每页数量，默认10
+ * @param {string} params.keyword - 搜索关键字（知识库名称/描述），非必传
+ * @param {string} params.sortBy - 排序字段，可选
+ * @param {string} params.sortOrder - 排序方式（ASC/DESC），默认DESC
+ * @param {string} params.kbType - 知识库类型筛选：personal=个人知识库，project=项目知识库，不传=全部
+ * @returns {Promise} 知识库列表响应
+ */
+export const getKnowledgeListPage = (params = {}) => {
+  return request({
+    url: KNOWLEDGE_API.LIST_PAGE,
+    method: HTTP_METHODS.POST,
+    data: {
+      pageNo: params.pageNo || 1,
+      pageSize: params.pageSize || 10,
+      keyword: params.keyword || undefined,
+      sortBy: params.sortBy || undefined,
+      sortOrder: params.sortOrder || undefined,
+      kbType: params.kbType || undefined
     }
   })
 }
@@ -67,6 +93,26 @@ export const updateKnowledge = (id, data) => {
 }
 
 /**
+ * 上传知识库封面
+ * @param {number} id - 知识库ID
+ * @param {File} file - 封面图片文件
+ * @returns {Promise} 上传封面响应
+ */
+export const uploadKnowledgeCover = (id, file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  return request({
+    url: KNOWLEDGE_API.UPLOAD_COVER(id),
+    method: HTTP_METHODS.POST,
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+/**
  * 删除知识库
  * @param {number} id - 知识库ID
  * @returns {Promise} 删除知识库响应
@@ -83,24 +129,74 @@ export const deleteKnowledge = (id) => {
  * @param {number} knowledgeId - 知识库ID
  * @returns {Promise} 文件夹树响应
  */
-export const getKnowledgeFolders = (knowledgeId) => {
+export const getKnowledgeFolderTree = (knowledgeId) => {
   return request({
-    url: KNOWLEDGE_API.FOLDERS(knowledgeId),
+    url: KNOWLEDGE_API.FOLDERS_TREE(knowledgeId),
     method: HTTP_METHODS.GET
   })
 }
 
 /**
+ * 获取文件夹列表（根据父文件夹ID）
+ * @param {number} knowledgeId - 知识库ID
+ * @param {number} [parentId=0] - 父文件夹ID，默认为0（根目录）
+ * @returns {Promise} 文件夹列表响应
+ */
+export const getKnowledgeFolders = (knowledgeId, parentId = 0) => {
+  return request({
+    url: KNOWLEDGE_API.FOLDERS(knowledgeId),
+    method: HTTP_METHODS.GET,
+    params: {
+      parentId: parentId
+    }
+  })
+}
+
+/**
+ * 获取文件夹详情
+ * @param {number} folderId - 文件夹ID
+ * @returns {Promise} 文件夹详情响应
+ */
+export const getKnowledgeFolderDetail = (folderId) => {
+  return request({
+    url: KNOWLEDGE_API.FOLDER_DETAIL(folderId),
+    method: HTTP_METHODS.GET
+  })
+}
+
+/**
+ * 获取知识库文件夹和文件列表（按文件夹分组，支持分页）
+ * @param {number} knowledgeId - 知识库ID
+ * @param {Object} params - 分页参数
+ * @param {number} [params.folderId] - 文件夹ID（可选，null或0表示根目录）
+ * @param {number} params.page - 页码，默认1
+ * @param {number} params.size - 每页数量，默认10
+ * @returns {Promise} 文件夹和文件列表响应（根目录时按文件夹分组，文件夹内时混合列表）
+ */
+export const getKnowledgeFoldersFiles = (knowledgeId, params = {}) => {
+  return request({
+    url: KNOWLEDGE_API.FOLDERS_FILES(knowledgeId),
+    method: HTTP_METHODS.GET,
+    params: {
+      folderId: params.folderId !== undefined && params.folderId !== null ? params.folderId : undefined,
+      page: params.page || 1,
+      size: params.size || 10
+    }
+  })
+}
+
+/**
  * 创建文件夹
+ * @param {number} knowledgeId - 知识库ID
  * @param {Object} data - 文件夹数据
- * @param {string} data.name - 文件夹名称
+ * @param {string} data.folderName - 文件夹名称
  * @param {number} data.knowledgeId - 知识库ID
  * @param {number} data.parentId - 父文件夹ID
  * @returns {Promise} 创建文件夹响应
  */
-export const createKnowledgeFolder = (data) => {
+export const createKnowledgeFolder = (knowledgeId, data) => {
   return request({
-    url: KNOWLEDGE_API.CREATE_FOLDER,
+    url: KNOWLEDGE_API.CREATE_FOLDER(knowledgeId),
     method: HTTP_METHODS.POST,
     data
   })
@@ -181,9 +277,10 @@ export const uploadFileToKnowledge = (difyKbId, file, folderId = 0) => {
  * @param {string|number} knowledgeId - 知识库ID（数据库主键ID）
  * @param {File[]} files - 要上传的文件列表
  * @param {number} [folderId=0] - 文件夹ID，默认为0（根目录）
+ * @param {Function} [onProgress] - 进度回调函数，参数为 (loaded, total, fileIndex)
  * @returns {Promise} 上传文件响应
  */
-export const uploadFilesToKnowledge = (knowledgeId, files, folderId = 0) => {
+export const uploadFilesToKnowledge = (knowledgeId, files, folderId = 0, onProgress = null) => {
   const formData = new FormData()
   
   // 添加多个文件（使用 files 字段名，后端接收 List<MultipartFile>）
@@ -196,6 +293,84 @@ export const uploadFilesToKnowledge = (knowledgeId, files, folderId = 0) => {
     formData.append('folderId', folderId)
   }
   
+  // 如果提供了进度回调，使用 XMLHttpRequest 来监听上传进度
+  if (onProgress && typeof onProgress === 'function') {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      const url = `${import.meta.env.VITE_API_BASE_URL || '/api'}${KNOWLEDGE_API.UPLOAD_BATCH(knowledgeId)}`
+      
+      // 监听上传进度
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const loaded = e.loaded
+          const total = e.total
+          onProgress(loaded, total)
+        }
+      })
+      
+      // 监听请求完成
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText)
+            // 🔥 修复：检查业务错误码，即使 HTTP 状态码是 200，也可能有业务错误
+            if (response.code && response.code !== 200) {
+              const error = new Error(response.message || '上传失败')
+              error.response = response
+              reject(error)
+            } else {
+              resolve(response)
+            }
+          } catch (e) {
+            reject(new Error('解析响应失败'))
+          }
+        } else {
+          try {
+            const error = JSON.parse(xhr.responseText)
+            const err = new Error(error.message || '上传失败')
+            err.response = error
+            reject(err)
+          } catch (e) {
+            reject(new Error(`上传失败: ${xhr.status}`))
+          }
+        }
+      })
+      
+      // 监听错误
+      xhr.addEventListener('error', () => {
+        reject(new Error('网络错误'))
+      })
+      
+      // 监听取消
+      xhr.addEventListener('abort', () => {
+        reject(new Error('上传已取消'))
+      })
+      
+      // 设置请求头（包括认证token）
+      // 注意：在 API 文件中不能直接使用 useAuthStore()，需要动态导入
+      // 先获取 token，然后再打开和发送请求
+      import('@/store/modules/auth').then(({ useAuthStore }) => {
+        const authStore = useAuthStore()
+        
+        // 打开请求
+        xhr.open('POST', url)
+        
+        // 设置请求头
+        if (authStore.token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${authStore.token}`)
+        }
+        
+        // 发送请求
+        xhr.send(formData)
+      }).catch(() => {
+        // 如果导入失败，继续发送请求（可能未登录）
+        xhr.open('POST', url)
+        xhr.send(formData)
+      })
+    })
+  }
+  
+  // 默认使用 axios（不监听进度）
   return request({
     url: KNOWLEDGE_API.UPLOAD_BATCH(knowledgeId),
     method: HTTP_METHODS.POST,
@@ -487,7 +662,8 @@ export const updateKnowledgeFileRelation = (id, data) => {
     url: KNOWLEDGE_API.FILE_RELATION_UPDATE(Number(id)),
     method: HTTP_METHODS.PUT,
     data: {
-      folderId: data.folderId !== undefined ? Number(data.folderId) : undefined,
+      // 后端接口要求 folderId 为 String 类型，"0" 表示根目录，null 或 undefined 表示不更新
+      folderId: data.folderId !== undefined && data.folderId !== null ? String(data.folderId) : undefined,
       fileName: data.fileName,
       sortOrder: data.sortOrder !== undefined ? Number(data.sortOrder) : undefined
     }

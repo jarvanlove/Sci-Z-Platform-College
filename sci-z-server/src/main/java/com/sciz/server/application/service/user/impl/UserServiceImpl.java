@@ -458,6 +458,7 @@ public class UserServiceImpl implements UserService {
                     });
 
             // 2. 规格化入参
+            var username = req.username().trim().toLowerCase(Locale.ROOT);
             var realName = req.realName().trim();
             var email = req.email().trim().toLowerCase(Locale.ROOT);
             var phone = req.phone().trim();
@@ -467,14 +468,15 @@ public class UserServiceImpl implements UserService {
                     .orElseThrow(() -> BusinessException.of(ResultCode.SERVER_ERROR, "行业配置未初始化"));
             var departmentCode = req.departmentCode();
 
-            // 3. 校验邮箱/手机号唯一性（排除当前用户）
-            ensureAccountUniquenessForUpdate(req.id(), email, phone);
+            // 3. 校验用户名/邮箱/手机号唯一性（排除当前用户）
+            ensureAccountUniquenessForUpdate(req.id(), username, email, phone);
 
             // 4. 根据部门编码查询部门ID并校验部门有效性
             var department = validateDepartmentByCode(departmentCode, industryType);
             var departmentId = department.getId();
 
             // 5. 更新用户信息
+            user.setUsername(username);
             user.setRealName(realName);
             user.setEmail(email);
             user.setPhone(phone);
@@ -629,11 +631,18 @@ public class UserServiceImpl implements UserService {
     /**
      * 校验账号唯一性（更新场景，排除当前用户）
      *
-     * @param userId Long 当前用户ID
-     * @param email  String 邮箱
-     * @param phone  String 手机号
+     * @param userId   Long 当前用户ID
+     * @param username String 用户名
+     * @param email    String 邮箱
+     * @param phone    String 手机号
      */
-    private void ensureAccountUniquenessForUpdate(Long userId, String email, String phone) {
+    private void ensureAccountUniquenessForUpdate(Long userId, String username, String email, String phone) {
+        Optional.ofNullable(sysUserRepo.findByUsername(username))
+                .filter(existing -> !existing.getId().equals(userId))
+                .ifPresent(existing -> {
+                    log.warn(String.format("更新用户失败，用户名已被其他用户使用: userId=%s, username=%s", userId, username));
+                    throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "用户名已被其他用户使用");
+                });
         Optional.ofNullable(sysUserRepo.findByEmail(email))
                 .filter(existing -> !existing.getId().equals(userId))
                 .ifPresent(existing -> {

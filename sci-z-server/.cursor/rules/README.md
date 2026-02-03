@@ -1,36 +1,24 @@
-# Cursor 规则文件说明
+# Sci-Z Server 规则说明
 
-## 重要提示
+> 本目录规则与 `sci-z-server/CLAUDE.md` 配合使用。CLAUDE.md 仅保留顶层指令，具体规范拆分为以下 .mdc 文件。
 
-**Cursor 2.0 更新说明**：
+---
 
-在 Cursor 2.0 版本中，规则管理方式发生了变化：
+## 规则文件
 
-1. **自动识别规则**：Cursor 2.0 会自动识别项目根目录下的 `CLAUDE.md` 或 `CLAUDE.local.md` 文件
-2. **不再支持 `@` 引用**：在对话框中无法通过 `@` 符号直接引用 `.cursor/rules/` 目录下的 `.mdc` 文件
-3. **统一规则文件**：建议将所有规则合并到项目根目录的 `CLAUDE.md` 文件中
-
-## 当前规则文件
-
-本目录下的规则文件已合并到项目根目录的 `CLAUDE.md` 文件中：
-
-- `common-rules.mdc` - 通用技术回复规则
-- `notes-rules.mdc` - 注释模板规则
-- `current-project-rules.mdc` - 项目特定规则
+| 文件                           | 说明                                                                                | 触发                                 |
+| ------------------------------ | ----------------------------------------------------------------------------------- | ------------------------------------ |
+| **notes-rules.mdc**            | 类/方法/字段注释模板                                                                | alwaysApply: true                    |
+| **common-rules.mdc**           | 回复与前置条件、编码要点                                                            | 智能/文件匹配                        |
+| **current-project-rules.mdc**  | 规则入口，指向其他 .mdc                                                             | 智能/文件匹配                        |
+| **ddd-architecture.mdc**       | DDD 分层、依赖、职责、实现顺序、文件命名                                            | globs: \*_/_.java                    |
+| **java-naming.mdc**            | 方法命名、变量命名、Stream Lambda 命名                                              | globs: \*_/_.java                    |
+| **java-dev-standards.mdc**     | 导入、日志、异常、返回、事务、LoginUserUtil、Record/BaseQueryReq、Java 21、接口规范 | globs: \*_/_.java                    |
+| **repository-and-service.mdc** | Repository 查询/更新/软删除、Service、操作日志                                      | globs: repository/**、application/** |
 
 ## 使用方式
 
-1. **推荐方式**：使用项目根目录的 `CLAUDE.md` 文件（Cursor 2.0 会自动识别）
-2. **保留原有文件**：`.cursor/rules/` 目录下的 `.mdc` 文件已保留作为备份参考
-
-## 如何验证规则是否生效
-
-1. 打开 Cursor 设置 → Rules, Memories, Commands
-2. 确认 "Include CLAUDE.md in context" 开关已启用
-3. 在对话框中输入问题，AI 应该会按照规则回复
-
-## 注意事项
-
-- `CLAUDE.md` 文件会随项目一起提交到版本控制系统
-- `CLAUDE.local.md` 文件是本地文件，不会被提交（适合个人定制规则）
-- 如果同时存在 `CLAUDE.md` 和 `CLAUDE.local.md`，两者都会生效
+- Cursor 会根据 description 与 globs 自动加载相关规则
+- 注释模板（notes-rules.mdc）始终应用
+- 其他规则在编辑/讨论 Java 文件时按需应用
+- 详细开发规范（代码模板、事件处理、枚举/常量等）可参考已备份的 CLAUDE.md 或《项目配置方案.md》

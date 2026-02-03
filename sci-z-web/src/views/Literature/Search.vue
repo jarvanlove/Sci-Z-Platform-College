@@ -646,18 +646,18 @@ onMounted(() => {
 <style scoped lang="scss">
 .literature-search-container {
   padding: 0;
-  height: calc(100vh - 60px);
-  min-height: calc(100vh - 60px);
-  max-height: calc(100vh - 60px);
+  height: 97vh; // 文献搜索高度占97%
+  min-height: 97vh;
+  max-height: 97vh;
   background: #f5f5f5;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 
   .search-header {
-    background: var(--surface);
+    background: #fff;
     padding: 20px 24px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #e5e7eb;
     margin-bottom: 0;
     position: relative;
     flex-shrink: 0; // 固定头部，不参与滚动
@@ -700,8 +700,8 @@ onMounted(() => {
         transform: translateX(-50%);
         width: 100%;
         max-width: 600px;
-        background: var(--surface);
-        border: 1px solid var(--border);
+        background: #fff;
+        border: 1px solid #e5e7eb;
         border-top: none;
         border-radius: 0 0 8px 8px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -717,12 +717,12 @@ onMounted(() => {
           .history-title {
             font-size: 14px;
             font-weight: 600;
-            color: var(--text);
+            color: #111827;
           }
 
           .clear-history-btn {
             padding: 4px 8px;
-            color: var(--text-3);
+            color: #6b7280;
 
             &:hover {
               color: #ef4444;
@@ -741,13 +741,13 @@ onMounted(() => {
             align-items: center;
             padding: 8px 12px;
             margin-bottom: 4px;
-            background: var(--hover-light);
+            background: #f9fafb;
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s;
 
             &:hover {
-              background: var(--hover);
+              background: #f3f4f6;
             }
 
             &:last-child {
@@ -757,7 +757,7 @@ onMounted(() => {
             .history-text {
               flex: 1;
               font-size: 14px;
-              color: var(--text);
+              color: #374151;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
@@ -765,7 +765,7 @@ onMounted(() => {
 
             .remove-history-btn {
               padding: 4px;
-              color: var(--text-3);
+              color: #9ca3af;
               opacity: 0;
               transition: all 0.2s;
 
@@ -820,26 +820,26 @@ onMounted(() => {
           align-items: center;
           gap: 6px;
           padding: 6px 12px;
-          background: var(--hover-light);
-          border: 1px solid var(--border);
+          background: #f9fafb;
+          border: 1px solid #e5e7eb;
           border-radius: 16px;
           cursor: pointer;
           transition: all 0.2s;
 
           &:hover {
-            background: var(--hover);
+            background: #f3f4f6;
             border-color: #d1d5db;
           }
 
           .tag-text {
             font-size: 13px;
-            color: var(--text);
+            color: #374151;
             white-space: nowrap;
           }
 
           .tag-remove-btn {
             padding: 2px;
-            color: var(--text-3);
+            color: #9ca3af;
             opacity: 0;
             transition: all 0.2s;
 
@@ -872,9 +872,9 @@ onMounted(() => {
   }
 
   .result-header {
-    background: var(--surface);
+    background: #fff;
     padding: 12px 24px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #e5e7eb;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -902,16 +902,16 @@ onMounted(() => {
     }
     
     &::-webkit-scrollbar-track {
-      background: var(--bg);
+      background: #f5f5f5;
       border-radius: 4px;
     }
     
     &::-webkit-scrollbar-thumb {
-      background: var(--border-hover);
+      background: #d1d5db;
       border-radius: 4px;
       
       &:hover {
-        background: var(--text-3);
+        background: #9ca3af;
       }
     }
   }
@@ -939,7 +939,7 @@ onMounted(() => {
     flex-shrink: 0; // 不收缩，让内容自然撑开
 
     .literature-card {
-      background: var(--surface);
+      background: #fff;
       border-radius: 8px;
       padding: 24px;
       border: 1px solid #e5e7eb;
@@ -1008,7 +1008,7 @@ onMounted(() => {
 
           .author-name {
             font-size: 14px;
-            color: var(--text);
+            color: #374151;
             font-weight: 500;
           }
         }
@@ -1080,7 +1080,7 @@ onMounted(() => {
             align-items: center;
             gap: 4px;
             font-size: 14px;
-            color: var(--text-3);
+            color: #6b7280;
 
             &.citation-stat {
               color: #3b82f6;
@@ -1104,7 +1104,7 @@ onMounted(() => {
     margin-top: 20px;
     padding: 20px;
     flex-shrink: 0; // 固定分页，不参与滚动
-    background: var(--surface);
+    background: #fff;
     border-top: 1px solid #e5e7eb;
   }
 }

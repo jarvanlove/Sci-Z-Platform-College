@@ -19,6 +19,9 @@ import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
 import com.sciz.server.domain.pojo.entity.declaration.Declaration;
 import com.sciz.server.domain.pojo.repository.declaration.DeclarationRepo;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRelationRepo;
+import com.sciz.server.domain.pojo.repository.project.ProjectMemberRepo;
+import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
+import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.enums.AttachmentRelationStatus;
 import com.sciz.server.infrastructure.shared.enums.DeclarationStatus;
@@ -29,6 +32,7 @@ import com.sciz.server.infrastructure.shared.event.declaration.DeclarationCreate
 import com.sciz.server.infrastructure.shared.event.declaration.DeclarationSuccessEvent;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
+import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
 import com.sciz.server.infrastructure.shared.utils.DateUtil;
 import com.sciz.server.infrastructure.shared.utils.DeclarationUtil;
 import com.sciz.server.infrastructure.shared.utils.JsonUtil;
@@ -42,6 +46,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +65,9 @@ import java.util.Optional;
 public class DeclarationServiceImpl implements DeclarationService {
 
     private final DeclarationRepo declarationRepo;
+    private final ProjectMemberRepo projectMemberRepo;
+    private final ProjectRepo projectRepo;
+    private final SysUserRepo sysUserRepo;
     private final DeclarationConverter declarationConverter;
     private final EventPublisher eventPublisher;
     private final OperationLogRecorderUtil operationLogRecorderUtil;
@@ -92,6 +100,22 @@ public class DeclarationServiceImpl implements DeclarationService {
 
             // 2. 转换为实体
             var entity = declarationConverter.toEntity(req);
+
+            // 2.1 项目负责人：若传 projectLeaderId 则据此解析姓名；否则用 projectLeader 姓名；至少其一非空
+            if (req.projectLeaderId() != null) {
+                entity.setProjectLeaderId(req.projectLeaderId());
+                var leader = sysUserRepo.findById(req.projectLeaderId());
+                if (leader != null) {
+                    entity.setProjectLeader(leader.getRealName());
+                }
+            }
+            if (entity.getProjectLeader() == null || entity.getProjectLeader().isBlank()) {
+                if (req.projectLeader() != null && !req.projectLeader().isBlank()) {
+                    entity.setProjectLeader(req.projectLeader());
+                } else {
+                    throw BusinessException.of(ResultCode.BAD_REQUEST, "项目负责人不能为空");
+                }
+            }
 
             // 3. 设置申报基本信息
             initializeDeclarationEntity(entity, userId, realName);
@@ -164,7 +188,21 @@ public class DeclarationServiceImpl implements DeclarationService {
         var asc = "ASC".equalsIgnoreCase(baseQuery.sortOrder());
         var sortBy = Optional.ofNullable(baseQuery.sortBy()).orElse("submitTime");
 
-        IPage<Declaration> declarationPage = declarationRepo.page(page, req.keyword(), req.status(), sortBy, asc);
+        // 项目成员/负责人可见：普通用户可见自己创建的、所属项目关联的、或作为项目负责人关联的申报
+        List<Long> includeDeclarationIdsForMember = null;
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            var memberProjectIds = projectMemberRepo.findProjectIdsByUserId(userId);
+            var managerProjectIds = projectRepo.findProjectIdsByManagerId(userId);
+            var mergedProjectIds = new ArrayList<Long>(memberProjectIds);
+            for (Long pid : managerProjectIds) {
+                if (!mergedProjectIds.contains(pid)) mergedProjectIds.add(pid);
+            }
+            includeDeclarationIdsForMember = projectRepo.findDeclarationIdsByProjectIds(mergedProjectIds);
+        }
+
+        IPage<Declaration> declarationPage = declarationRepo.page(page, req.keyword(), req.status(), sortBy, asc,
+                includeDeclarationIdsForMember);
 
         // 批量查询附件信息（用于判断是否有附件和获取附件ID）
         var declarationIds = declarationPage.getRecords().stream()

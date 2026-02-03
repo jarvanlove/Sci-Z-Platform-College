@@ -65,13 +65,55 @@ dify: # Dify 生产环境配置
   enable-retry: ${DIFY_ENABLE_RETRY:true} # 是否启用重试
   default-resource-id: ${DIFY_DEFAULT_RESOURCE_ID:default} # 默认资源ID（用于创建知识库时的resourceId参数）
   chatbot: # Chatbot 模型配置（生产环境）
+    pre-prompt: ${DIFY_CHATBOT_PRE_PROMPT:"你叫小域，是一位专业、严谨的学术助手，专注于科研与教学支持。请以清晰、准确、逻辑严密的方式回答问题，语言应符合学术规范，避免口语化、夸张或情绪化表达。若涉及数据、方法或结论，请注明假设条件与适用范围；若问题存在歧义或信息不足，请明确指出并请求澄清；优先使用正式术语，必要时可提供定义或简要解释；不使用表情符号、颜文字或非必要的修饰性语言；回答应结构清晰，可适当使用标题、编号或表格以提升可读性，但需保持内容精炼。请根据上述原则，就用户提出的问题提供专业、可靠、有依据的回应。"}
+    prompt-type: ${DIFY_CHATBOT_PROMPT_TYPE:simple} # 提示词类型
+    opening-statement: ${DIFY_CHATBOT_OPENING_STATEMENT:""} # 开场白
+    suggested-questions: ${DIFY_CHATBOT_SUGGESTED_QUESTIONS:[]} # 建议问题列表
+    dataset-query-variable: ${DIFY_CHATBOT_DATASET_QUERY_VARIABLE:""} # 数据集查询变量
+    more-like-this: ${DIFY_CHATBOT_MORE_LIKE_THIS:false} # 更多类似内容开关
+    speech-to-text: ${DIFY_CHATBOT_SPEECH_TO_TEXT:false} # 语音转文字开关
+    text-to-speech: ${DIFY_CHATBOT_TEXT_TO_SPEECH:false} # 文字转语音开关
+    suggested-questions-after-answer: ${DIFY_CHATBOT_SUGGESTED_QUESTIONS_AFTER_ANSWER:false} # 回答后建议问题开关
+    retriever-resource: ${DIFY_CHATBOT_RETRIEVER_RESOURCE:true} # 检索资源开关
+    sensitive-word-avoidance: # 敏感词规避配置
+      enabled: ${DIFY_CHATBOT_SENSITIVE_WORD_AVOIDANCE_ENABLED:false}
+      type: ${DIFY_CHATBOT_SENSITIVE_WORD_AVOIDANCE_TYPE:""}
+      configs: ${DIFY_CHATBOT_SENSITIVE_WORD_AVOIDANCE_CONFIGS:[]}
+    file-upload: # 文件上传配置
+      enabled: ${DIFY_CHATBOT_FILE_UPLOAD_ENABLED:false}
+      allowed-file-types: ${DIFY_CHATBOT_FILE_UPLOAD_ALLOWED_TYPES:[]}
+      allowed-file-extensions: ${DIFY_CHATBOT_FILE_UPLOAD_ALLOWED_EXTENSIONS:[".JPG", ".JPEG", ".PNG", ".GIF", ".WEBP", ".SVG", ".MP4", ".MOV", ".MPEG", ".WEBM"]}
+      allowed-file-upload-methods: ${DIFY_CHATBOT_FILE_UPLOAD_METHODS:["remote_url", "local_file"]}
+      number-limits: ${DIFY_CHATBOT_FILE_UPLOAD_NUMBER_LIMITS:3}
+      image:
+        enabled: ${DIFY_CHATBOT_FILE_UPLOAD_IMAGE_ENABLED:false}
+        detail: ${DIFY_CHATBOT_FILE_UPLOAD_IMAGE_DETAIL:high}
+        number-limits: ${DIFY_CHATBOT_FILE_UPLOAD_IMAGE_NUMBER_LIMITS:3}
+        transfer-methods: ${DIFY_CHATBOT_FILE_UPLOAD_IMAGE_TRANSFER_METHODS:["remote_url", "local_file"]}
+    agent-mode: # Agent模式配置
+      enabled: ${DIFY_CHATBOT_AGENT_MODE_ENABLED:false}
+      max-iteration: ${DIFY_CHATBOT_AGENT_MODE_MAX_ITERATION:10}
+      strategy: ${DIFY_CHATBOT_AGENT_MODE_STRATEGY:function_call}
+      tools: ${DIFY_CHATBOT_AGENT_MODE_TOOLS:[]}
     model: # 模型配置
       provider: ${DIFY_CHATBOT_MODEL_PROVIDER:langgenius/tongyi/tongyi} # 模型提供商
       name: ${DIFY_CHATBOT_MODEL_NAME:qwen3-next-80b-a3b-instruct} # 模型名称
       mode: ${DIFY_CHATBOT_MODEL_MODE:chat} # 模型模式（chat/completion）
+      completion-params: # 完成参数配置
+        enable-search: ${DIFY_CHATBOT_MODEL_COMPLETION_PARAMS_ENABLE_SEARCH:false} # 是否启用搜索
     reranking-model: # 重排序模型配置
       reranking-provider-name: ${DIFY_CHATBOT_RERANKING_PROVIDER:langgenius/tongyi/tongyi} # 重排序提供商名称
       reranking-model-name: ${DIFY_CHATBOT_RERANKING_MODEL_NAME:gte-rerank} # 重排序模型名称
+    dataset-configs: # 数据集配置
+      retrieval-model: ${DIFY_CHATBOT_DATASET_RETRIEVAL_MODEL:multiple} # 检索模型
+      top-k: ${DIFY_CHATBOT_DATASET_TOP_K:4} # Top K
+      reranking-mode: ${DIFY_CHATBOT_DATASET_RERANKING_MODE:reranking_model} # 重排序模式
+      reranking-enable: ${DIFY_CHATBOT_DATASET_RERANKING_ENABLE:false} # 是否启用重排序
+      datasets: # 数据集集合
+        datasets:
+          - dataset:
+              enabled: ${DIFY_CHATBOT_DATASET_ENABLED:true}
+              id: ${DIFY_CHATBOT_DATASET_ID:""}
 
 # LLM：OpenAI 兼容，建议用环境变量提供密钥与模型
 llm: # LLM(OpenAI) 生产环境配置

@@ -7,15 +7,19 @@ import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationCr
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationQueryReq;
 import com.sciz.server.domain.pojo.dto.request.knowledge.KnowledgeFileRelationUpdateReq;
 import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeFileRelationResp;
+import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeFolderWithFilesResp;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sciz.server.domain.pojo.entity.file.SysAttachment;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeFileRelation;
+import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeFolder;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeBaseRepo;
 import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeFileRelationRepo;
+import com.sciz.server.domain.pojo.repository.knowledge.SysKnowledgeFolderRepo;
+import com.sciz.server.application.service.file.FileService;
 import com.sciz.server.infrastructure.external.dify.config.DifyConfig;
 import com.sciz.server.infrastructure.external.dify.dto.DifyChatbotModelConfigRequest;
 import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
@@ -34,6 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 /**
  * 知识库文件关联应用服务实现类
  *
@@ -48,10 +54,12 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
     private final SysKnowledgeFileRelationRepo fileRelationRepo;
     private final KnowledgeFileRelationConverter converter;
     private final SysKnowledgeBaseRepo knowledgeBaseRepo;
+    private final SysKnowledgeFolderRepo folderRepo;
     private final DifyApiKeyServiceImpl difyApiKeyService;
     private final DifyApiService difyApiService;
     private final DifyConfig difyConfig;
     private final SysAttachmentRepo attachmentRepo;
+    private final FileService fileService;
     private final ObjectMapper objectMapper;
 
     @Value("${dify.default-resource-id:default}")
@@ -332,6 +340,32 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
         // 5. 转换为响应DTO列表
         var respList = converter.toRespList(pageResult.getRecords());
 
+        // 5.1 预加载所有相关附件的文件大小，避免 N+1 查询
+        Map<Long, Long> attachmentSizeMap = new HashMap<>();
+        var attachmentIds = pageResult.getRecords().stream()
+                .map(SysKnowledgeFileRelation::getAttachmentId)
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .collect(Collectors.toList());
+        if (!attachmentIds.isEmpty()) {
+            // 使用 findByIdsForRelation：不按上传人过滤，知识库可见性已在调用前校验，非 admin 用户也可看到他人上传文件的 fileSize
+            List<SysAttachment> attachments = attachmentRepo.findByIdsForRelation(attachmentIds);
+            attachmentSizeMap = attachments.stream()
+                    .collect(Collectors.toMap(SysAttachment::getId, a -> a.getFileSize() != null ? a.getFileSize() : 0L));
+        }
+        // 5.2 填充文件大小
+        for (var fileResp : respList) {
+            if (fileResp.getAttachmentId() != null) {
+                try {
+                    Long attachId = Long.valueOf(fileResp.getAttachmentId());
+                    Long sizeBytes = attachmentSizeMap.get(attachId);
+                    fileResp.setFileSize(sizeBytes);
+                } catch (NumberFormatException ignored) {
+                    // 保持 fileSize 为 null
+                }
+            }
+        }
+
         // 6. 构建分页结果
         var result = new PageResult<KnowledgeFileRelationResp>(
                 respList,
@@ -421,21 +455,15 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
                     new DifyChatbotModelConfigRequest.DatasetConfigs.DatasetCollection();
             datasetCollection.setDatasets(datasetList);
 
-            // 4. 构建数据集配置（使用默认配置）
-            DifyChatbotModelConfigRequest.DatasetConfigs datasetConfigs = 
-                    DifyChatbotModelConfigRequest.DatasetConfigs.defaultConfig();
-            datasetConfigs.setDatasets(datasetCollection);
-
-            // 5. 从配置文件读取模型配置
-            DifyChatbotModelConfigRequest.Model model = buildModelFromConfig();
-            DifyChatbotModelConfigRequest.DatasetConfigs.RerankingModel rerankingModel = buildRerankingModelFromConfig();
+            // 4. 从配置文件读取完整配置
+            DifyChatbotModelConfigRequest configRequest = DifyChatbotModelConfigRequest.fromConfig(difyConfig.getChatbot());
             
-            // 设置重排序模型到数据集配置
-            datasetConfigs.setRerankingModel(rerankingModel);
-
-            // 6. 构建模型配置请求
-            DifyChatbotModelConfigRequest configRequest = new DifyChatbotModelConfigRequest();
-            configRequest.setModel(model);
+            // 5. 覆盖数据集配置（使用动态的知识库ID）
+            DifyChatbotModelConfigRequest.DatasetConfigs datasetConfigs = configRequest.getDatasetConfigs();
+            if (datasetConfigs == null) {
+                datasetConfigs = DifyChatbotModelConfigRequest.DatasetConfigs.defaultConfig();
+            }
+            datasetConfigs.setDatasets(datasetCollection);
             configRequest.setDatasetConfigs(datasetConfigs);
 
             // 7. 调用 Dify API 更新配置
@@ -467,58 +495,295 @@ public class KnowledgeFileRelationServiceImpl implements KnowledgeFileRelationSe
         }
     }
 
-    /**
-     * 从配置文件构建模型配置
-     *
-     * @return 模型配置
-     */
-    private DifyChatbotModelConfigRequest.Model buildModelFromConfig() {
-        DifyChatbotModelConfigRequest.Model model = new DifyChatbotModelConfigRequest.Model();
-        
-        // 从配置文件读取，如果配置不存在则使用默认值
-        if (difyConfig.getChatbot() != null && difyConfig.getChatbot().getModel() != null) {
-            DifyConfig.Chatbot.Model configModel = difyConfig.getChatbot().getModel();
-            model.setProvider(configModel.getProvider() != null ? configModel.getProvider() : "langgenius/tongyi/tongyi");
-            model.setName(configModel.getName() != null ? configModel.getName() : "qwen3-next-80b-a3b-instruct");
-            model.setMode(configModel.getMode() != null ? configModel.getMode() : "chat");
-        } else {
-            // 使用默认值
-            model.setProvider("langgenius/tongyi/tongyi");
-            model.setName("qwen3-next-80b-a3b-instruct");
-            model.setMode("chat");
-        }
-        
-        model.setCompletionParams(new HashMap<>());
-        return model;
-    }
 
-    /**
-     * 从配置文件构建重排序模型配置
-     *
-     * @return 重排序模型配置
-     */
-    private DifyChatbotModelConfigRequest.DatasetConfigs.RerankingModel buildRerankingModelFromConfig() {
-        DifyChatbotModelConfigRequest.DatasetConfigs.RerankingModel rerankingModel = 
-                new DifyChatbotModelConfigRequest.DatasetConfigs.RerankingModel();
-        
-        // 从配置文件读取，如果配置不存在则使用默认值
-        if (difyConfig.getChatbot() != null && difyConfig.getChatbot().getRerankingModel() != null) {
-            DifyConfig.Chatbot.RerankingModel configRerankingModel = difyConfig.getChatbot().getRerankingModel();
-            rerankingModel.setRerankingProviderName(
-                    configRerankingModel.getRerankingProviderName() != null 
-                            ? configRerankingModel.getRerankingProviderName() 
-                            : "langgenius/tongyi/tongyi");
-            rerankingModel.setRerankingModelName(
-                    configRerankingModel.getRerankingModelName() != null 
-                            ? configRerankingModel.getRerankingModelName() 
-                            : "gte-rerank");
-        } else {
-            // 使用默认值
-            rerankingModel.setRerankingProviderName("langgenius/tongyi/tongyi");
-            rerankingModel.setRerankingModelName("gte-rerank");
+    @Override
+    public PageResult<KnowledgeFolderWithFilesResp> listFoldersWithFiles(Long knowledgeId, Long folderId, Integer page, Integer size) {
+        log.info(String.format("分页查询知识库文件夹及文件列表: knowledgeId=%s, folderId=%s, page=%s, size=%s", knowledgeId, folderId, page, size));
+
+        // 1. 校验知识库是否存在
+        var knowledge = knowledgeBaseRepo.findById(knowledgeId);
+        if (knowledge == null) {
+            throw new BusinessException(ResultCode.KNOWLEDGE_NOT_FOUND);
         }
+
+        // 2. 处理 folderId：null 或 0 表示根目录
+        Long actualFolderId = (folderId == null || folderId == 0) ? null : folderId;
         
-        return rerankingModel;
+        // 3. 如果指定了 folderId，校验文件夹是否存在
+        if (actualFolderId != null) {
+            var folder = folderRepo.findById(actualFolderId);
+            if (folder == null) {
+                throw new BusinessException(ResultCode.KNOWLEDGE_FOLDER_NOT_FOUND, "文件夹不存在");
+            }
+        }
+
+        // 4. 查询子文件夹列表（如果指定了 folderId，只查询该文件夹下的子文件夹）
+        List<SysKnowledgeFolder> subFolders;
+        if (actualFolderId == null) {
+            // 根目录：查询所有根目录下的文件夹
+            subFolders = folderRepo.findByKnowledgeId(knowledgeId).stream()
+                    .filter(folder -> folder.getParentId() == null || folder.getParentId() == 0)
+                    .collect(Collectors.toList());
+        } else {
+            // 指定文件夹：查询该文件夹下的子文件夹
+            subFolders = folderRepo.findByKnowledgeIdAndParentId(knowledgeId, actualFolderId);
+        }
+
+        // 5. 查询文件关联（如果指定了 folderId，只查询该文件夹下的文件）
+        List<SysKnowledgeFileRelation> fileRelations;
+        List<SysKnowledgeFileRelation> allFileRelations; // 用于根目录查询时获取所有文件
+        if (actualFolderId == null) {
+            // 根目录：查询所有文件（包括文件夹内的文件），用于构建响应和统计文件数量
+            allFileRelations = fileRelationRepo.findByKnowledgeId(knowledgeId);
+            // 只显示根目录下的文件（folderId 为 null 或 0），用于构建"未分类"文件夹
+            fileRelations = allFileRelations.stream()
+                    .filter(file -> file.getFolderId() == null || file.getFolderId() == 0)
+                    .collect(Collectors.toList());
+        } else {
+            // 指定文件夹：查询该文件夹下的文件
+            allFileRelations = null; // 子文件夹查询时不需要
+            fileRelations = fileRelationRepo.findByKnowledgeId(knowledgeId).stream()
+                    .filter(file -> actualFolderId.equals(file.getFolderId()))
+                    .collect(Collectors.toList());
+        }
+
+        // 6. 预加载所有相关附件的文件大小，避免 N+1 查询
+        Map<Long, Long> attachmentSizeMap = new HashMap<>();
+        // 🔥 修复：根目录查询时，使用 allFileRelations 来预加载所有文件的文件大小（包括文件夹内的文件）
+        List<SysKnowledgeFileRelation> filesForSizePreload = (actualFolderId == null && allFileRelations != null) 
+                ? allFileRelations 
+                : fileRelations;
+        var attachmentIds = filesForSizePreload.stream()
+                .map(SysKnowledgeFileRelation::getAttachmentId)
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .collect(Collectors.toList());
+        if (!attachmentIds.isEmpty()) {
+            // 使用 findByIdsForRelation：不按上传人过滤，知识库可见性已在 listFoldersWithFiles 前校验，非 admin 用户也可看到他人上传文件的 fileSize
+            List<SysAttachment> attachments = attachmentRepo.findByIdsForRelation(attachmentIds);
+            attachmentSizeMap = attachments.stream()
+                    .collect(Collectors.toMap(SysAttachment::getId, a -> a.getFileSize() != null ? a.getFileSize() : 0L));
+        }
+
+        // 7. 构建混合列表（文件夹在前，文件在后）
+        var mixedList = new ArrayList<KnowledgeFolderWithFilesResp>();
+
+        if (actualFolderId == null) {
+            // ========== 根目录：混合列表（文件夹在前，文件在后） ==========
+            // 7.1 按 folder_id 分组所有文件（包括文件夹内的文件），用于构建文件列表
+            // 根目录时 allFileRelations 已赋值（第596行），不会为 null，但为了消除警告添加检查
+            if (allFileRelations == null) {
+                allFileRelations = new ArrayList<>();
+            }
+            Map<Long, List<SysKnowledgeFileRelation>> filesByFolderId = allFileRelations.stream()
+                    .filter(file -> file.getFolderId() != null && file.getFolderId() != 0)
+                    .collect(Collectors.groupingBy(SysKnowledgeFileRelation::getFolderId));
+
+            // 7.2 分离没有文件夹的文档（folderId为null或0）
+            var filesWithoutFolder = fileRelations.stream()
+                    .filter(file -> file.getFolderId() == null || file.getFolderId() == 0)
+                    .collect(Collectors.toList());
+
+            // 7.3 遍历根目录文件夹，为每个文件夹找到对应的文件列表
+            for (var folder : subFolders) {
+                var currentFolderId = folder.getId();
+                var files = filesByFolderId.getOrDefault(currentFolderId, new ArrayList<>());
+
+                var resp = new KnowledgeFolderWithFilesResp();
+                resp.setType("folder");
+                resp.setFolderId(currentFolderId);
+                resp.setFolderName(folder.getFolderName());
+                // 🔥 修复：使用 countByFolderId 查询该文件夹下的准确文件数量（包括所有子文件）
+                var folderFileCount = fileRelationRepo.countByFolderId(currentFolderId);
+                resp.setFileCount(folderFileCount != null ? folderFileCount.intValue() : 0);
+
+                // 转换为响应DTO并填充文件大小
+                var fileRespList = converter.toRespList(files);
+                for (var fileResp : fileRespList) {
+                    if (fileResp.getAttachmentId() != null) {
+                        try {
+                            Long attachId = Long.valueOf(fileResp.getAttachmentId());
+                            Long sizeBytes = attachmentSizeMap.get(attachId);
+                            fileResp.setFileSize(sizeBytes);
+                        } catch (NumberFormatException ignored) {
+                            // 保持 fileSize 为 null
+                        }
+                    }
+                }
+                resp.setFiles(fileRespList);
+                mixedList.add(resp);
+            }
+
+            // 7.4 处理没有文件夹的文档（作为独立的文件项添加到 mixedList）
+            var fileRespList = converter.toRespList(filesWithoutFolder);
+            for (var fileResp : fileRespList) {
+                // 填充文件大小
+                if (fileResp.getAttachmentId() != null) {
+                    try {
+                        Long attachId = Long.valueOf(fileResp.getAttachmentId());
+                        Long sizeBytes = attachmentSizeMap.get(attachId);
+                        fileResp.setFileSize(sizeBytes);
+                    } catch (NumberFormatException ignored) {
+                        // 保持 fileSize 为 null
+                    }
+                }
+                
+                // 创建文件响应项
+                var resp = new KnowledgeFolderWithFilesResp();
+                resp.setType("file");
+                resp.setFileId(fileResp.getId());
+                resp.setFileName(fileResp.getFileName());
+                resp.setAttachmentId(fileResp.getAttachmentId());
+                resp.setFileSize(fileResp.getFileSize());
+                resp.setFolderId(null); // 未分类文件的 folderId 为 null
+                resp.setCallback(fileResp.getCallback());
+                resp.setCreatedTime(fileResp.getCreatedTime());
+                resp.setUpdatedTime(fileResp.getUpdatedTime());
+                // 提取文件扩展名
+                if (fileResp.getFileName() != null) {
+                    var lastDotIndex = fileResp.getFileName().lastIndexOf('.');
+                    if (lastDotIndex > 0 && lastDotIndex < fileResp.getFileName().length() - 1) {
+                        resp.setExt(fileResp.getFileName().substring(lastDotIndex + 1).toLowerCase());
+                    }
+                }
+                mixedList.add(resp);
+            }
+
+            // 7.5 排序：文件夹在前，文件在后；同类型按名称排序
+            mixedList.sort((a, b) -> {
+                // 文件夹在前
+                if ("folder".equals(a.getType()) && "file".equals(b.getType())) {
+                    return -1;
+                }
+                if ("file".equals(a.getType()) && "folder".equals(b.getType())) {
+                    return 1;
+                }
+                // 同类型按名称排序
+                String nameA = "folder".equals(a.getType()) ? a.getFolderName() : a.getFileName();
+                String nameB = "folder".equals(b.getType()) ? b.getFolderName() : b.getFileName();
+                if (nameA == null && nameB == null) {
+                    return 0;
+                }
+                if (nameA == null) {
+                    return 1;
+                }
+                if (nameB == null) {
+                    return -1;
+                }
+                return nameA.compareTo(nameB);
+            });
+        } else {
+            // ========== 文件夹内：混合列表（文件夹在前，文件在后） ==========
+            // 7.1 转换子文件夹为响应DTO
+            for (var folder : subFolders) {
+                var resp = new KnowledgeFolderWithFilesResp();
+                resp.setType("folder");
+                resp.setFolderId(folder.getId());
+                resp.setFolderName(folder.getFolderName());
+                // 统计该文件夹下的文件数量
+                var folderFileCount = fileRelationRepo.countByFolderId(folder.getId());
+                resp.setFileCount(folderFileCount != null ? folderFileCount.intValue() : 0);
+                resp.setFiles(new ArrayList<>()); // 文件夹内查询时，不返回文件列表
+                mixedList.add(resp);
+            }
+
+            // 7.2 转换文件为响应DTO
+            var fileRespList = converter.toRespList(fileRelations);
+            for (var fileResp : fileRespList) {
+                var resp = new KnowledgeFolderWithFilesResp();
+                resp.setType("file");
+                resp.setFileId(fileResp.getId());
+                resp.setFileName(fileResp.getFileName());
+                resp.setAttachmentId(fileResp.getAttachmentId());
+                resp.setFileSize(fileResp.getFileSize());
+                resp.setCreatedTime(fileResp.getCreatedTime());
+                resp.setUpdatedTime(fileResp.getUpdatedTime());
+                // 转换 folderId 从 String 到 Long
+                if (fileResp.getFolderId() != null && !fileResp.getFolderId().trim().isEmpty()) {
+                    try {
+                        resp.setFolderId(Long.parseLong(fileResp.getFolderId()));
+                    } catch (NumberFormatException ignored) {
+                        // 保持 folderId 为 null
+                    }
+                }
+                resp.setCallback(fileResp.getCallback());
+                // 提取文件扩展名
+                if (fileResp.getFileName() != null) {
+                    var lastDotIndex = fileResp.getFileName().lastIndexOf('.');
+                    if (lastDotIndex > 0 && lastDotIndex < fileResp.getFileName().length() - 1) {
+                        resp.setExt(fileResp.getFileName().substring(lastDotIndex + 1).toLowerCase());
+                    }
+                }
+                // 填充文件大小（如果还没有）
+                if (resp.getFileSize() == null && fileResp.getAttachmentId() != null) {
+                    try {
+                        Long attachId = Long.valueOf(fileResp.getAttachmentId());
+                        Long sizeBytes = attachmentSizeMap.get(attachId);
+                        resp.setFileSize(sizeBytes);
+                    } catch (NumberFormatException ignored) {
+                        // 保持 fileSize 为 null
+                    }
+                }
+                
+                mixedList.add(resp);
+            }
+
+            // 7.3 排序：文件夹在前，文件在后；同类型按名称排序
+            mixedList.sort((a, b) -> {
+                // 文件夹在前
+                if ("folder".equals(a.getType()) && "file".equals(b.getType())) {
+                    return -1;
+                }
+                if ("file".equals(a.getType()) && "folder".equals(b.getType())) {
+                    return 1;
+                }
+                // 同类型按名称排序
+                String nameA = "folder".equals(a.getType()) ? a.getFolderName() : a.getFileName();
+                String nameB = "folder".equals(b.getType()) ? b.getFolderName() : b.getFileName();
+                if (nameA == null && nameB == null) {
+                    return 0;
+                }
+                if (nameA == null) {
+                    return 1;
+                }
+                if (nameB == null) {
+                    return -1;
+                }
+                return nameA.compareTo(nameB);
+            });
+        }
+
+        // 8. 混合分页处理（文件夹在前，文件在后）
+        // 🔥 修复：统一 total 计算逻辑，根目录和子文件夹都使用 mixedList 的大小
+        // 根目录时，mixedList 包含所有文件夹（每个文件夹作为一个项）
+        // 子文件夹时，mixedList 包含子文件夹和文件（混合列表）
+        long total = (long) mixedList.size();
+        
+        var start = (page - 1) * size;
+        var end = Math.min(start + size, mixedList.size());
+        
+        var pagedItems = new ArrayList<KnowledgeFolderWithFilesResp>();
+        if (start < mixedList.size()) {
+            pagedItems = new ArrayList<>(mixedList.subList(start, end));
+        }
+
+        // 9. 为响应添加知识库封面信息（coverUrl 和 coverFileId）
+        for (var item : pagedItems) {
+            item.setCoverFileId(knowledge.getCoverFileId());
+            if (knowledge.getCoverUrl() != null && !knowledge.getCoverUrl().trim().isEmpty()) {
+                var presignedUrl = fileService.generatePresignedUrlFromFileUrl(knowledge.getCoverUrl(), null);
+                if (presignedUrl != null) {
+                    item.setCoverUrl(presignedUrl);
+                } else {
+                    item.setCoverUrl(knowledge.getCoverUrl());
+                }
+            }
+        }
+
+        log.info(String.format("分页查询知识库文件夹及文件列表成功: knowledgeId=%s, folderId=%s, total=%s, page=%s, size=%s, resultCount=%s", 
+                knowledgeId, actualFolderId, total, page, size, pagedItems.size()));
+        
+        return new PageResult<>(pagedItems, total, page, size);
     }
 }
 

@@ -23,11 +23,11 @@ import java.util.List;
 @Service
 public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, DifyApiKey> implements DifyApiKeyService {
     @Override
-    public String getApiKey(Long userId, String resourceId, String keyType) {
+    public String getApiKey( String resourceId, String keyType) {
         try {
             LambdaQueryWrapper<DifyApiKey> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper
-                    .eq(DifyApiKey::getUserId, userId)   //去除用户ID条件 查询到对应apikey
+                  //  .eq(DifyApiKey::getUserId, userId)   //去除用户ID条件 查询到对应apikey
                     .eq(StringUtils.hasText(resourceId), DifyApiKey::getResourceId, resourceId)
                     .eq(StringUtils.hasText(keyType), DifyApiKey::getKeyType, keyType)
                     .eq(DifyApiKey::getIsActive, true);
@@ -35,18 +35,18 @@ public class DifyApiKeyServiceImpl extends BaseServiceImpl<DifyApiKeyMapper, Dif
             DifyApiKey apiKey = this.getOne(queryWrapper);
 
             if (apiKey != null) {
-                log.debug("找到用户 {} 的 {} 密钥，资源ID: {}", userId, keyType, resourceId);
+                log.debug("找到用户 {} 的 {} 密钥，资源ID: {}",  keyType, resourceId);
                 return apiKey.getApiKey();
             }
 
             // 如果用户没有配置密钥，尝试使用系统默认密钥
-            log.warn("用户 {} 没有配置 {} 密钥，资源ID: {}，尝试使用系统默认密钥", userId, keyType, resourceId);
+            log.warn("用户 {} 没有配置 {} 密钥，资源ID: {}，尝试使用系统默认密钥",  keyType, resourceId);
             return getDefaultApiKey(keyType, resourceId);
 
         } catch (Exception e) {
             e.printStackTrace();
             log.error("获取API密钥失败: userId={}, resourceId={}, keyType={}, error={}",
-                    userId, resourceId, keyType, e.getMessage(), e);
+                   resourceId, keyType, e.getMessage(), e);
             throw new RuntimeException("获取API密钥失败: " + e.getMessage());
         }
     }

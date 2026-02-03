@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "node .cursor/hooks/session-start.js"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "node .cursor/hooks/audit-session-end.js"
+      },
+      {
+        "command": "node .cursor/hooks/audit-session-stats.js"
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "node .cursor/hooks/audit-prompt.js"
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "node .cursor/hooks/audit-edit.js"
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "node .cursor/hooks/guard-read-file.js"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "node .cursor/hooks/guard-shell.js",
+        "timeout": 10,
+        "matcher": "rm\\s+-rf|del\\s+/s|format\\s+disk|mvn\\s+clean\\s+install.*-DskipTests"
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": "node .cursor/hooks/audit-shell.js"
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": "node .cursor/hooks/audit-mcp-before.js"
+      }
+    ],
+    "afterMCPExecution": [
+      {
+        "command": "node .cursor/hooks/audit-mcp-after.js"
+      }
+    ],
+    "subagentStop": [
+      {
+        "command": "node .cursor/hooks/save-subagent-result.js"
+      }
+    ]
+  }
+}

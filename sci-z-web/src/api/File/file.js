@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import { FILE_API, HTTP_METHODS } from '../Common/constants'
+import { FILE_API, PROXY_API, HTTP_METHODS } from '../Common/constants'
 
 /**
  * 文件管理模块 API 接口
@@ -141,5 +141,19 @@ export const syncFileToDify = (data) => {
     url: FILE_API.SYNC_DIFY,
     method: HTTP_METHODS.POST,
     data
+  })
+}
+
+/**
+ * PDF代理下载并缓存
+ * @param {string} url - PDF链接地址
+ * @param {string} id - 文献ID（paperInfo.id）
+ * @returns {Promise} PDF缓存响应，返回唯一id和presignedUrl
+ */
+export const cachePdf = (url, id) => {
+  return request({
+    url: PROXY_API.PDF_CACHE,
+    method: HTTP_METHODS.GET,
+    params: { url, id }
   })
 }

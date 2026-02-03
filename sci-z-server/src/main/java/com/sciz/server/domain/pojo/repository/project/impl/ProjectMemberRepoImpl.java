@@ -69,6 +69,21 @@ public class ProjectMemberRepoImpl implements ProjectMemberRepo {
     }
 
     @Override
+    public List<Long> findProjectIdsByUserId(Long userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        return mapper.selectList(new LambdaQueryWrapper<ProjectMember>()
+                        .select(ProjectMember::getProjectId)
+                        .eq(ProjectMember::getUserId, userId)
+                        .eq(ProjectMember::getIsDeleted, DeleteStatus.NOT_DELETED.getCode()))
+                .stream()
+                .map(ProjectMember::getProjectId)
+                .distinct()
+                .toList();
+    }
+
+    @Override
     public boolean updateById(ProjectMember entity) {
         return mapper.updateById(entity) > 0;
     }

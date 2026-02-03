@@ -13,9 +13,12 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.HashMap;
@@ -36,6 +39,38 @@ import java.util.Set;
 public class GlobalExceptionHandler {
 
     /**
+     * 检查当前请求是否是 SSE 端点
+     * SSE 端点的异常应该通过 SseEmitter 发送错误消息，而不是通过全局异常处理器返回 Result
+     *
+     * @return 如果是 SSE 端点返回 true，否则返回 false
+     */
+    private boolean isSseEndpoint() {
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes != null) {
+                HttpServletRequest request = attributes.getRequest();
+                String accept = request.getHeader("Accept");
+                String contentType = request.getContentType();
+                // 检查 Accept 头或 Content-Type 是否包含 text/event-stream
+                if ((accept != null && accept.contains("text/event-stream")) ||
+                    (contentType != null && contentType.contains("text/event-stream"))) {
+                    return true;
+                }
+                // 检查请求路径是否包含 SSE 相关的端点
+                String requestURI = request.getRequestURI();
+                if (requestURI != null && (requestURI.contains("/workflow/run") || 
+                    requestURI.contains("/chatbot/stream") || 
+                    requestURI.contains("/knowledge/chatbot"))) {
+                    return true;
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("检查 SSE 端点时出错", ex);
+        }
+        return false;
+    }
+
+    /**
      * 处理业务异常
      *
      * @param e 业务异常
@@ -43,6 +78,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Result<Void>> handleBusinessException(BusinessException e) {
+        // SSE 端点的异常不通过全局异常处理器处理
+        if (isSseEndpoint()) {
+            log.debug("SSE 端点异常，跳过全局异常处理: {}", e.getMessage());
+            return null;
+        }
         log.error(String.format("业务异常: code=%s, message=%s", String.valueOf(e.getCode()), e.getMessage()), e);
 
         Result<Void> result = Result.fail(e.getCode(), e.getMessage());
@@ -157,6 +197,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Result<Void>> handleRuntimeException(RuntimeException e) {
+        // SSE 端点的异常不通过全局异常处理器处理
+        if (isSseEndpoint()) {
+            log.debug("SSE 端点运行时异常，跳过全局异常处理: {}", e.getMessage());
+            return null;
+        }
         log.error(String.format("运行时异常 err=%s", e.getMessage()), e);
 
         Result<Void> result = Result.fail(ResultCode.SERVER_ERROR.getCode(), "系统内部错误");
@@ -249,6 +294,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Result<Void>> handleException(Exception e) {
+        // SSE 端点的异常不通过全局异常处理器处理
+        if (isSseEndpoint()) {
+            log.debug("SSE 端点未知异常，跳过全局异常处理: {}", e.getMessage());
+            return null;
+        }
         log.error(String.format("未知异常 err=%s", e.getMessage()), e);
 
         Result<Void> result = Result.fail(ResultCode.SERVER_ERROR.getCode(), "系统内部错误");

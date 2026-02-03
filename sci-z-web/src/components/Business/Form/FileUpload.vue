@@ -99,7 +99,7 @@
             type="danger"
             text
             size="small"
-            @click="handleRemove(file)"
+            @click="handleRemoveClick(file, index)"
           >
             <el-icon><Delete /></el-icon>
           </el-button>
@@ -444,13 +444,37 @@ const handleChange = (file, currentFileList) => {
   }
 }
 
-// 移除文件
+// 移除文件（el-upload 的 on-remove 回调）
 const handleRemove = (file, currentFileList) => {
   // 批量模式下，同步更新 fileList
   if (isBatchMode.value) {
-    emit('update:modelValue', currentFileList)
+    emit('update:modelValue', currentFileList || [])
   }
-  emit('remove', { file, fileList: currentFileList })
+  emit('remove', { file, fileList: currentFileList || [] })
+}
+
+// 手动点击删除按钮（从文件列表中移除单个文件）
+const handleRemoveClick = (file, index) => {
+  // 创建新的文件列表，移除指定索引的文件
+  const newFileList = fileList.value.filter((f, i) => {
+    // 优先通过 uid 匹配（更准确），如果没有 uid 则通过索引匹配
+    if (file.uid && f.uid) {
+      return f.uid !== file.uid
+    }
+    // 也可以通过文件名和大小来匹配（作为备用方案）
+    if (file.name && f.name && file.size && f.size) {
+      return !(f.name === file.name && f.size === file.size)
+    }
+    // 最后使用索引匹配
+    return i !== index
+  })
+  
+  // 更新 fileList（无论是批量模式还是立即上传模式，都通过 v-model 更新）
+  // el-upload 组件通过 :file-list 属性绑定，会自动同步更新
+  emit('update:modelValue', newFileList)
+  
+  // 触发 remove 事件，通知外部组件
+  emit('remove', { file, fileList: newFileList })
 }
 
 // 超出限制

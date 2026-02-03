@@ -1,0 +1,38 @@
+---
+description: "DDD 分层架构、依赖方向、各层职责、实现顺序"
+alwaysApply: false
+globs: ["**/*.java"]
+---
+
+# DDD 分层架构
+
+## 分层结构
+
+```
+interfaces/       → controller, converter
+application/      → service (接口 + impl)
+domain/pojo/      → entity, mapper, repository, dto/request|response
+infrastructure/   → config, shared, external, common
+```
+
+依赖方向：`interfaces` → `application` → `domain` ← `infrastructure`
+
+## 各层职责
+
+- Controller：入参校验(@Valid)、鉴权注解、调用 Service、返回 Result<resp>
+- Converter：MapStruct，仅做 req↔entity↔resp 转换
+- Service：事务(@Transactional)、业务编排、发布事件
+- Repository：组合 Mapper 做数据访问，禁止业务逻辑
+- Entity：继承 BaseEntity，与表字段一一对应
+
+## 实现顺序
+
+1. Entity → Mapper → Repository(接口+实现) → DTO(CreateReq/UpdateReq/QueryReq, Resp/DetailResp/PageResp) → Converter → Service(接口+实现) → Controller
+2. Event & Handler 按需
+
+## 文件命名
+
+- Entity: Xxx.java；Mapper: XxxMapper.java；Repository: XxxRepo.java + XxxRepoImpl.java
+- Service: XxxService.java + XxxServiceImpl.java；Controller: XxxController.java；Converter: XxxConverter.java
+- Request: XxxCreateReq, XxxUpdateReq, XxxQueryReq；Response: XxxResp, XxxDetailResp, XxxPageResp
+- Event: XxxCreatedEvent 等；Handler: XxxEventHandler

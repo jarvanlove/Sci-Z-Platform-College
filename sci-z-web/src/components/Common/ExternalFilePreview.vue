@@ -48,6 +48,10 @@ const props = defineProps({
     type: String,
     required: true
   },
+  fileId: {
+    type: String,
+    default: ''
+  },
   landingPageUrl: {
     type: String,
     default: ''
@@ -68,7 +72,12 @@ const loadTimeout = ref(null)
 const previewUrl = computed(() => {
   if (!props.fileUrl) return ''
   if (useProxy.value) {
-  return `/api/proxy/pdf?url=${encodeURIComponent(props.fileUrl)}`
+    if (props.fileId) {
+      return `/api/proxy/pdf?id=${encodeURIComponent(props.fileId)}&url=${encodeURIComponent(props.fileUrl)}`
+    }
+    // 如果没有fileId，使用URL的hash作为临时ID
+    const tempId = btoa(props.fileUrl).replace(/[+/=]/g, '').substring(0, 16)
+    return `/api/proxy/pdf?id=${encodeURIComponent(tempId)}&url=${encodeURIComponent(props.fileUrl)}`
   }
   return props.fileUrl
 })
@@ -78,7 +87,9 @@ const verifyProxyResponse = async () => {
   if (!props.fileUrl) return false
   
   try {
-    const proxyUrl = `/api/proxy/pdf?url=${encodeURIComponent(props.fileUrl)}`
+    // 构建ID参数
+    const fileId = props.fileId || btoa(props.fileUrl).replace(/[+/=]/g, '').substring(0, 16)
+    const proxyUrl = `/api/proxy/pdf?id=${encodeURIComponent(fileId)}&url=${encodeURIComponent(props.fileUrl)}`
     const response = await fetch(proxyUrl)
     
     if (!response.ok) {

@@ -1,0 +1,62 @@
+---
+description: "导入、日志、异常、返回、事务、登录与异步上下文、项目封装工具、Record/BaseQueryReq、Java21"
+alwaysApply: false
+globs: ["**/*.java"]
+---
+
+# Java 开发规范
+
+## 导入与日志
+
+- 必须用 `import`，禁止在代码中写全限定类名
+- 日志统一使用 `String.format("%s", ...)` 占位符，例如：`log.info(String.format("项目创建成功: id=%s", id))`
+
+## 异常抛出
+
+- **仅抛** `BusinessException`，禁止抛其他运行时异常（除非框架明确要求）
+- **推荐写法**：使用静态工厂方法，便于格式化消息与统一构造
+  - `BusinessException.of(ResultCode.XXX)`：仅用枚举默认消息
+  - `BusinessException.of(ResultCode.XXX, "自定义消息")`：固定文案
+  - `BusinessException.of(ResultCode.XXX, "模板 %s 失败: %s", name, e.getMessage())`：带占位符，与日志风格一致
+- **不推荐**：`new BusinessException(ResultCode.XXX, "字符串" + e.getMessage())` 等手拼字符串，易漏判空与格式不统一
+- 错误码使用 `ResultCode` 枚举（系统级 4xx/5xx 与业务级 1000+）；新增错误码按项目分段（见 CLAUDE 或 result 包文档）
+
+## 返回
+
+- Controller 统一返回 `Result<T>`；Service 返回领域对象、Optional 或 void，不返回 Result
+
+## 事务
+
+- Service 写操作加 `@Transactional(rollbackFor = Exception.class)`
+
+## 登录用户上下文
+
+- **Web 请求线程**：业务中直接使用 `LoginUserUtil.requireCurrentUser()`、`requireCurrentUserId()` 或 `getCurrentUser()`；修改用户资料后调用 `LoginUserUtil.cacheCurrentUser(updatedContext)`；登出时调用 `LoginUserUtil.clearCurrentUser()`。
+- **异步场景**（@Async、@EventListener、定时任务、CompletableFuture 等非 Web 线程）：  
+  - 在异步方法**开始时**设置上下文：`AsyncUserContext.set(userId, username, realName)` 或 `AsyncUserContext.set(loginUserContext)`；  
+  - 业务中照常使用 `LoginUserUtil.requireCurrentUser()`（会优先从 ThreadLocal 取）；  
+  - 在 **finally** 中**必须**调用 `AsyncUserContext.clear()`，防止内存泄漏。  
+- **事务提交后异步**：使用 `AsyncTaskUtil.executeAfterCommit(task, currentUser, executor)`，工具内会自动设置与清理 `AsyncUserContext`，无需手写 set/clear。
+- 需要操作人时，优先在异步入口处用 `LoginUserUtil.requireCurrentUser()` 取得 `currentUser` 再传入异步逻辑或通过事件传递，避免在异步线程内再取 Web 上下文。
+
+## 项目封装与工具调用
+
+- **必须优先使用项目内已有封装**，禁止重复造轮子；新增能力先查 `infrastructure.shared` 与各层已有类再实现。
+- **登录与异步**：`LoginUserUtil`、`AsyncUserContext`、`AsyncTaskUtil`（见上）。
+- **操作日志**：使用 `OperationLogRecorderUtil`，操作类型用 `OperationLogRecorderStatus` 枚举；同步上下文自动取用户，异步上下文调用 `recordSuccess(operation, detail, executionTime, userId, username)` / `recordFailure(..., userId, username)` 等重载传入用户信息。
+- **数据权限**：使用 `DataPermissionUtil.isAdmin()`、`getDataPermissionUserId()` 等，在 Repository 查询时根据返回值决定是否加 `created_by` 等过滤；异步场景需先设置 `AsyncUserContext`。
+- **异常与返回**：`BusinessException.of(ResultCode.XXX, ...)`、`ResultCode`、`Result`（见上）。
+- **分页与查询**：查询 DTO 组合或封装 `BaseQueryReq`，实现 `toBaseQuery()`；Service 中用 `req.toBaseQuery()` 或 `BaseQueryReq.defaultPage()`。
+- **其他工具**：按需使用 `ValidationUtil`、`JsonUtil`、`FileUtil`、`DateUtil`、`TraceIdUtil`、`MinioUtil`、`RedisUtil` 等（见 `infrastructure.shared.utils`）；事件发布使用 `EventPublisher`。
+
+## Record 与 BaseQueryReq
+
+- 简单 DTO 优先用 Record；查询 DTO 用 record 组合 BaseQueryReq 并提供 `toBaseQuery()`；Service 用 `req.toBaseQuery()` 或 `BaseQueryReq.defaultPage()`。
+
+## Java 21 必须
+
+- 使用 `java.time`，禁止 `Date`/`Calendar`；简单 DTO 用 Record；多行字符串用 Text Blocks；类型明显时用 `var`；集合用 Stream API 与 Optional；禁止使用 @Deprecated API。
+
+## 接口规范
+
+- 统一返回 `Result`、`ResultCode`；新增错误码按项目分段（见 CLAUDE 或规则文档）。

@@ -267,6 +267,41 @@ public enum ResultCode {
      */
     KNOWLEDGE_FILE_DELETE_SUCCESS(6104, "文件删除成功"),
 
+    /**
+     * 知识库文件夹不存在
+     */
+    KNOWLEDGE_FOLDER_NOT_FOUND(6005, "知识库文件夹不存在"),
+
+    /**
+     * 知识库文件夹名称重复
+     */
+    KNOWLEDGE_FOLDER_NAME_DUPLICATE(6006, "同级目录下文件夹名称已存在"),
+
+    /**
+     * 知识库文件夹存在子文件夹
+     */
+    KNOWLEDGE_FOLDER_HAS_CHILDREN(6007, "文件夹下存在子文件夹，无法删除"),
+
+    /**
+     * 知识库文件夹下存在文件
+     */
+    KNOWLEDGE_FOLDER_HAS_FILES(6008, "文件夹下存在文件，无法删除"),
+
+    /**
+     * 知识库文件夹创建成功
+     */
+    KNOWLEDGE_FOLDER_CREATE_SUCCESS(6105, "文件夹创建成功"),
+
+    /**
+     * 知识库文件夹更新成功
+     */
+    KNOWLEDGE_FOLDER_UPDATE_SUCCESS(6106, "文件夹更新成功"),
+
+    /**
+     * 知识库文件夹删除成功
+     */
+    KNOWLEDGE_FOLDER_DELETE_SUCCESS(6107, "文件夹删除成功"),
+
     // ==================== 对话相关错误码 (7000-7999) ====================
     /**
      * 对话不存在
@@ -441,16 +476,6 @@ public enum ResultCode {
     SMS_CODE_RATE_LIMITED(9012, "短信验证码发送频繁，请稍后再试"),
 
     /**
-     * 短信验证码10分钟内发送次数超限
-     */
-    SMS_CODE_10MIN_LIMIT_EXCEEDED(9017, "10分钟内发送次数过多，请稍后再试"),
-
-    /**
-     * 短信验证码一天内发送次数超限
-     */
-    SMS_CODE_DAY_LIMIT_EXCEEDED(9018, "今日发送次数已达上限，请明天再试"),
-
-    /**
      * 短信验证码发送失败
      */
     SMS_CODE_SEND_FAILED(9013, "短信验证码发送失败"),
@@ -469,6 +494,16 @@ public enum ResultCode {
      * 短信验证码已过期
      */
     SMS_CODE_EXPIRED(9016, "短信验证码已过期"),
+
+    /**
+     * 短信验证码10分钟内发送次数超限
+     */
+    SMS_CODE_10MIN_LIMIT_EXCEEDED(9017, "10分钟内发送次数过多，请稍后再试"),
+
+    /**
+     * 短信验证码一天内发送次数超限
+     */
+    SMS_CODE_DAY_LIMIT_EXCEEDED(9018, "今日发送次数已达上限，请明天再试"),
 
     /**
      * 邮箱验证码发送成功

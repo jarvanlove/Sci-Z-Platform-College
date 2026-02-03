@@ -209,6 +209,7 @@ const { t } = useI18n()
 const selectedRows = ref([])
 const tableRef = ref(null)
 let cleanupScrollSync = null
+let resizeObserver = null
 
 // 计算属性
 const computedActionLabel = computed(() => {
@@ -394,6 +395,24 @@ onMounted(() => {
     setTimeout(() => {
       if (tableRef.value) {
         cleanupScrollSync = syncScroll()
+        
+        // 🔥 修复：TOC 布局侧边栏展开/收起、窗口缩放会改变容器宽度
+        // Element Plus 表格需要 doLayout() 重新计算列宽，否则会出现“表格怪怪的/列错位”
+        try {
+          const tableEl = tableRef.value.$el || tableRef.value
+          if (tableEl && typeof ResizeObserver !== 'undefined') {
+            resizeObserver = new ResizeObserver(() => {
+              // 使用 requestAnimationFrame 合并频繁变化
+              requestAnimationFrame(() => {
+                tableRef.value?.doLayout?.()
+              })
+            })
+            resizeObserver.observe(tableEl)
+          }
+        } catch (e) {
+          // 忽略 ResizeObserver 不可用的环境
+        }
+        
         // 如果第一次没找到固定列，再试一次
         if (!cleanupScrollSync) {
           setTimeout(() => {
@@ -410,6 +429,14 @@ onMounted(() => {
 onUnmounted(() => {
   if (cleanupScrollSync) {
     cleanupScrollSync()
+  }
+  if (resizeObserver) {
+    try {
+      resizeObserver.disconnect()
+    } catch (e) {
+      // ignore
+    }
+    resizeObserver = null
   }
 })
 

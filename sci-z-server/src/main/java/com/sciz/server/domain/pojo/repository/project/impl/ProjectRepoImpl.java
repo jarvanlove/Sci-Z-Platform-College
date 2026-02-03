@@ -8,11 +8,13 @@ import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWra
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.domain.pojo.entity.project.Project;
 import com.sciz.server.domain.pojo.mapper.project.ProjectMapper;
+import com.sciz.server.domain.pojo.repository.project.ProjectMemberRepo;
 import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.infrastructure.shared.enums.DeleteStatus;
 import com.sciz.server.infrastructure.shared.enums.ProjectStatus;
 import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import java.util.List;
 
@@ -27,9 +29,11 @@ import java.util.List;
 public class ProjectRepoImpl implements ProjectRepo {
 
     private final ProjectMapper mapper;
+    private final ProjectMemberRepo projectMemberRepo;
 
-    public ProjectRepoImpl(ProjectMapper mapper) {
+    public ProjectRepoImpl(ProjectMapper mapper, ProjectMemberRepo projectMemberRepo) {
         this.mapper = mapper;
+        this.projectMemberRepo = projectMemberRepo;
     }
 
     @Override
@@ -44,10 +48,15 @@ public class ProjectRepoImpl implements ProjectRepo {
                 .eq(Project::getId, id)
                 .eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
-        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 数据权限：admin 看全部；普通用户可看自己创建的、作为成员的项目、或作为项目负责人(manager_id)的项目
         Long userId = DataPermissionUtil.getDataPermissionFilter();
         if (userId != null) {
-            queryWrapper.eq(Project::getCreatedBy, userId);
+            List<Long> memberProjectIds = projectMemberRepo.findProjectIdsByUserId(userId);
+            if (CollectionUtils.isEmpty(memberProjectIds)) {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().eq(Project::getManagerId, userId));
+            } else {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().in(Project::getId, memberProjectIds).or().eq(Project::getManagerId, userId));
+            }
         }
 
         return queryWrapper.one();
@@ -59,10 +68,15 @@ public class ProjectRepoImpl implements ProjectRepo {
         var queryWrapper = new LambdaQueryWrapper<Project>();
         queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
-        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 数据权限：admin 看全部；普通用户可看自己创建的、作为成员的项目、或作为项目负责人(manager_id)的项目
         Long userId = DataPermissionUtil.getDataPermissionFilter();
         if (userId != null) {
-            queryWrapper.eq(Project::getCreatedBy, userId);
+            List<Long> memberProjectIds = projectMemberRepo.findProjectIdsByUserId(userId);
+            if (CollectionUtils.isEmpty(memberProjectIds)) {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().eq(Project::getManagerId, userId));
+            } else {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().in(Project::getId, memberProjectIds).or().eq(Project::getManagerId, userId));
+            }
         }
 
         // 关键字搜索（项目编号/项目名称）
@@ -120,6 +134,23 @@ public class ProjectRepoImpl implements ProjectRepo {
     }
 
     @Override
+    public List<Long> findDeclarationIdsByProjectIds(List<Long> projectIds) {
+        if (CollectionUtils.isEmpty(projectIds)) {
+            return List.of();
+        }
+        return mapper.selectList(
+                new LambdaQueryWrapper<Project>()
+                        .select(Project::getDeclarationId)
+                        .in(Project::getId, projectIds)
+                        .eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                        .isNotNull(Project::getDeclarationId))
+                .stream()
+                .map(Project::getDeclarationId)
+                .distinct()
+                .toList();
+    }
+
+    @Override
     public boolean updateById(Project entity) {
         return mapper.updateById(entity) > 0;
     }
@@ -137,10 +168,15 @@ public class ProjectRepoImpl implements ProjectRepo {
         var queryWrapper = new LambdaQueryWrapper<Project>();
         queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
-        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 数据权限：admin 看全部；普通用户可看自己创建的、作为成员的项目、或作为项目负责人(manager_id)的项目
         Long userId = DataPermissionUtil.getDataPermissionFilter();
         if (userId != null) {
-            queryWrapper.eq(Project::getCreatedBy, userId);
+            List<Long> memberProjectIds = projectMemberRepo.findProjectIdsByUserId(userId);
+            if (CollectionUtils.isEmpty(memberProjectIds)) {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().eq(Project::getManagerId, userId));
+            } else {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().in(Project::getId, memberProjectIds).or().eq(Project::getManagerId, userId));
+            }
         }
 
         // 如果指定了状态，则按状态筛选
@@ -159,10 +195,15 @@ public class ProjectRepoImpl implements ProjectRepo {
         // 排除已取消的项目（已取消的项目不需要自动更新）
         queryWrapper.ne(Project::getStatus, ProjectStatus.CANCELLED.getCode().toString());
 
-        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 数据权限：admin 看全部；普通用户可看自己创建的、作为成员的项目、或作为项目负责人(manager_id)的项目
         Long userId = DataPermissionUtil.getDataPermissionFilter();
         if (userId != null) {
-            queryWrapper.eq(Project::getCreatedBy, userId);
+            List<Long> memberProjectIds = projectMemberRepo.findProjectIdsByUserId(userId);
+            if (CollectionUtils.isEmpty(memberProjectIds)) {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().eq(Project::getManagerId, userId));
+            } else {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().in(Project::getId, memberProjectIds).or().eq(Project::getManagerId, userId));
+            }
         }
 
         return mapper.selectList(queryWrapper);
@@ -174,15 +215,63 @@ public class ProjectRepoImpl implements ProjectRepo {
         // 排除已删除的项目
         queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
-        // 数据权限过滤：admin 用户可以看到所有数据，普通用户只能看到自己的数据
+        // 数据权限：admin 看全部；普通用户可看自己创建的、作为成员的项目、或作为项目负责人(manager_id)的项目
         Long userId = DataPermissionUtil.getDataPermissionFilter();
         if (userId != null) {
-            queryWrapper.eq(Project::getCreatedBy, userId);
+            List<Long> memberProjectIds = projectMemberRepo.findProjectIdsByUserId(userId);
+            if (CollectionUtils.isEmpty(memberProjectIds)) {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().eq(Project::getManagerId, userId));
+            } else {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().in(Project::getId, memberProjectIds).or().eq(Project::getManagerId, userId));
+            }
         }
 
         // 按创建时间倒序
         queryWrapper.orderByDesc(Project::getCreatedTime);
 
         return mapper.selectList(queryWrapper);
+    }
+
+    @Override
+    public List<Long> findProjectIdsByManagerId(Long managerId) {
+        if (managerId == null) {
+            return List.of();
+        }
+        return mapper.selectList(
+                new LambdaQueryWrapper<Project>()
+                        .select(Project::getId)
+                        .eq(Project::getManagerId, managerId)
+                        .eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode()))
+                .stream()
+                .map(Project::getId)
+                .toList();
+    }
+
+    @Override
+    public List<Long> findProjectIdsByCreatedBy(Long createdBy) {
+        if (createdBy == null) {
+            return List.of();
+        }
+        return mapper.selectList(
+                new LambdaQueryWrapper<Project>()
+                        .select(Project::getId)
+                        .eq(Project::getCreatedBy, createdBy)
+                        .eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode()))
+                .stream()
+                .map(Project::getId)
+                .toList();
+    }
+
+    @Override
+    public Project findByDeclarationId(Long declarationId) {
+        if (declarationId == null) {
+            return null;
+        }
+        var list = mapper.selectList(
+                new LambdaQueryWrapper<Project>()
+                        .eq(Project::getDeclarationId, declarationId)
+                        .eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                        .last("LIMIT 1"));
+        return list.isEmpty() ? null : list.get(0);
     }
 }

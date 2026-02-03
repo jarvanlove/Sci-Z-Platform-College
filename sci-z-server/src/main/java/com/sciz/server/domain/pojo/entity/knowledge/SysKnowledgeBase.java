@@ -83,6 +83,12 @@ public class SysKnowledgeBase extends BaseEntity {
     private String callback;
 
     /**
+     * 知识库类型：personal=个人知识库，project=项目知识库
+     */
+    @TableField("kb_type")
+    private String kbType;
+
+    /**
      * 是否共享
      */
     @TableField("is_shared")
@@ -105,4 +111,16 @@ public class SysKnowledgeBase extends BaseEntity {
      */
     @TableField("folder_count")
     private Integer folderCount;
+
+    /**
+     * 知识库封面附件ID
+     */
+    @TableField("cover_file_id")
+    private Long coverFileId;
+
+    /**
+     * 知识库封面URL
+     */
+    @TableField("cover_url")
+    private String coverUrl;
 }

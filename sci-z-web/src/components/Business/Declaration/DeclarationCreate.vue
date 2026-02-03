@@ -1,7 +1,7 @@
 <!--
 /**
  * @description 新建申报业务组件
- * 包含红头文件上传、AI分析、表单填写、工作流选择、申报提交等功能
+ * 包含红头文件上传、AI分析、表单填写、申报提交等功能
  */
 -->
 <template>
@@ -22,7 +22,13 @@
           <div class="form-group">
             <div class="group-title">{{ $t('declaration.documentUpload') }}</div>
             
-            <div v-if="!uploadedFile" class="upload-area" @click="triggerFileInput">
+            <!-- 上传/分析中：隐藏上传区域，仅显示转圈与提示，避免重复点击 -->
+            <div v-if="uploadStatus === 'uploading' || uploadStatus === 'analyzing'" class="upload-loading-block">
+              <el-icon class="upload-loading-icon is-loading"><Loading /></el-icon>
+              <div class="upload-loading-text">{{ $t('declaration.uploadingAndAnalyzing') }}</div>
+            </div>
+            
+            <div v-else-if="!uploadedFile" class="upload-area" @click="triggerFileInput">
               <el-icon class="upload-icon"><UploadFilled /></el-icon>
               <div class="upload-text">{{ $t('declaration.clickUpload') }}</div>
               <div class="upload-hint">{{ $t('declaration.uploadHint') }}</div>
@@ -37,7 +43,7 @@
   
             <div v-else class="file-info-section">
               <div class="file-info">
-                <el-icon class="file-icon"><Document /></el-icon>
+                <FileTypeIcon :fileName="uploadedFile.name" size="small" />
                 <span class="file-name">{{ uploadedFile.name }}</span>
                 <BaseButton
                   type="danger"
@@ -120,11 +126,25 @@
                 </el-select>
               </el-form-item>
   
-              <el-form-item :label="$t('declaration.projectLeader')" prop="projectLeader">
-                <el-input
-                  v-model="form.projectLeader"
+              <el-form-item :label="$t('declaration.projectLeader')" prop="projectLeaderId">
+                <el-select
+                  v-model="form.projectLeaderId"
+                  filterable
+                  clearable
+                  :suffix-icon="ArrowDown"
+                  :loading="projectLeaderLoading"
                   :placeholder="$t('declaration.projectLeaderPlaceholder')"
-                />
+                  style="width: 100%"
+                  popper-class="declaration-leader-select-dropdown"
+                  @change="syncProjectLeaderNameFromId"
+                >
+                  <el-option
+                    v-for="opt in projectLeaderOptions"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
               </el-form-item>
             </div>
   
@@ -186,13 +206,13 @@
                 :placeholder="$t('declaration.directionPlaceholder')"
               />
               <div
-                v-if="analysisResult && uploadStatus === 'success' && analysisResult.researchDirection !== undefined"
+                v-if="analysisResult && uploadStatus === 'success' && analysisResult.researchDirection !== undefined && form.researchDirection === autoFilledResearchDirection"
                 class="auto-filled-hint"
               >
                 ✨ {{ $t('declaration.autoFilled') }}
               </div>
             </el-form-item>
-  
+
             <el-form-item
               :label="$t('declaration.topic')"
               prop="researchTopic"
@@ -205,14 +225,14 @@
                 :placeholder="$t('declaration.topicPlaceholder')"
               />
               <div
-                v-if="analysisResult && uploadStatus === 'success' && analysisResult.researchTopic !== undefined"
+                v-if="analysisResult && uploadStatus === 'success' && analysisResult.researchTopic !== undefined && form.researchTopic === autoFilledResearchTopic"
                 class="auto-filled-hint"
               >
                 ✨ {{ $t('declaration.autoFilled') }}
               </div>
             </el-form-item>
           </div>
-  
+
           <!-- 研究领域 -->
           <div class="form-group">
             <div class="group-title">
@@ -232,7 +252,7 @@
                   v-model="tagInput"
                   class="tag-input"
                   :placeholder="$t('declaration.fieldPlaceholder')"
-                  @keydown.enter.prevent="addTag"
+                  @blur="addTag"
                   @keydown.backspace="handleBackspace"
                 />
               </div>
@@ -240,7 +260,7 @@
                 {{ $t('declaration.fieldCount', { current: form.researchField.length, max: 10 }) }}
               </div>
               <div
-                v-if="analysisResult && analysisResult.researchField !== undefined && uploadStatus === 'success'"
+                v-if="showResearchFieldAutoFilledHint"
                 class="auto-filled-hint"
               >
                 ✨ {{ $t('declaration.autoFilled') }}
@@ -250,26 +270,7 @@
               </div>
             </el-form-item>
           </div>
-  
-          <!-- 工作流选择 - 已注释，后端会自行处理 -->
-          <!--
-          <div class="form-group">
-            <div class="group-title">
-              {{ $t('declaration.workflow') }} <span class="required-mark">*</span>
-            </div>
-            <el-form-item :label="$t('declaration.createPage.selectWorkflow')" prop="workflow">
-              <WorkflowSelect
-                v-model="form.workflow"
-                :options="workflowOptions"
-                :placeholder="$t('declaration.workflowPlaceholder')"
-                :loading="workflowLoading"
-                :no-match-text="$t('declaration.workflowNoMatch')"
-                :no-data-text="$t('declaration.workflowNoData')"
-              />
-            </el-form-item>
-          </div>
-          -->
-  
+
           <!-- 表单操作按钮 -->
           <div class="form-actions">
             <BaseButton
@@ -298,14 +299,13 @@
     Loading,
     MagicStick,
     UploadFilled,
-    Document
+    ArrowDown
   } from '@element-plus/icons-vue'
   import { BaseCard, BaseButton, BaseDatePicker, BackButton } from '@/components/Common'
-  // import { WorkflowSelect } from '@/components/Business/Form' // 🔥 已注释，后端会自行处理
   import { DECLARATION_DEPARTMENT_OPTIONS } from '@/utils/constants'
   import { createLogger } from '@/utils/simpleLogger'
   import { uploadRedHeaderFile, createDeclaration } from '@/api/Declaration/declaration'
-  // import { getWorkflows } from '@/api/User/user' // 🔥 已注释，后端会自行处理
+  import { getUsers } from '@/api/System'
   import { validateFileSize, validateFileType } from '@/constants/attachment'
   
   const router = useRouter()
@@ -321,13 +321,13 @@
     documentFile: null,
     department: '',
     projectLeader: '',
+    projectLeaderId: null, // 项目负责人用户ID，提交给后端用于权限与申报/项目关联
     documentPublishTime: '',
     projectStartTime: '',
     projectEndTime: '',
     researchDirection: '',
     researchTopic: '',
-    researchField: [],
-    // workflow: '' // 🔥 已注释，后端会自行处理
+    researchField: []
   })
   
   // 表单验证规则
@@ -339,11 +339,11 @@
         trigger: 'change'
       }
     ],
-    projectLeader: [
+    projectLeaderId: [
       {
         required: true,
         message: t('declaration.projectLeaderRequired'),
-        trigger: 'blur'
+        trigger: 'change'
       }
     ],
     documentPublishTime: [
@@ -395,14 +395,7 @@
         },
         trigger: 'change'
       }
-    ],
-    // workflow: [ // 🔥 已注释，后端会自行处理
-    //   {
-    //     required: true,
-    //     message: t('declaration.workflowRequired'),
-    //     trigger: 'change'
-    //   }
-    // ]
+    ]
   }))
   
   // 状态管理
@@ -411,19 +404,87 @@
   const uploadStatus = ref('idle') // idle, uploading, analyzing, success, error
   const uploadProgress = ref(0)
   const analysisResult = ref(null)
+  // 自动填充时的快照：用于“已自动填充”提示仅在当前值与当时一致时显示，用户修改后隐藏
+  const autoFilledResearchDirection = ref('')
+  const autoFilledResearchTopic = ref('')
+  const autoFilledResearchField = ref([])
   
   // 部门选项
   const departmentOptions = DECLARATION_DEPARTMENT_OPTIONS
-  
-  // 工作流选项 - 已注释，后端会自行处理
-  // const workflowOptions = ref([])
-  // const workflowLoading = ref(false)
   
   // 标签输入
   const tagInput = ref('')
   const formErrors = reactive({
     researchField: ''
   })
+  
+  // 项目负责人可检索下拉：用户列表选项与加载状态
+  const projectLeaderOptions = ref([])
+  const projectLeaderLoading = ref(false)
+  
+  // 研究领域当前是否仍与自动填充一致（用于“已自动填充”提示：用户增删改标签后隐藏）
+  const showResearchFieldAutoFilledHint = computed(() => {
+    if (!analysisResult.value || uploadStatus.value !== 'success' || analysisResult.value.researchField === undefined) return false
+    const a = form.researchField
+    const b = autoFilledResearchField.value
+    if (a.length !== b.length) return false
+    return a.every((t, i) => t === b[i])
+  })
+  
+  // 项目负责人下拉：进入页面时加载一次，之后仅前端过滤（与报告生成「选择项目」一致，不再每次打开/输入都请求后端）
+  const loadProjectLeaderOptions = async () => {
+    projectLeaderLoading.value = true
+    try {
+      const response = await getUsers({
+        pageNo: 1,
+        pageSize: 500,
+        sortBy: 'createTime',
+        sortOrder: 'DESC'
+      })
+      const data = response?.data?.data ?? response?.data ?? {}
+      const list = data.records ?? data.list ?? []
+      const options = list
+        .filter(user => {
+          const username = (user.username || '').toLowerCase()
+          return username !== 'admin'
+        })
+        .map(user => {
+          const id = user.id ?? user.userId
+          const label = user.realName || user.name || user.username || ''
+          return id != null && label ? { value: id, label } : null
+        })
+        .filter(Boolean)
+      const seen = new Set()
+      projectLeaderOptions.value = options.filter(o => {
+        if (seen.has(o.value)) return false
+        seen.add(o.value)
+        return true
+      })
+      if (form.projectLeaderId != null && !projectLeaderOptions.value.some(o => o.value === form.projectLeaderId)) {
+        const label = form.projectLeader || ''
+        if (label) projectLeaderOptions.value = [{ value: form.projectLeaderId, label }, ...projectLeaderOptions.value]
+      }
+      // 若仅有姓名（如 AI 填充）无 ID，则按姓名匹配回填 projectLeaderId
+      if (form.projectLeader && form.projectLeaderId == null) {
+        const opt = projectLeaderOptions.value.find(o => (o.label || '').trim() === (form.projectLeader || '').trim())
+        if (opt) form.projectLeaderId = opt.value
+      }
+    } catch (error) {
+      logger.error('Load project leader options failed', error)
+      projectLeaderOptions.value = []
+      if (!error._messageShown) {
+        ElMessage.error(t('declaration.projectLeaderLoadError') || '加载负责人列表失败')
+      }
+    } finally {
+      projectLeaderLoading.value = false
+    }
+  }
+
+  const syncProjectLeaderNameFromId = () => {
+    const id = form.projectLeaderId
+    const opt = id != null ? projectLeaderOptions.value.find(o => o.value === id) : null
+    form.projectLeader = opt ? opt.label : ''
+  }
   
   // 触发文件选择
   const triggerFileInput = () => {
@@ -492,14 +553,6 @@
     let progressInterval = null
     
     try {
-      // 显示提示消息
-      loadingMessage = ElMessage({
-        message: t('declaration.uploadingAndAnalyzing'),
-        type: 'info',
-        duration: 0, // 不自动关闭
-        showClose: false
-      })
-  
       logger.info('Starting file upload and analysis', { fileName: file.name, fileSize: file.size })
   
       // 模拟上传进度（实际进度由接口控制）
@@ -559,21 +612,25 @@
       // 研究方向：无论是否为空都填充（接口返回空字符串也填充，表示AI分析结果是空的）
       if (analysisData.researchDirection !== undefined) {
         form.researchDirection = analysisData.researchDirection ? String(analysisData.researchDirection).trim() : ''
+        autoFilledResearchDirection.value = form.researchDirection
         logger.info('Auto-filled researchDirection', { value: form.researchDirection })
       }
       
       // 研究课题：无论是否为空都填充
       if (analysisData.researchTopic !== undefined) {
         form.researchTopic = analysisData.researchTopic ? String(analysisData.researchTopic).trim() : ''
+        autoFilledResearchTopic.value = form.researchTopic
         logger.info('Auto-filled researchTopic', { value: form.researchTopic })
       }
       
-      // 研究领域：在接口返回中是字符串（如："人工智能、具身智能、工业软件"），需要转换为数组
-      // 无论接口是否返回了 researchField 字段，都进行处理（即使为空也要清空表单，表示AI分析结果是空的）
+      // 研究领域：接口可能返回字符串（如 "[人工智能,工业软件]" 或 "人工智能、工业软件"），需去两端 [] 再转数组
       if (analysisData.researchField !== undefined) {
         if (analysisData.researchField && String(analysisData.researchField).trim()) {
-          // 如果返回的是字符串，尝试按分隔符拆分（支持顿号、逗号、中英文逗号）
-          const fieldValue = String(analysisData.researchField).trim()
+          let fieldValue = String(analysisData.researchField).trim()
+          // 去掉首尾的方括号（后端可能返回 "[人工智能,工业软件]" 这种格式）
+          if (fieldValue.startsWith('[') && fieldValue.endsWith(']')) {
+            fieldValue = fieldValue.slice(1, -1)
+          }
           const fields = typeof analysisData.researchField === 'string'
             ? fieldValue.split(/[、，,]/).map(f => f.trim()).filter(f => f)
             : Array.isArray(analysisData.researchField)
@@ -582,10 +639,12 @@
           
           // 清空现有字段，替换为接口返回的字段（避免重复）
           form.researchField = fields.slice(0, 10) // 最多保留10个字段
+          autoFilledResearchField.value = [...form.researchField]
           logger.info('Auto-filled researchField', { fields, count: form.researchField.length })
         } else {
           // 如果接口返回了 researchField 但值为空，清空表单字段
           form.researchField = []
+          autoFilledResearchField.value = []
           logger.info('Cleared researchField (empty value from API)')
         }
       }
@@ -608,7 +667,10 @@
       logger.error('File upload or analysis failed', error)
       uploadStatus.value = 'error'
       uploadProgress.value = 0
-      ElMessage.error(t('declaration.analysisError'))
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(t('declaration.analysisError'))
+      }
     }
   }
   
@@ -617,6 +679,9 @@
     uploadedFile.value = null
     form.documentFile = null
     analysisResult.value = null
+    autoFilledResearchDirection.value = ''
+    autoFilledResearchTopic.value = ''
+    autoFilledResearchField.value = []
     uploadStatus.value = 'idle'
     uploadProgress.value = 0
     if (fileInputRef.value) {
@@ -657,70 +722,6 @@
     }
   }
   
-  // 加载工作流选项 - 已注释，后端会自行处理
-  // const loadWorkflowOptions = async () => {
-  //   try {
-  //     workflowLoading.value = true
-  //     logger.info('Loading workflow options')
-
-  //     // 调用工作流列表接口
-  //     const response = await getWorkflows()
-      
-  //     // 处理响应数据：支持多种响应格式
-  //     // 标准响应格式：{ code, message, data: [...] } 或直接是数组
-  //     let workflowsData = []
-      
-  //     // 检查 response.data 是否为数组（标准格式：{ data: [...] }）
-  //     if (Array.isArray(response?.data)) {
-  //       workflowsData = response.data
-  //     } 
-  //     // 检查 response.data.data 是否为数组（嵌套格式：{ data: { data: [...] } }）
-  //     else if (Array.isArray(response?.data?.data)) {
-  //       workflowsData = response.data.data
-  //     }
-  //     // 如果 response 本身就是数组（直接返回数组）
-  //     else if (Array.isArray(response)) {
-  //       workflowsData = response
-  //     }
-  //     // 如果都没有，尝试从 data 字段获取
-  //     else {
-  //       workflowsData = response?.data || []
-  //     }
-      
-  //     logger.info('Raw workflows data received', { 
-  //       rawData: workflowsData, 
-  //       count: workflowsData.length,
-  //       responseType: typeof response,
-  //       isArray: Array.isArray(response),
-  //       hasData: !!response?.data,
-  //       isDataArray: Array.isArray(response?.data)
-  //     })
-      
-  //     // 转换数据格式：将后端返回的格式转换为组件需要的格式
-  //     // 后端格式：{ id, userId, keyType, resourceId, keyName, description }
-  //     // 组件格式：{ id, name, description }
-  //     // 注意：后端已经过滤了 keyType === 'workflow' 的工作流，前端不需要再过滤
-  //     workflowOptions.value = workflowsData.map(workflow => ({
-  //       id: workflow.resourceId, // 使用 resourceId 作为工作流ID
-  //       name: workflow.keyName || '',
-  //       description: workflow.description || ''
-  //     }))
-      
-  //     logger.info('Workflow options loaded successfully', { 
-  //       total: workflowsData.length,
-  //       loaded: workflowOptions.value.length,
-  //       options: workflowOptions.value
-  //     })
-  //   } catch (error) {
-  //     logger.error('Failed to load workflow options', error)
-  //     ElMessage.error(t('declaration.workflowLoadError'))
-  //     // 加载失败时设置为空数组，避免组件报错
-  //     workflowOptions.value = []
-  //   } finally {
-  //     workflowLoading.value = false
-  //   }
-  // }
-  
   // 提交申报
   const handleSubmit = async () => {
     try {
@@ -744,17 +745,17 @@
 
       logger.info('Submitting declaration (calling createDeclaration API)', { form })
 
-      // 构建提交数据
+      // 构建提交数据（projectLeaderId 用于后端申报/项目负责人权限与关联）
       const submitData = {
         department: form.department,
         projectLeader: form.projectLeader,
+        projectLeaderId: form.projectLeaderId ?? undefined,
         documentPublishTime: form.documentPublishTime,
         projectStartTime: form.projectStartTime,
         projectEndTime: form.projectEndTime,
         researchFields: form.researchField, // 数组格式
         researchDirection: form.researchDirection,
         researchTopic: form.researchTopic
-        // workflowId: form.workflow // 🔥 已注释，后端会自行处理
       }
 
       // 调用创建申报接口
@@ -783,7 +784,10 @@
     } catch (error) {
       if (error !== 'cancel') {
         logger.error('Submit failed', error)
-        ElMessage.error(t('declaration.submitError'))
+        // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+        if (!error._messageShown) {
+          ElMessage.error(t('declaration.submitError'))
+        }
       }
     } finally {
       submitting.value = false
@@ -811,7 +815,8 @@
   
   // 生命周期
   onMounted(() => {
-    // loadWorkflowOptions() // 🔥 已注释，后端会自行处理
+    // 负责人列表只加载一次，检索由前端对已加载数据过滤（与报告生成「选择项目」一致）
+    loadProjectLeaderOptions()
   })
   </script>
   
@@ -940,6 +945,32 @@
     }
   }
   
+  // 上传/分析中：仅显示转圈与提示，不可点击
+  .upload-loading-block {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 40px 32px;
+    text-align: center;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    
+    .upload-loading-icon {
+      font-size: 48px;
+      color: var(--color-primary);
+    }
+    
+    .upload-loading-text {
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: var(--color-primary);
+      white-space: nowrap;
+    }
+  }
+  
   .file-info-section {
     .file-info {
       display: flex;
@@ -949,12 +980,7 @@
       background: var(--bg);
       border-radius: 8px;
       margin-bottom: 12px;
-  
-      .file-icon {
-        font-size: 24px;
-        color: var(--color-primary);
-      }
-  
+
       .file-name {
         flex: 1;
         font-weight: 500;
@@ -975,9 +1001,10 @@
       gap: 8px;
   
       &.success {
-        background: #f0fdf4;
-        color: #166534;
-        border: 1px solid #bbf7d0;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.06) 50%, rgba(59, 130, 246, 0.06) 100%);
+        color: #4338ca;
+        border: 1px solid rgba(99, 102, 241, 0.22);
+        box-shadow: 0 1px 3px rgba(99, 102, 241, 0.06);
       }
   
       &.analyzing {
@@ -1012,24 +1039,25 @@
     .analysis-result {
       margin-top: 16px;
       padding: 16px;
-      background: #f0fdf4;
-      border-radius: 8px;
-      border: 1px solid #bbf7d0;
-  
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.08) 50%, rgba(59, 130, 246, 0.05) 100%);
+      border-radius: 10px;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.06);
+
       .analysis-title {
         font-weight: 600;
-        color: #166534;
+        color: #4338ca;
         margin-bottom: 8px;
         display: flex;
         align-items: center;
         gap: 6px;
       }
-  
+
       p {
         margin: 8px 0;
         color: var(--text);
       }
-  
+
       .analysis-hint {
         margin-top: 8px;
         font-size: 12px;
@@ -1192,6 +1220,16 @@
   
     .form-actions {
       flex-direction: column;
+    }
+  }
+  </style>
+
+  <!-- 负责人下拉 popper 样式（挂载在 body，需全局）与报告生成「选择项目」一致 -->
+  <style lang="scss">
+  .declaration-leader-select-dropdown {
+    .el-select-dropdown__item {
+      font-size: 14px;
+      padding: 8px 12px;
     }
   }
   </style>

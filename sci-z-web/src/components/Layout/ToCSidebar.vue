@@ -31,10 +31,11 @@
           ]
         }"
       >
+        <!-- 🔥 统一图标样式：与Header中的侧边栏toggle按钮保持一致（使用Menu/Fold图标） -->
         <button class="sidebar-toggle-btn" @click="toggleSidebar">
           <el-icon>
-            <ArrowRight v-if="isCollapsed" />
-            <ArrowLeft v-else />
+            <Menu v-if="isCollapsed" />
+            <Fold v-else />
           </el-icon>
         </button>
       </el-tooltip>
@@ -278,9 +279,9 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <!-- 🔥 修改：i18n切换按钮放在用户信息右边 -->
+        <!-- 🔥 修改：i18n切换按钮放在用户信息右边，使用紧凑模式 -->
         <div v-show="!isCollapsed" class="language-switcher-inline">
-          <LanguageSwitcher />
+          <LanguageSwitcher :compact="true" />
         </div>
         </div>
       </div>
@@ -316,6 +317,8 @@ import {
   ArrowUp,
   ArrowLeft,
   ArrowRight,
+  Menu,
+  Fold,
   User,
   Lock,
   Setting,
@@ -398,44 +401,55 @@ const mainMenus = computed(() => {
 
 // 用户信息
 const userInfo = computed(() => authStore.userInfo)
-const avatarUrl = computed(() => userInfo.value?.avatar || '')
+
+// 头像 URL：与 Header 一致，支持完整 URL、相对路径、avatarFileId、纯数字文件 ID
+const avatarUrl = computed(() => {
+  const info = userInfo.value
+  if (!info) return ''
+  const avatar = info.avatar
+  const avatarFileId = info.avatarFileId || info.avatarId
+  if (avatar && (avatar.startsWith('http://') || avatar.startsWith('https://'))) return avatar
+  if (avatar && avatar.startsWith('/')) return avatar
+  if (avatarFileId) return `/api/file/preview/${avatarFileId}`
+  if (avatar && /^\d+$/.test(String(avatar))) return `/api/file/preview/${avatar}`
+  return avatar || ''
+})
 
 // 🔥 格式化用户名显示（处理用户名/手机号/邮箱过长问题）
+// 规则：手机号格式化显示，用户名完整显示（只在过长时截断）
 const displayUsername = computed(() => {
   const username = userInfo.value?.username || 'User'
   if (!username || username === 'User') return username
   
-  // 判断是否为手机号
+  // 🔥 判断是否为手机号：如果是手机号，使用格式化显示（159***424）
   if (validatePhone(username)) {
     return formatPhoneDisplay(username)
   }
   
-  // 判断是否为邮箱
+  // 🔥 判断是否为邮箱：邮箱过长时截断显示
   if (validateEmail(username)) {
-    // 邮箱过长时截断显示：显示前部分 + ...
     const maxLength = 20
     if (username.length > maxLength) {
       const atIndex = username.indexOf('@')
       if (atIndex > 0 && atIndex < maxLength - 5) {
-        // 如果@符号在合理位置，显示@前部分 + @ + 域名前几个字符
         const prefix = username.substring(0, Math.min(atIndex, 12))
         const domain = username.substring(atIndex + 1)
         const domainPrefix = domain.substring(0, 5)
         return `${prefix}...@${domainPrefix}...`
       } else {
-        // 否则直接截断
         return username.substring(0, maxLength - 3) + '...'
       }
     }
     return username
   }
   
-  // 普通用户名，如果过长则截断
+  // 🔥 普通用户名：完整显示，只在过长时截断（保持原有规则）
   const maxLength = 16
   if (username.length > maxLength) {
     return username.substring(0, maxLength - 3) + '...'
   }
   
+  // 用户名正常显示（完整显示）
   return username
 })
 
@@ -453,6 +467,20 @@ const isDark = computed(() => appStore.theme === 'dark')
 
 // 当前激活的菜单
 const isActive = (path) => {
+  // 🔥 特殊处理：实践菜单需要包含其子页面
+  if (path === '/practice') {
+    // 实践菜单应该在这些页面时保持选中：
+    // - /practice（实践首页）
+    // - /declaration/*（申报相关）
+    // - /project/*（项目相关）
+    // - /report/*（报告相关）
+    // - /dashboard（仪表板）
+    return route.path === '/practice' ||
+           route.path.startsWith('/declaration') ||
+           route.path.startsWith('/project') ||
+           route.path.startsWith('/report') ||
+           route.path === '/dashboard'
+  }
   return route.path.startsWith(path)
 }
 
@@ -553,6 +581,12 @@ const storedConversationId = ref(sessionStorage.getItem('currentConversationId')
 
 // 计算属性：判断是否是最新对话（没有 conversationId 或为空）
 const isNewChatActive = computed(() => {
+  // 🔥 修复：只有当用户在 AI 对话页面时，"新建对话"按钮才可能被选中
+  // 如果用户在其他页面（如知识库、文献搜索等），"新建对话"按钮不应该被选中
+  if (route.path !== '/ai/chat') {
+    return false
+  }
+  
   // 🔥 修复：使用响应式的 ref 而不是直接读取 sessionStorage
   const storedId = storedConversationId.value || sessionStorage.getItem('currentConversationId')
   const hasNoStoredId = !storedId || 
@@ -561,7 +595,7 @@ const isNewChatActive = computed(() => {
                          storedId === 'undefined'
   const hasNoCurrentChatId = !currentChatId.value
   
-  // 只有在没有存储的对话ID且没有当前选中的对话ID时，才显示"新建对话"为选中状态
+  // 只有在 AI 对话页面，且没有存储的对话ID且没有当前选中的对话ID时，才显示"新建对话"为选中状态
   return hasNoStoredId && hasNoCurrentChatId
 })
 
@@ -690,7 +724,10 @@ const editChatTitle = async (chat) => {
         ElMessage.success(t('ai.chat.titleUpdated'))
       } catch (error) {
         console.error('更新对话标题失败', error)
-        ElMessage.error(t('ai.chat.updateTitleFailed'))
+        // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+        if (!error._messageShown) {
+          ElMessage.error(t('ai.chat.updateTitleFailed'))
+        }
       }
     }
   } catch (error) {
@@ -718,7 +755,10 @@ const togglePinChat = async (chat) => {
     ElMessage.success(newPinnedStatus ? t('ai.chat.chatPinned') : t('ai.chat.chatUnpinned'))
   } catch (error) {
     console.error('更新置顶状态失败', error)
-    ElMessage.error(t('ai.chat.operationFailed'))
+    // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+    if (!error._messageShown) {
+      ElMessage.error(t('ai.chat.operationFailed'))
+    }
   }
 }
 
@@ -741,13 +781,24 @@ const deleteChatConfirm = async (chat) => {
       if (index !== -1) {
         chatHistory.value.splice(index, 1)
       }
+
+      // 如果当前选中的会话就是被删除的这条，则切回“新建对话”默认状态
       if (currentChatId.value === chat.id) {
+        // 清除当前会话ID（侧边栏自身状态 + sessionStorage）
         currentChatId.value = null
+        sessionStorage.removeItem('currentConversationId')
+        storedConversationId.value = null
+        // 触发与点击“新建对话”按钮相同的逻辑
+        await createNewChat()
       }
+
       ElMessage.success(t('ai.chat.chatDeleted'))
     } catch (error) {
       console.error('删除对话失败', error)
-      ElMessage.error(t('ai.chat.deleteFailed'))
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(t('ai.chat.deleteFailed'))
+      }
     }
   } catch (error) {
     // 用户取消
@@ -789,17 +840,9 @@ const handleUserCommand = (command) => {
     case 'logout':
       // 退出登录，保持在当前页面（不跳转到登录页）
       authStore.logout({ redirect: false })
-      // 清除对话ID参数，跳转到AI对话页面（不带参数）
-      if (route.path === '/ai/chat') {
-        // 使用 replace 清除 conversationId 参数
-        router.replace({ path: '/ai/chat', query: {} })
-      } else {
-        // 如果当前不在公开页面，跳转到AI对话页面（公开页面）
-        const publicPages = ['/ai/chat', '/literature/search']
-        if (!publicPages.includes(route.path)) {
-          router.push('/ai/chat')
-        }
-      }
+      // 🔥 修复：退出登录后统一跳转到AI对话页面，确保路由更新和页面刷新
+      // 使用 replace 而不是 push，避免用户通过后退按钮回到需要登录的页面
+      router.replace({ path: '/ai/chat', query: {} })
       break
   }
 }
@@ -847,6 +890,21 @@ setInterval(() => {
 const hasInitializedSidebar = ref(false)
 // 标记是否正在加载对话历史（避免重复调用）
 const isLoadingChatHistory = ref(false)
+
+// 🔥 修复：监听路由变化，当离开 AI 对话页面时，清除对话选中状态
+watch(
+  () => route.path,
+  (newPath) => {
+    // 如果路由不是 AI 对话页面，清除对话相关的选中状态
+    if (newPath !== '/ai/chat') {
+      currentChatId.value = null
+      // 注意：不清除 sessionStorage，因为用户可能在其他页面时，对话状态应该保留
+      // 但是要更新响应式的 ref，确保"新建对话"按钮不会被选中
+      storedConversationId.value = sessionStorage.getItem('currentConversationId')
+    }
+  },
+  { immediate: true }
+)
 
 // 🔥 修复：创建全局共享的加载状态，避免 ToCSidebar 和 AIChat 同时调用接口
 if (!window.__isLoadingConversations) {
@@ -986,7 +1044,7 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .toc-sidebar {
-  width: 300px; // 🔥 调整：从 280px 增加到 300px，提供更宽的显示空间
+  width: 260px; // 🔥 TOC 侧边栏展开宽度（适当收窄，给表格内容更多空间）
   height: 100vh;
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -1009,6 +1067,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   min-height: 64px; // 确保折叠时也有足够高度
 
   .toc-sidebar.is-collapsed & {
@@ -1021,9 +1080,10 @@ onUnmounted(() => {
 
 // 折叠/展开按钮（参考千问AI设计：简洁的矩形按钮）
 .sidebar-toggle-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
+  // 🔥 修复：不要使用 absolute，避免侧边栏宽度变化后按钮覆盖 logo/跑位
+  // 让按钮参与 flex 布局，位置稳定（展开态靠右；折叠态由 header 居中对齐）
+  position: relative;
+  flex-shrink: 0;
   width: 32px;
   height: 32px;
   background: #f8f9fa;
@@ -1039,12 +1099,9 @@ onUnmounted(() => {
   padding: 0;
 
   .toc-sidebar.is-collapsed & {
-    position: static;
+    // 折叠态保持按钮尺寸，不要撑满导致“位置怪/占满整行”
+    position: relative;
     margin: 0;
-    top: auto;
-    right: auto;
-    width: 100%;
-    max-width: 100%;
   }
 
   &:hover {
@@ -1068,6 +1125,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  // 🔥 允许 logo 在窄侧边栏下收缩，避免挤压按钮
+  flex: 1;
+  min-width: 0;
 }
 
 .logo-img {
@@ -1434,18 +1494,19 @@ onUnmounted(() => {
 .user-info-wrapper {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-radius: 50px !important;
   transition: background 0.2s ease;
   flex: 1;
+  min-width: 0;
   box-sizing: border-box;
   background-color: var(--hover-light);
 
@@ -1463,7 +1524,7 @@ onUnmounted(() => {
   flex-shrink: 0;
   
   :deep(.language-switcher) {
-    padding: 8px 12px;
+    padding: 8px 10px;
     color: #374151 !important;
     border-radius: 50px !important;
     background-color: var(--hover-light);
@@ -1471,9 +1532,19 @@ onUnmounted(() => {
     box-sizing: border-box;
     display: flex;
     align-items: center;
+    white-space: nowrap;
     
     .language-icon {
       color: #374151 !important;
+      flex-shrink: 0;
+    }
+    
+    span {
+      flex-shrink: 0;
+    }
+    
+    .el-icon--right {
+      flex-shrink: 0;
     }
     
     &:hover {
@@ -1549,11 +1620,11 @@ onUnmounted(() => {
 .username {
   font-size: 14px;
   font-weight: 500;
-  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.4;
+  max-width: 100%;
+  color: var(--text);
 }
 
 .dropdown-icon {

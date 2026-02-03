@@ -1,0 +1,49 @@
+---
+description: "Java 包、类、方法、变量、DTO、事件等命名规范"
+alwaysApply: false
+globs: ["**/*.java"]
+---
+
+# Java 命名规范
+
+## 包命名
+
+- 根包：`com.sciz.server`
+- 分层与模块：`interfaces.controller`、`interfaces.converter`；`application.service.<模块>`、`application.task`；`domain.pojo.entity.<模块>`、`domain.pojo.mapper.<模块>`、`domain.pojo.repository.<模块>`、`domain.pojo.dto.request.<模块>`、`domain.pojo.dto.response.<模块>`；`infrastructure.shared`（constant、context、enums、event、exception、result、utils、handler）、`infrastructure.external.<第三方>`、`infrastructure.config`
+- 全小写，单词连续，无下划线
+
+## 类与接口命名
+
+- **Entity**：业务实体 `Xxx.java`（如 Project、Declaration）；系统/配置表实体 `SysXxx.java`（如 SysUser、SysRole、SysAttachment、SysConfig）
+- **Mapper**：`XxxMapper.java`，与实体对应
+- **Repository**：接口 `XxxRepo.java` 或 `SysXxxRepo.java`，实现类 `impl/XxxRepoImpl.java`
+- **DTO 请求**：`XxxCreateReq`、`XxxUpdateReq`、`XxxListQueryReq`/`XxxQueryReq`（组合或继承 BaseQueryReq 时提供 `toBaseQuery()`）；按模块放在 `dto/request/<模块>/`
+- **DTO 响应**：`XxxResp`、`XxxDetailResp`、`XxxPageResp`、`XxxListResp`；按模块放在 `dto/response/<模块>/`
+- **Service**：接口 `XxxService.java`，实现类 `impl/XxxServiceImpl.java`
+- **Controller**：`XxxController.java`
+- **Converter**：`XxxConverter.java`（MapStruct），放在 `interfaces.converter`
+- **Event**：`XxxCreatedEvent`、`XxxUpdatedEvent`、`XxxDeletedEvent` 等，放在 `infrastructure.shared.event.<模块>/`
+- **Event Handler**：`XxxEventHandler.java`，放在 `infrastructure.shared.handler.<模块>/`
+- **枚举**：业务状态/类型 `XxxStatus`、`XxxType`（如 ProjectStatus、UserStatus、DeclarationStatus、OperationLogRecorderStatus），放在 `infrastructure.shared.enums`
+- **常量类**：`XxxConstant`（如 SystemConstant、CacheConstant、MessageConstant），常量名为全大写下划线，如 `SYSTEM_NAME`、`LOGIN_USER_SESSION_KEY`
+- **工具类**：`XxxUtil`（如 LoginUserUtil、OperationLogRecorderUtil、DataPermissionUtil、AsyncTaskUtil、JsonUtil、FileUtil、DateUtil、ValidationUtil）；无实例化，构造器私有
+
+## 方法命名
+
+- **Controller**：`createXxx`、`updateXxx`、`deleteXxx`、`getXxxDetail`、`listXxx`、`pageXxx`、`batchCreateXxx`、`batchDeleteXxx`
+- **Service**：`create`、`update`、`deleteById`、`findDetail`、`list`、`page`、`saveBatch`、`updateBatch`、`deleteBatch`；返回领域对象或 Optional，不返回 Result
+- **Repository**：`save`、`update`、`deleteById`、`findById`、`findByCondition`、`pageByCondition`；批量：`saveBatch`、`updateBatchById`、`updateStatusByIds`、`deleteBatchByIds`
+- **Converter**：`toEntity(req)`、`toResp(entity)`、`toRespList(list)`、`updateEntity(@MappingTarget entity, req)`
+
+## 变量与参数命名
+
+- 驼峰 camelCase；禁止单字母 a、b、c（循环下标 i、j、k 或语义明确的 item、user 等除外）
+- 局部变量：`userId`、`userName`、`currentUser`、`projectId`
+- 循环：集合单数形式（`users` → `user`，`roles` → `role`）；或 `item`、`row`、`index`
+- 布尔：`isDeleted`、`hasPermission`、`canEdit`
+- 集合：`userList`、`userIdSet`、`userMap`、`idList`
+- **Stream/Lambda**：集合取单数（`users` → `user`，`roles` → `role`，`permissions` → `perm`）；禁止 u、r、p 等无意义缩写；可方法引用时用 `User::getId`
+
+## 注释
+
+- 类/方法/字段注释见 `notes-rules.mdc`（alwaysApply）；`@date` 手动填北京时间 yyyy-MM-dd HH:mm；`@Override` 时注释写在 `@Override` 上面

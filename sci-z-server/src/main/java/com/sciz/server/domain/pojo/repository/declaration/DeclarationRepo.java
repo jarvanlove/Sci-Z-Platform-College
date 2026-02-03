@@ -46,6 +46,20 @@ public interface DeclarationRepo {
     IPage<Declaration> page(Page<Declaration> page, String keyword, Integer status, String sortBy, boolean asc);
 
     /**
+     * 分页查询申报列表（支持项目成员可见：普通用户可见自己创建的或所属项目关联的申报）
+     *
+     * @param page                        Page<Declaration> 分页对象
+     * @param keyword                     String 搜索关键字
+     * @param status                      Integer 申报状态
+     * @param sortBy                      String 排序字段
+     * @param asc                         boolean 是否升序
+     * @param includeDeclarationIdsForMember 项目成员可见的申报ID列表（来自其所属项目的 declaration_id），可为 null
+     * @return IPage<Declaration> 分页结果
+     */
+    IPage<Declaration> page(Page<Declaration> page, String keyword, Integer status, String sortBy, boolean asc,
+            List<Long> includeDeclarationIdsForMember);
+
+    /**
      * 更新工作流状态和工作流结果
      *
      * @param id             Long 申报ID

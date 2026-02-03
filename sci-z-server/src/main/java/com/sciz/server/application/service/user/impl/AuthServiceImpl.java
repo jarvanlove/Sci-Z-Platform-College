@@ -1466,26 +1466,48 @@ public class AuthServiceImpl implements AuthService {
         // 2. 查询并校验用户有效性
         var user = findAndValidateUser(userId);
 
-        // 3. 从行业缓存获取行业类型，规格化部门编码
+        // 3. 校验用户名唯一性（如果用户名发生变化）
+        if (!user.getUsername().equals(req.username())) {
+            validateUsernameUniqueness(req.username(), userId);
+        }
+
+        // 3.1. 🔥 如果手机号发生变化，需要验证手机验证码
+        var normalizedPhone = normalizePhone(req.phone());
+        var currentPhone = Optional.ofNullable(user.getPhone()).orElse("");
+        if (!normalizedPhone.equals(currentPhone)) {
+            if (!StringUtils.hasText(req.smsCode())) {
+                log.warn(String.format("更新个人信息失败，手机号变化但未提供验证码: userId=%s, oldPhone=%s, newPhone=%s", 
+                        userId, currentPhone, normalizedPhone));
+                throw BusinessException.of(ResultCode.SMS_CODE_INVALID, "修改手机号需要验证码，请输入验证码");
+            }
+            // 验证手机验证码（使用新手机号验证）
+            validateSmsVerificationCode(normalizedPhone, req.smsCode());
+            // 验证成功后清理验证码缓存
+            clearSmsVerificationCode(normalizedPhone);
+            log.info(String.format("手机号变化验证码校验成功: userId=%s, oldPhone=%s, newPhone=%s", 
+                    userId, currentPhone, normalizedPhone));
+        }
+
+        // 4. 从行业缓存获取行业类型，规格化部门编码
         var normalizedIndustry = industryConfigCache.get().getType();
         var departmentCode = normalizeDepartmentCode(req.department());
 
-        // 4. 校验部门有效性
+        // 5. 校验部门有效性
         var department = validateDepartment(normalizedIndustry, departmentCode, userId);
 
-        // 5. 更新用户基础信息
-        updateUserBasicInfo(user, req, normalizedIndustry, department.getId());
+        // 6. 更新用户基础信息（使用规格化后的手机号）
+        updateUserBasicInfo(user, req, normalizedIndustry, department.getId(), normalizedPhone);
 
-        // 6. 保存用户实体
+        // 7. 保存用户实体
         saveUserEntity(user, userId);
 
-        // 7. 保存用户扩展属性（职称）
+        // 8. 保存用户扩展属性（职称）
         saveUserExtendedAttributes(userId, normalizedIndustry, req);
 
-        // 8. 构建用户信息响应
+        // 9. 构建用户信息响应
         var userInfo = buildUserInfoResponse(user, normalizedIndustry);
 
-        // 9. 刷新登录用户上下文缓存
+        // 10. 刷新登录用户上下文缓存
         cacheLoginUserContext(user, normalizedIndustry);
 
         log.info(String.format("update user info success: userId=%s", userId));
@@ -1540,6 +1562,21 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
+     * 校验用户名唯一性（排除当前用户）
+     *
+     * @param username String 用户名
+     * @param currentUserId Long 当前用户ID
+     */
+    private void validateUsernameUniqueness(String username, Long currentUserId) {
+        var existingUser = sysUserRepo.findByUsername(username);
+        if (existingUser != null && !existingUser.getId().equals(currentUserId)) {
+            log.warn(String.format("update user info username exists: username=%s, currentUserId=%s, existingUserId=%s",
+                    username, currentUserId, existingUser.getId()));
+            throw BusinessException.of(ResultCode.USER_ALREADY_EXISTS, "用户名已存在");
+        }
+    }
+
+    /**
      * 更新用户基础信息
      * 仅更新基础信息，不包含头像（头像通过单独的 uploadAvatar 方法处理）
      *
@@ -1547,12 +1584,15 @@ public class AuthServiceImpl implements AuthService {
      * @param req                UserInfoUpdateReq 更新请求
      * @param normalizedIndustry String 规格化后的行业类型
      * @param departmentId       Long 部门ID
+     * @param normalizedPhone    String 规格化后的手机号
      */
     private void updateUserBasicInfo(SysUser user, UserInfoUpdateReq req, String normalizedIndustry,
-            Long departmentId) {
+            Long departmentId, String normalizedPhone) {
+        user.setUsername(req.username());
         user.setRealName(req.realName());
         user.setEmail(req.email());
-        user.setPhone(req.phone());
+        // 🔥 使用传入的规格化后的手机号
+        user.setPhone(normalizedPhone);
         user.setIndustryType(normalizedIndustry);
         user.setDepartmentId(departmentId);
         user.setUpdatedTime(LocalDateTime.now(DEFAULT_ZONE));

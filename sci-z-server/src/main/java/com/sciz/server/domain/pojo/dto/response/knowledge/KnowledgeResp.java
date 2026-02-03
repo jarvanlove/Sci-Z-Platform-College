@@ -49,6 +49,11 @@ public class KnowledgeResp {
     private String projectName;
 
     /**
+     * 知识库类型：personal=个人知识库，project=项目知识库
+     */
+    private String kbType;
+
+    /**
      * Dify知识库ID
      */
     private String difyKbId;
@@ -84,6 +89,16 @@ public class KnowledgeResp {
     private Integer folderCount;
 
     /**
+     * 封面附件ID
+     */
+    private Long coverFileId;
+
+    /**
+     * 封面URL
+     */
+    private String coverUrl;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createdTime;
@@ -92,5 +107,11 @@ public class KnowledgeResp {
      * 更新时间
      */
     private LocalDateTime updatedTime;
+
+    /**
+     * 当前用户是否可编辑该知识库（含删除文件/文件夹、修改资料等；用于前端显示删除按钮等）
+     * true=管理员/创建人/项目知识库的项目成员或项目负责人
+     */
+    private Boolean canEdit;
 }
 

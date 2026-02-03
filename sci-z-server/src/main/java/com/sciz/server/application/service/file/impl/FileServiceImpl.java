@@ -12,10 +12,15 @@ import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.file.FileDownloadContext;
 import com.sciz.server.domain.pojo.dto.response.file.FileDuplicateCheckResp;
 import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
+import com.sciz.server.domain.pojo.dto.response.file.FileUploadResp;
 import com.sciz.server.domain.pojo.entity.file.SysAttachment;
 import com.sciz.server.domain.pojo.entity.file.SysAttachmentRelation;
+import com.sciz.server.domain.pojo.repository.declaration.DeclarationRepo;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRelationRepo;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRepo;
+import com.sciz.server.domain.pojo.repository.project.ProjectMemberRepo;
+import com.sciz.server.domain.pojo.repository.project.ProjectProgressRepo;
+import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.infrastructure.shared.enums.AttachmentCategoryStatus;
 import com.sciz.server.infrastructure.shared.enums.AttachmentRelationStatus;
 import com.sciz.server.infrastructure.shared.constant.SystemConstant;
@@ -40,6 +45,7 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -72,6 +78,10 @@ public class FileServiceImpl implements FileService {
     private final MinioClient minioClient;
     private final SysAttachmentRepo sysAttachmentRepo;
     private final SysAttachmentRelationRepo sysAttachmentRelationRepo;
+    private final ProjectProgressRepo projectProgressRepo;
+    private final ProjectMemberRepo projectMemberRepo;
+    private final ProjectRepo projectRepo;
+    private final DeclarationRepo declarationRepo;
     private final FileConverter fileConverter;
     private final EventPublisher eventPublisher;
     private final FileConvertService fileConvertService;
@@ -282,6 +292,286 @@ public class FileServiceImpl implements FileService {
             log.info(String.format("批量上传文件完成: fileCount=%s, successCount=%s",
                     req.files().length, responses.size()));
             return responses;
+
+        } catch (Exception e) {
+            log.error(String.format("批量上传文件失败: fileCount=%s, err=%s", req.files().length, e.getMessage()), e);
+            if (e instanceof BusinessException) {
+                throw e;
+            }
+            throw BusinessException.of(ResultCode.FILE_UPLOAD_FAILED, "批量上传文件失败: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * 批量上传（支持进度返回，支持部分成功）
+     *
+     * @param req FileBatchUploadReq 上传请求
+     * @return List<FileUploadResp> 每个文件的上传结果列表（包含成功和失败的详细信息）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<FileUploadResp> uploadBatchWithProgress(FileBatchUploadReq req) {
+        if (req == null || req.files() == null || req.files().length == 0) {
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "文件列表不能为空");
+        }
+
+        // 1. 提前校验文件类型和大小，过滤不支持的文件
+        List<MultipartFile> validFiles = new ArrayList<>();
+        List<FileUploadResp> results = new ArrayList<>();
+
+        for (MultipartFile file : req.files()) {
+            String fileName = file.getOriginalFilename();
+            try {
+                // 提前校验文件类型和大小
+                if (!FileUtil.isSupportedFileType(fileName)
+                        && !FileUtil.isSupportedMimeType(file.getContentType())) {
+                    results.add(FileUploadResp.builder()
+                            .fileName(fileName)
+                            .success(false)
+                            .errorMessage("文件类型不支持")
+                            .fileSize(file.getSize())
+                            .stage(0)
+                            .stageDescription("文件类型校验失败")
+                            .build());
+                    continue;
+                }
+                if (FileUtil.isFileSizeExceeded(file.getSize())) {
+                    results.add(FileUploadResp.builder()
+                            .fileName(fileName)
+                            .success(false)
+                            .errorMessage("文件大小超出限制（最大300MB）")
+                            .fileSize(file.getSize())
+                            .stage(0)
+                            .stageDescription("文件大小校验失败")
+                            .build());
+                    continue;
+                }
+                validFiles.add(file);
+                // 初始化成功状态的文件结果
+                results.add(FileUploadResp.builder()
+                        .fileName(fileName)
+                        .success(false) // 初始为false，上传成功后改为true
+                        .fileSize(file.getSize())
+                        .stage(1)
+                        .stageDescription("准备上传")
+                        .build());
+            } catch (Exception e) {
+                results.add(FileUploadResp.builder()
+                        .fileName(fileName)
+                        .success(false)
+                        .errorMessage("文件校验失败: " + e.getMessage())
+                        .fileSize(file.getSize())
+                        .stage(0)
+                        .stageDescription("文件校验失败")
+                        .build());
+            }
+        }
+
+        if (validFiles.isEmpty()) {
+            log.warn(String.format("所有文件都不支持上传: total=%d, invalid=%d",
+                    req.files().length, results.size()));
+            return results; // 返回所有失败的结果
+        }
+
+        // 2. 获取当前用户
+        var currentUser = LoginUserUtil.requireCurrentUser();
+        var userId = currentUser.userId();
+        var realName = currentUser.realName();
+
+        // 3. 确保存储桶可用
+        ensureBucket();
+
+        log.info(String.format("批量上传文件（支持进度）: total=%d, valid=%d, invalid=%d, uploaderId=%s",
+                req.files().length, validFiles.size(), req.files().length - validFiles.size(), userId));
+
+        // 4. 找到有效文件在 results 中的索引
+        List<Integer> validFileIndices = new ArrayList<>();
+        int resultIndex = 0;
+        for (MultipartFile file : req.files()) {
+            if (validFiles.contains(file)) {
+                validFileIndices.add(resultIndex);
+            }
+            resultIndex++;
+        }
+
+        // 5. 使用 Java 21 Virtual Thread 并行处理文件上传
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            // 5.1 并行处理：文件校验、构建实体、上传到 MinIO
+            var uploadFutures = validFiles.stream()
+                    .map(multipartFile -> CompletableFuture.supplyAsync(() -> {
+                        try {
+                            // 设置异步用户上下文
+                            AsyncUserContext.set(currentUser);
+
+                            // 构建单文件上传请求
+                            var singleReq = buildSingleUploadReq(req, multipartFile);
+
+                            // 参数校验
+                            validateUploadRequest(singleReq);
+
+                            // 解析附件分类并校验关联信息
+                            var category = normalizeAttachmentCategory(singleReq.getAttachmentType());
+                            singleReq.setAttachmentType(category.getCode());
+                            validateRelationParams(singleReq);
+
+                            // 构建附件实体
+                            var attachment = buildAttachment(singleReq, userId, realName, category);
+
+                            // 上传至对象存储（I/O 操作，并行执行）
+                            uploadToObjectStorage(singleReq, attachment);
+
+                            log.debug(String.format("文件上传到 MinIO 完成: originalName=%s, attachmentId=%s",
+                                    attachment.getOriginalName(), attachment.getId()));
+
+                            return new UploadContext(singleReq, attachment, category);
+
+                        } catch (Exception e) {
+                            log.error(String.format("并行上传文件失败: fileName=%s, err=%s",
+                                    multipartFile.getOriginalFilename(), e.getMessage()), e);
+                            throw new RuntimeException("文件上传失败: " + e.getMessage(), e);
+                        } finally {
+                            // 清理异步用户上下文（防止内存泄漏）
+                            AsyncUserContext.clear();
+                        }
+                    }, executor))
+                    .toList();
+
+            // 5.2 等待所有并行上传任务完成（不阻塞，允许部分失败）
+            CompletableFuture.allOf(uploadFutures.toArray(new CompletableFuture[0])).join();
+
+            // 6. 收集 MinIO 上传结果，支持部分成功
+            List<UploadContext> minioSuccessContexts = new ArrayList<>();
+            List<Integer> minioSuccessIndices = new ArrayList<>();
+
+            for (int i = 0; i < uploadFutures.size(); i++) {
+                CompletableFuture<UploadContext> future = uploadFutures.get(i);
+                MultipartFile file = validFiles.get(i);
+                int fileResultIndex = validFileIndices.get(i);
+
+                try {
+                    UploadContext context = future.get();
+                    if (context != null && context.attachment() != null) {
+                        minioSuccessContexts.add(context);
+                        minioSuccessIndices.add(fileResultIndex);
+                        // 更新结果：MinIO 上传成功
+                        results.set(fileResultIndex, FileUploadResp.builder()
+                                .fileName(file.getOriginalFilename())
+                                .success(false) // 还未完成，继续标记为false
+                                .attachmentId(context.attachment().getId())
+                                .fileSize(file.getSize())
+                                .stage(2)
+                                .stageDescription("MinIO上传完成")
+                                .build());
+                        log.info(String.format("MinIO上传成功: fileName=%s, attachmentId=%s",
+                                file.getOriginalFilename(), context.attachment().getId()));
+                    } else {
+                        // MinIO 上传失败
+                        results.set(fileResultIndex, FileUploadResp.builder()
+                                .fileName(file.getOriginalFilename())
+                                .success(false)
+                                .errorMessage("MinIO上传失败: 返回结果为空")
+                                .fileSize(file.getSize())
+                                .stage(1)
+                                .stageDescription("MinIO上传失败")
+                                .build());
+                        log.error(String.format("MinIO上传失败: fileName=%s - 返回结果为空", file.getOriginalFilename()));
+                    }
+                } catch (java.util.concurrent.ExecutionException e) {
+                    // 获取异步执行时的异常
+                    Throwable cause = e.getCause();
+                    String errorMessage = cause != null ? cause.getMessage() : e.getMessage();
+                    // 更新结果：MinIO 上传失败
+                    results.set(fileResultIndex, FileUploadResp.builder()
+                            .fileName(file.getOriginalFilename())
+                            .success(false)
+                            .errorMessage("MinIO上传失败: " + errorMessage)
+                            .fileSize(file.getSize())
+                            .stage(1)
+                            .stageDescription("MinIO上传失败")
+                            .build());
+                    log.error(String.format("获取MinIO上传结果失败: fileName=%s, error=%s",
+                            file.getOriginalFilename(), errorMessage), e);
+                } catch (Exception e) {
+                    // 更新结果：MinIO 上传失败
+                    results.set(fileResultIndex, FileUploadResp.builder()
+                            .fileName(file.getOriginalFilename())
+                            .success(false)
+                            .errorMessage("MinIO上传失败: " + e.getMessage())
+                            .fileSize(file.getSize())
+                            .stage(1)
+                            .stageDescription("MinIO上传失败")
+                            .build());
+                    log.error(String.format("获取MinIO上传结果失败: fileName=%s, error=%s",
+                            file.getOriginalFilename(), e.getMessage()), e);
+                }
+            }
+
+            if (minioSuccessContexts.isEmpty()) {
+                log.warn(String.format("所有文件MinIO上传失败: validFiles=%d", validFiles.size()));
+                return results; // 返回所有失败的结果
+            }
+
+            // 7. 串行处理数据库操作（保证事务一致性）
+            for (int i = 0; i < minioSuccessContexts.size(); i++) {
+                UploadContext context = minioSuccessContexts.get(i);
+                int fileResultIndex = minioSuccessIndices.get(i);
+                FileUploadResp currentResult = results.get(fileResultIndex);
+
+                try {
+                    // 更新阶段：处理中
+                    results.set(fileResultIndex, FileUploadResp.builder()
+                            .fileName(context.attachment().getOriginalName())
+                            .success(false)
+                            .attachmentId(currentResult.getAttachmentId())
+                            .fileSize(context.attachment().getFileSize())
+                            .stage(3)
+                            .stageDescription("处理中")
+                            .build());
+
+                    // 持久化附件记录
+                    var attachmentId = persistAttachment(context.attachment());
+
+                    // 记录业务关联（可选）
+                    saveRelationIfNecessary(context.req(), attachmentId);
+
+                    // 发布上传事件
+                    publishUploadEvent(context.req(), userId, realName, context.attachment());
+
+                    // 更新结果：全部完成
+                    results.set(fileResultIndex, FileUploadResp.builder()
+                            .fileName(context.attachment().getOriginalName())
+                            .success(true)
+                            .attachmentId(attachmentId)
+                            .fileSize(context.attachment().getFileSize())
+                            .stage(4)
+                            .stageDescription("上传完成")
+                            .build());
+                    log.info(String.format("文件上传成功: fileName=%s, attachmentId=%s",
+                            context.attachment().getOriginalName(), attachmentId));
+
+                } catch (Exception e) {
+                    // 更新结果：处理失败
+                    results.set(fileResultIndex, FileUploadResp.builder()
+                            .fileName(context.attachment().getOriginalName())
+                            .success(false)
+                            .errorMessage("处理文件上传结果失败: " + e.getMessage())
+                            .attachmentId(currentResult.getAttachmentId())
+                            .fileSize(context.attachment().getFileSize())
+                            .stage(3)
+                            .stageDescription("处理失败")
+                            .build());
+                    log.error(String.format("处理文件上传结果失败: fileName=%s, error=%s",
+                            context.attachment().getOriginalName(), e.getMessage()), e);
+                }
+            }
+
+            // 8. 统计并返回结果
+            long successCount = results.stream().filter(r -> r.getSuccess() != null && r.getSuccess()).count();
+            long failedCount = results.stream().filter(r -> r.getSuccess() == null || !r.getSuccess()).count();
+            log.info(String.format("批量上传完成: total=%d, success=%d, failed=%d",
+                    req.files().length, successCount, failedCount));
+
+            return results;
 
         } catch (Exception e) {
             log.error(String.format("批量上传文件失败: fileCount=%s, err=%s", req.files().length, e.getMessage()), e);
@@ -820,14 +1110,65 @@ public class FileServiceImpl implements FileService {
     }
 
     /**
-     * 获取附件
+     * 获取附件（上传人、管理员可直接访问；项目成员/负责人可访问项目里程碑或申报下的附件，用于预览/下载）
      */
     private SysAttachment obtainAttachment(Long attachmentId) {
         SysAttachment attachment = sysAttachmentRepo.findById(attachmentId);
+        if (attachment != null && !DeleteStatus.DELETED.getCode().equals(attachment.getIsDeleted())) {
+            return attachment;
+        }
+        // 非上传人：按关联类型校验权限
+        attachment = sysAttachmentRepo.findByIdForRelation(attachmentId);
         if (attachment == null || DeleteStatus.DELETED.getCode().equals(attachment.getIsDeleted())) {
             throw BusinessException.of(ResultCode.FILE_NOT_FOUND);
         }
-        return attachment;
+        Long userId = LoginUserUtil.getCurrentUser().map(u -> u.userId()).orElse(null);
+        if (userId == null) {
+            throw BusinessException.of(ResultCode.FILE_NOT_FOUND);
+        }
+
+        // 1) 附件属于项目里程碑：项目成员 / 创建人 / 负责人可访问
+        var projectRelation = sysAttachmentRelationRepo.findByAttachmentId(attachmentId, AttachmentRelationStatus.PROJECT.getCode());
+        if (projectRelation != null && projectRelation.getRelationId() != null) {
+            var milestone = projectProgressRepo.findById(projectRelation.getRelationId());
+            if (milestone != null && milestone.getProjectId() != null) {
+                if (projectMemberRepo.findByProjectIdAndUserId(milestone.getProjectId(), userId) != null) {
+                    return attachment;
+                }
+                var project = projectRepo.findById(milestone.getProjectId());
+                if (project != null) {
+                    if (userId.equals(project.getCreatedBy()) || (project.getManagerId() != null && userId.equals(project.getManagerId()))) {
+                        return attachment;
+                    }
+                }
+            }
+            throw BusinessException.of(ResultCode.FILE_NOT_FOUND);
+        }
+
+        // 2) 附件属于申报：申报人 / 关联项目的创建人 / 负责人 / 成员可访问（项目负责人可预览/下载申报文件）
+        var declarationRelation = sysAttachmentRelationRepo.findByAttachmentId(attachmentId, AttachmentRelationStatus.DECLARATION.getCode());
+        if (declarationRelation != null && declarationRelation.getRelationId() != null) {
+            Long declarationId = declarationRelation.getRelationId();
+            var declaration = declarationRepo.findById(declarationId);
+            if (declaration == null) {
+                throw BusinessException.of(ResultCode.FILE_NOT_FOUND);
+            }
+            if (declaration.getApplicantId() != null && declaration.getApplicantId().equals(userId)) {
+                return attachment;
+            }
+            var project = projectRepo.findByDeclarationId(declarationId);
+            if (project != null) {
+                if (userId.equals(project.getCreatedBy()) || (project.getManagerId() != null && userId.equals(project.getManagerId()))) {
+                    return attachment;
+                }
+                if (projectMemberRepo.findByProjectIdAndUserId(project.getId(), userId) != null) {
+                    return attachment;
+                }
+            }
+            throw BusinessException.of(ResultCode.FILE_NOT_FOUND);
+        }
+
+        throw BusinessException.of(ResultCode.FILE_NOT_FOUND);
     }
 
     /**

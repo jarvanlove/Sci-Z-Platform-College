@@ -80,7 +80,7 @@ public class DifyApiController {
     public ResponseEntity<String> deleteDataset(
             @PathVariable String datasetId,
             @Valid @RequestBody BaseDifyRequest request) {
-        return difyApiService.deleteDataset(datasetId, request.getUserId(), request.getResourceId(), request.getKeyType());
+        return difyApiService.deleteDataset(datasetId,  request.getResourceId(), request.getKeyType());
     }
     /**
      * 检索知识库

@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>仪表板 - 高校科研项目管理平台</title>
+    <link rel="icon" href="../images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.4.4/dist/index.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/element-plus@2.4.4"></script>
+    <link rel="stylesheet" href="../通用规范/样式.css" />
+    <style>
+      .dashboard-container {
+        padding: 20px;
+        background: #f7f9fc;
+        min-height: calc(100vh - 56px);
+        overflow-x: hidden;
+        max-width: 100%;
+      }
+
+      .stats-cards {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .stat-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        position: relative;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        overflow: hidden;
+      }
+
+      .stat-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: 8px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: -1;
+      }
+
+      /* 总项目数 - 蓝色渐变 */
+      .stat-total::before {
+        background: linear-gradient(
+          135deg,
+          #1e3a8a 0%,
+          #3b82f6 50%,
+          #60a5fa 100%
+        );
+      }
+
+      /* 进行中的项目 - 橙色/黄色渐变 */
+      .stat-progress::before {
+        background: linear-gradient(
+          135deg,
+          #d97706 0%,
+          #f59e0b 50%,
+          #fbbf24 100%
+        );
+      }
+
+      /* 待验收项目 - 蓝色/紫色渐变 */
+      .stat-pending::before {
+        background: linear-gradient(
+          135deg,
+          #2563eb 0%,
+          #6366f1 50%,
+          #8b5cf6 100%
+        );
+      }
+
+      /* 已完成项目 - 绿色渐变 */
+      .stat-completed::before {
+        background: linear-gradient(
+          135deg,
+          #15803d 0%,
+          #16a34a 50%,
+          #22c55e 100%
+        );
+      }
+
+      .stat-card:hover {
+        transform: translateY(-4px);
+        border: 1px solid transparent;
+      }
+
+      /* 总项目数 - 悬停阴影 */
+      .stat-total:hover {
+        box-shadow: 0 8px 25px rgba(30, 58, 138, 0.15);
+      }
+
+      /* 进行中的项目 - 悬停阴影 */
+      .stat-progress:hover {
+        box-shadow: 0 8px 25px rgba(217, 119, 6, 0.15);
+      }
+
+      /* 待验收项目 - 悬停阴影 */
+      .stat-pending:hover {
+        box-shadow: 0 8px 25px rgba(37, 99, 235, 0.15);
+      }
+
+      /* 已完成项目 - 悬停阴影 */
+      .stat-completed:hover {
+        box-shadow: 0 8px 25px rgba(21, 128, 61, 0.15);
+      }
+
+      .stat-card:hover::before {
+        opacity: 1;
+      }
+
+      .stat-card:hover .stat-icon {
+        transform: scale(1.1);
+        transition: transform 0.3s ease;
+      }
+
+      .stat-card:hover .stat-value {
+        color: #ffffff;
+        transition: color 0.3s ease;
+      }
+
+      /* 不同状态卡片的悬停文字颜色 */
+      .stat-total:hover .stat-label {
+        color: #e0e7ff;
+        transition: color 0.3s ease;
+      }
+
+      .stat-progress:hover .stat-label {
+        color: #fef3c7;
+        transition: color 0.3s ease;
+      }
+
+      .stat-pending:hover .stat-label {
+        color: #e0e7ff;
+        transition: color 0.3s ease;
+      }
+
+      .stat-completed:hover .stat-label {
+        color: #dcfce7;
+        transition: color 0.3s ease;
+      }
+
+      .stat-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+        transition: transform 0.3s ease;
+      }
+
+      .stat-value {
+        font-size: 28px;
+        font-weight: 600;
+        margin-bottom: 4px;
+        transition: color 0.3s ease;
+      }
+
+      .stat-label {
+        font-size: 14px;
+        color: #6b7280;
+        transition: color 0.3s ease;
+      }
+
+      .stat-total {
+        color: #1e3a8a;
+      }
+
+      .stat-progress {
+        color: #f59e0b;
+      }
+
+      .stat-pending {
+        color: #2563eb;
+      }
+
+      .stat-completed {
+        color: #16a34a;
+      }
+
+      .main-content {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      .top-section {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 24px;
+        align-items: start;
+      }
+
+      .bottom-section {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      .declaration-card {
+        min-height: auto;
+        height: fit-content;
+      }
+
+      .quick-actions-card {
+        min-height: auto;
+        height: fit-content;
+      }
+
+      .progress-card {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+        box-sizing: border-box;
+      }
+
+      .progress-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .content-card {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e5e7eb;
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .card-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1e3a8a;
+        margin: 0;
+      }
+
+      .card-action {
+        color: #1e3a8a;
+        font-size: 14px;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .card-action:hover {
+        text-decoration: underline;
+      }
+
+      .declaration-table-container {
+        margin-bottom: 0;
+        overflow-x: auto;
+      }
+
+      .declaration-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #e5e7eb;
+        font-size: 14px;
+      }
+
+      .declaration-table thead {
+        background-color: #f8fafc;
+      }
+
+      .declaration-table th {
+        border: 1px solid #e5e7eb;
+        padding: 10px 8px;
+        font-size: 13px;
+        color: #6b7280;
+        font-weight: 600;
+        text-align: left;
+      }
+
+      .declaration-table td {
+        border: 1px solid #e5e7eb;
+        padding: 10px 8px;
+        font-size: 13px;
+        color: #374151;
+      }
+
+      .declaration-table tbody tr {
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .declaration-table tbody tr:hover {
+        background-color: #f0f9ff;
+      }
+
+      .declaration-table tbody tr.even-row {
+        background-color: #f9fafb;
+      }
+
+      .declaration-table tbody tr.even-row:hover {
+        background-color: #f0f9ff;
+      }
+
+      .number-cell {
+        text-align: center;
+        color: #9ca3af;
+        font-weight: 500;
+      }
+
+      .direction-cell {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .time-cell {
+        text-align: center;
+        color: #9ca3af;
+      }
+
+      .status-cell {
+        text-align: center;
+      }
+
+      .action-cell {
+        text-align: center;
+      }
+
+      .view-button {
+        background: #f3f4f6;
+        color: #6b7280;
+        border: 1px solid #d1d5db;
+        padding: 4px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .view-button:hover {
+        background: #1e3a8a;
+        color: #ffffff;
+        border-color: #1e3a8a;
+      }
+
+      .progress-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        gap: 8px;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .progress-item:hover {
+        background-color: #f0f9ff;
+        border-color: #1e3a8a;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.1);
+      }
+
+      .progress-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .progress-info {
+        flex: 1;
+        min-width: 0;
+        max-width: 40%;
+      }
+
+      .progress-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: #374151;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .progress-time {
+        font-size: 12px;
+        color: #6b7280;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .progress-bar-container {
+        width: 100px;
+        flex-shrink: 0;
+        margin: 0 8px;
+      }
+
+      .progress-bar {
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+        background-color: #e5e7eb;
+      }
+
+      .progress-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+
+      .progress-fill.low {
+        background-color: #dc2626;
+      }
+
+      .progress-fill.medium {
+        background-color: #f59e0b;
+      }
+
+      .progress-fill.high {
+        background-color: #16a34a;
+      }
+
+      .progress-percentage {
+        font-size: 12px;
+        font-weight: 600;
+        color: #1e3a8a;
+        min-width: 30px;
+        text-align: right;
+        flex-shrink: 0;
+      }
+
+      .quick-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .action-button {
+        display: flex;
+        align-items: center;
+        padding: 10px 14px;
+        border-radius: 6px;
+        text-decoration: none;
+        color: #374151;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+        cursor: pointer;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+      }
+
+      .action-button.primary {
+        background-color: #ffffff;
+        border: 1px solid #1e3a8a;
+        color: #1e3a8a;
+      }
+
+      .action-button.primary:hover {
+        background-color: #f0f9ff;
+        border-color: #1e40af;
+        color: #1e40af;
+      }
+
+      .action-button.secondary {
+        background-color: #ffffff;
+        border: 1px solid #1e3a8a;
+        color: #1e3a8a;
+      }
+
+      .action-button.secondary:hover {
+        background-color: #f8fafc;
+      }
+
+      .action-button.text {
+        background-color: #ffffff;
+        color: #1e3a8a;
+        border: 1px solid #1e3a8a;
+      }
+
+      .action-button.text:hover {
+        background-color: #f0f9ff;
+        border-color: #1e40af;
+        color: #1e40af;
+      }
+
+      .action-icon {
+        margin-right: 8px;
+        font-size: 16px;
+      }
+
+      .status-tag {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .status-submitting {
+        background-color: #fef3c7;
+        color: #f59e0b;
+      }
+
+      .status-success {
+        background-color: #dcfce7;
+        color: #16a34a;
+      }
+
+      .status-failed {
+        background-color: #fee2e2;
+        color: #dc2626;
+      }
+
+      .status-withdrawn {
+        background-color: #e0e7ff;
+        color: #2563eb;
+      }
+
+      .loading-skeleton {
+        background: linear-gradient(
+          90deg,
+          #f0f0f0 25%,
+          #e0e0e0 50%,
+          #f0f0f0 75%
+        );
+        background-size: 200% 100%;
+        animation: loading 1.5s infinite;
+      }
+
+      @keyframes loading {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+
+      .skeleton-card {
+        height: 120px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+      }
+
+      .skeleton-content {
+        height: 200px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+      }
+
+      @media (max-width: 1200px) {
+        .top-section {
+          grid-template-columns: 1fr;
+        }
+
+        .progress-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 1024px) {
+        .stats-cards {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .progress-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 768px) {
+        .stats-cards {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+
+        .dashboard-container {
+          padding: 16px;
+        }
+
+        .declaration-table-container {
+          overflow-x: auto;
+        }
+
+        .declaration-table {
+          min-width: 600px;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .stats-cards {
+          grid-template-columns: 1fr;
+        }
+
+        .dashboard-container {
+          padding: 12px;
+        }
+
+        .progress-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .progress-item {
+          flex-direction: row;
+          align-items: center;
+        }
+
+        .declaration-table th,
+        .declaration-table td {
+          padding: 8px 4px;
+          font-size: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="dashboard-container">
+        <!-- 顶部统计卡片区域 -->
+        <div class="stats-cards">
+          <div
+            v-if="loading"
+            v-for="i in 4"
+            :key="`skeleton-${i}`"
+            class="stat-card loading-skeleton"
+          ></div>
+
+          <div
+            v-else
+            v-for="stat in stats"
+            :key="stat.type"
+            class="stat-card"
+            :class="`stat-${stat.type}`"
+          >
+            <div class="stat-icon">{{ stat.icon }}</div>
+            <div class="stat-value">{{ formatNumber(stat.value) }}</div>
+            <div class="stat-label">{{ stat.label }}</div>
+          </div>
+        </div>
+
+        <!-- 主要内容区域 -->
+        <div class="main-content">
+          <!-- 上半部分：最近申报和快捷入口并排 -->
+          <div class="top-section">
+            <!-- 最近申报列表 -->
+            <div class="content-card declaration-card">
+              <div class="card-header">
+                <h3 class="card-title">最近申报</h3>
+                <a
+                  href="#"
+                  class="card-action"
+                  @click="handleViewAllDeclarations"
+                >
+                  查看全部
+                </a>
+              </div>
+
+              <div
+                v-if="loading"
+                class="skeleton-content loading-skeleton"
+              ></div>
+
+              <!-- 申报数据表格 -->
+              <div
+                v-if="!loading && recentDeclarations.length > 0"
+                class="declaration-table-container"
+              >
+                <table class="declaration-table">
+                  <thead>
+                    <tr>
+                      <th>申报编号</th>
+                      <th>研究方向</th>
+                      <th>申报时间</th>
+                      <th>状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="(item, index) in recentDeclarations"
+                      :key="item.id"
+                      :class="{ 'even-row': index % 2 === 0 }"
+                    >
+                      <td class="number-cell">{{ item.number }}</td>
+                      <td class="direction-cell">{{ item.direction }}</td>
+                      <td class="time-cell">{{ item.submitTime }}</td>
+                      <td class="status-cell">
+                        <span :style="getStatusStyle(item.statusType)">
+                          {{ item.status }}
+                        </span>
+                      </td>
+                      <td class="action-cell">
+                        <button
+                          @click="handleDeclarationClick(item)"
+                          class="view-button"
+                        >
+                          查看
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 快捷入口 -->
+            <div class="content-card quick-actions-card">
+              <div class="card-header">
+                <h3 class="card-title">快捷入口</h3>
+              </div>
+
+              <div class="quick-actions">
+                <button
+                  class="action-button primary"
+                  @click="handleQuickAction('newDeclaration')"
+                >
+                  <span class="action-icon">📝</span>
+                  新建申报
+                </button>
+                <button
+                  class="action-button secondary"
+                  @click="handleQuickAction('createProject')"
+                >
+                  <span class="action-icon">📁</span>
+                  创建项目
+                </button>
+                <button
+                  class="action-button secondary"
+                  @click="handleQuickAction('applyAcceptance')"
+                >
+                  <span class="action-icon">✅</span>
+                  申请验收
+                </button>
+                <button
+                  class="action-button text"
+                  @click="handleQuickAction('knowledgeSearch')"
+                >
+                  <span class="action-icon">🔍</span>
+                  知识库搜索
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 下半部分：项目进度概览全宽 -->
+          <div class="bottom-section">
+            <div class="content-card progress-card">
+              <div class="card-header">
+                <h3 class="card-title">项目进度概览</h3>
+                <a href="#" class="card-action" @click="handleViewAllProjects">
+                  查看全部
+                </a>
+              </div>
+
+              <div
+                v-if="loading"
+                class="skeleton-content loading-skeleton"
+              ></div>
+
+              <div v-else class="progress-grid">
+                <div
+                  v-for="project in projectProgress"
+                  :key="project.id"
+                  class="progress-item"
+                  @click="handleProjectClick(project.id)"
+                >
+                  <div class="progress-info">
+                    <div class="progress-name">{{ project.name }}</div>
+                  </div>
+                  <div class="progress-bar-container">
+                    <div class="progress-bar">
+                      <div
+                        class="progress-fill"
+                        :class="getProgressClass(project.progress)"
+                        :style="{ width: project.progress + '%' }"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="progress-percentage">{{ project.progress }}%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, computed, onMounted } = Vue;
+      const { ElMessage } = ElementPlus;
+
+      createApp({
+        setup() {
+          // 数据状态
+          const loading = ref(true);
+
+          // 统计数据
+          const stats = reactive([
+            {
+              type: "total",
+              icon: "📁",
+              value: 0,
+              label: "总项目数",
+            },
+            {
+              type: "progress",
+              icon: "⏰",
+              value: 0,
+              label: "进行中的项目",
+            },
+            {
+              type: "pending",
+              icon: "⏳",
+              value: 0,
+              label: "待验收项目",
+            },
+            {
+              type: "completed",
+              icon: "✅",
+              value: 0,
+              label: "已完成项目",
+            },
+          ]);
+
+          // 最近申报列表
+          const recentDeclarations = ref([]);
+
+          // 项目进度
+          const projectProgress = ref([]);
+
+          // 格式化数字
+          const formatNumber = (num) => {
+            return num.toLocaleString();
+          };
+
+          // 获取进度条样式类
+          const getProgressClass = (progress) => {
+            if (progress <= 30) return "low";
+            if (progress <= 70) return "medium";
+            return "high";
+          };
+
+          // 获取状态样式
+          const getStatusStyle = (statusType) => {
+            const styleMap = {
+              submitting:
+                "background-color: #fef3c7; color: #f59e0b; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;",
+              success:
+                "background-color: #dcfce7; color: #16a34a; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;",
+              failed:
+                "background-color: #fee2e2; color: #dc2626; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;",
+              withdrawn:
+                "background-color: #e0e7ff; color: #2563eb; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;",
+            };
+            return (
+              styleMap[statusType] ||
+              "background-color: #f3f4f6; color: #6b7280; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;"
+            );
+          };
+
+          // 加载仪表板数据
+          const loadDashboardData = async () => {
+            try {
+              loading.value = true;
+
+              // 模拟API调用延迟
+              await new Promise((resolve) => setTimeout(resolve, 1500));
+
+              // 模拟统计数据
+              stats[0].value = 156;
+              stats[1].value = 23;
+              stats[2].value = 8;
+              stats[3].value = 125;
+
+              // 模拟最近申报数据
+              recentDeclarations.value = [
+                {
+                  id: 1,
+                  number: "SB2024001",
+                  direction: "人工智能在教育领域的应用研究",
+                  submitTime: "2024-01-15",
+                  status: "申报中",
+                  statusType: "submitting",
+                },
+                {
+                  id: 2,
+                  number: "SB2024002",
+                  direction: "区块链技术在供应链管理中的应用",
+                  submitTime: "2024-01-14",
+                  status: "申报成功",
+                  statusType: "success",
+                },
+                {
+                  id: 3,
+                  number: "SB2024003",
+                  direction: "量子计算算法优化研究",
+                  submitTime: "2024-01-13",
+                  status: "申报失败",
+                  statusType: "failed",
+                },
+                {
+                  id: 4,
+                  number: "SB2024004",
+                  direction: "生物信息学数据分析方法研究",
+                  submitTime: "2024-01-12",
+                  status: "已撤回",
+                  statusType: "withdrawn",
+                },
+                {
+                  id: 5,
+                  number: "SB2024005",
+                  direction: "物联网安全防护技术研究",
+                  submitTime: "2024-01-11",
+                  status: "申报中",
+                  statusType: "submitting",
+                },
+              ];
+
+              // 模拟项目进度数据
+              projectProgress.value = [
+                {
+                  id: 1,
+                  name: "智能教学系统开发",
+                  progress: 75,
+                  expectedDate: "2024-03-15",
+                },
+                {
+                  id: 2,
+                  name: "区块链供应链平台",
+                  progress: 45,
+                  expectedDate: "2024-04-20",
+                },
+                {
+                  id: 3,
+                  name: "量子算法优化研究",
+                  progress: 20,
+                  expectedDate: "2024-05-10",
+                },
+                {
+                  id: 4,
+                  name: "生物信息学分析工具",
+                  progress: 90,
+                  expectedDate: "2024-02-28",
+                },
+                {
+                  id: 5,
+                  name: "物联网安全框架",
+                  progress: 60,
+                  expectedDate: "2024-03-30",
+                },
+              ];
+            } catch (error) {
+              ElMessage.error("加载数据失败，请重试");
+            } finally {
+              loading.value = false;
+            }
+          };
+
+          // 申报点击处理
+          const handleDeclarationClick = (row) => {
+            ElMessage.info(`查看申报详情：${row.number}`);
+
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "declaration/detail",
+                },
+                "*"
+              );
+            }
+          };
+
+          // 查看全部申报
+          const handleViewAllDeclarations = () => {
+            ElMessage.info("跳转到申报列表页面");
+
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "declaration/list",
+                },
+                "*"
+              );
+            }
+          };
+
+          // 项目点击处理
+          const handleProjectClick = (projectId) => {
+            ElMessage.info(`查看项目详情：项目ID ${projectId}`);
+
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "project/detail",
+                },
+                "*"
+              );
+            }
+          };
+
+          // 查看全部项目
+          const handleViewAllProjects = () => {
+            ElMessage.info("跳转到项目列表页面");
+
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: "project/list",
+                },
+                "*"
+              );
+            }
+          };
+
+          // 快捷操作处理
+          const handleQuickAction = (action) => {
+            const actionMap = {
+              newDeclaration: "新建申报",
+              createProject: "创建项目",
+              applyAcceptance: "申请验收",
+              knowledgeSearch: "知识库搜索",
+            };
+
+            ElMessage.info(`执行操作：${actionMap[action]}`);
+
+            // 检查是否在iframe中
+            if (window.parent !== window) {
+              const pathMap = {
+                newDeclaration: "declaration/create",
+                createProject: "project/create",
+                applyAcceptance: "acceptance/list",
+                knowledgeSearch: "ai/knowledge",
+              };
+
+              window.parent.postMessage(
+                {
+                  type: "navigate",
+                  path: pathMap[action],
+                },
+                "*"
+              );
+            }
+          };
+
+          // 组件挂载时加载数据
+          onMounted(() => {
+            loadDashboardData();
+          });
+
+          return {
+            loading,
+            stats,
+            recentDeclarations,
+            projectProgress,
+            formatNumber,
+            getProgressClass,
+            getStatusStyle,
+            handleDeclarationClick,
+            handleViewAllDeclarations,
+            handleProjectClick,
+            handleViewAllProjects,
+            handleQuickAction,
+          };
+        },
+      })
+        .use(ElementPlus)
+        .mount("#app");
+    </script>
+  </body>
+</html>

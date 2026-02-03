@@ -5,11 +5,9 @@
  */
 -->
 <template>
-  <BaseScrollbar 
-    class="declaration-list-container"
-    :custom-style="{ height: '100%', overflow: 'auto' }"
-  >
+  <div class="declaration-list-container">
     <div class="page-header">
+      <BackButton :tooltip="$t('practice.backToPractice')" @click="handleBack" />
       <h1 class="page-title">{{ $t('declaration.title') }}</h1>
     </div>
 
@@ -84,17 +82,16 @@
           <div class="direction-cell base-table__cell-wrap">{{ row.direction }}</div>
         </template>
 
-        <!-- 研究领域列自定义 -->
+        <!-- 研究领域列自定义 - 只显示前6个字符，鼠标悬浮显示完整内容 -->
         <template #fields="{ row }">
-          <div class="fields-cell base-table__cell-wrap">
-            <span
-              v-for="field in row.fields"
-              :key="field"
-              class="field-tag"
-            >
-              {{ field }}
-            </span>
-          </div>
+          <BaseTooltip 
+            :content="formatFields(row.fields)" 
+            placement="top"
+          >
+            <div class="fields-cell base-table__cell-wrap">
+              {{ truncateFields(row.fields, 6) }}
+            </div>
+          </BaseTooltip>
         </template>
 
         <!-- 研究主题列自定义 -->
@@ -181,9 +178,9 @@
         <!-- 操作列 -->
         <template #actions="{ row }">
           <div class="action-buttons">
-            <!-- 更新申报状态按钮（只有工作流已完成且申报状态不是"申报成功"或"申报未通过"时才显示） -->
+            <!-- 更新申报状态按钮（暂时隐藏，由后端根据工作流执行结果自动更新） -->
             <BaseTooltip
-              v-if="row.workflowStatus === 'completed' && row.statusType !== 'success' && row.statusType !== 'failed'"
+              v-if="false"
               :content="$t('declaration.updateStatus') || '更新申报状态'"
               placement="top"
             >
@@ -281,13 +278,13 @@
       </BaseTable>
     </BaseCard>
 
-    <!-- 文件预览组件 -->
-    <FilePreview
+    <!-- 文件预览组件 - 已改为新窗口打开，保留组件以防需要 -->
+    <!-- <FilePreview
       v-model="showPreviewDialog"
       :file-info="previewFileInfo"
       @close="closePreview"
-    />
-  </BaseScrollbar>
+    /> -->
+  </div>
 </template>
 
 <script setup>
@@ -296,7 +293,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, Document, Edit, View, Download, TopRight } from '@element-plus/icons-vue'
-import { BaseCard, BaseTable, FilePreview, BaseTooltip, BaseScrollbar } from '@/components/Common'
+import { BaseCard, BaseTable, BaseTooltip, BackButton } from '@/components/Common'
 import { DECLARATION_STATUS_CONFIG } from '@/utils/constants'
 import { 
   getDeclarationList, 
@@ -304,6 +301,7 @@ import {
 } from '@/api/Declaration'
 import { downloadFile } from '@/api/File'
 import { createLogger } from '@/utils/simpleLogger'
+import { openFilePreviewInNewWindow } from '@/utils/file'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -485,6 +483,26 @@ const formatNumber = (number) => {
   return `${number.substring(0, 4)}...${number.substring(number.length - 4)}`
 }
 
+// 🔥 格式化研究领域：将所有字段合并成一个字符串
+const formatFields = (fields) => {
+  if (!fields || !Array.isArray(fields) || fields.length === 0) {
+    return '-'
+  }
+  return fields.join('、') // 使用中文顿号分隔
+}
+
+// 🔥 截取研究领域：只显示前6个字符
+const truncateFields = (fields, maxLength = 6) => {
+  if (!fields || !Array.isArray(fields) || fields.length === 0) {
+    return '-'
+  }
+  const fullText = fields.join('、') // 使用中文顿号分隔
+  if (fullText.length <= maxLength) {
+    return fullText
+  }
+  return fullText.substring(0, maxLength) + '...'
+}
+
 // 加载申报列表
 const loadDeclarations = async () => {
   try {
@@ -557,7 +575,10 @@ const loadDeclarations = async () => {
     })
   } catch (error) {
     logger.error('Declaration list data loading failed', error)
-    ElMessage.error(t('declaration.loadError'))
+    // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+    if (!error._messageShown) {
+      ElMessage.error(t('declaration.loadError'))
+    }
     declarations.value = []
     pagination.total = 0
   } finally {
@@ -615,6 +636,10 @@ const handleNewDeclaration = () => {
   router.push('/declaration/create')
 }
 
+const handleBack = () => {
+  router.push('/practice')
+}
+
 // 查看详情
 const handleView = (id) => {
   logger.info('User viewed declaration details', { id })
@@ -665,12 +690,15 @@ const handleDownload = async (command) => {
     logger.info('Download completed', { id, attachmentId, format: fileFormat })
   } catch (error) {
     logger.error('Download failed', error)
-    ElMessage.error(t('declaration.downloadFailed'))
+    // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+    if (!error._messageShown) {
+      ElMessage.error(t('declaration.downloadFailed'))
+    }
   }
 }
 
-// 预览处理
-const handlePreview = (row) => {
+// 预览处理 - 在新窗口打开
+const handlePreview = async (row) => {
   const { id, attachmentId, direction } = row
   
   logger.info('User started preview', { id, attachmentId })
@@ -682,22 +710,17 @@ const handlePreview = (row) => {
     return
   }
   
-  // 使用通用预览组件
-  // 注意：由于列表接口可能没有返回文件名，使用默认的 .docx 扩展名
-  // FilePreview 组件会从预览 URL 中自动识别文件类型
-  previewFileInfo.value = {
-    name: `${direction || '申报文件'}.docx`, // 添加默认扩展名，帮助识别文件类型
-    attachmentId
+  try {
+    const fileName = `${direction || '申报文件'}.docx`
+    await openFilePreviewInNewWindow(attachmentId, fileName)
+    logger.info('Preview opened in new window', { attachmentId, fileName })
+  } catch (error) {
+    logger.error('Failed to open preview in new window', error)
+    // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+    if (!error._messageShown) {
+      ElMessage.error(error.message || t('declaration.previewFailed') || '预览失败，请稍后重试')
+    }
   }
-  showPreviewDialog.value = true
-}
-
-/**
- * 关闭预览
- */
-const closePreview = () => {
-  showPreviewDialog.value = false
-  previewFileInfo.value = null
 }
 
 // 状态字符串到数字的映射（用于更新状态接口）
@@ -761,7 +784,10 @@ const handleStatusEdit = async (id, newStatusType) => {
     } else {
       // 接口错误
       logger.error('Status update failed', error)
-      ElMessage.error(t('declaration.statusUpdateFailed'))
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        ElMessage.error(t('declaration.statusUpdateFailed'))
+      }
     }
   }
 }
@@ -786,20 +812,20 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .declaration-list-container {
-  padding: 0;
-  background: var(--bg);
-  min-height: calc(100vh - 60px);
+  padding: var(--gap-lg);
+  background: var(--bg-secondary);
+  min-height: calc(100vh - 56px);
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  margin: 0;
-  overflow-x: visible;
+  overflow-x: hidden; // 🔥 不允许内容超出容器，横向滚动交给表格内部处理
 }
 
 .page-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 12px;
   margin-bottom: 24px;
 
   .page-title {
@@ -941,46 +967,15 @@ onMounted(() => {
 
 .fields-cell {
   display: flex;
-  flex-direction: column; // 🔥 垂直排列，实现1*n换行（每行一个标签）
-  gap: 6px;
+  align-items: center;
   line-height: 1.4;
-  justify-content: center;
-  align-items: flex-start; // 🔥 标签左对齐
-  
-  .field-tag {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 500;
-    white-space: nowrap;
-    background: var(--hover-light); // 🔥 使用浅灰色背景，更协调
-    color: var(--text-3); // 🔥 与表格字体颜色保持一致
-    border: 1px solid var(--border); // 🔥 添加边框，更精致
-    transition: all 0.2s ease;
-    
-    &:hover {
-      background: var(--hover);
-      border-color: var(--border-hover);
-      color: var(--text-2); // 🔥 hover时稍微加深
-    }
-  }
-}
-
-// 暗色主题下的标签样式
-[data-theme='dark'] .fields-cell .field-tag,
-.dark .fields-cell .field-tag {
-  background: rgba(148, 163, 184, 0.1); // 🔥 暗色主题下使用半透明背景
-  color: var(--text-3); // 🔥 与表格字体颜色保持一致
-  border-color: var(--border);
-  
-  &:hover {
-    background: rgba(148, 163, 184, 0.2);
-    border-color: var(--border-hover);
-    color: var(--text-2);
-  }
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  cursor: pointer; // 🔥 鼠标悬浮时显示为手型，提示可以查看完整内容
 }
 
 // 状态标签样式
@@ -1362,9 +1357,9 @@ onMounted(() => {
       }
       
       // 🔥 研究方向表头居中对齐（通过列的 align 属性，BaseTable 会自动添加 is-center 类）
-      // 使用更具体的选择器确保生效
-      th.is-center,
-      th:has(.cell:contains("研究方向")) {
+      // 使用稳定的 data-column-key，避免 :contains() 这类无效选择器造成兼容问题
+      th[data-column-key="direction"],
+      th.is-center {
         text-align: center !important;
         
         .cell {
@@ -1376,8 +1371,7 @@ onMounted(() => {
       }
       
       // 🔥 研究领域表头左对齐
-      th[data-column-key="fields"],
-      th:has(.cell:contains("研究领域")) {
+      th[data-column-key="fields"] {
         text-align: left !important;
         
         .cell {
@@ -1386,8 +1380,7 @@ onMounted(() => {
       }
       
       // 🔥 研究课题表头左对齐
-      th[data-column-key="topic"],
-      th:has(.cell:contains("研究课题")) {
+      th[data-column-key="topic"] {
         text-align: left !important;
         
         .cell {

@@ -7,6 +7,7 @@ import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.file.FileDownloadContext;
 import com.sciz.server.domain.pojo.dto.response.file.FileDuplicateCheckResp;
 import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
+import com.sciz.server.domain.pojo.dto.response.file.FileUploadResp;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import java.util.List;
 
@@ -46,6 +47,19 @@ public interface FileService {
      * @return List<FileInfoResp> 上传结果
      */
     List<FileInfoResp> uploadBatch(FileBatchUploadReq req);
+
+    /**
+     * 批量上传（支持进度返回，支持部分成功）
+     * <p>
+     * 与 uploadBatch 的区别：
+     * 1. 提前校验文件类型和大小，过滤不支持的文件
+     * 2. 支持部分成功，即使部分文件失败也返回结果
+     * 3. 返回详细的进度信息，包含每个文件的上传状态和阶段
+     *
+     * @param req FileBatchUploadReq 上传请求
+     * @return List<FileUploadResp> 每个文件的上传结果列表（包含成功和失败的详细信息）
+     */
+    List<FileUploadResp> uploadBatchWithProgress(FileBatchUploadReq req);
 
     /**
      * 文件分页列表

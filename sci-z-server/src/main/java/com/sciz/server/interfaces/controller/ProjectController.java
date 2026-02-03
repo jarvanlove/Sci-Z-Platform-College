@@ -6,7 +6,7 @@ import com.sciz.server.domain.pojo.dto.request.project.MilestoneDocumentDeleteRe
 import com.sciz.server.domain.pojo.dto.request.project.ProjectCreateReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectListQueryReq;
 import com.sciz.server.domain.pojo.dto.request.project.ProjectUpdateReq;
-import com.sciz.server.domain.pojo.dto.response.project.MilestoneDocumentUploadResp;
+import com.sciz.server.domain.pojo.dto.response.file.FileUploadResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectDetailResp;
 import com.sciz.server.domain.pojo.dto.response.project.ProjectProgressResp;
 
@@ -124,18 +124,18 @@ public class ProjectController {
     }
 
     /**
-     * 批量上传里程碑文档
+     * 批量上传里程碑文档（支持进度返回）
      *
      * @param req 批量文件上传请求
-     * @return 文档上传响应列表
+     * @return 每个文件的上传结果列表（包含成功和失败的详细信息）
      */
-    @Operation(summary = "批量上传里程碑文档", description = "批量上传里程碑文档，返回文件信息列表。前端传递的relationId为项目ID（此时还没有进度数据）")
+    @Operation(summary = "批量上传里程碑文档（支持进度返回）", description = "批量上传里程碑文档，支持部分成功，返回每个文件的上传进度和状态。前端传递的relationId为项目ID")
     @PostMapping("/milestone/document")
     // @SaCheckPermission("api:project:milestone:document:upload")
-    public Result<List<MilestoneDocumentUploadResp>> uploadMilestoneDocument(
+    public Result<List<FileUploadResp>> uploadMilestoneDocument(
             @Valid @ModelAttribute FileBatchUploadReq req) {
-        var respList = projectService.uploadMilestoneDocument(req);
-        return Result.success(respList);
+        List<FileUploadResp> results = projectService.uploadMilestoneDocument(req);
+        return Result.success(results);
     }
 
     /**

@@ -9,6 +9,7 @@
   <div class="report-list-container">
     <!-- 页面标题 -->
     <div class="page-header">
+      <BackButton :tooltip="$t('practice.backToPractice')" @click="handleBack" />
       <h1 class="page-title">{{ $t('report.listPage.title') }}</h1>
     </div>
 
@@ -226,12 +227,12 @@
       </div>
     </BaseCard>
 
-    <!-- 文件预览组件 -->
-    <FilePreview
+    <!-- 文件预览组件 - 已改为新窗口打开，保留组件以防需要 -->
+    <!-- <FilePreview
       v-model="showPreviewDialog"
       :file-info="previewFileInfo"
       @close="closePreview"
-    />
+    /> -->
   </div>
 </template>
 
@@ -241,11 +242,12 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, Loading, View, Download, Delete, Document, Edit } from '@element-plus/icons-vue'
-import { BaseCard, BaseButton, BaseDatePicker, BasePagination, BaseTooltip, FilePreview } from '@/components/Common'
+import { BaseCard, BaseButton, BaseDatePicker, BasePagination, BaseTooltip, BackButton } from '@/components/Common'
 import { getReportManagementList, deleteReportManagement } from '@/api/Report'
 import { downloadFile } from '@/api/File/file'
 import { createLogger } from '@/utils/simpleLogger'
 import { formatDate } from '@/utils/date'
+import { openFilePreviewInNewWindow } from '@/utils/file'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -474,8 +476,11 @@ const loadReportList = async (forceRefresh = false) => {
     checkAndStartAutoRefresh()
   } catch (error) {
     logger.error('Failed to load report list', error)
-    const errorMessage = error.response?.data?.message || error.message || t('report.listPage.loadError')
-    ElMessage.error(errorMessage)
+    // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+    if (!error._messageShown) {
+      const errorMessage = error.response?.data?.message || error.message || t('report.listPage.loadError')
+      ElMessage.error(errorMessage)
+    }
   } finally {
     // 只有在设置了 loading 的情况下才重置
     if (loading.value) {
@@ -531,6 +536,10 @@ const handleGenerateReport = () => {
   router.push('/report/generate')
 }
 
+const handleBack = () => {
+  router.push('/practice')
+}
+
 // 判断是否可以下载/预览
 // 规则：attachmentId 有值 → 可以下载/预览
 const canDownloadPreview = (record) => {
@@ -547,8 +556,8 @@ const canPreview = (record) => {
   return canDownloadPreview(record)
 }
 
-// 预览处理 - 完全按照申报列表的实现
-const handlePreview = (report) => {
+// 预览处理 - 在新窗口打开
+const handlePreview = async (report) => {
   const { id, attachmentId, projectName } = report
   
   logger.info('User started preview', { id, attachmentId })
@@ -560,22 +569,17 @@ const handlePreview = (report) => {
     return
   }
   
-  // 使用通用预览组件
-  // 注意：由于列表接口可能没有返回文件名，使用默认的 .docx 扩展名
-  // FilePreview 组件会从预览 URL 中自动识别文件类型
-  previewFileInfo.value = {
-    name: `${projectName || '报告文件'}.docx`, // 添加默认扩展名，帮助识别文件类型
-    attachmentId
+  try {
+    const fileName = `${projectName || '报告文件'}.docx`
+    await openFilePreviewInNewWindow(attachmentId, fileName)
+    logger.info('Preview opened in new window', { attachmentId, fileName })
+  } catch (error) {
+    logger.error('Failed to open preview in new window', error)
+    // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+    if (!error._messageShown) {
+      ElMessage.error(error.message || t('report.previewFailed') || '预览失败，请稍后重试')
+    }
   }
-  showPreviewDialog.value = true
-}
-
-/**
- * 关闭预览
- */
-const closePreview = () => {
-  showPreviewDialog.value = false
-  previewFileInfo.value = null
 }
 
 // 下载报告 - 参考申报列表的实现
@@ -621,7 +625,10 @@ const handleDownload = async (command) => {
     logger.info('Download completed', { id, attachmentId, format: fileFormat })
   } catch (error) {
     logger.error('Download failed', error)
-    ElMessage.error(t('report.listPage.downloadError') || '下载失败')
+    // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+    if (!error._messageShown) {
+      ElMessage.error(t('report.listPage.downloadError') || '下载失败')
+    }
   }
 }
 
@@ -668,8 +675,11 @@ const handleDelete = async (report) => {
   } catch (error) {
     if (error !== 'cancel') {
       logger.error('Failed to delete report', error)
-      const errorMessage = error.response?.data?.message || error.message || t('report.listPage.deleteError')
-      ElMessage.error(errorMessage)
+      // 🔥 修复：检查错误是否已经在响应拦截器中显示过，避免重复提示
+      if (!error._messageShown) {
+        const errorMessage = error.response?.data?.message || error.message || t('report.listPage.deleteError')
+        ElMessage.error(errorMessage)
+      }
     }
   }
 }
@@ -768,8 +778,9 @@ onUnmounted(() => {
 
 .page-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 12px;
   margin-bottom: var(--gap-lg);
 }
 

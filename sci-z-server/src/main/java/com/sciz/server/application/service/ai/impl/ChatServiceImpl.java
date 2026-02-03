@@ -85,6 +85,7 @@ public class ChatServiceImpl implements ChatService {
         String conversationId = req.getConversationId();
         String user = req.getUser();
         List<Long> attachmentIds = req.getAttachmentIds();
+        Boolean enableSearch = req.getEnableSearch() != null ? req.getEnableSearch() : false;
         
         // 1. 如果提供了 attachmentIds，从 MinIO 获取文件并解析（最多处理3个，防止上下文太长）
         if (attachmentIds != null && !attachmentIds.isEmpty()) {
@@ -185,7 +186,7 @@ public class ChatServiceImpl implements ChatService {
             // 2.1 如果有 knowledgeId，更新chatbot的知识库并调用知识库 chatbot 流式接口
             if (!knowledgeIdList.isEmpty()) {
                 // 更新chatbot的多个知识库
-                updateChatbotKnowledgeBases(userId, knowledgeIdList);
+                updateChatbotKnowledgeBases(userId, knowledgeIdList, enableSearch);
                 // 使用第一个知识库ID调用流式接口（Dify API 只支持单个知识库ID）
                 String firstKnowledgeId = knowledgeIdList.get(0);
                 log.info(String.format("无文件，直接调用知识库 Chatbot 流式接口: knowledgeId=%s, query=%s", firstKnowledgeId, query));
@@ -202,19 +203,19 @@ public class ChatServiceImpl implements ChatService {
             } else {
                 // 2.2 如果没有 knowledgeId，直接调用 chatbot（不使用知识库）
                 log.info(String.format("无文件且无知识库ID，直接调用 Chatbot 流式接口: query=%s", query));
-                return callChatbotDirectly(query, difyConversationId, user, userId);
+                return callChatbotDirectly(query, difyConversationId, user, userId, enableSearch);
             }
         }
 
         // 3. 如果有文件，执行工作流流程
         // 3.1 如果没有 knowledgeId，使用 key_type=file 的API key 上传文件并执行工作流
         if (knowledgeIdList.isEmpty()) {
-            return handleWorkflowWithFileKey(userId, query, workflowId, files, conversationId, user);
+            return handleWorkflowWithFileKey(userId, query, workflowId, files, conversationId, user, enableSearch);
         }
 
         // 3.2 如果有 knowledgeId，使用知识库上传文件并执行工作流
         // 3.2.1 更新chatbot的多个知识库
-        updateChatbotKnowledgeBases(userId, knowledgeIdList);
+        updateChatbotKnowledgeBases(userId, knowledgeIdList, enableSearch);
 
         // 使用第一个知识库ID上传文件（文件上传到第一个知识库）
         String firstKnowledgeId = knowledgeIdList.get(0);
@@ -264,6 +265,12 @@ public class ChatServiceImpl implements ChatService {
 
                 // 使用 outputs 数据调用 chatbot 流式接口
                 String difyConversationId = convertToDifyConversationId(conversationId, userId);
+                // 查找用户的 Chatbot 并更新 enable_search 配置
+                List<DifyApiKey> chatbotKeys = difyApiKeyService.getUserApiKeysByType(userId, "chatbot");
+                if (chatbotKeys != null && !chatbotKeys.isEmpty()) {
+                    String chatbotAppId = chatbotKeys.get(0).getResourceId();
+                    updateChatbotEnableSearch(chatbotAppId, enableSearch);
+                }
                 callChatbotStreamWithQuery(emitter, userId, finalQuery, difyConversationId, user);
 
                 log.info(String.format("Dify 工作流+Chatbot 流式对话完成: userId=%s, knowledgeIds=%s", userId, knowledgeIdList));
@@ -290,11 +297,12 @@ public class ChatServiceImpl implements ChatService {
      * @param files          文件列表
      * @param conversationId 会话ID
      * @param user           用户标识
+     * @param enableSearch   是否启用联网搜索
      * @return 流式响应
      */
     private SseEmitter handleWorkflowWithFileKey(Long userId, String query, String workflowId,
             List<MultipartFile> files,
-            String conversationId, String user) {
+            String conversationId, String user, Boolean enableSearch) {
         // 获取 key_type=file 的API key
         List<DifyApiKey> fileKeys = difyApiKeyService.getUserApiKeysByType(userId, "file");
         if (fileKeys == null || fileKeys.isEmpty()) {
@@ -394,8 +402,8 @@ public class ChatServiceImpl implements ChatService {
                 DifyApiKey chatbotKey = chatbotKeys.get(0);
                 String chatbotAppId = chatbotKey.getResourceId();
                 log.info(String.format("找到用户Chatbot: userId=%s, appId=%s", userId, chatbotAppId));
-                // 更新chatbot的知识库ID为空（不使用知识库）
-                updateChatbotKnowledgeBaseToEmpty(chatbotAppId);
+                // 更新chatbot的知识库ID为空（不使用知识库）和 enable_search 配置
+                updateChatbotKnowledgeBaseToEmpty(chatbotAppId, enableSearch);
 
                 // 调用 chatbot 流式接口并转发响应
                 callChatbotStreamWithQuery(emitter, userId, finalQuery, difyConversationId, user, chatbotAppId);
@@ -645,9 +653,10 @@ public class ChatServiceImpl implements ChatService {
      * @param conversationId 会话ID（可选）
      * @param user           用户标识（可选）
      * @param userId         当前登录用户ID
+     * @param enableSearch   是否启用联网搜索
      * @return 流式响应（SSE格式）
      */
-    private SseEmitter callChatbotDirectly(String query, String conversationId, String user, Long userId) {
+    private SseEmitter callChatbotDirectly(String query, String conversationId, String user, Long userId, Boolean enableSearch) {
         // 1. 创建 SSE Emitter（超时时间设置为60秒）
         SseEmitter emitter = new SseEmitter(60000L);
 
@@ -672,8 +681,8 @@ public class ChatServiceImpl implements ChatService {
                 String chatbotAppId = chatbotKey.getResourceId();
                 log.info(String.format("找到用户Chatbot: userId=%s, appId=%s", userId, chatbotAppId));
 
-                // 更新chatbot的知识库ID为空（不使用知识库）
-                updateChatbotKnowledgeBaseToEmpty(chatbotAppId);
+                // 更新chatbot的知识库ID为空（不使用知识库）和 enable_search 配置
+                updateChatbotKnowledgeBaseToEmpty(chatbotAppId, enableSearch);
 
                 // 转换系统内部的 conversationId 为 Dify 的 UUID（如果存在）
                 String difyConversationId = convertToDifyConversationId(conversationId, userId);
@@ -786,8 +795,9 @@ public class ChatServiceImpl implements ChatService {
      * 
      * @param userId       用户ID
      * @param knowledgeIds 知识库ID列表（系统内部的ID）
+     * @param enableSearch 是否启用联网搜索
      */
-    private void updateChatbotKnowledgeBases(Long userId, List<String> knowledgeIds) {
+    private void updateChatbotKnowledgeBases(Long userId, List<String> knowledgeIds, Boolean enableSearch) {
         if (knowledgeIds == null || knowledgeIds.isEmpty()) {
             return;
         }
@@ -826,7 +836,7 @@ public class ChatServiceImpl implements ChatService {
 
             // 3. 更新 Chatbot 的知识库配置
             if (!difyKnowledgeIds.isEmpty()) {
-                updateChatbotKnowledgeBases(chatbotAppId, difyKnowledgeIds);
+                updateChatbotKnowledgeBases(chatbotAppId, difyKnowledgeIds, enableSearch);
             }
         } catch (Exception e) {
             log.warn(String.format("更新Chatbot知识库失败: userId=%s, knowledgeIds=%s, err=%s",
@@ -840,8 +850,9 @@ public class ChatServiceImpl implements ChatService {
      * 
      * @param chatbotAppId     Chatbot 应用ID
      * @param difyKnowledgeIds Dify 知识库ID列表
+     * @param enableSearch     是否启用联网搜索（可选，为null时使用配置文件默认值）
      */
-    private void updateChatbotKnowledgeBases(String chatbotAppId, List<String> difyKnowledgeIds) {
+    private void updateChatbotKnowledgeBases(String chatbotAppId, List<String> difyKnowledgeIds, Boolean enableSearch) {
         try {
             // 1. 构建多个数据集配置
             List<DifyChatbotModelConfigRequest.DatasetConfigs.DatasetCollection.DatasetWrapper> datasetList = new ArrayList<>();
@@ -858,22 +869,27 @@ public class ChatServiceImpl implements ChatService {
             DifyChatbotModelConfigRequest.DatasetConfigs.DatasetCollection datasetCollection = new DifyChatbotModelConfigRequest.DatasetConfigs.DatasetCollection();
             datasetCollection.setDatasets(datasetList);
 
-            // 2. 构建数据集配置（使用默认配置）
-            DifyChatbotModelConfigRequest.DatasetConfigs datasetConfigs = DifyChatbotModelConfigRequest.DatasetConfigs
-                    .defaultConfig();
+            // 2. 从配置文件读取完整配置
+            DifyChatbotModelConfigRequest configRequest = DifyChatbotModelConfigRequest.fromConfig(difyConfig.getChatbot());
+            
+            // 3. 覆盖数据集配置（使用动态的知识库ID列表）
+            DifyChatbotModelConfigRequest.DatasetConfigs datasetConfigs = configRequest.getDatasetConfigs();
+            if (datasetConfigs == null) {
+                datasetConfigs = DifyChatbotModelConfigRequest.DatasetConfigs.defaultConfig();
+            }
             datasetConfigs.setDatasets(datasetCollection);
-
-            // 3. 从配置文件读取模型配置
-            DifyChatbotModelConfigRequest.Model model = buildModelFromConfig();
-            DifyChatbotModelConfigRequest.DatasetConfigs.RerankingModel rerankingModel = buildRerankingModelFromConfig();
-
-            // 设置重排序模型到数据集配置
-            datasetConfigs.setRerankingModel(rerankingModel);
-
-            // 4. 构建模型配置请求
-            DifyChatbotModelConfigRequest configRequest = new DifyChatbotModelConfigRequest();
-            configRequest.setModel(model);
             configRequest.setDatasetConfigs(datasetConfigs);
+
+            // 4. 更新 enable_search 配置
+            DifyChatbotModelConfigRequest.Model model = configRequest.getModel();
+            if (model == null) {
+                model = DifyChatbotModelConfigRequest.Model.defaultConfig();
+            }
+            if (model.getCompletionParams() == null) {
+                model.setCompletionParams(new HashMap<>());
+            }
+            model.getCompletionParams().put("enable_search", enableSearch != null ? enableSearch : false);
+            configRequest.setModel(model);
 
             // 5. 调用 Dify API 更新配置
             ResponseEntity<String> updateResponse = difyApiService.updateChatbotModelConfig(chatbotAppId,
@@ -902,11 +918,58 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /**
+     * 更新 Chatbot 的 enable_search 配置
+     * 
+     * @param chatbotAppId Chatbot 应用ID
+     * @param enableSearch 是否启用联网搜索
+     */
+    private void updateChatbotEnableSearch(String chatbotAppId, Boolean enableSearch) {
+        try {
+            // 从配置文件读取完整配置
+            DifyChatbotModelConfigRequest configRequest = DifyChatbotModelConfigRequest.fromConfig(difyConfig.getChatbot());
+            
+            // 更新 completion_params.enable_search
+            DifyChatbotModelConfigRequest.Model model = configRequest.getModel();
+            if (model == null) {
+                model = DifyChatbotModelConfigRequest.Model.defaultConfig();
+            }
+            if (model.getCompletionParams() == null) {
+                model.setCompletionParams(new HashMap<>());
+            }
+            model.getCompletionParams().put("enable_search", enableSearch != null ? enableSearch : false);
+            configRequest.setModel(model);
+
+            // 调用 Dify API 更新配置
+            ResponseEntity<String> updateResponse = difyApiService.updateChatbotModelConfig(chatbotAppId, configRequest);
+
+            if (!updateResponse.getStatusCode().is2xxSuccessful()) {
+                String errorBody = updateResponse.getBody() != null ? updateResponse.getBody() : "Unknown error";
+                log.warn(String.format("更新Chatbot enable_search失败: chatbotAppId=%s, enableSearch=%s, status=%s, body=%s",
+                        chatbotAppId, enableSearch, updateResponse.getStatusCode(), errorBody));
+                // 不抛出异常，允许继续执行
+            } else {
+                log.info(String.format("更新Chatbot enable_search成功: chatbotAppId=%s, enableSearch=%s", chatbotAppId, enableSearch));
+            }
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            // 网络连接异常（如连接被拒绝、超时等）
+            log.warn(String.format("更新Chatbot enable_search失败（网络连接异常）: chatbotAppId=%s, enableSearch=%s, err=%s",
+                    chatbotAppId, enableSearch, e.getMessage()));
+            // 不抛出异常，允许继续执行
+        } catch (Exception e) {
+            // 其他异常
+            log.warn(String.format("更新Chatbot enable_search失败（未知异常）: chatbotAppId=%s, enableSearch=%s, err=%s",
+                    chatbotAppId, enableSearch, e.getMessage()));
+            // 不抛出异常，允许继续执行
+        }
+    }
+
+    /**
      * 更新 Chatbot 的知识库ID为空（不使用知识库）
      * 
      * @param chatbotAppId Chatbot 应用ID
+     * @param enableSearch 是否启用联网搜索
      */
-    private void updateChatbotKnowledgeBaseToEmpty(String chatbotAppId) {
+    private void updateChatbotKnowledgeBaseToEmpty(String chatbotAppId, Boolean enableSearch) {
         try {
             // 1. 构建空的数据集集合（不添加任何数据集）
             List<DifyChatbotModelConfigRequest.DatasetConfigs.DatasetCollection.DatasetWrapper> datasetList = new ArrayList<>();
@@ -914,22 +977,27 @@ public class ChatServiceImpl implements ChatService {
             DifyChatbotModelConfigRequest.DatasetConfigs.DatasetCollection datasetCollection = new DifyChatbotModelConfigRequest.DatasetConfigs.DatasetCollection();
             datasetCollection.setDatasets(datasetList);
 
-            // 2. 构建数据集配置（使用默认配置，但数据集列表为空）
-            DifyChatbotModelConfigRequest.DatasetConfigs datasetConfigs = DifyChatbotModelConfigRequest.DatasetConfigs
-                    .defaultConfig();
+            // 2. 从配置文件读取完整配置
+            DifyChatbotModelConfigRequest configRequest = DifyChatbotModelConfigRequest.fromConfig(difyConfig.getChatbot());
+            
+            // 3. 覆盖数据集配置（设置为空列表，不使用知识库）
+            DifyChatbotModelConfigRequest.DatasetConfigs datasetConfigs = configRequest.getDatasetConfigs();
+            if (datasetConfigs == null) {
+                datasetConfigs = DifyChatbotModelConfigRequest.DatasetConfigs.defaultConfig();
+            }
             datasetConfigs.setDatasets(datasetCollection);
-
-            // 3. 从配置文件读取模型配置
-            DifyChatbotModelConfigRequest.Model model = buildModelFromConfig();
-            DifyChatbotModelConfigRequest.DatasetConfigs.RerankingModel rerankingModel = buildRerankingModelFromConfig();
-
-            // 设置重排序模型到数据集配置
-            datasetConfigs.setRerankingModel(rerankingModel);
-
-            // 4. 构建模型配置请求
-            DifyChatbotModelConfigRequest configRequest = new DifyChatbotModelConfigRequest();
-            configRequest.setModel(model);
             configRequest.setDatasetConfigs(datasetConfigs);
+
+            // 4. 更新 enable_search 配置
+            DifyChatbotModelConfigRequest.Model model = configRequest.getModel();
+            if (model == null) {
+                model = DifyChatbotModelConfigRequest.Model.defaultConfig();
+            }
+            if (model.getCompletionParams() == null) {
+                model.setCompletionParams(new HashMap<>());
+            }
+            model.getCompletionParams().put("enable_search", enableSearch != null ? enableSearch : false);
+            configRequest.setModel(model);
 
             // 5. 调用 Dify API 更新配置
             ResponseEntity<String> updateResponse = difyApiService.updateChatbotModelConfig(chatbotAppId,
@@ -954,60 +1022,6 @@ public class ChatServiceImpl implements ChatService {
                     chatbotAppId, e.getMessage()));
             // 不抛出异常，允许继续执行
         }
-    }
-
-    /**
-     * 从配置文件构建模型配置
-     *
-     * @return 模型配置
-     */
-    private DifyChatbotModelConfigRequest.Model buildModelFromConfig() {
-        DifyChatbotModelConfigRequest.Model model = new DifyChatbotModelConfigRequest.Model();
-
-        // 从配置文件读取，如果配置不存在则使用默认值
-        if (difyConfig.getChatbot() != null && difyConfig.getChatbot().getModel() != null) {
-            DifyConfig.Chatbot.Model configModel = difyConfig.getChatbot().getModel();
-            model.setProvider(
-                    configModel.getProvider() != null ? configModel.getProvider() : "langgenius/tongyi/tongyi");
-            model.setName(configModel.getName() != null ? configModel.getName() : "qwen3-next-80b-a3b-instruct");
-            model.setMode(configModel.getMode() != null ? configModel.getMode() : "chat");
-        } else {
-            // 使用默认值
-            model.setProvider("langgenius/tongyi/tongyi");
-            model.setName("qwen3-next-80b-a3b-instruct");
-            model.setMode("chat");
-        }
-
-        model.setCompletionParams(new HashMap<>());
-        return model;
-    }
-
-    /**
-     * 从配置文件构建重排序模型配置
-     *
-     * @return 重排序模型配置
-     */
-    private DifyChatbotModelConfigRequest.DatasetConfigs.RerankingModel buildRerankingModelFromConfig() {
-        DifyChatbotModelConfigRequest.DatasetConfigs.RerankingModel rerankingModel = new DifyChatbotModelConfigRequest.DatasetConfigs.RerankingModel();
-
-        // 从配置文件读取，如果配置不存在则使用默认值
-        if (difyConfig.getChatbot() != null && difyConfig.getChatbot().getRerankingModel() != null) {
-            DifyConfig.Chatbot.RerankingModel configRerankingModel = difyConfig.getChatbot().getRerankingModel();
-            rerankingModel.setRerankingProviderName(
-                    configRerankingModel.getRerankingProviderName() != null
-                            ? configRerankingModel.getRerankingProviderName()
-                            : "langgenius/tongyi/tongyi");
-            rerankingModel.setRerankingModelName(
-                    configRerankingModel.getRerankingModelName() != null
-                            ? configRerankingModel.getRerankingModelName()
-                            : "gte-rerank");
-        } else {
-            // 使用默认值
-            rerankingModel.setRerankingProviderName("langgenius/tongyi/tongyi");
-            rerankingModel.setRerankingModelName("gte-rerank");
-        }
-
-        return rerankingModel;
     }
 
     /**

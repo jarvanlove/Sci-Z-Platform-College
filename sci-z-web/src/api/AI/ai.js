@@ -438,7 +438,7 @@ export const deleteAiMessagesByConversationId = (conversationId) => {
  * @returns {Promise} 返回AbortController用于取消请求
  */
 export const runWorkflowStream = async (params) => {
-  const { query, knowledgeId, workflowId, files, attachmentIds, conversationId, user, onMessage, onEnd, onError } = params
+  const { query, knowledgeId, workflowId, files, attachmentIds, conversationId, user, enableSearch, onMessage, onEnd, onError } = params
   
   // 获取token
   const authStore = await import('@/store/modules/auth').then(m => m.useAuthStore())
@@ -502,6 +502,9 @@ export const runWorkflowStream = async (params) => {
     }
     if (user) {
       formData.append('user', user)
+    }
+    if (enableSearch !== undefined && enableSearch !== null) {
+      formData.append('enableSearch', String(enableSearch))
     }
 
     const response = await fetch(url, {

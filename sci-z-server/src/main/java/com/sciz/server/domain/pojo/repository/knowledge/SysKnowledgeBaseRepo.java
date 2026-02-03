@@ -58,12 +58,48 @@ public interface SysKnowledgeBaseRepo {
     IPage<SysKnowledgeBase> pageByCondition(Page<SysKnowledgeBase> page, Long userId);
 
     /**
+     * 分页查询知识库列表（支持关键字搜索）
+     *
+     * @param page   分页对象
+     * @param userId 用户ID（可选，如果为null则查询所有）
+     * @param keyword 搜索关键字（知识库名称/描述），可为null
+     * @param sortBy 排序字段，可为null
+     * @param asc 是否升序，false为降序
+     * @return 分页结果
+     */
+    IPage<SysKnowledgeBase> pageByCondition(Page<SysKnowledgeBase> page, Long userId, String keyword, String sortBy, boolean asc);
+
+    /**
+     * 分页查询知识库列表（支持类型筛选与项目成员可见性）
+     * 普通用户可见：本人创建的 + 作为项目成员可见的项目知识库；管理员可见全部。
+     *
+     * @param page              分页对象
+     * @param userId            当前用户ID（管理员可为null表示不限）
+     * @param memberProjectIds  当前用户作为成员的项目ID列表（非管理员时必传，可为空列表）
+     * @param kbType            类型筛选：personal / project / null=全部
+     * @param keyword           搜索关键字，可为null
+     * @param sortBy            排序字段，可为null
+     * @param asc               是否升序
+     * @return 分页结果
+     */
+    IPage<SysKnowledgeBase> pageByCondition(Page<SysKnowledgeBase> page, Long userId, List<Long> memberProjectIds,
+                                            String kbType, String keyword, String sortBy, boolean asc);
+
+    /**
      * 根据ID删除知识库（软删除）
      *
      * @param id 知识库ID
      * @return 是否删除成功
      */
     boolean deleteById(Long id);
+
+    /**
+     * 更新知识库
+     *
+     * @param entity 知识库实体
+     * @return 是否更新成功
+     */
+    boolean updateById(SysKnowledgeBase entity);
 
     /**
      * 更新知识库文件数量

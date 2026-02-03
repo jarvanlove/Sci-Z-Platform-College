@@ -186,4 +186,27 @@ public class SysAttachmentRepoImpl implements SysAttachmentRepo {
         queryWrapper.orderByDesc(SysAttachment::getUploadTime);
         return mapper.selectList(queryWrapper);
     }
+
+    @Override
+    public List<SysAttachment> findByIdsForRelation(List<Long> attachmentIds) {
+        if (attachmentIds == null || attachmentIds.isEmpty()) {
+            return List.of();
+        }
+        var queryWrapper = new LambdaQueryWrapper<SysAttachment>()
+                .in(SysAttachment::getId, attachmentIds)
+                .eq(SysAttachment::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+        queryWrapper.orderByDesc(SysAttachment::getUploadTime);
+        return mapper.selectList(queryWrapper);
+    }
+
+    @Override
+    public SysAttachment findByIdForRelation(Long id) {
+        if (id == null) {
+            return null;
+        }
+        var queryWrapper = new LambdaQueryWrapper<SysAttachment>()
+                .eq(SysAttachment::getId, id)
+                .eq(SysAttachment::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+        return mapper.selectOne(queryWrapper);
+    }
 }

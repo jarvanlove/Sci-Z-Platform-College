@@ -386,7 +386,7 @@ router.beforeEach(async (to, from, next) => {
 
   // 设置页面标题
   if (to.meta.title) {
-    document.title = `${to.meta.title} - 高校科研管理平台`
+    document.title = `${to.meta.title} - AI.科研管理平台`
   }
 
   // 检查是否需要认证

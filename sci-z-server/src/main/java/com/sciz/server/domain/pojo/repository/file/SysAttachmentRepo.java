@@ -89,10 +89,26 @@ public interface SysAttachmentRepo {
             boolean asc);
 
     /**
-     * 根据附件ID列表批量查询附件
+     * 根据附件ID列表批量查询附件（受数据权限：普通用户仅能查自己上传的）
      *
      * @param attachmentIds List<Long> 附件ID列表
      * @return List<SysAttachment> 附件列表
      */
     List<SysAttachment> findByIds(List<Long> attachmentIds);
+
+    /**
+     * 根据附件ID列表批量查询附件（不按上传人过滤，用于已校验关系的场景，如项目成员查看项目里程碑文档）
+     *
+     * @param attachmentIds List<Long> 附件ID列表
+     * @return List<SysAttachment> 附件列表
+     */
+    List<SysAttachment> findByIdsForRelation(List<Long> attachmentIds);
+
+    /**
+     * 根据附件ID查询单条附件（不按上传人过滤，用于预览/下载时校验项目成员权限后使用）
+     *
+     * @param id Long 附件ID
+     * @return SysAttachment 或 null
+     */
+    SysAttachment findByIdForRelation(Long id);
 }

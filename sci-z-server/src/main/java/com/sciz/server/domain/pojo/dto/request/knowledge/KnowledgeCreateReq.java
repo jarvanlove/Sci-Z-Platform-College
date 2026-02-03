@@ -33,6 +33,12 @@ public class KnowledgeCreateReq {
     private Long projectId;
 
     /**
+     * 关联项目名称（可选，申报创建知识库时由研究课题传入）
+     */
+    @Size(max = 200, message = "项目名称长度不能超过200个字符")
+    private String projectName;
+
+    /**
      * 是否共享：0=私有，1=共享
      */
     private Integer isShared = 0;
@@ -59,7 +65,5 @@ public class KnowledgeCreateReq {
      * 密钥类型
      */
     private String keyType;
-
-
 }
 

@@ -37,15 +37,15 @@ import Sidebar from './Sidebar.vue'
   flex: 1;
   overflow: auto;
   background: var(--bg);
-  // 🔥 响应式内边距：大屏幕上减少内边距，充分利用空间
-  padding: 16px;
+  // 🔥 响应式内边距：减少内边距，充分利用空间
+  padding: 5px;
   
   @media (min-width: 1920px) {
-    padding: 16px 24px; // 大屏幕：左右内边距稍大，上下保持
+    padding: 5px 12px; // 大屏幕：左右内边距稍大，上下保持
   }
   
   @media (min-width: 2560px) {
-    padding: 16px 32px; // 超大屏幕：进一步优化内边距
+    padding: 5px 16px; // 超大屏幕：进一步优化内边距
   }
   
   .content-wrapper {
@@ -65,7 +65,7 @@ import Sidebar from './Sidebar.vue'
 // 响应式设计
 @media (max-width: 768px) {
   .main-content {
-    padding: 12px;
+    padding: 5px;
     
     .content-wrapper {
       min-height: calc(100vh - 88px);

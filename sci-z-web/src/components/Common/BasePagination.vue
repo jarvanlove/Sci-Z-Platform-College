@@ -141,6 +141,10 @@ const props = defineProps({
     type: Number,
     default: 0
   },
+  pages: {
+    type: Number,
+    default: 0
+  },
   pageSizes: {
     type: Array,
     default: () => [10, 20, 50, 100]
@@ -176,7 +180,13 @@ const pageSize = ref(props.size)
 const jumpPage = ref(props.current)
 
 // 计算属性
-const totalPages = computed(() => Math.ceil(props.total / pageSize.value))
+// 🔥 优化：优先使用后端返回的 pages 字段，如果没有则计算
+const totalPages = computed(() => {
+  if (props.pages && props.pages > 0) {
+    return props.pages
+  }
+  return Math.ceil(props.total / pageSize.value)
+})
 
 const visiblePages = computed(() => {
   const pages = []

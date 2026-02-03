@@ -160,7 +160,7 @@ export const getProjectStatistics = () => {
 }
 
 /**
- * 批量上传项目里程碑文档
+ * 批量上传项目里程碑文档（支持进度监听）
  * @param {FormData} formData - 文件表单数据
  * @param {File[]} formData.files - 文件对象数组（批量上传）
  * @param {string} formData.relationType - 关联类型（固定值：'project'）
@@ -168,10 +168,89 @@ export const getProjectStatistics = () => {
  * @param {number} formData.relationId - 关联ID（传项目ID，后端会处理）
  * @param {string} formData.relationName - 关联名称（项目编号/里程碑名称）
  * @param {number} formData.isPublic - 是否公开（0:私有, 1:公开，默认0）
- * @returns {Promise} 文件上传响应，data 为文件信息数组
- * 响应格式：{ code: 200, data: [{ id, fileName, originalName, fileType, fileSize, uploaderName, uploadTime, fileUrl, previewUrl }, ...] }
+ * @param {Function} [onProgress] - 进度回调函数 (loaded, total) => void
+ * @returns {Promise} 文件上传响应，data 为每个文件的上传结果列表（包含成功和失败的详细信息）
+ * 响应格式：{ code: 200, data: [{ fileName, success, errorMessage, attachmentId, fileSize, stage, stageDescription }, ...] }
  */
-export const uploadMilestoneDocument = (formData) => {
+export const uploadMilestoneDocument = (formData, onProgress = null) => {
+  // 如果提供了进度回调，使用 XMLHttpRequest 来监听上传进度
+  if (onProgress && typeof onProgress === 'function') {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      const url = `${import.meta.env.VITE_API_BASE_URL || '/api'}${PROJECT_API.MILESTONE_DOCUMENT}`
+      
+      // 监听上传进度
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const loaded = e.loaded
+          const total = e.total
+          onProgress(loaded, total)
+        }
+      })
+      
+      // 监听请求完成
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText)
+            // 检查业务错误码，即使 HTTP 状态码是 200，也可能有业务错误
+            if (response.code && response.code !== 200) {
+              const error = new Error(response.message || '上传失败')
+              error.response = response
+              reject(error)
+            } else {
+              resolve(response)
+            }
+          } catch (e) {
+            reject(new Error('解析响应失败'))
+          }
+        } else {
+          try {
+            const error = JSON.parse(xhr.responseText)
+            const err = new Error(error.message || '上传失败')
+            err.response = error
+            reject(err)
+          } catch (e) {
+            reject(new Error(`上传失败: ${xhr.status}`))
+          }
+        }
+      })
+      
+      // 监听错误
+      xhr.addEventListener('error', () => {
+        reject(new Error('网络错误'))
+      })
+      
+      // 监听取消
+      xhr.addEventListener('abort', () => {
+        reject(new Error('上传已取消'))
+      })
+      
+      // 设置请求头（包括认证token）
+      // 注意：在 API 文件中不能直接使用 useAuthStore()，需要动态导入
+      // 先获取 token，然后再打开和发送请求
+      import('@/store/modules/auth').then(({ useAuthStore }) => {
+        const authStore = useAuthStore()
+        
+        // 打开请求
+        xhr.open('POST', url)
+        
+        // 设置请求头
+        if (authStore.token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${authStore.token}`)
+        }
+        
+        // 发送请求
+        xhr.send(formData)
+      }).catch(() => {
+        // 如果导入失败，继续发送请求（可能未登录）
+        xhr.open('POST', url)
+        xhr.send(formData)
+      })
+    })
+  }
+  
+  // 默认使用 axios（不监听进度）
   return request({
     url: PROJECT_API.MILESTONE_DOCUMENT,
     method: HTTP_METHODS.POST,
@@ -181,6 +260,7 @@ export const uploadMilestoneDocument = (formData) => {
     }
   })
 }
+
 
 /**
  * 完成里程碑
