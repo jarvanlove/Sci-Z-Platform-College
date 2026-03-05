@@ -113,5 +113,16 @@ public class KnowledgeResp {
      * true=管理员/创建人/项目知识库的项目成员或项目负责人
      */
     private Boolean canEdit;
+
+    /**
+     * 最近一次更新时 Dify 同步是否成功（仅更新接口在发生名称/描述同步时返回）
+     * null=未尝试同步，true=同步成功，false=同步失败
+     */
+    private Boolean difySyncSuccess;
+
+    /**
+     * Dify 同步失败时的提示信息（仅当 difySyncSuccess=false 时可能有值）
+     */
+    private String difySyncMessage;
 }
 

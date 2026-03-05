@@ -7,7 +7,9 @@ import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationDetailRes
 import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationListResp;
 import com.sciz.server.domain.pojo.dto.request.declaration.DeclarationUpdateStatusReq;
 import com.sciz.server.domain.pojo.dto.response.declaration.RedHeaderFileParseResp;
+import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
 import com.sciz.server.infrastructure.shared.result.PageResult;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 申报应用服务
@@ -64,4 +66,14 @@ public interface DeclarationService {
      * @param req 更新状态请求
      */
     void updateStatus(DeclarationUpdateStatusReq req);
+
+    /**
+     * 上传/覆盖申报书文档
+     * 上传新文件后，将该申报对应的附件关联更新为新附件ID（覆盖逻辑），下载时获取最新文件。
+     *
+     * @param declarationId 申报ID
+     * @param file          申报书文件
+     * @return 新附件信息（含 attachmentId）
+     */
+    FileInfoResp uploadDeclarationDocument(Long declarationId, MultipartFile file);
 }

@@ -16,6 +16,7 @@ import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -63,8 +64,28 @@ public class ProjectRepoImpl implements ProjectRepo {
     }
 
     @Override
+    public List<Project> findByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        var queryWrapper = new LambdaQueryWrapper<Project>();
+        queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+        queryWrapper.in(Project::getId, ids);
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            List<Long> memberProjectIds = projectMemberRepo.findProjectIdsByUserId(userId);
+            if (CollectionUtils.isEmpty(memberProjectIds)) {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().eq(Project::getManagerId, userId));
+            } else {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().in(Project::getId, memberProjectIds).or().eq(Project::getManagerId, userId));
+            }
+        }
+        return mapper.selectList(queryWrapper);
+    }
+
+    @Override
     public IPage<Project> page(Page<Project> page, String keyword, String status, String sortBy, boolean asc,
-            List<Long> declarationIds) {
+            List<Long> declarationIds, List<Long> declarationIdsByLeader) {
         var queryWrapper = new LambdaQueryWrapper<Project>();
         queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
@@ -79,12 +100,21 @@ public class ProjectRepoImpl implements ProjectRepo {
             }
         }
 
-        // 关键字搜索（项目编号/项目名称）
+        // 关键字搜索（项目编号/项目名称 或 项目负责人对应的申报ID）
         if (StringUtils.hasText(keyword)) {
-            queryWrapper.and(wrapper -> wrapper
-                    .like(Project::getNumber, keyword)
-                    .or()
-                    .like(Project::getName, keyword));
+            if (declarationIdsByLeader != null && !declarationIdsByLeader.isEmpty()) {
+                queryWrapper.and(wrapper -> wrapper
+                        .like(Project::getNumber, keyword)
+                        .or()
+                        .like(Project::getName, keyword)
+                        .or()
+                        .in(Project::getDeclarationId, declarationIdsByLeader));
+            } else {
+                queryWrapper.and(wrapper -> wrapper
+                        .like(Project::getNumber, keyword)
+                        .or()
+                        .like(Project::getName, keyword));
+            }
         }
 
         // 项目状态筛选
@@ -188,6 +218,32 @@ public class ProjectRepoImpl implements ProjectRepo {
     }
 
     @Override
+    public Long countByCreatedTimeBetween(LocalDateTime startTime, LocalDateTime endTime) {
+        var queryWrapper = new LambdaQueryWrapper<Project>();
+        queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        // 数据权限：admin 看全部；普通用户可看自己创建的、作为成员的项目、或作为项目负责人(manager_id)的项目
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            List<Long> memberProjectIds = projectMemberRepo.findProjectIdsByUserId(userId);
+            if (CollectionUtils.isEmpty(memberProjectIds)) {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().eq(Project::getManagerId, userId));
+            } else {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().in(Project::getId, memberProjectIds).or().eq(Project::getManagerId, userId));
+            }
+        }
+
+        if (startTime != null) {
+            queryWrapper.ge(Project::getCreatedTime, startTime);
+        }
+        if (endTime != null) {
+            queryWrapper.le(Project::getCreatedTime, endTime);
+        }
+
+        return mapper.selectCount(queryWrapper);
+    }
+
+    @Override
     public List<Project> findAllActiveProjects() {
         var queryWrapper = new LambdaQueryWrapper<Project>();
         // 排除已删除的项目
@@ -206,6 +262,14 @@ public class ProjectRepoImpl implements ProjectRepo {
             }
         }
 
+        return mapper.selectList(queryWrapper);
+    }
+
+    @Override
+    public List<Project> findAllActiveProjectsForTask() {
+        var queryWrapper = new LambdaQueryWrapper<Project>();
+        queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+        queryWrapper.ne(Project::getStatus, ProjectStatus.CANCELLED.getCode().toString());
         return mapper.selectList(queryWrapper);
     }
 
@@ -273,5 +337,38 @@ public class ProjectRepoImpl implements ProjectRepo {
                         .eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
                         .last("LIMIT 1"));
         return list.isEmpty() ? null : list.get(0);
+    }
+
+    @Override
+    public List<Project> findForIndustryEducationMatch(List<Long> declarationIds, String keyword, int limit) {
+        var queryWrapper = new LambdaQueryWrapper<Project>();
+        queryWrapper.eq(Project::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            List<Long> memberProjectIds = projectMemberRepo.findProjectIdsByUserId(userId);
+            if (CollectionUtils.isEmpty(memberProjectIds)) {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().eq(Project::getManagerId, userId));
+            } else {
+                queryWrapper.and(w -> w.eq(Project::getCreatedBy, userId).or().in(Project::getId, memberProjectIds).or().eq(Project::getManagerId, userId));
+            }
+        }
+
+        String pattern = StringUtils.hasText(keyword) ? "%" + keyword.trim() + "%" : null;
+        if (!CollectionUtils.isEmpty(declarationIds) || pattern != null) {
+            if (!CollectionUtils.isEmpty(declarationIds) && pattern != null) {
+                queryWrapper.and(w -> w.in(Project::getDeclarationId, declarationIds)
+                        .or().like(Project::getName, pattern)
+                        .or().like(Project::getDescription, pattern));
+            } else if (!CollectionUtils.isEmpty(declarationIds)) {
+                queryWrapper.in(Project::getDeclarationId, declarationIds);
+            } else {
+                queryWrapper.and(w -> w.like(Project::getName, pattern).or().like(Project::getDescription, pattern));
+            }
+        }
+
+        queryWrapper.orderByDesc(Project::getUpdatedTime);
+        queryWrapper.last("LIMIT " + Math.max(1, limit));
+        return mapper.selectList(queryWrapper);
     }
 }

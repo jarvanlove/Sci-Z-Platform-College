@@ -587,20 +587,43 @@ export const runWorkflowStream = async (params) => {
 
           try {
             const data = JSON.parse(dataStr)
-            
+
+            // 多轮对话：从任意事件中提取 conversation_id / message_id，Dify 常在首条 message 事件就带上
+            if (data.conversation_id) {
+              conversationIdFromResponse = data.conversation_id
+            }
+            if (data.message_id) {
+              messageIdFromResponse = data.message_id
+            }
+            if (data.metadata?.retriever_resources) {
+              const retrieverResources = data.metadata.retriever_resources
+              documentsFromResponse = retrieverResources.map((resource, index) => ({
+                id: resource.segment_id || `doc-${index}`,
+                name: resource.document_name || resource.dataset_name || `文档 ${index + 1}`,
+                datasetName: resource.dataset_name,
+                content: resource.content || '',
+                score: resource.score || 0,
+                position: resource.position || index + 1,
+                documentId: resource.document_id,
+                segmentId: resource.segment_id,
+                document_name: resource.document_name,
+                dataset_name: resource.dataset_name,
+                segment_id: resource.segment_id
+              }))
+            }
+
             if (data.event === 'message' || data.answer) {
               // 消息片段
               messageCount++
               const answer = data.answer || ''
               if (answer) {
                 onMessage?.(answer)
-                // 每10条消息记录一次日志（避免日志过多）
                 if (messageCount % 10 === 0) {
                   logger.debug('流式消息更新', { messageCount, answerLength: answer.length })
                 }
               }
             } else if (data.event === 'message_end') {
-              // 消息结束
+              // 消息结束：优先使用 Dify 返回的 conversation_id，保证多轮对话能续上
               onEnd?.({
                 conversationId: conversationIdFromResponse || conversationId,
                 messageId: messageIdFromResponse,
@@ -608,40 +631,12 @@ export const runWorkflowStream = async (params) => {
                 metadata: data.metadata
               })
             } else if (data.event === 'error') {
-              // 错误事件
               const error = new Error(data.message || '请求失败')
               error.code = data.code
               onError?.(error)
               throw error
-            } else {
-              // 其他数据，尝试提取信息
-              if (data.conversation_id) {
-                conversationIdFromResponse = data.conversation_id
-              }
-              if (data.message_id) {
-                messageIdFromResponse = data.message_id
-              }
-              // 提取文档片段数据
-              if (data.metadata?.retriever_resources) {
-                const retrieverResources = data.metadata.retriever_resources
-                documentsFromResponse = retrieverResources.map((resource, index) => ({
-                  id: resource.segment_id || `doc-${index}`,
-                  name: resource.document_name || resource.dataset_name || `文档 ${index + 1}`,
-                  datasetName: resource.dataset_name,
-                  content: resource.content || '',
-                  score: resource.score || 0,
-                  position: resource.position || index + 1,
-                  documentId: resource.document_id,
-                  segmentId: resource.segment_id,
-                  document_name: resource.document_name,
-                  dataset_name: resource.dataset_name,
-                  segment_id: resource.segment_id
-                }))
-              }
-              // 如果有 answer 字段，也触发 onMessage
-              if (data.answer) {
-                onMessage?.(data.answer)
-              }
+            } else if (data.answer) {
+              onMessage?.(data.answer)
             }
           } catch (parseError) {
             // 忽略解析错误，继续处理下一行

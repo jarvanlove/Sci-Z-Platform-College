@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sciz.server.application.service.file.FileConvertService;
 import com.sciz.server.application.service.file.FileService;
 import com.sciz.server.application.service.knowledge.KnowledgeService;
 import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
@@ -17,8 +18,8 @@ import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
 import com.sciz.server.domain.pojo.dto.response.file.FileUploadResp;
 import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeFileUploadResp;
 import com.sciz.server.domain.pojo.dto.response.knowledge.KnowledgeResp;
-import com.sciz.server.infrastructure.shared.utils.FileUtil;
 import com.sciz.server.infrastructure.external.dify.dto.DifyChatbotMessageRequest;
+import com.sciz.server.infrastructure.external.dify.dto.DifyDatasetPatchRequest;
 import com.sciz.server.domain.pojo.entity.file.SysAttachment;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeBase;
 import com.sciz.server.domain.pojo.entity.knowledge.SysKnowledgeFileRelation;
@@ -30,7 +31,9 @@ import com.sciz.server.domain.pojo.repository.project.ProjectMemberRepo;
 import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
 import com.sciz.server.infrastructure.shared.enums.KnowledgeStatus;
+import com.sciz.server.infrastructure.external.dify.config.DifyDocumentConfig;
 import com.sciz.server.infrastructure.external.dify.dto.DifyDatasetRequest;
+import com.sciz.server.infrastructure.external.dify.dto.DifyDatasetRetrievalModelDto;
 import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
 import com.sciz.server.infrastructure.external.dify.service.DifyApiService;
 import com.sciz.server.infrastructure.external.dify.service.impl.DifyApiKeyServiceImpl;
@@ -42,25 +45,37 @@ import com.sciz.server.domain.pojo.dto.response.user.LoginUserContext;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.infrastructure.shared.utils.DataPermissionUtil;
+import com.sciz.server.infrastructure.shared.utils.FileUtil;
 import com.sciz.server.interfaces.converter.KnowledgeConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.nio.file.Files;
+
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.concurrent.Executor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /**
  * 知识库应用服务实现类
@@ -79,12 +94,14 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private final ProjectMemberRepo projectMemberRepo;
     private final ProjectRepo projectRepo;
     private final DifyApiService difyApiService;
+    private final DifyDocumentConfig difyDocumentConfig;
     private final ObjectMapper objectMapper;
     private final DifyApiKeyServiceImpl difyApiKeyService;
     private final KnowledgeConverter knowledgeConverter;
     private final SysAttachmentRepo attachmentRepo;
     private final SysKnowledgeFileRelationRepo fileRelationRepo;
     private final FileService fileService;
+    private final FileConvertService fileConvertService;
 
     @Autowired
     @Qualifier("globalTaskExecutor")
@@ -119,11 +136,14 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (user == null) {
             throw new BusinessException(ResultCode.USER_NOT_FOUND);
         }
-        // 4. 构建 Dify API 请求
+        // 4. 构建 Dify API 请求（名称、描述 + 与图2 一致的索引/嵌入/检索策略）
         DifyDatasetRequest difyRequest = new DifyDatasetRequest();
         difyRequest.setName(req.getName());
-        // difyRequest.setName(userId + "_" + req.getName());
         difyRequest.setDescription(req.getDescription());
+        difyRequest.setIndexingTechnique(difyDocumentConfig.getIndexingTechnique());
+        difyRequest.setEmbeddingModel(difyDocumentConfig.getEmbeddingModel());
+        difyRequest.setEmbeddingModelProvider(difyDocumentConfig.getEmbeddingModelProvider());
+        difyRequest.setRetrievalModel(buildDatasetRetrievalModelFromConfig());
 
         // 5. 获取用户的 Dify API Key（用于调用 Dify API）
 
@@ -209,6 +229,12 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         entity.setFolderCount(0);
         entity.setCreatedBy(userId);
         entity.setUpdatedBy(userId);
+        if (req.getCoverFileId() != null) {
+            entity.setCoverFileId(req.getCoverFileId());
+        }
+        if (req.getCoverUrl() != null && !req.getCoverUrl().isBlank()) {
+            entity.setCoverUrl(req.getCoverUrl());
+        }
         // 13. 保存到数据库
         Long id = knowledgeBaseRepo.save(entity);
         if (id == null) {
@@ -315,21 +341,24 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             log.debug("用户未登录，查询所有知识库");
         }
 
-        // 2. 可见性：管理员查全部；普通用户 = 本人创建的 + 作为项目成员或项目负责人可见的项目知识库（负责人视为拥有全部权限的成员）
+        // 2. 可见性：管理员查全部；普通用户 = 本人创建的 + 作为项目成员或项目负责人可见的项目知识库
+        //    点击「个人/项目」Tab 时前端会传 ownerId，此时必须按该用户算参与项目列表，否则「项目」Tab 会查不到数据
         List<Long> memberProjectIds = List.of();
-        if (!DataPermissionUtil.isAdmin() && userId != null) {
-            List<Long> asMember = projectMemberRepo.findProjectIdsByUserId(userId);
-            List<Long> asManager = projectRepo.findProjectIdsByManagerId(userId);
+        Long effectiveId = req.ownerId() != null ? req.ownerId() : userId;
+        if (effectiveId != null) {
+            List<Long> asMember = projectMemberRepo.findProjectIdsByUserId(effectiveId);
+            List<Long> asManager = projectRepo.findProjectIdsByManagerId(effectiveId);
             List<Long> merged = new ArrayList<>(asMember);
             for (Long pid : asManager) {
                 if (!merged.contains(pid)) merged.add(pid);
             }
             memberProjectIds = merged;
-            log.info(String.format("普通用户查询知识库: userId=%s, kbType=%s, memberProjectCount=%d",
-                    userId, req.kbType(), memberProjectIds.size()));
-        } else if (DataPermissionUtil.isAdmin()) {
+            log.info(String.format("知识库列表: effectiveId=%s, kbType=%s, memberProjectCount=%d",
+                    effectiveId, req.kbType(), memberProjectIds.size()));
+        }
+        if (DataPermissionUtil.isAdmin() && req.ownerId() == null) {
             userId = null;
-            log.info("管理员查询所有知识库");
+            log.info("管理员查询所有知识库（未指定 ownerId）");
         }
 
         // 3. 创建分页对象
@@ -339,13 +368,28 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         boolean asc = "ASC".equalsIgnoreCase(req.sortOrder());
 
         // 5. 执行分页查询（支持类型筛选、关键字、项目成员可见性）
-        var pageResult = knowledgeBaseRepo.pageByCondition(pageParam, userId, memberProjectIds,
-                req.kbType(), req.keyword(), req.sortBy(), asc);
+        //    前端在「个人 / 项目」Tab 下会显式传入 ownerId（当前登录用户ID），用于后端据此筛选创建人；
+        //    如果未传 ownerId，则退回到原有逻辑，仅按 userId 和 kbType / 项目成员进行可见性控制。
+        var pageResult = knowledgeBaseRepo.pageByCondition(
+                pageParam,
+                userId,
+                memberProjectIds,
+                req.kbType(),
+                req.keyword(),
+                req.sortBy(),
+                asc,
+                req.ownerId());
 
         // 6. 转换为响应DTO列表
         var respList = knowledgeConverter.toRespList(pageResult.getRecords());
 
-        // 7. 为每个知识库的封面URL生成预签名URL，并设置 canEdit（供前端显示删除按钮等）
+        // 7. 循环外一次查询当前用户作为负责人的项目 ID，避免 N+1
+        Set<Long> managerProjectIds = new HashSet<>();
+        if (userId != null) {
+            managerProjectIds.addAll(projectRepo.findProjectIdsByManagerId(userId));
+        }
+
+        // 8. 为每个知识库的封面URL生成预签名URL，并设置 canEdit（供前端显示删除按钮等）
         var records = pageResult.getRecords();
         for (int i = 0; i < respList.size(); i++) {
             var resp = respList.get(i);
@@ -355,15 +399,15 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             }
             if (i < records.size()) {
                 var entity = records.get(i);
-                // 可编辑：管理员 / 创建人；个人知识库共享给他人后他人仅查看；项目知识库仅创建人/项目负责人可编辑，项目成员仅查看
+                // 可编辑：管理员 / 创建人；项目知识库仅创建人/项目负责人可编辑，项目成员仅查看
                 boolean canEdit = DataPermissionUtil.isAdmin()
                         || (userId != null && entity.getOwnerId() != null && entity.getOwnerId().equals(userId))
-                        || (entity.getProjectId() != null && userId != null && projectRepo.findProjectIdsByManagerId(userId).contains(entity.getProjectId()));
+                        || (entity.getProjectId() != null && managerProjectIds.contains(entity.getProjectId()));
                 resp.setCanEdit(canEdit);
             }
         }
 
-        // 8. 构建分页结果
+        // 9. 构建分页结果
         var result = new PageResult<KnowledgeResp>(
                 respList,
                 pageResult.getTotal(),
@@ -408,8 +452,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         log.info(String.format("上传多个文件到知识库: userId=%s, knowledgeId=%s, fileCount=%d, folderId=%s",
                 userId, knowledgeId, files.size(), folderId));
         
-        // 2. 根据Dify知识库ID查询知识库信息
-        SysKnowledgeBase knowledgeBase = knowledgeBaseRepo.findByDifyKnowdataId(knowledgeId);
+        // 2. 根据系统知识库ID查询知识库信息（路径变量 id 为系统主键）
+        SysKnowledgeBase knowledgeBase = knowledgeBaseRepo.findById((long) knowledgeId);
         if (knowledgeBase == null) {
             throw new BusinessException(ResultCode.DATA_NOT_FOUND, "知识库不存在");
         }
@@ -489,15 +533,51 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 .map(DifyApiKey::getResourceId)
                 .orElse(defaultResourceId);
         
-        // 7. 从成功上传的文件中获取 MultipartFile（用于 Dify 上传）
+        // 7. 从成功上传的文件中获取 MultipartFile（用于 Dify 上传）；.doc 转为 .docx 再上传以兼容 Dify
         List<MultipartFile> difyUploadFiles = new ArrayList<>();
         for (FileUploadResp fileResult : minioSuccessResults) {
-            // 从原始文件列表中找到对应的文件
-            for (MultipartFile file : files) {
-                if (file.getOriginalFilename().equals(fileResult.getFileName())) {
-                    difyUploadFiles.add(file);
+            MultipartFile file = null;
+            for (MultipartFile f : files) {
+                if (f.getOriginalFilename().equals(fileResult.getFileName())) {
+                    file = f;
                     break;
                 }
+            }
+            if (file == null) {
+                continue;
+            }
+            String ext = FileUtil.getFileExtension(file.getOriginalFilename());
+            if ("doc".equalsIgnoreCase(ext)) {
+                try {
+                    var result = fileConvertService.convertDocToDocx(file.getInputStream(), file.getOriginalFilename());
+                    byte[] docxBytes = result.inputStream().readAllBytes();
+                    result.close();
+                    String docxFileName = result.fileName();
+                    MultipartFile docxFile = new MultipartFile() {
+                        @Override
+                        public String getName() { return "file"; }
+                        @Override
+                        public String getOriginalFilename() { return docxFileName; }
+                        @Override
+                        public String getContentType() { return result.mimeType(); }
+                        @Override
+                        public boolean isEmpty() { return docxBytes.length == 0; }
+                        @Override
+                        public long getSize() { return docxBytes.length; }
+                        @Override
+                        public byte[] getBytes() { return docxBytes; }
+                        @Override
+                        public InputStream getInputStream() { return new ByteArrayInputStream(docxBytes); }
+                        @Override
+                        public void transferTo(File dest) throws IOException { Files.write(dest.toPath(), docxBytes); }
+                    };
+                    difyUploadFiles.add(docxFile);
+                } catch (Exception e) {
+                    log.warn(String.format("doc 转 docx 失败，将按原文件上传 Dify: fileName=%s, err=%s", file.getOriginalFilename(), e.getMessage()));
+                    difyUploadFiles.add(file);
+                }
+            } else {
+                difyUploadFiles.add(file);
             }
         }
         
@@ -506,7 +586,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         CompletableFuture<List<ResponseEntity<String>>> difyUploadFuture = difyApiService.uploadDocumentsAsync(
                 datasetId, difyUploadFiles, userId, resourceId, "dataset");
 
-        // 9. 等待 Dify 上传完成并处理结果
+        // 9. 当前设计为同步等待 Dify 结果后再落库关联，避免“先返回再轮询”的复杂度；若 Dify 延迟可接受可保持现状
         List<ResponseEntity<String>> difyResponses;
         try {
             difyResponses = difyUploadFuture.get();
@@ -548,8 +628,18 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             }
             return results;
         }
+
+        // 10. 批量查询附件信息，避免循环内 N 次 findById
+        List<Long> attachmentIds = minioSuccessResults.stream()
+                .map(FileUploadResp::getAttachmentId)
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+        Map<Long, SysAttachment> attachmentMap = attachmentRepo.findByIds(attachmentIds).stream()
+                .filter(a -> a != null && a.getId() != null)
+                .collect(Collectors.toMap(SysAttachment::getId, a -> a, (a, b) -> a));
         
-        // 10. 🔥 处理每个文件的上传结果，更新详细状态
+        // 11. 处理每个文件的上传结果，更新详细状态
         for (int i = 0; i < difyUploadFiles.size(); i++) {
             MultipartFile file = difyUploadFiles.get(i);
             FileUploadResp fileResult = minioSuccessResults.get(i);
@@ -557,18 +647,16 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             int fileResultIndex = minioSuccessIndices.get(i);
             
             try {
-                // 更新阶段：Dify 上传中
                 results.set(fileResultIndex, KnowledgeFileUploadResp.builder()
-                        .fileName(file.getOriginalFilename())
+                        .fileName(fileResult.getFileName())
                         .success(false)
                         .attachmentId(fileResult.getAttachmentId())
-                        .fileSize(file.getSize())
+                        .fileSize(fileResult.getFileSize())
                         .stage(3)
                         .stageDescription("Dify上传中")
                         .build());
-                
-                // 从数据库查询附件信息
-                SysAttachment attachment = attachmentRepo.findById(fileResult.getAttachmentId());
+
+                SysAttachment attachment = attachmentMap.get(fileResult.getAttachmentId());
                 if (attachment == null) {
                     throw new BusinessException(ResultCode.DATA_NOT_FOUND, "附件不存在");
                 }
@@ -596,34 +684,35 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 
                 processSingleFileUpload(knowledgeId, file, folderId, difyResponse, userId, knowledgeBase, minioResult);
                 
-                // 更新结果：全部完成
+                // 更新结果：全部完成（展示用原始文件名与大小，含 .doc 转 .docx 场景）
                 results.set(fileResultIndex, KnowledgeFileUploadResp.builder()
-                        .fileName(file.getOriginalFilename())
+                        .fileName(fileResult.getFileName())
                         .success(true)
                         .attachmentId(fileResult.getAttachmentId())
-                        .fileSize(file.getSize())
+                        .fileSize(fileResult.getFileSize())
                         .stage(5)
                         .stageDescription("上传完成")
                         .build());
                 log.info(String.format("文件上传成功: fileName=%s, attachmentId=%s", 
-                        file.getOriginalFilename(), fileResult.getAttachmentId()));
+                        fileResult.getFileName(), fileResult.getAttachmentId()));
             } catch (Exception e) {
-                // 更新结果：处理失败
+                // 更新结果：处理失败，仅向前端返回用户友好文案，技术细节仅写日志
+                String userMessage = toUserFriendlyKnowledgeUploadError(e);
                 results.set(fileResultIndex, KnowledgeFileUploadResp.builder()
-                        .fileName(file.getOriginalFilename())
+                        .fileName(fileResult.getFileName())
                         .success(false)
-                        .errorMessage("处理文件上传结果失败: " + e.getMessage())
+                        .errorMessage(userMessage)
                         .attachmentId(fileResult.getAttachmentId())
-                        .fileSize(file.getSize())
+                        .fileSize(fileResult.getFileSize())
                         .stage(4)
                         .stageDescription("处理失败")
                         .build());
                 log.error(String.format("处理文件上传结果失败: fileName=%s, error=%s",
-                        file.getOriginalFilename(), e.getMessage()), e);
+                        fileResult.getFileName(), e.getMessage()), e);
             }
         }
         
-        // 11. 统计并返回结果
+        // 12. 统计并返回结果
         long successCount = results.stream().filter(r -> r.getSuccess() != null && r.getSuccess()).count();
         long failedCount = results.stream().filter(r -> r.getSuccess() == null || !r.getSuccess()).count();
         log.info(String.format("批量上传完成: knowledgeId=%s, total=%d, success=%d, failed=%d",
@@ -637,18 +726,20 @@ public class KnowledgeServiceImpl implements KnowledgeService {
      */
     private void processSingleFileUpload(int knowledgeId, MultipartFile file, Long folderId,
             ResponseEntity<String> response, Long userId, SysKnowledgeBase knowledgeBase, FileInfoResp minioResult) {
-        // 1. 检查 Dify 响应状态
+        // 1. 检查 Dify 响应状态（技术细节仅写日志，向前端返回友好文案）
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            HttpStatusCode status = response.getStatusCode();
             log.error(String.format("Dify API上传文档失败: fileName=%s, status=%s, body=%s",
-                    file.getOriginalFilename(), response.getStatusCode(), response.getBody()));
+                    file.getOriginalFilename(), status, response.getBody()));
             throw new BusinessException(ResultCode.SERVER_ERROR,
-                    String.format("上传文件失败: Dify API调用失败, status=%s", response.getStatusCode()));
+                    toUserFriendlyMessageByHttpStatus(status));
         }
 
         // 2. 使用 MinIO 上传结果（已异步上传完成）
         Long attachmentId = minioResult.id();
         if (attachmentId == null) {
-            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED, "MinIO上传失败: attachmentId为空");
+            log.error("知识库上传: MinIO 上传结果中 attachmentId 为空");
+            throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED, "文件存储异常，请重试");
         }
         log.info(String.format("使用MinIO上传结果: attachmentId=%s", attachmentId));
 
@@ -658,14 +749,14 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             responseJson = objectMapper.readTree(response.getBody());
         } catch (Exception e) {
             log.error(String.format("解析Dify API响应失败: body=%s, error=%s", response.getBody(), e.getMessage()), e);
-            throw new BusinessException(ResultCode.SERVER_ERROR, "解析Dify API响应失败");
+            throw new BusinessException(ResultCode.SERVER_ERROR, "处理上传结果时出错，请重试");
         }
 
         // 4. 提取文档信息
         JsonNode documentNode = responseJson.get("document");
         if (documentNode == null) {
             log.error(String.format("Dify API返回数据缺少document字段: body=%s", response.getBody()));
-            throw new BusinessException(ResultCode.SERVER_ERROR, "上传文件失败: Dify API返回数据异常");
+            throw new BusinessException(ResultCode.SERVER_ERROR, "处理上传结果时出错，请重试");
         }
 
         String difyDocId = documentNode.has("id") ? documentNode.get("id").asText() : null;
@@ -674,7 +765,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
         if (difyDocId == null) {
             log.error(String.format("Dify API返回数据缺少document.id字段: body=%s", response.getBody()));
-            throw new BusinessException(ResultCode.SERVER_ERROR, "上传文件失败: Dify API返回数据异常");
+            throw new BusinessException(ResultCode.SERVER_ERROR, "处理上传结果时出错，请重试");
         }
 
         // 5. 更新附件记录，保存 Dify 文档ID
@@ -696,7 +787,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         fileRelation.setKnowledgeId(knowledgeBase.getId()); // 使用数据库主键ID
         fileRelation.setFolderId(folderId != null ? folderId : 0L);
         fileRelation.setAttachmentId(attachmentId);
-        fileRelation.setFileName(documentName);
+        fileRelation.setFileName(attachment.getOriginalName() != null ? attachment.getOriginalName() : documentName);
         fileRelation.setSortOrder(0); // 默认排序号
         fileRelation.setCallback(response.getBody()); // 存储完整的Dify API回调数据
         fileRelation.setCreatedBy(userId);
@@ -709,6 +800,56 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
         log.info(String.format("上传文件成功: knowledgeId=%s, attachmentId=%s, relationId=%s, difyDocId=%s, batch=%s",
                 knowledgeId, attachmentId, relationId, difyDocId, batch));
+    }
+
+    /**
+     * 将知识库上传过程中的异常转为对用户友好的提示，避免将 Dify API、status 等技术信息暴露给前端。
+     *
+     * @param e 原始异常
+     * @return 用户可见的简短提示
+     */
+    private String toUserFriendlyKnowledgeUploadError(Throwable e) {
+        if (e == null) {
+            return "上传失败，请稍后重试";
+        }
+        String msg = e.getMessage();
+        if (msg != null) {
+            if (msg.contains("413") || msg.contains("Payload Too Large")) {
+                return "文件过大，请压缩或分批上传";
+            }
+            if (msg.contains("400") || msg.contains("BAD_REQUEST")) {
+                return "文件可能过大、格式不支持或不符合要求，请检查后重试";
+            }
+            if (msg.contains("500") || msg.contains("502") || msg.contains("503") || msg.contains("SERVER_ERROR") || msg.contains("SERVICE_UNAVAILABLE")) {
+                return "知识库服务暂时不可用，请稍后重试";
+            }
+            if (msg.contains("Dify") || msg.contains("status=") || msg.contains("API")) {
+                return "上传失败，请稍后重试";
+            }
+        }
+        return "上传失败，请稍后重试";
+    }
+
+    /**
+     * 根据 HTTP 状态码返回对用户友好的上传失败提示。
+     *
+     * @param status 响应状态码
+     * @return 用户可见的简短提示
+     */
+    private String toUserFriendlyMessageByHttpStatus(HttpStatusCode status) {
+        if (status == null) {
+            return "上传失败，请稍后重试";
+        }
+        if (status.value() == 413) {
+            return "文件过大，请压缩或分批上传";
+        }
+        if (status.is4xxClientError()) {
+            return "文件可能过大、格式不支持或不符合要求，请检查后重试";
+        }
+        if (status.is5xxServerError()) {
+            return "知识库服务暂时不可用，请稍后重试";
+        }
+        return "上传失败，请稍后重试";
     }
 
     /**
@@ -998,6 +1139,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         }
 
         // 4. 如果有更新，保存到数据库
+        boolean nameOrDescUpdated = (req.getName() != null && !req.getName().trim().isEmpty()) || req.getDescription() != null;
         if (hasUpdate) {
             entity.setUpdatedBy(userId);
             boolean success = knowledgeBaseRepo.updateById(entity);
@@ -1005,11 +1147,46 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 throw new BusinessException(ResultCode.DATABASE_OPERATION_FAILED);
             }
             log.info(String.format("更新知识库成功: id=%s", id));
+
+            // 4.1 若名称或描述有变更，同步到 Dify（PATCH /datasets/{dataset_id}），实现系统与 Dify 联动
+            String difyDatasetId = entity.getDifyKbId() != null ? entity.getDifyKbId() : entity.getDifyKnowdataId();
+            Boolean difySyncSuccess = null;
+            String difySyncMessage = null;
+            if (nameOrDescUpdated && difyDatasetId != null && !difyDatasetId.isEmpty()) {
+                try {
+                    QueryWrapper<DifyApiKey> keyQuery = new QueryWrapper<>();
+                    keyQuery.eq("key_type", "dataset").eq("is_active", true).last("LIMIT 1");
+                    DifyApiKey apiKey = difyApiKeyService.getOne(keyQuery);
+                    String resourceId = (apiKey != null && apiKey.getResourceId() != null) ? apiKey.getResourceId() : defaultResourceId;
+                    DifyDatasetPatchRequest patchReq = DifyDatasetPatchRequest.builder()
+                            .name(entity.getName())
+                            .description(entity.getDescription())
+                            .build();
+                    ResponseEntity<String> patchResponse = difyApiService.patchDataset(difyDatasetId, patchReq, userId, resourceId, "dataset");
+                    if (patchResponse.getStatusCode().is2xxSuccessful()) {
+                        log.info("知识库名称/描述已同步至 Dify: id={}, difyDatasetId={}", id, difyDatasetId);
+                        difySyncSuccess = true;
+                    } else {
+                        log.warn("同步知识库至 Dify 未成功: id={}, difyDatasetId={}, status={}", id, difyDatasetId, patchResponse.getStatusCode());
+                        difySyncSuccess = false;
+                        difySyncMessage = "Dify 同步失败: " + patchResponse.getStatusCode();
+                    }
+                } catch (Exception e) {
+                    log.warn("同步知识库至 Dify 异常（本地已更新）: id={}, difyDatasetId={}, err={}", id, difyDatasetId, e.getMessage());
+                    difySyncSuccess = false;
+                    difySyncMessage = e.getMessage() != null ? e.getMessage() : "Dify 同步异常";
+                }
+            }
+
+            // 5. 构建响应（含 Dify 同步结果，便于前端展示）
+            KnowledgeResp resp = knowledgeConverter.toResp(entity);
+            resp.setDifySyncSuccess(difySyncSuccess);
+            resp.setDifySyncMessage(difySyncMessage);
+            return resp;
         } else {
             log.info(String.format("知识库无需更新: id=%s", id));
         }
 
-        // 5. 构建响应
         return knowledgeConverter.toResp(entity);
     }
 
@@ -1137,5 +1314,38 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         }
 
         return resp;
+    }
+
+    /**
+     * 从 DifyDocumentConfig 构建创建知识库时的 retrieval_model，与图2 配置一致（权重融合、top_k 等）
+     */
+    private DifyDatasetRetrievalModelDto buildDatasetRetrievalModelFromConfig() {
+        DifyDocumentConfig.RetrievalModel rm = difyDocumentConfig.getRetrievalModel();
+        String rerankingMode = rm.getRerankingMode() != null ? rm.getRerankingMode() : "weight";
+
+        DifyDatasetRetrievalModelDto.WeightsDto weights = null;
+        if ("weight".equals(rerankingMode)) {
+            weights = DifyDatasetRetrievalModelDto.WeightsDto.builder()
+                    .weightType("customized")
+                    .keywordSetting(DifyDatasetRetrievalModelDto.KeywordSettingDto.builder()
+                            .keywordWeight(rm.getKeywordWeight() != null ? rm.getKeywordWeight() : 0.3)
+                            .build())
+                    .vectorSetting(DifyDatasetRetrievalModelDto.VectorSettingDto.builder()
+                            .vectorWeight(rm.getVectorWeight() != null ? rm.getVectorWeight() : 0.7)
+                            .embeddingModelName(difyDocumentConfig.getEmbeddingModel())
+                            .embeddingProviderName(difyDocumentConfig.getEmbeddingModelProvider())
+                            .build())
+                    .build();
+        }
+
+        return DifyDatasetRetrievalModelDto.builder()
+                .searchMethod(rm.getSearchMethod() != null ? rm.getSearchMethod() : "hybrid_search")
+                .rerankingEnable(rm.getRerankingEnable() != null ? rm.getRerankingEnable() : true)
+                .rerankingMode(rerankingMode)
+                .topK(rm.getTopK() != null ? rm.getTopK() : 6)
+                .scoreThresholdEnabled(rm.getScoreThresholdEnabled() != null ? rm.getScoreThresholdEnabled() : false)
+                .scoreThreshold(rm.getScoreThreshold())
+                .weights(weights)
+                .build();
     }
 }

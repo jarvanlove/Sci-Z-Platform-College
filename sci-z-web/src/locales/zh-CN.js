@@ -60,7 +60,9 @@ export default {
     dayAgo: '天前',
     justNow: '刚刚',
     collapseSidebar: '收起侧边栏',
-    expandSidebar: '展开侧边栏'
+    expandSidebar: '展开侧边栏',
+    month: '月份',
+    quantity: '数量'
   },
   // 分页
   pagination: {
@@ -120,7 +122,32 @@ export default {
     systemRole: '角色权限',
     systemConfig: '系统配置',
     systemLogs: '日志管理',
-    apiKey: 'API Key 配置'
+    apiKey: 'API Key 配置',
+    industryEducation: '产教研智能体'
+  },
+
+  // 系统消息（站内消息中心）
+  message: {
+    systemMessage: '系统消息',
+    languageSwitch: '语言切换',
+    placeholderDesc: '站内消息列表与详情将在此展示。',
+    noMessage: '暂无消息',
+    unreadOnly: '仅未读',
+    sender: '发送人',
+    time: '时间',
+    status: '状态',
+    pending: '待处理',
+    read: '已读',
+    accepted: '已接受',
+    rejected: '已拒绝',
+    accept: '接受',
+    reject: '拒绝',
+    rejectReason: '拒绝原因',
+    rejectReasonPlaceholder: '请输入拒绝原因',
+    acceptSuccess: '已接受，申报与项目已创建',
+    rejectSuccess: '已拒绝，已通知下发领导',
+    distributeTitle: '科研项目分发',
+    distributeResultTitle: '分发结果通知'
   },
 
   // 认证相关
@@ -390,7 +417,9 @@ export default {
       avatarPreviewTitle: '头像预览',
       previewError: '头像预览加载失败，请稍后重试',
       avatarRememberSave: '头像已更新，请记得点击“保存信息”生效。',
-      avatarReused: '检测到已上传过相同头像，已直接复用。'
+      avatarReused: '检测到已上传过相同头像，已直接复用。',
+      completeProfilePrompt: '请完善您的个人信息，以便更好地使用平台功能',
+      goToComplete: '去完善'
     },
     security: {
       menu: '安全设置',
@@ -455,6 +484,7 @@ export default {
     statusSubmitting: '申报已提交',
     statusSuccess: '申报成功',
     statusFailed: '申报未通过',
+    statusInProgress: '申报进行中',
     keywordPlaceholder: '请输入申报编号/申报人/研究方向',
     statusFilter: '状态筛选',
     declarationStatusPlaceholder: '请选择申报状态',
@@ -484,11 +514,17 @@ export default {
     researchDirection: '研究方向',
     researchField: '研究领域',
     statusPending: '待审核',
-    statusApproved: '已通过',
+    statusApproved: '申报成功',
     statusRejected: '申报未通过',
     statusSubmitted: '申报已提交',
     updateStatus: '更新申报状态',
+    uploadDocumentEdit: '申报书编辑',
+    uploadDocumentTip: '上传后将覆盖当前申报书，仅支持 .doc / .docx / .pdf，单文件不超过 200MB',
+    uploadDocumentSuccess: '申报书已更新',
+    uploadDocumentFailed: '申报书上传失败',
+    uploadDocumentNoFile: '请先选择文件',
     workflowStatus: '处理状态',
+    workflowStatusColumn: '申报书生成状态',
     workflowStatusPending: '待处理',
     workflowStatusPendingDesc: '等待工作流启动',
     workflowStatusRunning: '处理中',
@@ -501,6 +537,8 @@ export default {
     declarationUpdated: '申报更新成功',
     declarationDeleted: '申报删除成功',
     workflowNotCompletedHint: '处理状态未完成，无法修改申报状态',
+    viewErrorReason: '查看失败原因',
+    collapseError: '收起',
     // 列表页面
     listPage: {
       searchPlaceholder: '请输入申报标题/编号',
@@ -609,7 +647,9 @@ export default {
     processing: '处理中',
     processingDesc: '正在处理您的申报，请稍候...',
     completed: '处理完成',
-    completedDesc: '申报书已生成，前往列表下载',
+    completedDesc: '申报书已生成，前往列表查看下载',
+    completedDescPrefix: '申报书已生成，',
+    completedDescLink: '前往列表查看下载',
     failed: '处理失败',
     failedDesc: '申报处理过程中出现错误',
     unknown: '未知状态',
@@ -658,7 +698,7 @@ export default {
     list: {
       title: '项目管理',
       keywordSearch: '关键词搜索',
-      keywordPlaceholder: '请输入项目名称或编号',
+      keywordPlaceholder: '请输入项目名称或编号或负责人',
       statusFilter: '状态筛选',
       statusPlaceholder: '请选择状态',
       dateFilter: '时间筛选',
@@ -672,6 +712,12 @@ export default {
       cancelSuccess: '项目"{name}"已取消',
       cancelError: '项目取消失败',
       loadError: '项目列表加载失败',
+      export: '导出',
+      exportModeHint: '请勾选要导出的项目，然后点击「确认导出」',
+      confirmExport: '确认导出',
+      exportSelectFirst: '请先勾选要导出的项目',
+      exportSuccess: '导出成功',
+      exportError: '导出失败',
       columns: {
         number: '项目编号',
         name: '项目名称',
@@ -914,6 +960,11 @@ export default {
   dashboard: {
     title: '仪表板',
     stats: '统计概览',
+    trendTitle: '申报 & 项目趋势',
+    declarationStatusDistribution: '申报状态分布',
+    projectStatusDistribution: '项目状态分布',
+    byDepartmentTitle: '按照课题发布部门',
+    byTypeTitle: '按项目类型分布',
     recentDeclarations: '最近申报',
     projectProgress: '项目进度概览',
     quickActions: '快捷入口',
@@ -939,7 +990,26 @@ export default {
     executingAction: '执行操作：{action}',
     actionNewDeclaration: '新建申报',
     actionApplyAcceptance: '申请验收',
-    actionKnowledgeSearch: '知识库搜索'
+    actionAcademicSearch: '学术搜索',
+    actionKnowledgeSearch: '知识库搜索',
+    declarationCount: '申报数量',
+    projectCount: '项目数量',
+    topicDepartment: '课题发布部门',
+    delayWarningTitle: '项目延期预警',
+    riskLevel: {
+      delayed: '已延期',
+      sevenDays: '7天内到期',
+      thirtyDays: '30天内到期',
+      normal: '正常'
+    },
+    departments: {
+      youthFund: '国自然-青年基金',
+      generalFund: '国自然-面上基金',
+      regionalProject: '国自然-地区项目',
+      provincialProject: '省市级项目',
+      other: '其他'
+    },
+    projectCountLabel: '项目数量'
   },
 
   // 知识库相关
@@ -1143,6 +1213,7 @@ export default {
       retry: '重试',
       regenerate: '重新生成',
       edit: '编辑',
+      scrollToBottom: '滚动到底部',
       editMessagePlaceholder: '编辑消息内容...',
       // 🔥 修复：使用全角 ＠ 符号，避免 Vue I18n 编译错误
       // 全角字符不会被 Vue I18n 识别为链接格式，既保留了视觉效果又避免了编译错误
@@ -1153,10 +1224,14 @@ export default {
         supportUpload: '支持上传个人知识库与本地文件',
         maxFiles: '文件数量:最多支持10个',
         fileTypes: '文件类型: 支持pdf、doc、docx、ppt、pptx、xls、xlsx、csv、md, txt',
-        maxKbFiles: '知识库文件:最多支持3个'
+        maxKbFiles: '知识库文件:最多支持3个',
+        // 附件按钮悬浮提示全文，value 内换行即可多行显示（需 tooltip 容器 white-space: pre-line）
+        attachmentTooltipFull: '·支持上传个人知识库与本地文件\n·文件数量:最多支持10个\n·文件类型:支持pdf、doc、docx、ppt、pptx、xls、xlsx、csv、md、txt\n·知识库文件:最多支持3个'
       },
       attachmentLocalFile: '本地文件',
       attachmentKnowledgeFile: '知识库文件',
+      searchTooltipOn: '已开启联网搜索',
+      searchTooltipOff: '已关闭联网搜索',
       aiContentHint: '内容由AI生成仅供参考',
       editTitle: '编辑标题',
       enterNewTitle: '请输入新的对话标题',
@@ -1181,13 +1256,13 @@ export default {
           name: 'Qwen3-Max',
           description: '通义千问最新模型，擅长中文理解和生成'
         },
-        deepseekV31: {
-          name: 'Deepseek-V3.1',
-          description: '深度求索V3.1，强大的代码和推理能力'
+        minimax21: {
+          name: 'MiniMax-2.1',
+          description: 'MiniMax M2.1，多模态与 Agent 场景、代码与推理能力强'
         },
-        deepseekR1: {
-          name: 'Deepseek-R1',
-          description: '深度求索R1，强化学习模型'
+        kimiK25: {
+          name: 'Kimi-k2.5',
+          description: '月之暗面 K2.5，原生视觉与 Agent 集群、代码与推理能力强'
         }
       },
       justNow: '刚刚',
@@ -1258,13 +1333,69 @@ export default {
     pageBadge: '智能体',
     pageSubtitle: '选择智能体，开启高效科研协作',
     startUse: '开始使用',
+    groupProject: '团队项目管理智能体',
+    groupDecision: '科研团队建设',
+    groupDashboard: '项目汇总',
     subtitle: '科研项目管理与实践工具',
     dashboardDesc: '查看项目概览和统计数据',
     projectDesc: '管理科研项目全生命周期，跟踪项目进度',
     declarationDesc: '创建和管理科研项目申报',
+    industryEducationDesc: '根据申报课题匹配科研团队，查看明细并分发',
     reportDesc: '生成和管理科研报告',
     knowledgeDesc: '构建和管理知识库，支持文档上传和检索',
-    systemDesc: '权限配置、日志查询、apiKey配置'
+    systemDesc: '权限配置、日志查询、apiKey配置',
+    industryEducation: {
+      pageTitle: '产教研智能体',
+      pageSubtitle: '输入申报课题关键词，快速匹配科研团队并分发',
+      keywordPlaceholder: '请输入申报课题或研究方向关键词',
+      matchButton: '匹配团队',
+      emptyHint: '输入申报课题并点击「匹配团队」',
+      noResultHint: '暂无匹配团队，请尝试其他关键词',
+      teamCard: {
+        leader: '负责人',
+        members: '成员',
+        completed: '已完成',
+        participantProjects: '参与项目数量',
+        efficiency: '效率',
+        viewDetail: '查看明细',
+        assign: '分发给该团队'
+      },
+      detail: {
+        title: '团队明细',
+        titleTeamProjectIntro: '团队项目介绍',
+        leaderIntro: '负责人介绍',
+        members: '成员列表',
+        projectLeader: '项目负责人',
+        projectMembers: '项目成员',
+        memberIntro: '介绍',
+        projects: '关联项目',
+        viewProjectDetail: '查看项目明细',
+        backToTeam: '返回团队明细',
+        clickProjectToShowDetail: '点击上方关联项目可在此处查看该项目明细',
+        efficiency: '效率指标',
+        nonLeadParticipant: '非责任参与项目',
+        honors: '荣誉',
+        assign: '分发给该团队'
+      },
+      projectDetail: {
+        title: '项目明细',
+        status: '状态',
+        efficiencyChart: '效率图表',
+        honors: '荣誉',
+        assign: '分发给该团队'
+      },
+      assign: {
+        title: '分发科研项目',
+        projectLeaderLabel: '项目负责人（自动获取当前项目负责人）',
+        projectLeaderColon: '项目负责人：',
+        topicLabel: '申报课题',
+        topicLabelPlaceholder: '请输入申报课题（可与匹配关键词一致或微调）',
+        success: '分发成功',
+        selectDeclaration: '请选择要分发的申报',
+        declarationIdPlaceholder: '申报ID'
+      },
+      semanticMatch: '语义匹配'
+    }
   },
 
   // 科学导航相关

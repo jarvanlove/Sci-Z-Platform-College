@@ -120,4 +120,25 @@ public class SysAttachmentRelationRepoImpl implements SysAttachmentRelationRepo 
                 .last("LIMIT 1");
         return mapper.selectOne(queryWrapper);
     }
+
+    @Override
+    public List<SysAttachmentRelation> findRelations(String relationType, Long relationId) {
+        if (!StringUtils.hasText(relationType) || relationId == null) {
+            return Collections.emptyList();
+        }
+        return mapper.selectList(new LambdaQueryWrapper<SysAttachmentRelation>()
+                .eq(SysAttachmentRelation::getRelationType, relationType)
+                .eq(SysAttachmentRelation::getRelationId, relationId)
+                .eq(SysAttachmentRelation::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
+                .orderByDesc(SysAttachmentRelation::getCreatedTime));
+    }
+
+    @Override
+    public boolean updateById(SysAttachmentRelation entity) {
+        if (entity == null || entity.getId() == null) {
+            return false;
+        }
+        entity.setUpdatedTime(LocalDateTime.now());
+        return mapper.updateById(entity) > 0;
+    }
 }

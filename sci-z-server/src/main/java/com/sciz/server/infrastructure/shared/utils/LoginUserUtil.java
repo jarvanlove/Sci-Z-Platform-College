@@ -1,5 +1,6 @@
 package com.sciz.server.infrastructure.shared.utils;
 
+import cn.dev33.satoken.exception.SaTokenException;
 import cn.dev33.satoken.stp.StpUtil;
 import com.sciz.server.domain.pojo.dto.response.user.LoginUserContext;
 import com.sciz.server.infrastructure.shared.context.AsyncUserContext;
@@ -71,22 +72,27 @@ public final class LoginUserUtil {
      * @return Optional<LoginUserContext> 登录用户上下文
      */
     public static Optional<LoginUserContext> getCurrentUser() {
-        // 1. 优先从 AsyncUserContext（ThreadLocal）获取（用于异步线程）
+        // 1. 优先从 AsyncUserContext（ThreadLocal）获取（用于异步线程、定时任务等）
         var asyncContext = AsyncUserContext.get();
         if (asyncContext.isPresent()) {
             return asyncContext;
         }
 
         // 2. 如果 ThreadLocal 中没有，则从 Sa-Token Session 获取（用于 Web 请求线程）
-        if (!StpUtil.isLogin()) {
+        try {
+            if (!StpUtil.isLogin()) {
+                return Optional.empty();
+            }
+            // 从 Sa-Token Session 中获取用户上下文（如果配置了 Redis，会自动从 Redis 读取）
+            Object value = StpUtil.getSession().get(SystemConstant.LOGIN_USER_SESSION_KEY);
+            if (value instanceof LoginUserContext context) {
+                return Optional.of(context);
+            }
+            return Optional.empty();
+        } catch (SaTokenException e) {
+            // 非 Web 上下文或 Sa-Token 未初始化等场景，视为未登录，返回空
             return Optional.empty();
         }
-        // 从 Sa-Token Session 中获取用户上下文（如果配置了 Redis，会自动从 Redis 读取）
-        Object value = StpUtil.getSession().get(SystemConstant.LOGIN_USER_SESSION_KEY);
-        if (value instanceof LoginUserContext context) {
-            return Optional.of(context);
-        }
-        return Optional.empty();
     }
 
     /**

@@ -18,6 +18,8 @@ import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.poi.hwpf.HWPFDocument;
+import org.apache.poi.hwpf.extractor.WordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.springframework.beans.factory.annotation.Value;
@@ -1010,5 +1012,42 @@ public class FileConvertServiceImpl implements FileConvertService {
             case "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
             default -> "application/octet-stream";
         };
+    }
+
+    @Override
+    public ConvertResult convertDocToDocx(InputStream docInputStream, String originalFileName) {
+        if (docInputStream == null) {
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "doc 文件流不能为空");
+        }
+        try {
+            byte[] docBytes = docInputStream.readAllBytes();
+            String text;
+            try (var docStream = new ByteArrayInputStream(docBytes);
+                 var doc = new HWPFDocument(docStream);
+                 var extractor = new WordExtractor(doc)) {
+                text = extractor.getText();
+            }
+            if (text == null) {
+                text = "";
+            }
+            try (var docxDoc = new XWPFDocument()) {
+                createDocxFromText(docxDoc, text);
+                var out = new ByteArrayOutputStream();
+                docxDoc.write(out);
+                byte[] docxBytes = out.toByteArray();
+                String docxFileName = changeFileExtension(originalFileName, "docx");
+                log.info(String.format("doc 转 docx 成功: original=%s, docxSize=%d", originalFileName, docxBytes.length));
+                return new ConvertResult(
+                        new ByteArrayInputStream(docxBytes),
+                        docxFileName,
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        (long) docxBytes.length);
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn(String.format("doc 转 docx 失败: fileName=%s, err=%s", originalFileName, e.getMessage()), e);
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "doc 文件转换失败，请检查文件是否损坏或使用 docx 格式上传: %s", e.getMessage());
+        }
     }
 }

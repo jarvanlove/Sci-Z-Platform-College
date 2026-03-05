@@ -56,7 +56,9 @@ export default {
     added: 'Added',
     remove: 'Remove',
     collapseSidebar: 'Collapse sidebar',
-    expandSidebar: 'Expand sidebar'
+    expandSidebar: 'Expand sidebar',
+    month: 'Month',
+    quantity: 'Quantity'
   },
   // Pagination
   pagination: {
@@ -115,7 +117,31 @@ export default {
     systemRole: 'Role & Permission',
     systemConfig: 'System Config',
     systemLogs: 'Log Management',
-    apiKey: 'API Key Configuration'
+    apiKey: 'API Key Configuration',
+    industryEducation: 'Industry-Education Agent'
+  },
+
+  message: {
+    systemMessage: 'System Messages',
+    languageSwitch: 'Language',
+    placeholderDesc: 'Inbox messages will be listed here.',
+    noMessage: 'No messages',
+    unreadOnly: 'Unread only',
+    sender: 'Sender',
+    time: 'Time',
+    status: 'Status',
+    pending: 'Pending',
+    read: 'Read',
+    accepted: 'Accepted',
+    rejected: 'Rejected',
+    accept: 'Accept',
+    reject: 'Reject',
+    rejectReason: 'Reject reason',
+    rejectReasonPlaceholder: 'Enter reject reason',
+    acceptSuccess: 'Accepted; declaration and project created',
+    rejectSuccess: 'Rejected; sender has been notified',
+    distributeTitle: 'Research Project Assignment',
+    distributeResultTitle: 'Assignment Result'
   },
 
   // Authentication
@@ -394,7 +420,9 @@ export default {
       avatarPreviewTitle: 'Avatar Preview',
       previewError: 'Failed to load avatar preview, please try again later',
       avatarRememberSave: 'Avatar updated, please remember to click "Save Information" to apply.',
-      avatarReused: 'Detected that the same avatar has been uploaded before, directly reused.'
+      avatarReused: 'Detected that the same avatar has been uploaded before, directly reused.',
+      completeProfilePrompt: 'Please complete your profile for a better experience',
+      goToComplete: 'Complete profile'
     },
     security: {
       menu: 'Security',
@@ -457,6 +485,7 @@ export default {
     noTopic: 'None',
     declarationStatus: 'Declaration Status',
     statusSubmitting: 'Submitting',
+    statusInProgress: 'In Progress',
     statusSuccess: 'Success',
     statusFailed: 'Failed',
     keywordPlaceholder: 'Please enter declaration number/applicant/research direction',
@@ -488,11 +517,17 @@ export default {
     researchDirection: 'Research Direction',
     researchField: 'Research Field',
     statusPending: 'Pending Review',
-    statusApproved: 'Approved',
+    statusApproved: 'Declaration Successful',
     statusRejected: 'Not Passed',
     statusSubmitted: 'Submitted',
     updateStatus: 'Update Declaration Status',
+    uploadDocumentEdit: 'Edit Declaration Document',
+    uploadDocumentTip: 'Upload will replace the current declaration document. Only .doc / .docx / .pdf, max 200MB per file',
+    uploadDocumentSuccess: 'Declaration document updated',
+    uploadDocumentFailed: 'Declaration document upload failed',
+    uploadDocumentNoFile: 'Please select a file first',
     workflowStatus: 'Processing Status',
+    workflowStatusColumn: 'Declaration Generation Status',
     workflowStatusPending: 'Pending',
     workflowStatusPendingDesc: 'Waiting for workflow to start',
     workflowStatusRunning: 'Processing',
@@ -505,6 +540,8 @@ export default {
     declarationUpdated: 'Declaration updated successfully',
     declarationDeleted: 'Declaration deleted successfully',
     workflowNotCompletedHint: 'Processing status not completed, cannot modify declaration status',
+    viewErrorReason: 'View error reason',
+    collapseError: 'Collapse',
     listPage: {
       searchPlaceholder: 'Please enter declaration title/number',
       download: 'Download',
@@ -608,7 +645,9 @@ export default {
     processing: 'Processing',
     processingDesc: 'Processing your declaration, please wait...',
     completed: 'Processing Completed',
-    completedDesc: 'Declaration document has been generated, go to list to download',
+    completedDesc: 'Declaration document has been generated, go to list to view and download',
+    completedDescPrefix: 'Declaration document has been generated, ',
+    completedDescLink: 'go to list to view and download',
     failed: 'Processing Failed',
     failedDesc: 'Error occurred during declaration processing',
     unknown: 'Unknown Status',
@@ -656,7 +695,7 @@ export default {
     list: {
       title: 'Project Management',
       keywordSearch: 'Keyword Search',
-      keywordPlaceholder: 'Please enter project name or number',
+      keywordPlaceholder: 'Please enter project name, number or leader',
       statusFilter: 'Status Filter',
       statusPlaceholder: 'Please select status',
       dateFilter: 'Date Filter',
@@ -670,6 +709,12 @@ export default {
       cancelSuccess: 'Project "{name}" has been cancelled',
       cancelError: 'Project cancellation failed',
       loadError: 'Failed to load project list',
+      export: 'Export',
+      exportModeHint: 'Select projects to export, then click "Confirm Export"',
+      confirmExport: 'Confirm Export',
+      exportSelectFirst: 'Please select at least one project to export',
+      exportSuccess: 'Export successful',
+      exportError: 'Export failed',
       columns: {
         number: 'Project Number',
         name: 'Project Name',
@@ -909,6 +954,11 @@ export default {
   dashboard: {
     title: 'Dashboard',
     stats: 'Statistics Overview',
+    trendTitle: 'Declaration & Project Trends',
+    declarationStatusDistribution: 'Declaration Status Distribution',
+    projectStatusDistribution: 'Project Status Distribution',
+    byDepartmentTitle: 'Projects by Topic Department',
+    byTypeTitle: 'Projects by Type',
     recentDeclarations: 'Recent Declarations',
     projectProgress: 'Project Progress Overview',
     quickActions: 'Quick Actions',
@@ -935,7 +985,25 @@ export default {
     actionNewDeclaration: 'New Declaration',
     actionApplyAcceptance: 'Apply Acceptance',
     actionAcademicSearch: 'Academic Search',
-    actionKnowledgeSearch: 'Knowledge Base Search'
+    actionKnowledgeSearch: 'Knowledge Base Search',
+    declarationCount: 'Declaration Count',
+    projectCount: 'Project Count',
+    topicDepartment: 'Topic Department',
+    delayWarningTitle: 'Project Delay Warning',
+    riskLevel: {
+      delayed: 'Delayed',
+      sevenDays: 'Due in 7 Days',
+      thirtyDays: 'Due in 30 Days',
+      normal: 'Normal'
+    },
+    departments: {
+      youthFund: 'NSFC Youth Fund',
+      generalFund: 'NSFC General Fund',
+      regionalProject: 'NSFC Regional Project',
+      provincialProject: 'Provincial Project',
+      other: 'Other'
+    },
+    projectCountLabel: 'Project Count'
   },
 
   // Knowledge Base
@@ -1139,6 +1207,7 @@ export default {
       retry: 'Retry',
       regenerate: 'Regenerate',
       edit: 'Edit',
+      scrollToBottom: 'Scroll to bottom',
       editMessagePlaceholder: 'Edit message content...',
       // 🔥 修复：使用全角 ＠ 符号，避免 Vue I18n 编译错误
       inputPlaceholderWithKb: '＠knowledge base or ask directly',
@@ -1148,10 +1217,13 @@ export default {
         supportUpload: 'Supports uploading personal knowledge base and local files',
         maxFiles: 'File count: Maximum 10 files',
         fileTypes: 'File types: Supports pdf, doc, docx, ppt, pptx, xls, xlsx, csv, md, txt',
-        maxKbFiles: 'Knowledge base files: Maximum 3 files'
+        maxKbFiles: 'Knowledge base files: Maximum 3 files',
+        attachmentTooltipFull: '·Supports uploading personal knowledge base and local files\n·File count: Maximum 10 files\n·File types: pdf, doc, docx, ppt, pptx, xls, xlsx, csv, md, txt\n·Knowledge base files: Maximum 3 files'
       },
       attachmentLocalFile: 'Local files',
       attachmentKnowledgeFile: 'Knowledge base files',
+      searchTooltipOn: 'Online search is on',
+      searchTooltipOff: 'Online search is off',
       aiContentHint: 'Content generated by AI, for reference only',
       editTitle: 'Edit Title',
       enterNewTitle: 'Please enter new chat title',
@@ -1176,13 +1248,13 @@ export default {
           name: 'Qwen3-Max',
           description: 'Tongyi Qianwen latest model, excellent at Chinese understanding and generation'
         },
-        deepseekV31: {
-          name: 'Deepseek-V3.1',
-          description: 'Deepseek V3.1, powerful code and reasoning capabilities'
+        minimax21: {
+          name: 'MiniMax-2.1',
+          description: 'MiniMax M2.1, strong in multimodal, Agent scenarios, code and reasoning'
         },
-        deepseekR1: {
-          name: 'Deepseek-R1',
-          description: 'Deepseek R1, reinforcement learning model'
+        kimiK25: {
+          name: 'Kimi-k2.5',
+          description: 'Moonshot Kimi K2.5, native vision and Agent cluster, code and reasoning'
         }
       },
       justNow: 'Just now',
@@ -1253,13 +1325,69 @@ export default {
     pageBadge: 'Agents',
     pageSubtitle: 'Choose an agent to start efficient research collaboration',
     startUse: 'Get Started',
+    groupProject: 'Team Project Management Agent',
+    groupDecision: 'Research Team Building',
+    groupDashboard: 'Project Overview',
     subtitle: 'Research Project Management and Practice Tools',
     dashboardDesc: 'View project overview and statistical data',
     projectDesc: 'Manage the full lifecycle of research projects, track project progress',
     declarationDesc: 'Create and manage research project applications',
+    industryEducationDesc: 'Match research teams by declaration topic, view details and assign',
     reportDesc: 'Generate and manage research reports',
     knowledgeDesc: 'Build and manage knowledge bases, support document upload and retrieval',
-    systemDesc: 'Permission configuration, log query, API key configuration'
+    systemDesc: 'Permission configuration, log query, API key configuration',
+    industryEducation: {
+      pageTitle: 'Industry-Education Agent',
+      pageSubtitle: 'Enter declaration topic keywords to match research teams and assign',
+      keywordPlaceholder: 'Enter declaration topic or research direction keywords',
+      matchButton: 'Match Teams',
+      emptyHint: 'Enter a topic and click "Match Teams"',
+      noResultHint: 'No matching teams, try other keywords',
+      teamCard: {
+        leader: 'Leader',
+        members: 'Members',
+        completed: 'Completed',
+        participantProjects: 'Participant Projects',
+        efficiency: 'Efficiency',
+        viewDetail: 'View Detail',
+        assign: 'Assign to This Team'
+      },
+      detail: {
+        title: 'Team Detail',
+        titleTeamProjectIntro: 'Team & Project Intro',
+        leaderIntro: 'Leader Intro',
+        members: 'Members',
+        projectLeader: 'Project Leader',
+        projectMembers: 'Project Members',
+        memberIntro: 'Intro',
+        projects: 'Projects',
+        viewProjectDetail: 'View Project Detail',
+        backToTeam: 'Back to Team',
+        clickProjectToShowDetail: 'Click a project above to show its detail here',
+        efficiency: 'Efficiency',
+        nonLeadParticipant: 'Non-Lead Participant Projects',
+        honors: 'Honors',
+        assign: 'Assign to This Team'
+      },
+      projectDetail: {
+        title: 'Project Detail',
+        status: 'Status',
+        efficiencyChart: 'Efficiency Chart',
+        honors: 'Honors',
+        assign: 'Assign to This Team'
+      },
+      assign: {
+        title: 'Distribute Research Project',
+        projectLeaderLabel: 'Project Leader (auto from current team)',
+        projectLeaderColon: 'Project Leader: ',
+        topicLabel: 'Declaration Topic',
+        topicLabelPlaceholder: 'Enter declaration topic (same as keyword or adjust)',
+        success: 'Distributed successfully',
+        selectDeclaration: 'Select declaration to assign',
+        declarationIdPlaceholder: 'Declaration ID'
+      },
+      semanticMatch: 'Semantic Match'
+    }
   },
 
   // System Management

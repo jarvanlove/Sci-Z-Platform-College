@@ -4,8 +4,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sciz.server.domain.pojo.entity.declaration.Declaration;
 
-import java.util.List;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -106,4 +107,39 @@ public interface DeclarationRepo {
      * @return boolean 是否更新成功
      */
     boolean updateById(Declaration entity);
+
+    /**
+     * 根据关键词检索申报ID（用于产教研智能体匹配：research_topic、research_direction、content_summary）
+     * 不做数据权限过滤，仅用于匹配候选。
+     *
+     * @param keyword  关键词
+     * @param maxCount 最大返回数量
+     * @return 申报ID列表
+     */
+    List<Long> findIdsByKeywordForMatch(String keyword, int maxCount);
+
+    /**
+     * 根据项目负责人姓名模糊查询申报ID（用于项目列表 keyword 支持负责人筛选）
+     * 不做申报创建人维度数据权限过滤，项目列表侧已按项目权限（创建人/成员/负责人）过滤。
+     *
+     * @param keyword 负责人姓名关键词（project_leader like %keyword%）
+     * @return 符合条件的申报ID列表
+     */
+    List<Long> findIdsByProjectLeaderLike(String keyword);
+
+    /**
+     * 统计指定时间范围内的申报数量（按提交时间）
+     *
+     * @param startTime LocalDateTime 开始时间（包含），null 表示不限制下界
+     * @param endTime   LocalDateTime 结束时间（包含），null 表示不限制上界
+     * @return Long 申报数量
+     */
+    Long countBySubmitTimeBetween(LocalDateTime startTime, LocalDateTime endTime);
+
+    /**
+     * 按申报状态统计数量（带数据权限）
+     *
+     * @return Map<状态编码, 数量>
+     */
+    Map<String, Long> countByStatus();
 }

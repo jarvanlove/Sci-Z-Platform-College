@@ -20,10 +20,11 @@ import org.springframework.stereotype.Repository;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.time.LocalDate;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -256,5 +257,76 @@ public class DeclarationRepoImpl implements DeclarationRepo {
     @Override
     public boolean updateById(Declaration entity) {
         return mapper.updateById(entity) > 0;
+    }
+
+    @Override
+    public Long countBySubmitTimeBetween(LocalDateTime startTime, LocalDateTime endTime) {
+        var queryWrapper = new LambdaQueryWrapper<Declaration>();
+        queryWrapper.eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(Declaration::getCreatedBy, userId);
+        }
+
+        if (startTime != null) {
+            queryWrapper.ge(Declaration::getSubmitTime, startTime);
+        }
+        if (endTime != null) {
+            queryWrapper.le(Declaration::getSubmitTime, endTime);
+        }
+
+        return mapper.selectCount(queryWrapper);
+    }
+
+    @Override
+    public Map<String, Long> countByStatus() {
+        var queryWrapper = new LambdaQueryWrapper<Declaration>();
+        queryWrapper.eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+
+        Long userId = DataPermissionUtil.getDataPermissionFilter();
+        if (userId != null) {
+            queryWrapper.eq(Declaration::getCreatedBy, userId);
+        }
+
+        // 这里直接在内存中按照状态分组计数，避免复杂 SQL
+        return mapper.selectList(queryWrapper).stream()
+                .filter(declaration -> declaration.getStatus() != null)
+                .collect(Collectors.groupingBy(Declaration::getStatus, Collectors.counting()));
+    }
+
+    @Override
+    public List<Long> findIdsByKeywordForMatch(String keyword, int maxCount) {
+        if (!StringUtils.hasText(keyword) || maxCount <= 0) {
+            return List.of();
+        }
+        var queryWrapper = new LambdaQueryWrapper<Declaration>();
+        queryWrapper.eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+        String pattern = "%" + keyword.trim() + "%";
+        queryWrapper.and(w -> w
+                .like(Declaration::getResearchTopic, pattern)
+                .or().like(Declaration::getResearchDirection, pattern)
+                .or().like(Declaration::getContentSummary, pattern));
+        queryWrapper.select(Declaration::getId);
+        queryWrapper.orderByDesc(Declaration::getSubmitTime);
+        queryWrapper.last("LIMIT " + maxCount);
+        return mapper.selectList(queryWrapper).stream()
+                .map(Declaration::getId)
+                .toList();
+    }
+
+    @Override
+    public List<Long> findIdsByProjectLeaderLike(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return List.of();
+        }
+        var queryWrapper = new LambdaQueryWrapper<Declaration>();
+        queryWrapper.eq(Declaration::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
+        String pattern = "%" + keyword.trim() + "%";
+        queryWrapper.like(Declaration::getProjectLeader, pattern);
+        queryWrapper.select(Declaration::getId);
+        return mapper.selectList(queryWrapper).stream()
+                .map(Declaration::getId)
+                .toList();
     }
 }

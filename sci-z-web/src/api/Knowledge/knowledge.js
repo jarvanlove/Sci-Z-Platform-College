@@ -32,6 +32,7 @@ export const getKnowledgeList = (params = {}) => {
  * @param {string} params.sortBy - 排序字段，可选
  * @param {string} params.sortOrder - 排序方式（ASC/DESC），默认DESC
  * @param {string} params.kbType - 知识库类型筛选：personal=个人知识库，project=项目知识库，不传=全部
+ * @param {number} params.ownerId - 创建人ID（可选，用于「个人/项目」Tab 时筛选当前用户数据）
  * @returns {Promise} 知识库列表响应
  */
 export const getKnowledgeListPage = (params = {}) => {
@@ -44,7 +45,8 @@ export const getKnowledgeListPage = (params = {}) => {
       keyword: params.keyword || undefined,
       sortBy: params.sortBy || undefined,
       sortOrder: params.sortOrder || undefined,
-      kbType: params.kbType || undefined
+      kbType: params.kbType || undefined,
+      ownerId: params.ownerId || undefined
     }
   })
 }

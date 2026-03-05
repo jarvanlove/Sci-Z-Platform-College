@@ -134,4 +134,13 @@ public interface ProjectService {
      * @return List<ProjectSelectResp> 项目下拉框列表
      */
     List<ProjectSelectResp> findSelectList();
+
+    /**
+     * 按当前查询条件导出项目列表为 Excel（表头：项目编号、项目名称、项目负责人、项目状态、进度、开始时间、预计完成时间、项目预算）
+     * 最多导出 10000 条，性能考虑。
+     *
+     * @param req 与列表一致的查询条件（keyword、status、startTime、endTime 等）
+     * @return Excel 文件字节数组
+     */
+    byte[] exportList(ProjectListQueryReq req);
 }

@@ -100,7 +100,10 @@
         >
           <div class="card-header">
             <div class="report-type-tag" :class="report.reportType">
-              <span>{{ report.reportType === 'tech' ? '📄' : '📊' }}</span>
+              <el-icon class="report-type-icon">
+                <Reading v-if="report.reportType === 'tech'" />
+                <DataAnalysis v-else />
+              </el-icon>
               {{ getReportTypeText(report.reportType) }}
             </div>
           </div>
@@ -241,7 +244,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Refresh, Loading, View, Download, Delete, Document, Edit } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Loading, View, Download, Delete, Document, Edit, DataAnalysis, Reading } from '@element-plus/icons-vue'
 import { BaseCard, BaseButton, BaseDatePicker, BasePagination, BaseTooltip, BackButton } from '@/components/Common'
 import { getReportManagementList, deleteReportManagement } from '@/api/Report'
 import { downloadFile } from '@/api/File/file'
@@ -886,11 +889,16 @@ onUnmounted(() => {
       .report-type-tag {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 12px;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 13px;
         font-weight: 500;
+
+        .report-type-icon {
+          font-size: 16px;
+          color: currentColor;
+        }
 
         &.tech {
           background: #dbeafe;
@@ -898,8 +906,12 @@ onUnmounted(() => {
         }
 
         &.self {
-          background: #e0f2fe;
-          color: var(--color-primary) !important;
+          background: #fef3c7;
+          color: #b45309 !important;
+        }
+
+        &.self .report-type-icon {
+          color: currentColor;
         }
       }
     }

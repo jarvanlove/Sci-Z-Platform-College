@@ -17,12 +17,14 @@ import com.sciz.server.infrastructure.external.dify.dto.request.DeclarationWorkf
 import com.sciz.server.infrastructure.external.dify.entity.DifyApiKey;
 import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
 import com.sciz.server.domain.pojo.entity.declaration.Declaration;
+import com.sciz.server.domain.pojo.entity.file.SysAttachmentRelation;
 import com.sciz.server.domain.pojo.repository.declaration.DeclarationRepo;
 import com.sciz.server.domain.pojo.repository.file.SysAttachmentRelationRepo;
 import com.sciz.server.domain.pojo.repository.project.ProjectMemberRepo;
 import com.sciz.server.domain.pojo.repository.user.SysUserRepo;
 import com.sciz.server.domain.pojo.repository.project.ProjectRepo;
 import com.sciz.server.infrastructure.shared.result.PageResult;
+import com.sciz.server.infrastructure.shared.enums.AttachmentCategoryStatus;
 import com.sciz.server.infrastructure.shared.enums.AttachmentRelationStatus;
 import com.sciz.server.infrastructure.shared.enums.DeclarationStatus;
 import com.sciz.server.infrastructure.shared.enums.WorkflowStatus;
@@ -42,8 +44,11 @@ import com.sciz.server.infrastructure.shared.enums.OperationLogRecorderStatus;
 import com.sciz.server.interfaces.converter.DeclarationConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -326,7 +331,7 @@ public class DeclarationServiceImpl implements DeclarationService {
             if (workflowResultMap != null) {
                 var workflowResult = new DeclarationDetailResp.WorkflowResult();
 
-                // 解析步骤列表
+                // 解析步骤列表（错误信息仅存在于步骤级别 step.errorMessage，不解析整体 errorMessage）
                 @SuppressWarnings("unchecked")
                 var stepsList = (List<Map<String, Object>>) workflowResultMap.get("steps");
                 if (stepsList != null) {
@@ -336,17 +341,28 @@ public class DeclarationServiceImpl implements DeclarationService {
                                 step.setName((String) stepMap.get("name"));
                                 step.setStatus((String) stepMap.get("status"));
                                 step.setTimestamp((String) stepMap.get("timestamp"));
+                                step.setErrorMessage((String) stepMap.get("errorMessage"));
                                 return step;
                             })
                             .toList();
                     workflowResult.setSteps(steps);
                 }
 
-                // 解析文件URL和格式
                 workflowResult.setFileUrl((String) workflowResultMap.get("fileUrl"));
                 workflowResult.setFileFormat((String) workflowResultMap.get("fileFormat"));
 
                 resp.setWorkflowResult(workflowResult);
+            }
+        }
+
+        // 6. 防止「提交后立刻显示处理完成」：若标记为 completed 但已完成步骤不足，视为仍在运行
+        if (WorkflowStatus.COMPLETED.getCode().equals(resp.getWorkflowStatus()) && resp.getWorkflowResult() != null && resp.getWorkflowResult().getSteps() != null) {
+            long completedCount = resp.getWorkflowResult().getSteps().stream()
+                    .filter(s -> "success".equals(s.getStatus()))
+                    .count();
+            if (completedCount < 5) {
+                resp.setWorkflowStatus(WorkflowStatus.RUNNING.getCode());
+                log.debug("申报详情 workflowStatus 由 completed 修正为 running（已完成步骤数 {} < 5）", completedCount);
             }
         }
 
@@ -382,6 +398,7 @@ public class DeclarationServiceImpl implements DeclarationService {
                 // 解析步骤列表
                 @SuppressWarnings("unchecked")
                 var stepsList = (List<Map<String, Object>>) workflowResultMap.get("steps");
+                // 错误信息仅存在于步骤级别 step.errorMessage
                 if (stepsList != null) {
                     var steps = stepsList.stream()
                             .map(stepMap -> {
@@ -389,13 +406,13 @@ public class DeclarationServiceImpl implements DeclarationService {
                                 step.setName((String) stepMap.get("name"));
                                 step.setStatus((String) stepMap.get("status"));
                                 step.setTimestamp((String) stepMap.get("timestamp"));
+                                step.setErrorMessage((String) stepMap.get("errorMessage"));
                                 return step;
                             })
                             .toList();
                     workflowResult.setSteps(steps);
                 }
 
-                // 解析文件URL和格式
                 workflowResult.setFileUrl((String) workflowResultMap.get("fileUrl"));
                 workflowResult.setFileFormat((String) workflowResultMap.get("fileFormat"));
             }
@@ -440,18 +457,6 @@ public class DeclarationServiceImpl implements DeclarationService {
         String resourceId = req.workflowId();
         String keyType = DifyApiKey.KeyType.WORKFLOW.getCode();
 
-        // ==================== 本地调试模式 ====================
-        // 方案一：临时改为同步执行（推荐用于本地debug）
-        // 取消下面的注释，注释掉异步调用，即可同步调试
-        // declarationWorkflowTask.processDeclarationWorkflowSync(declarationId,
-        // resourceId, inputs, userId, keyType);
-        // log.info(String.format("同步触发工作流处理（调试模式）: declarationId=%s, workflowId=%s,
-        // resourceId=%s",
-        // declarationId, req.workflowId(), resourceId));
-        // return; // 调试模式下直接返回，避免继续执行后续代码
-
-        // ==================== 生产模式 ====================
-        // 调用异步任务处理类（传递类型安全的 inputs 对象）
         declarationWorkflowTask.processDeclarationWorkflow(declarationId, resourceId,
                 inputs, userId, keyType);
         log.info(String.format("异步触发工作流处理: declarationId=%s, workflowId=%s,resourceId=%s",
@@ -640,6 +645,73 @@ public class DeclarationServiceImpl implements DeclarationService {
             log.error(String.format("更新申报状态异常: declarationId=%s, err=%s", req.id(), e.getMessage()), e);
             throw BusinessException.of(ResultCode.SERVER_ERROR, "更新申报状态失败: %s", e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public FileInfoResp uploadDeclarationDocument(Long declarationId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw BusinessException.of(ResultCode.BAD_REQUEST, "上传文件不能为空");
+        }
+        var declaration = declarationRepo.findById(declarationId);
+        if (declaration == null) {
+            throw BusinessException.of(ResultCode.DECLARATION_NOT_FOUND);
+        }
+        var currentUser = LoginUserUtil.requireCurrentUser();
+        var userId = currentUser.userId();
+        var realName = currentUser.realName();
+
+        var uploadReq = new FileUploadReq();
+        uploadReq.setFile(file);
+        uploadReq.setAttachmentType(AttachmentCategoryStatus.DOCUMENT.getCode());
+        uploadReq.setIsPublic(0);
+        uploadReq.setRelationType(null);
+        uploadReq.setRelationId(null);
+        uploadReq.setRelationName(null);
+
+        FileInfoResp resp = fileService.upload(uploadReq, userId, realName);
+        if (resp == null || resp.id() == null) {
+            throw BusinessException.of(ResultCode.FILE_UPLOAD_FAILED, "申报书上传失败");
+        }
+        long newAttachmentId = resp.id();
+
+        var relations = sysAttachmentRelationRepo.findRelations(
+                AttachmentRelationStatus.DECLARATION.getCode(), declarationId);
+        if (!CollectionUtils.isEmpty(relations)) {
+            var relation = relations.get(0);
+            relation.setAttachmentId(newAttachmentId);
+            relation.setUpdatedBy(userId);
+            sysAttachmentRelationRepo.updateById(relation);
+            log.info(String.format("申报书覆盖上传: declarationId=%s, oldRelationId=%s, newAttachmentId=%s",
+                    declarationId, relation.getId(), newAttachmentId));
+        } else {
+            var relationName = buildDeclarationRelationName(declaration);
+            var relation = new SysAttachmentRelation();
+            relation.setAttachmentId(newAttachmentId);
+            relation.setRelationType(AttachmentRelationStatus.DECLARATION.getCode());
+            relation.setRelationId(declarationId);
+            relation.setRelationName(relationName);
+            relation.setAttachmentType(AttachmentCategoryStatus.DOCUMENT.getCode());
+            relation.setSortOrder(0);
+            relation.setIsDeleted(DeleteStatus.NOT_DELETED.getCode());
+            relation.setCreatedBy(userId);
+            relation.setUpdatedBy(userId);
+            relation.setCreatedTime(LocalDateTime.now());
+            relation.setUpdatedTime(LocalDateTime.now());
+            sysAttachmentRelationRepo.save(relation);
+            log.info(String.format("申报书首次上传关联: declarationId=%s, attachmentId=%s",
+                    declarationId, newAttachmentId));
+        }
+        return resp;
+    }
+
+    private String buildDeclarationRelationName(Declaration declaration) {
+        var number = declaration.getNumber();
+        var researchTopic = declaration.getResearchTopic();
+        if (researchTopic == null || researchTopic.isEmpty() || researchTopic.length() > 60) {
+            return number != null ? number : "申报-" + declaration.getId();
+        }
+        return String.format("%s/%s", number, researchTopic);
     }
 
 }

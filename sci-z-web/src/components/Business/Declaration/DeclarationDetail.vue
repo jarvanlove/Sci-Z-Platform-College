@@ -63,7 +63,10 @@
       <!-- 工作流状态卡片 -->
       <BaseCard class="detail-card">
         <template #header>
-          <div class="card-title">{{ $t('declaration.workflowStatus') }}</div>
+          <div class="card-header-with-loading">
+            <span class="card-title">{{ $t('declaration.workflowStatus') }}</span>
+            <el-icon v-if="isWorkflowRunning" class="workflow-header-loading is-loading"><Loading /></el-icon>
+          </div>
         </template>
         <div class="workflow-container">
           <!-- 工作流状态 -->
@@ -74,13 +77,19 @@
             <div class="workflow-info">
               <div class="workflow-title">{{ workflowStatus.title }}</div>
               <div class="workflow-description">
-                {{ workflowStatus.description }}
+                <template v-if="workflowStatus.type === 'completed'">
+                  {{ t('declaration.completedDescPrefix') }}
+                  <a href="javascript:void(0)" class="workflow-detail-link" @click="goToDeclarationList">{{ t('declaration.completedDescLink') }}</a>
+                </template>
+                <template v-else>
+                  {{ workflowStatus.description }}
+                </template>
               </div>
               <!-- 进度条 - 始终显示，根据步骤计算进度（包括失败状态） -->
               <!-- 只要有工作流步骤数据就显示进度条，无论成功还是失败 -->
               <ProgressBar
                 v-if="workflowTimeline && workflowTimeline.length > 0"
-                :percentage="Number(calculateProgress)"
+                :percentage="declaration.workflowStatus === 'completed' ? 100 : Number(calculateProgress)"
                 :status="progressStatus"
                 :status-map="{
                   success: { text: '已完成', type: 'success' },
@@ -95,12 +104,27 @@
             </div>
           </div>
 
-          <!-- 时间线 - 始终显示，即使为空也显示空状态 -->
+          <!-- 时间线 - 始终显示，失败步骤可点开展示错误信息 -->
           <Timeline
             :items="workflowTimeline"
             direction="vertical"
             class="workflow-timeline"
-          />
+          >
+            <template v-for="(item, index) in workflowTimeline" #[`content-${index}`]="{ item: slotItem }">
+              <div :key="'err-'+index" class="step-error-wrapper">
+                <div v-if="slotItem.errorMessage" class="step-error-block">
+                  <a
+                    class="step-error-toggle"
+                    href="javascript:void(0)"
+                    @click.prevent="expandedError = expandedError === index ? null : index"
+                  >
+                    {{ expandedError === index ? t('declaration.collapseError') : t('declaration.viewErrorReason') }}
+                  </a>
+                  <div v-if="expandedError === index" class="step-error-message">{{ slotItem.errorMessage }}</div>
+                </div>
+              </div>
+            </template>
+          </Timeline>
 
         </div>
       </BaseCard>
@@ -149,8 +173,11 @@ const loading = ref(false)
 // 工作流时间线
 const workflowTimeline = ref([])
 
-// 工作流结果
+// 工作流结果（预留，当前错误信息仅使用各步骤 steps[].errorMessage，不依赖整体 errorMessage）
 const workflowResult = ref(null)
+
+// 当前展开显示失败原因的步骤索引（用于时间线失败节点点开展示）
+const expandedError = ref(null)
 
 // 工作流状态轮询定时器
 let workflowPollingTimer = null
@@ -240,6 +267,12 @@ const basicInfoItems = computed(() => {
   ]
 })
 
+// 工作流是否进行中：与轮询逻辑一致——pending/running 时显示 loading，completed/failed 时消失（流程全部完成即停止轮询）
+const isWorkflowRunning = computed(() => {
+  const status = declaration.value?.workflowStatus
+  return status === 'pending' || status === 'running'
+})
+
 // 工作流状态 - 使用 workflowStatus 字段（pending/running/completed/failed）
 const workflowStatus = computed(() => {
   const status = declaration.value.workflowStatus
@@ -294,9 +327,9 @@ const workflowStatus = computed(() => {
   }
 })
 
-// 计算进度 - 根据 workflowResult.steps 计算
-// 固定总步数为 6 步，只计算成功的步骤（type === 'success' 或 status === 'completed'）
-const TOTAL_STEPS = 6
+// 计算进度 - 根据工作流步骤（workflowTimeline 来自 steps）计算
+// 总步数与后端一致：申报提交 + 工作流启动 + AI内容分析 + 申报信息生成 + 数据库存储 + 申报书生成 + 项目创建 = 7 步
+const TOTAL_STEPS = 7
 const calculateProgress = computed(() => {
   // 如果没有时间线数据，返回 0
   if (!workflowTimeline.value || workflowTimeline.value.length === 0) {
@@ -450,7 +483,8 @@ const loadWorkflowStatus = async (declarationId) => {
             failed: { text: '失败', type: 'danger' },
             processing: { text: '处理中', type: 'warning' },
             pending: { text: '待处理', type: 'info' }
-          }
+          },
+          errorMessage: step.errorMessage || ''
         }
       })
       
@@ -459,20 +493,7 @@ const loadWorkflowStatus = async (declarationId) => {
         progress: calculateProgress.value
       })
       
-      // 处理工作流结果（成功或失败的额外信息）
-      if (declaration.value.workflowStatus === 'completed') {
-        workflowResult.value = {
-          projectId: workflowData.projectId,
-          projectName: workflowData.projectName,
-          projectDescription: workflowData.projectDescription
-        }
-      } else if (declaration.value.workflowStatus === 'failed') {
-        workflowResult.value = {
-          errorMessage: workflowData.errorMessage || workflowData.error,
-          suggestion: workflowData.suggestion,
-          errorDetails: workflowData.errorDetails
-        }
-      }
+      // 失败/成功信息仅来自各步骤（steps[].errorMessage），不再使用整体 workflowResult 的 errorMessage
     } else {
       // 工作流未开始时，steps 为空数组或 null
       workflowTimeline.value = []
@@ -500,9 +521,9 @@ const loadWorkflowStatus = async (declarationId) => {
       return
     }
     
-    // 3. 如果没有 workflowStatus，根据 steps 判断
+    // 3. 仅当接口未返回 workflowStatus 时，才根据 steps 推断失败；是否完成必须以接口返回的 workflowStatus === 'completed' 为准
+    // 不能因「当前 steps 全部 success」就设为 completed 并停止轮询，否则只有 2 步时会把 running 误判为完成
     if (Array.isArray(steps) && steps.length > 0) {
-      // 检查是否有失败的步骤
       const hasFailedStep = steps.some(step => step.status === 'failed')
       if (hasFailedStep) {
         declaration.value.workflowStatus = 'failed'
@@ -510,15 +531,7 @@ const loadWorkflowStatus = async (declarationId) => {
         stopWorkflowPolling()
         return
       }
-      
-      // 检查是否所有步骤都完成
-      const allCompleted = steps.every(step => step.status === 'success')
-      if (allCompleted && currentStatus !== 'completed') {
-        declaration.value.workflowStatus = 'completed'
-        logger.info('All steps completed, stopping polling', { steps })
-        stopWorkflowPolling()
-        return
-      }
+      // 不再根据 allCompleted 覆盖为 completed：轮询仅在接口返回 workflowStatus === 'completed' 时停止
     }
 
     logger.info('Workflow status loaded successfully from polling API', { 
@@ -600,6 +613,15 @@ const loadDeclarationDetail = async () => {
     })
 
     // 数据映射：后端字段 -> 前端字段
+    // 防止详情接口误返 completed：若为 completed 但步骤数不足 7，视为 running，由轮询接口为准
+    let initialWorkflowStatus = detailData.workflowStatus || 'pending'
+    const detailSteps = detailData.workflowResult?.steps || []
+    const successStepCount = detailSteps.filter((s) => s.status === 'success').length
+    if (initialWorkflowStatus === 'completed' && successStepCount < 7) {
+      initialWorkflowStatus = 'running'
+      logger.info('Detail returned completed but steps < 7, treat as running and will poll', { successStepCount })
+    }
+
     declaration.value = {
       id: detailData.id,
       declarationNumber: detailData.number || detailData.declarationNumber,
@@ -618,7 +640,7 @@ const loadDeclarationDetail = async () => {
       researchFields: detailData.researchFields || [],
       status: detailData.statusDescription || STATUS_MAP[detailData.status]?.label || '申报中',
       statusType: STATUS_MAP[detailData.status]?.type || 'submitting',
-      workflowStatus: detailData.workflowStatus || 'pending',
+      workflowStatus: initialWorkflowStatus,
       workflowStatusDescription: detailData.workflowStatusDescription || '',
       workflowId: detailData.workflowId || null,
       hasAttachment: detailData.hasAttachment || false,
@@ -661,7 +683,8 @@ const loadDeclarationDetail = async () => {
               failed: { text: '失败', type: 'danger' },
               processing: { text: '处理中', type: 'warning' },
               pending: { text: '待处理', type: 'info' }
-            }
+            },
+            errorMessage: step.errorMessage || ''
           }
         })
         
@@ -672,56 +695,31 @@ const loadDeclarationDetail = async () => {
         workflowTimeline.value = []
       }
       
-      // 处理工作流结果（成功或失败的额外信息）
-      // 注意：workflowResult 主要用于展示步骤明细，成功/失败信息是额外的
-      if (declaration.value.workflowStatus === 'completed') {
-        workflowResult.value = {
-          projectId: detailData.workflowResult.projectId,
-          projectName: detailData.workflowResult.projectName,
-          projectDescription: detailData.workflowResult.projectDescription
-        }
-      } else if (declaration.value.workflowStatus === 'failed') {
-        workflowResult.value = {
-          errorMessage: detailData.workflowResult.errorMessage || detailData.workflowResult.error,
-          suggestion: detailData.workflowResult.suggestion,
-          errorDetails: detailData.workflowResult.errorDetails
-        }
-      }
+      // 失败/成功信息仅来自各步骤（steps[].errorMessage），不再使用整体 workflowResult 的 errorMessage
     }
 
-    // 如果详情接口没有返回工作流步骤信息，尝试从工作流状态接口获取
-    if (!workflowTimeline.value || workflowTimeline.value.length === 0) {
-      logger.info('No workflow steps in detail response, loading from workflow status API')
-      await loadWorkflowStatus(declarationId)
-    }
-    
-    // 🔥 修复：无论详情接口返回什么状态，只要有 workflowId 且状态不是明确的 completed 或 failed，都应该启动轮询
-    // 这样可以确保即使详情接口返回的状态不准确，也能通过轮询获取最新状态
+    // 若需要轮询，先拉一次工作流状态接口，保证首屏状态、进度条、loading 与后端一致
     const currentWorkflowStatus = declaration.value.workflowStatus
     const hasWorkflowId = declaration.value.workflowId
-    
-    // 判断是否需要启动轮询：
-    // 1. 状态是 running 或 pending（明确需要轮询）
-    // 2. 或者有 workflowId 且状态不是明确的 completed 或 failed（可能还在运行中，需要轮询确认）
-    const shouldStartPolling = 
-      currentWorkflowStatus === 'running' || 
+    const shouldStartPolling =
+      currentWorkflowStatus === 'running' ||
       currentWorkflowStatus === 'pending' ||
+      !currentWorkflowStatus ||
       (hasWorkflowId && currentWorkflowStatus !== 'completed' && currentWorkflowStatus !== 'failed')
-    
+
     if (shouldStartPolling) {
-      logger.info('Starting workflow polling', { 
-        workflowStatus: currentWorkflowStatus,
-        hasWorkflowId: hasWorkflowId,
-        workflowId: declaration.value.workflowId
-      })
-      // 工作流运行中，启动轮询监控工作流进度
-      // 轮询启动后，loadWorkflowStatus 会使用轮询接口的数据更新状态和进度
-      startWorkflowPolling(declarationId)
+      logger.info('Fetching workflow status once then starting polling', { workflowStatus: currentWorkflowStatus, hasWorkflowId })
+      await loadWorkflowStatus(declarationId)
+      // 仅当轮询未在 loadWorkflowStatus 内被停止（即接口仍未返回 completed/failed）时再启动定时轮询
+      const stillRunning = declaration.value.workflowStatus === 'running' || declaration.value.workflowStatus === 'pending' || !declaration.value.workflowStatus
+      if (stillRunning) {
+        startWorkflowPolling(declarationId)
+      }
     } else {
-      logger.info('Workflow is completed or failed, no polling needed', { 
-        workflowStatus: currentWorkflowStatus,
-        hasWorkflowId: hasWorkflowId
-      })
+      if (!workflowTimeline.value || workflowTimeline.value.length === 0) {
+        await loadWorkflowStatus(declarationId)
+      }
+      logger.info('Workflow is completed or failed, no polling', { workflowStatus: currentWorkflowStatus })
     }
 
     logger.info('Declaration detail loaded successfully', { id: declaration.value.id })
@@ -735,6 +733,10 @@ const loadDeclarationDetail = async () => {
 
 // 事件处理
 const handleBack = () => {
+  router.push('/declaration/list')
+}
+
+const goToDeclarationList = () => {
   router.push('/declaration/list')
 }
 
@@ -799,6 +801,35 @@ onBeforeUnmount(() => {
   padding: var(--gap-lg);
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
+}
+
+.card-header-with-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: var(--gap-sm);
+  border-bottom: 1px solid var(--border);
+  min-height: 28px;
+
+  .card-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-primary);
+    margin: 0;
+    line-height: 1.4;
+    padding-bottom: 0;
+    border-bottom: none; 
+  }
+
+  .workflow-header-loading {
+    font-size: 18px;
+    color: var(--color-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    vertical-align: middle;
+  }
 }
 
 .card-title {
@@ -897,9 +928,11 @@ onBeforeUnmount(() => {
   font-size: 14px;
 }
 
-// 工作流状态样式
+// 工作流状态样式 - 成功态使用墨绿色（仅本区域）
 .workflow-container {
   margin-top: 16px;
+  --color-success: #1b5e20; /* 墨绿色 */
+  --color-success-bg: #b8d4b8; /* 墨绿浅底（状态标签用） */
 }
 
 .workflow-status {
@@ -931,7 +964,7 @@ onBeforeUnmount(() => {
   }
 
   &.completed {
-    background: var(--color-success, #16a34a);
+    background: var(--color-success);
     color: white;
   }
 
@@ -973,6 +1006,16 @@ onBeforeUnmount(() => {
   color: var(--text-3) !important; // #6b7280，与表单内容一致
   font-weight: 400 !important; // normal，与表单内容一致
   margin-bottom: 8px;
+
+  .workflow-detail-link {
+    color: var(--color-primary);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 500;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
 }
 
 .workflow-progress {
@@ -999,11 +1042,11 @@ onBeforeUnmount(() => {
     gap: 4px !important;
     transition: all 0.2s ease !important;
     
-    // 🔥 成功状态样式：与列表页保持一致
+    // 🔥 成功状态样式：墨绿色（仅处理状态区域）
     &.el-tag--success {
-      background-color: #d1fae5 !important; // 🔥 与列表页一致
-      color: #059669 !important; // 🔥 与列表页一致
-      border-color: #d1fae5 !important;
+      background-color: var(--color-success-bg) !important;
+      color: var(--color-success) !important;
+      border-color: var(--color-success-bg) !important;
     }
     
     // 🔥 警告状态样式：与列表页保持一致
@@ -1031,6 +1074,31 @@ onBeforeUnmount(() => {
 
 .workflow-timeline {
   margin-top: var(--gap-lg);
+  
+  // 失败步骤：可点开展示失败原因
+  :deep(.step-error-block) {
+    margin-top: var(--gap-sm);
+    .step-error-toggle {
+      font-size: var(--font-size-sm);
+      color: var(--color-primary);
+      text-decoration: none;
+      cursor: pointer;
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+    .step-error-message {
+      margin-top: var(--gap-xs);
+      padding: var(--gap-sm);
+      background: #fee2e2;
+      color: #b91c1c;
+      font-size: var(--font-size-sm);
+      border-radius: var(--radius-md);
+      border: 1px solid #fecaca;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  }
   
   // 时间线样式优化 - 时间对齐、状态标签对齐、圆角
   :deep(.timeline-item) {
@@ -1085,12 +1153,12 @@ onBeforeUnmount(() => {
             transition: all 0.2s ease !important;
             position: relative !important;
             
-            // 🔥 成功状态样式：与列表页保持一致
+            // 🔥 成功状态样式：墨绿色（仅处理状态区域）
             &.el-tag--success {
-              background-color: #d1fae5 !important; // 🔥 与列表页一致
-              color: #059669 !important; // 🔥 与列表页一致
-              border-color: #d1fae5 !important;
-              border-radius: 12px !important; // 🔥 再次强调圆角
+              background-color: var(--color-success-bg) !important;
+              color: var(--color-success) !important;
+              border-color: var(--color-success-bg) !important;
+              border-radius: 12px !important;
             }
             
             // 🔥 警告状态样式：与列表页保持一致

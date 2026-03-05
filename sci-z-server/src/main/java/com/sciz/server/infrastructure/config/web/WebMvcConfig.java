@@ -42,7 +42,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                  */
                 String[] exclude = new String[] {
                                 "/actuator/**", "/health/**", "/error",
-                                "/swagger-ui/**", "/doc.html", "/doc/**", "/v3/api-docs/**", "/static/**"
+                                "/swagger-ui/**", "/doc.html", "/doc/**", "/v3/api-docs/**", "/static/**",
+                                "/ws/**"
                 };
 
                 // 顺序：鉴权 -> 幂等 -> 日志（或根据需要调整）

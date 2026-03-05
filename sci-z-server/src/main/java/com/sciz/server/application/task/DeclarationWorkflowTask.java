@@ -14,7 +14,6 @@ import com.sciz.server.infrastructure.external.dify.dto.response.DeclarationWork
 import com.sciz.server.infrastructure.external.dify.service.DifyWorkflowService;
 import com.sciz.server.infrastructure.shared.enums.*;
 import com.sciz.server.infrastructure.shared.event.EventPublisher;
-import com.sciz.server.infrastructure.shared.event.declaration.DeclarationUpdatedEvent;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.ResultCode;
 import com.sciz.server.infrastructure.shared.utils.DateUtil;
@@ -88,119 +87,6 @@ public class DeclarationWorkflowTask {
     }
 
     /**
-     * 处理申报工作流（同步调试版本）
-     * 用于本地debug，不包含 @Async 注解，可以同步执行和调试
-     * 
-     * ⚠️ 注意：此方法仅用于本地调试，生产环境请使用 processDeclarationWorkflow 异步方法
-     *
-     * @param declarationId 申报ID
-     * @param resourceId    资源ID（工作流ID，用于查找 API Key）
-     * @param inputs        工作流输入参数（类型安全）
-     * @param userId        用户ID
-     * @param keyType       密钥类型（workflow/file/chatbot）
-     */
-    public void processDeclarationWorkflowSync(Long declarationId, String resourceId,
-            DeclarationWorkflowReq inputs, Long userId, String keyType) {
-        log.info(String.format("开始同步处理申报工作流（调试模式）: declarationId=%s, resourceId=%s, keyType=%s",
-                declarationId, resourceId, keyType));
-
-        try {
-            // 1. 更新工作流状态为"处理中"
-            updateWorkflowStatus(declarationId, WorkflowStatus.RUNNING, null);
-
-            // 2. 记录工作流启动步骤
-            addWorkflowStep(declarationId, "工作流启动", "success");
-
-            // 3. 调用申报工作流
-            log.info(String.format("调用 Dify 工作流 API: declarationId=%s, resourceId=%s", declarationId, resourceId));
-            DeclarationWorkflowResp workflowOutputs = difyWorkflowService.executeDeclarationWorkflow(
-                    inputs, userId, resourceId, keyType);
-            String fileUrl = workflowOutputs.fileUrl();
-
-            // 去除 URL 中的所有空格（前后和中间）
-            if (fileUrl != null) {
-                fileUrl = fileUrl.trim().replaceAll("\\s+", "");
-            }
-
-            // 4. 记录 AI 内容分析步骤
-            addWorkflowStep(declarationId, "AI 内容分析", "success");
-
-            // 5. 记录项目信息生成步骤
-            addWorkflowStep(declarationId, "申报信息生成", "success");
-
-            // 6. 记录数据库存储步骤
-            addWorkflowStep(declarationId, "数据库存储", "success");
-
-            if (fileUrl == null || fileUrl.isEmpty()) {
-                throw BusinessException.of(ResultCode.SERVER_ERROR, "工作流未返回文件下载URL");
-            }
-
-            log.info(String.format("工作流执行完成，获取文件URL: declarationId=%s, fileUrl=%s",
-                    declarationId, fileUrl));
-
-            // 7. 从 URL 下载文件
-            var fileData = downloadFileFromUrl(fileUrl);
-
-            // 8. 上传文件到 MinIO
-            var attachmentId = uploadFileToMinio(declarationId, fileData, fileUrl, userId);
-
-            // 9. 创建附件关联
-            createAttachmentRelation(declarationId, attachmentId, userId);
-
-            // 10. 记录申报书生成步骤
-            addWorkflowStep(declarationId, "申报书生成", "success");
-
-            // 11. 记录项目创建步骤（标记为"进行中"，实际创建由事件处理器完成）
-            addWorkflowStep(declarationId, "项目创建", "running");
-            log.info(String.format("项目创建步骤已记录，等待事件处理器创建项目: declarationId=%s", declarationId));
-
-            // 12. 保持工作流状态为"处理中"，等待所有步骤（包括项目创建）完成后，由事件处理器更新为"已完成"
-            // 注意：不要在这里更新为 COMPLETED，因为项目创建步骤还是 "running" 状态
-            // 当项目创建步骤完成后，DeclarationEventHandler 会检查所有步骤状态并更新工作流状态
-            updateWorkflowStatus(declarationId, WorkflowStatus.RUNNING, fileUrl);
-
-            // 13. 工作流执行成功，自动更新申报状态为"申报已提交"（状态2）
-            // 注意：updateStatus 会发布 DeclarationSuccessEvent 事件，事件处理器会创建项目和知识库
-            updateDeclarationStatus(declarationId, DeclarationStatus.SUCCESS);
-            log.info(String.format("工作流执行成功，自动更新申报状态为申报已提交: declarationId=%s", declarationId));
-
-            // 14. 发布申报更新事件
-            var declaration = declarationRepo.findById(declarationId);
-            if (declaration != null) {
-                var event = new DeclarationUpdatedEvent(
-                        String.valueOf(declarationId),
-                        declaration.getResearchTopic(), // 申报名称（研究课题）
-                        String.valueOf(userId),
-                        declaration.getApplicantName(), // 申报人姓名
-                        String.valueOf(DeclarationStatus.IN_PROGRESS.getCode()),
-                        String.valueOf(DeclarationStatus.SUCCESS.getCode()),
-                        "申报书生成完成",
-                        "工作流执行成功");
-                eventPublisher.publish(event);
-            } else {
-                log.warn(String.format("发布申报更新事件失败：申报不存在: declarationId=%s", declarationId));
-            }
-
-            log.info(String.format("申报工作流处理完成: declarationId=%s, attachmentId=%s",
-                    declarationId, attachmentId));
-
-        } catch (Exception e) {
-            log.error(String.format("申报工作流处理失败: declarationId=%s, err=%s",
-                    declarationId, e.getMessage()), e);
-
-            // 更新工作流状态为"失败"
-            updateWorkflowStatus(declarationId, WorkflowStatus.FAILED, null);
-
-            // 记录失败步骤
-            addWorkflowStep(declarationId, "申报书生成", "failed");
-
-            // 工作流执行失败，自动更新申报状态为"申报未通过"（状态3）
-            updateDeclarationStatus(declarationId, DeclarationStatus.FAILED);
-            log.info(String.format("工作流执行失败，自动更新申报状态为申报未通过: declarationId=%s", declarationId));
-        }
-    }
-
-    /**
      * 处理申报工作流（异步）
      * 使用类型安全的工作流输入参数构建
      *
@@ -242,92 +128,69 @@ public class DeclarationWorkflowTask {
             // 2. 记录工作流启动步骤
             addWorkflowStep(declarationId, "工作流启动", "success");
 
-            // 3. 调用申报工作流
-            log.info(String.format("调用 Dify 工作流 API: declarationId=%s, resourceId=%s", declarationId, resourceId));
-            DeclarationWorkflowResp workflowOutputs = difyWorkflowService.executeDeclarationWorkflow(
-                    inputs, userId, resourceId, keyType);
-            String fileUrl = workflowOutputs.fileUrl();
-
-            // 去除 URL 中的所有空格（前后和中间）
-            if (fileUrl != null) {
-                fileUrl = fileUrl.trim().replaceAll("\\s+", "");
+            // 3. 步骤：AI 内容分析（调用 Dify 工作流）
+            String fileUrl;
+            try {
+                log.info(String.format("调用 Dify 工作流 API: declarationId=%s, resourceId=%s", declarationId, resourceId));
+                DeclarationWorkflowResp workflowOutputs = difyWorkflowService.executeDeclarationWorkflow(
+                        inputs, userId, resourceId, keyType);
+                fileUrl = workflowOutputs.fileUrl();
+                if (fileUrl != null) {
+                    fileUrl = fileUrl.trim().replaceAll("\\s+", "");
+                }
+                addWorkflowStep(declarationId, "AI 内容分析", "success");
+                addWorkflowStep(declarationId, "申报信息生成", "success");
+                addWorkflowStep(declarationId, "数据库存储", "success");
+                if (fileUrl == null || fileUrl.isEmpty()) {
+                    failWorkflowAtStep(declarationId, "申报书生成", "工作流未返回文件下载URL");
+                    return;
+                }
+            } catch (Exception e) {
+                log.error(String.format("申报工作流-AI 内容分析失败: declarationId=%s, err=%s", declarationId, e.getMessage()), e);
+                failWorkflowAtStep(declarationId, "AI 内容分析", e.getMessage());
+                return;
             }
 
-            // 4. 记录 AI 内容分析步骤
-            addWorkflowStep(declarationId, "AI 内容分析", "success");
+            log.info(String.format("工作流执行完成，获取文件URL: declarationId=%s, fileUrl=%s", declarationId, fileUrl));
 
-            // 5. 记录项目信息生成步骤
-            addWorkflowStep(declarationId, "申报信息生成", "success");
-
-            // 6. 记录数据库存储步骤
-            addWorkflowStep(declarationId, "数据库存储", "success");
-
-            if (fileUrl == null || fileUrl.isEmpty()) {
-                throw BusinessException.of(ResultCode.SERVER_ERROR, "工作流未返回文件下载URL");
+            // 4. 步骤：申报书生成（下载、上传 MinIO、创建附件关联）
+            FileData fileData;
+            try {
+                fileData = downloadFileFromUrl(fileUrl);
+            } catch (Exception e) {
+                log.error(String.format("申报工作流-文件下载失败: declarationId=%s, err=%s", declarationId, e.getMessage()), e);
+                failWorkflowAtStep(declarationId, "申报书生成", e.getMessage());
+                return;
             }
 
-            log.info(String.format("工作流执行完成，获取文件URL: declarationId=%s, fileUrl=%s",
-                    declarationId, fileUrl));
+            Long attachmentId;
+            try {
+                attachmentId = uploadFileToMinio(declarationId, fileData, fileUrl, userId);
+            } catch (Exception e) {
+                log.error(String.format("申报工作流-文件上传 MinIO 失败: declarationId=%s, err=%s", declarationId, e.getMessage()), e);
+                failWorkflowAtStep(declarationId, "申报书生成", e.getMessage());
+                return;
+            }
 
-            // 7. 从 URL 下载文件
-            var fileData = downloadFileFromUrl(fileUrl);
+            try {
+                createAttachmentRelation(declarationId, attachmentId, userId);
+            } catch (Exception e) {
+                log.error(String.format("申报工作流-创建附件关联失败: declarationId=%s, err=%s", declarationId, e.getMessage()), e);
+                failWorkflowAtStep(declarationId, "申报书生成", e.getMessage());
+                return;
+            }
 
-            // 8. 上传文件到 MinIO
-            var attachmentId = uploadFileToMinio(declarationId, fileData, fileUrl, userId);
-
-            // 9. 创建附件关联
-            createAttachmentRelation(declarationId, attachmentId, userId);
-
-            // 10. 记录申报书生成步骤
             addWorkflowStep(declarationId, "申报书生成", "success");
 
-            // 11. 记录项目创建步骤（标记为"进行中"，实际创建由事件处理器完成）
+            // 5. 记录项目创建步骤（标记为"进行中"，实际创建由事件处理器完成）
             addWorkflowStep(declarationId, "项目创建", "running");
             log.info(String.format("项目创建步骤已记录，等待事件处理器创建项目: declarationId=%s", declarationId));
 
-            // 12. 保持工作流状态为"处理中"，等待所有步骤（包括项目创建）完成后，由事件处理器更新为"已完成"
-            // 注意：不要在这里更新为 COMPLETED，因为项目创建步骤还是 "running" 状态
-            // 当项目创建步骤完成后，DeclarationEventHandler 会检查所有步骤状态并更新工作流状态
             updateWorkflowStatus(declarationId, WorkflowStatus.RUNNING, fileUrl);
 
-            // 13. 工作流执行成功，自动更新申报状态为"申报已提交"（状态2）
-            // 注意：updateStatus 会发布 DeclarationSuccessEvent 事件，事件处理器会创建项目和知识库
-            updateDeclarationStatus(declarationId, DeclarationStatus.SUCCESS);
-            log.info(String.format("工作流执行成功，自动更新申报状态为申报已提交: declarationId=%s", declarationId));
+            // 申报状态由用户手动修改：工作流仅更新「申报书生成状态」，不自动更新「申报状态」
+            log.info(String.format("申报工作流处理完成（申报状态需用户手动更新）: declarationId=%s, attachmentId=%s", declarationId, attachmentId));
 
-            // 14. 发布申报更新事件
-            var declaration = declarationRepo.findById(declarationId);
-            if (declaration != null) {
-                var event = new DeclarationUpdatedEvent(
-                        String.valueOf(declarationId),
-                        declaration.getResearchTopic(), // 申报名称（研究课题）
-                        String.valueOf(userId),
-                        declaration.getApplicantName(), // 申报人姓名
-                        String.valueOf(DeclarationStatus.IN_PROGRESS.getCode()),
-                        String.valueOf(DeclarationStatus.SUCCESS.getCode()),
-                        "申报书生成完成",
-                        "工作流执行成功");
-                eventPublisher.publish(event);
-            } else {
-                log.warn(String.format("发布申报更新事件失败：申报不存在: declarationId=%s", declarationId));
-            }
-
-            log.info(String.format("申报工作流处理完成: declarationId=%s, attachmentId=%s",
-                    declarationId, attachmentId));
-
-        } catch (Exception e) {
-            log.error(String.format("申报工作流处理失败: declarationId=%s, err=%s",
-                    declarationId, e.getMessage()), e);
-
-            // 更新工作流状态为"失败"
-            updateWorkflowStatus(declarationId, WorkflowStatus.FAILED, null);
-
-            // 记录失败步骤
-            addWorkflowStep(declarationId, "申报书生成", "failed");
-
-            // 工作流执行失败，自动更新申报状态为"申报未通过"（状态3）
-            updateDeclarationStatus(declarationId, DeclarationStatus.FAILED);
-            log.info(String.format("工作流执行失败，自动更新申报状态为申报未通过: declarationId=%s", declarationId));
         } finally {
             // 清理异步用户上下文（防止内存泄漏）
             AsyncUserContext.clear();
@@ -403,9 +266,21 @@ public class DeclarationWorkflowTask {
     }
 
     /**
-     * 添加工作流步骤
+     * 添加工作流步骤（无失败原因，用于成功/进行中步骤）
      */
     private void addWorkflowStep(Long declarationId, String stepName, String stepStatus) {
+        addWorkflowStep(declarationId, stepName, stepStatus, null);
+    }
+
+    /**
+     * 添加工作流步骤
+     *
+     * @param declarationId 申报ID
+     * @param stepName      步骤名称
+     * @param stepStatus    步骤状态（success/running/failed）
+     * @param errorMessage  失败原因（仅当 stepStatus 为 failed 时使用，可为 null）
+     */
+    private void addWorkflowStep(Long declarationId, String stepName, String stepStatus, String errorMessage) {
         // 重试机制：如果查询不到申报，可能是事务还没提交，等待后重试
         int maxRetries = 5;
         int retryDelayMs = 200; // 每次重试等待 200ms
@@ -445,6 +320,9 @@ public class DeclarationWorkflowTask {
                 step.put("name", stepName);
                 step.put("status", stepStatus);
                 step.put("timestamp", DateUtil.formatDateTime(LocalDateTime.now()));
+                if (errorMessage != null && !errorMessage.isBlank()) {
+                    step.put("errorMessage", errorMessage);
+                }
                 steps.add(step);
 
                 // 更新工作流结果
@@ -474,6 +352,15 @@ public class DeclarationWorkflowTask {
                 }
             }
         }
+    }
+
+    /**
+     * 在指定步骤失败并结束工作流：更新工作流状态、记录该步骤失败原因；申报状态由用户手动修改
+     */
+    private void failWorkflowAtStep(Long declarationId, String stepName, String errorMessage) {
+        updateWorkflowStatus(declarationId, WorkflowStatus.FAILED, null);
+        addWorkflowStep(declarationId, stepName, "failed", errorMessage);
+        log.info(String.format("工作流在步骤【%s】失败并已终止: declarationId=%s, err=%s", stepName, declarationId, errorMessage));
     }
 
     /**

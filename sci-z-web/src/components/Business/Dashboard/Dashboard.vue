@@ -5,7 +5,7 @@
  */
 -->
 <template>
-  <BaseScrollbar 
+  <BaseScrollbar
     class="dashboard-container"
     :custom-style="{ height: '100%', overflow: 'auto' }"
   >
@@ -15,182 +15,132 @@
       <h1 class="page-title">{{ $t('menu.dashboard') }}</h1>
     </div>
 
-    <!-- 统计卡片区域 -->
+    <!-- 顶部统计卡片区域：改用 DashboardStatCard，更靠近 dashboard 视觉 -->
     <div class="stats-cards">
-      <div
+      <DashboardStatCard
         v-for="stat in stats"
         :key="stat.key"
-        class="stat-card"
-        :class="`stat-${stat.key}`"
-      >
-        <div class="stat-icon">{{ stat.icon }}</div>
-        <div class="stat-value" :class="stat.valueClass">{{ formatNumber(stat.value) }}</div>
-        <div class="stat-label">{{ stat.label }}</div>
-      </div>
+        :type="stat.type"
+        :title="stat.label"
+        :value="stat.value"
+        :unit="stat.unit"
+        :icon="stat.icon"
+        :show-trend="!!stat.trend"
+        :trend="stat.trend"
+        :custom-class="`stat-${stat.key}`"
+      />
     </div>
 
     <!-- 主要内容区域 -->
     <div class="main-content">
-      <!-- 顶部区域 -->
+      <!-- 第一行：趋势 + 状态分布 -->
       <div class="top-section">
-        <!-- 最近申报 -->
-        <BaseCard class="declaration-card content-card">
+        <!-- 申报 & 项目趋势 -->
+        <BaseCard class="trend-card content-card">
           <template #header>
             <div class="card-header">
-              <h3 class="card-title">{{ $t('dashboard.recentDeclarations') }}</h3>
-              <a href="#" class="card-action" @click.prevent="handleViewAllDeclarations">
-                {{ $t('dashboard.viewAll') }}
-              </a>
+              <h3 class="card-title">{{ $t('dashboard.trendTitle') }}</h3>
             </div>
           </template>
-
-          <!-- 加载状态 -->
-          <div v-if="loading" class="loading-skeleton">
-            <el-skeleton :rows="5" animated />
+          <div class="trend-chart-wrap">
+            <EfficiencyChart
+              :data="trendChartData"
+              :chart-type="'line'"
+              :loading="loading"
+              :empty-text="$t('dashboard.loadError')"
+              :x-axis-name="$t('common.month')"
+              :y-axis-name="$t('common.quantity')"
+            />
           </div>
-
-          <!-- 申报数据表格 - 使用 Element Plus el-table -->
-          <el-table
-            v-else
-            :data="recentDeclarations"
-            :empty-text="$t('common.noData')"
-            :show-header="true"
-            stripe
-            class="declaration-table"
-          >
-            <el-table-column
-              prop="number"
-              :label="$t('dashboard.declarationNumber')"
-              min-width="120"
-              align="center"
-            >
-              <template #default="{ row }">
-                <span class="number-cell" style="white-space: nowrap;">{{ row.number }}</span>
-              </template>
-            </el-table-column>
-
-            <el-table-column
-              prop="topic"
-              :label="$t('declaration.topic')"
-              min-width="200"
-              show-overflow-tooltip
-            >
-              <template #default="{ row }">
-                <div class="topic-cell">{{ row.topic }}</div>
-              </template>
-            </el-table-column>
-
-            <el-table-column
-              prop="submitTime"
-              :label="$t('dashboard.submitTime')"
-              min-width="120"
-              align="center"
-            >
-              <template #default="{ row }">
-                <span class="time-cell">{{ row.submitTime }}</span>
-              </template>
-            </el-table-column>
-
-            <el-table-column
-              prop="status"
-              :label="$t('common.status')"
-              min-width="100"
-              align="center"
-            >
-              <template #default="{ row }">
-                <span
-                  class="status-tag"
-                  :class="`status-${row.statusType}`"
-                >
-                  {{ row.status }}
-                </span>
-              </template>
-            </el-table-column>
-
-            <el-table-column
-              :label="$t('common.actions')"
-              min-width="80"
-              align="center"
-              fixed="right"
-            >
-              <template #default="{ row }">
-                <BaseTooltip :content="$t('common.view')" placement="top">
-                  <button
-                    class="action-btn btn-primary"
-                    @click.stop="handleDeclarationClick(row)"
-                  >
-                    <el-icon><TopRight /></el-icon>
-                  </button>
-                </BaseTooltip>
-              </template>
-            </el-table-column>
-          </el-table>
         </BaseCard>
 
-        <!-- 快捷操作 -->
-        <BaseCard class="quick-actions-card content-card">
+        <!-- 状态分布（申报/项目切换） -->
+        <BaseCard class="status-card content-card">
           <template #header>
-            <div class="card-header">
-              <h3 class="card-title">{{ $t('dashboard.quickActions') }}</h3>
+            <div class="card-header status-header">
+              <h3 class="card-title">
+                {{
+                  activeStatusTab === 'declaration'
+                    ? $t('dashboard.declarationStatusDistribution')
+                    : $t('dashboard.projectStatusDistribution')
+                }}
+              </h3>
+              <div class="status-tabs">
+                <button
+                  class="status-tab"
+                  :class="{ active: activeStatusTab === 'declaration' }"
+                  @click="activeStatusTab = 'declaration'"
+                >
+                  {{ $t('menu.declaration') }}
+                </button>
+                <button
+                  class="status-tab"
+                  :class="{ active: activeStatusTab === 'project' }"
+                  @click="activeStatusTab = 'project'"
+                >
+                  {{ $t('menu.project') }}
+                </button>
+              </div>
             </div>
           </template>
-          <div class="quick-actions">
-            <button
-              v-for="action in quickActions"
-              :key="action.key"
-              class="action-button"
-              :class="action.buttonClass"
-              @click="handleQuickAction(action.key)"
-            >
-              <el-icon class="action-icon"><component :is="action.icon" /></el-icon>
-              {{ action.label }}
-            </button>
-          </div>
+          <DashboardPieChart
+            :data="activeStatusTab === 'declaration' ? declarationStatusSeries : projectStatusSeries"
+            :loading="loading"
+            :empty-text="$t('dashboard.loadError')"
+          />
         </BaseCard>
       </div>
 
-      <!-- 底部区域 -->
-      <div class="bottom-section">
-        <!-- 项目进度概览 -->
-        <BaseCard class="progress-card content-card">
+      <!-- 第二行：按学院 / 类型分布 -->
+      <div class="middle-section">
+        <BaseCard class="content-card dept-card">
           <template #header>
             <div class="card-header">
-              <h3 class="card-title">{{ $t('dashboard.projectProgress') }}</h3>
-              <a href="#" class="card-action" @click.prevent="handleViewAllProjects">
-                {{ $t('dashboard.viewAll') }}
-              </a>
+              <h3 class="card-title">{{ $t('dashboard.byDepartmentTitle') }}</h3>
             </div>
           </template>
+          <EfficiencyChart
+            :data="departmentChartData"
+            :chart-type="'bar'"
+            :loading="loading"
+            :empty-text="$t('dashboard.loadError')"
+            :x-axis-name="$t('dashboard.topicDepartment')"
+            :y-axis-name="$t('common.quantity')"
+            :tooltip-quantity-label="$t('common.quantity')"
+          />
+        </BaseCard>
 
-          <!-- 加载状态 -->
-          <div v-if="loading" class="loading-skeleton">
-            <el-skeleton :rows="3" animated />
-          </div>
-
-          <!-- 项目进度列表 -->
-          <div v-else class="progress-grid">
-            <div
-              v-for="project in projectProgress"
-              :key="project.id"
-              class="progress-item"
-              @click="handleProjectClick(project.id)"
-            >
-              <div class="progress-info">
-                <div class="progress-name">{{ project.name }}</div>
-                <div class="progress-time">
-                  {{ $t('dashboard.expectedCompletion') }}: {{ project.expectedDate }}
-                </div>
-              </div>
-              <div class="progress-bar-container">
-                <ProjectProgressBar
-                  :progress="project.progress"
-                  :height="8"
-                  :show-text="false"
-                />
-              </div>
-              <div class="progress-percentage">{{ project.progress }}%</div>
+        <!-- 按项目类型分布 - 暂时隐藏
+        <BaseCard class="content-card type-card">
+          <template #header>
+            <div class="card-header">
+              <h3 class="card-title">{{ $t('dashboard.byTypeTitle') }}</h3>
             </div>
-          </div>
+          </template>
+          <DashboardPieChart
+            :data="projectTypeSeries"
+            :loading="loading"
+            :empty-text="$t('dashboard.loadError')"
+          />
+        </BaseCard>
+        -->
+      </div>
+
+      <!-- 第三行：项目延期预警 -->
+      <div class="bottom-section">
+        <BaseCard class="content-card delay-warning-card">
+          <template #header>
+            <div class="card-header">
+              <h3 class="card-title">{{ $t('dashboard.delayWarningTitle') }}</h3>
+            </div>
+          </template>
+          <DelayWarningChart
+            :data="delayWarningData"
+            :loading="loading"
+            :empty-text="$t('dashboard.loadError')"
+            :project-count-label="$t('dashboard.projectCountLabel')"
+            :risk-level-labels="riskLevelLabels"
+          />
         </BaseCard>
       </div>
     </div>
@@ -202,13 +152,15 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Document, Folder, Check, Search, TopRight, Reading } from '@element-plus/icons-vue'
+import { Document, Folder, Check, Search, TopRight, Reading, PieChart, TrendCharts } from '@element-plus/icons-vue'
 import { BaseCard, ProjectProgressBar, BaseScrollbar, BaseTooltip, BackButton } from '@/components/Common'
-import { formatDate } from '@/utils/date'
-import { DECLARATION_STATUS_CONFIG } from '@/utils/constants'
 import { createLogger } from '@/utils/simpleLogger'
-import { getDeclarationList } from '@/api/Declaration'
-import { getProjectList, getProjectStatistics } from '@/api/Project'
+import { getProjectStatistics } from '@/api/Project/project'
+import { getDashboardTrend, getDeclarationStatusStats, getProjectStatusStats, getByDepartmentStats, getByTypeStats, getDelayWarningStats } from '@/api/Dashboard/dashboard'
+import EfficiencyChart from '@/components/Practice/EfficiencyChart.vue'
+import DashboardPieChart from './DashboardPieChart.vue'
+import DashboardStatCard from './DashboardStatCard.vue'
+import DelayWarningChart from './DelayWarningChart.vue'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -219,10 +171,42 @@ const loading = ref(false)
 
 // 统计数据 - 使用 computed 使标签响应语言切换
 const stats = computed(() => [
-  { key: 'total', icon: '📁', value: statsValues.value.total, label: t('dashboard.totalProjects'), valueClass: 'stat-total' },
-  { key: 'progress', icon: '⏰', value: statsValues.value.progress, label: t('dashboard.inProgress'), valueClass: 'stat-progress' },
-  { key: 'pending', icon: '⏳', value: statsValues.value.pending, label: t('dashboard.delayedProjects'), valueClass: 'stat-pending' },
-  { key: 'completed', icon: '✅', value: statsValues.value.completed, label: t('dashboard.completed'), valueClass: 'stat-completed' }
+  {
+    key: 'total',
+    type: 'primary',
+    icon: 'Folder',
+    value: statsValues.value.total,
+    unit: '',
+    label: t('dashboard.totalProjects'),
+    trend: null
+  },
+  {
+    key: 'progress',
+    type: 'warning',
+    icon: 'Document',
+    value: statsValues.value.progress,
+    unit: '',
+    label: t('dashboard.inProgress'),
+    trend: null
+  },
+  {
+    key: 'pending',
+    type: 'danger',
+    icon: 'PieChart',
+    value: statsValues.value.pending,
+    unit: '',
+    label: t('dashboard.delayedProjects'),
+    trend: null
+  },
+  {
+    key: 'completed',
+    type: 'success',
+    icon: 'Check',
+    value: statsValues.value.completed,
+    unit: '',
+    label: t('dashboard.completed'),
+    trend: null
+  }
 ])
 
 // 统计数据值
@@ -233,61 +217,45 @@ const statsValues = ref({
   completed: 0
 })
 
-const recentDeclarations = ref([])
-const projectProgress = ref([])
+// 新仪表板不再展示申报列表、项目进度等旧模块，相关数据与接口调用已移除
 
-// 快捷操作 - 使用 computed 使标签响应语言切换
-const quickActions = computed(() => [
-  { key: 'newDeclaration', icon: Document, buttonClass: 'primary', label: t('dashboard.newDeclaration') },
-  { key: 'projectList', icon: Folder, buttonClass: 'secondary', label: t('dashboard.projectList') },
-  { key: 'applyAcceptance', icon: Check, buttonClass: 'secondary', label: t('dashboard.applyAcceptance') },
-  { key: 'academicSearch', icon: Reading, buttonClass: 'secondary', label: t('dashboard.academicSearch') },
-  { key: 'knowledgeSearch', icon: Search, buttonClass: 'text', label: t('dashboard.knowledgeSearch') }
-])
+// 图表相关数据（由后端聚合接口提供）
+// 趋势图数据结构：{ x: string[], series: [{ name: string, data: number[] }, ...] }
+const trendChartData = ref({
+  x: [],
+  series: []
+})
 
+const declarationStatusSeries = ref([])
+
+const projectStatusSeries = ref([])
+
+const departmentChartData = ref({
+  x: [],
+  y: []
+})
+
+const projectTypeSeries = ref([])
+
+// 延期预警数据
+const delayWarningData = ref({
+  riskLevels: [],
+  upcomingDeadlines: []
+})
+
+// 风险等级 i18n 标签
+const riskLevelLabels = computed(() => ({
+  1: t('dashboard.riskLevel.delayed'),
+  2: t('dashboard.riskLevel.sevenDays'),
+  3: t('dashboard.riskLevel.thirtyDays'),
+  4: t('dashboard.riskLevel.normal')
+}))
+
+const activeStatusTab = ref('declaration')
 
 // 格式化数字
 const formatNumber = (num) => {
   return num.toLocaleString()
-}
-
-// 获取状态标签类型
-const getStatusTagType = (statusType) => {
-  const typeMap = {
-    submitting: 'warning',
-    success: 'success',
-    failed: 'danger',
-    withdrawn: 'info'
-  }
-  return typeMap[statusType] || 'info'
-}
-
-// 注意：进度条颜色逻辑已移至 ProjectProgressBar 组件中
-
-// 状态数字到字符串的映射
-const STATUS_MAP = {
-  1: { type: 'submitting', label: '申报已提交' },
-  2: { type: 'success', label: '申报成功' },
-  3: { type: 'failed', label: '申报未通过' }
-}
-
-// 将后端状态数字转换为前端状态类型
-const mapStatusType = (status) => {
-  return STATUS_MAP[status]?.type || 'submitting'
-}
-
-// 格式化提交时间 - 格式：yyyy-mm-dd
-const formatSubmitTime = (timeStr) => {
-  if (!timeStr) return '-'
-  try {
-    const date = new Date(timeStr)
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-  } catch (e) {
-    return timeStr
-  }
 }
 
 // 加载数据
@@ -296,7 +264,7 @@ const loadDashboardData = async () => {
     loading.value = true
     logger.info('Starting to load dashboard data')
 
-    // 获取项目统计信息
+    // 1）获取项目统计信息
     try {
       const statsResponse = await getProjectStatistics()
       if (statsResponse.code === 200 && statsResponse.data) {
@@ -311,46 +279,194 @@ const loadDashboardData = async () => {
       // 统计信息加载失败不影响其他数据展示
     }
 
-    // 使用申报分页查询接口，获取最近5条
-    const declarationsResponse = await getDeclarationList({
-      pageNo: 1,
-      pageSize: 5,
-      sortBy: 'submitTime',
-      sortOrder: 'DESC'
-    })
+    // 2）加载趋势图数据
+    try {
+      const trendResp = await getDashboardTrend()
+      logger.info('Dashboard trend API response:', trendResp)
+      if (trendResp.code === 200 && trendResp.data) {
+        const data = trendResp.data
+        // 后端返回格式: { x: [], declarationSeries: [], projectSeries: [] }
+        // 注意：后端返回的是 Long 类型，前端需要转换为 Number
+        const declarationData = (data.declarationSeries || []).map(v => Number(v))
+        const projectData = (data.projectSeries || []).map(v => Number(v))
 
-    // 更新最近申报数据（限制5条）
-    if (declarationsResponse.code === 200 && declarationsResponse.data) {
-      const records = declarationsResponse.data.records || []
-      recentDeclarations.value = records.slice(0, 5).map(item => ({
-        id: item.id,
-        number: item.number || '-',
-        topic: item.researchTopic || '-',
-        submitTime: formatSubmitTime(item.submitTime),
-        status: item.statusDescription || STATUS_MAP[item.status]?.label || '-',
-        statusType: mapStatusType(item.status)
-      }))
-      logger.info('Recent declarations loaded successfully', { count: recentDeclarations.value.length })
+        logger.info('Trend data processed:', { x: data.x, declarationData, projectData })
+
+        trendChartData.value = {
+          x: data.x || [],
+          series: [
+            {
+              name: t('dashboard.declarationCount'),
+              data: declarationData,
+              color: '#1e3a8a' // 深蓝色 - 申报
+            },
+            {
+              name: t('dashboard.projectCount'),
+              data: projectData,
+              color: '#f59e0b' // 琥珀色/黄色 - 项目（与饼图已延期项目颜色一致）
+            }
+          ]
+        }
+        logger.info('Dashboard trend data loaded successfully', trendChartData.value)
+      }
+    } catch (error) {
+      logger.error('Failed to load dashboard trend data', error)
     }
 
-    // 使用项目分页查询接口，获取最近6条
-    const progressResponse = await getProjectList({
-      pageNo: 1,
-      pageSize: 6,
-      sortBy: 'createdTime',
-      sortOrder: 'DESC'
-    })
+    // 3）加载状态分布数据
+    try {
+      const declarationStatusResp = await getDeclarationStatusStats()
+      if (declarationStatusResp.code === 200 && Array.isArray(declarationStatusResp.data)) {
+        // 申报状态映射：按用户要求显示为 申报进行中、申报成功、申报未通过
+        // 支持字符串状态和数字状态（1=进行中，2=成功，3=未通过）
+        const declarationStatusMap = {
+          '1': { name: t('declaration.statusInProgress'), color: '#3b82f6' },
+          '2': { name: t('declaration.statusSuccess'), color: '#22c55e' },
+          '3': { name: t('declaration.statusFailed'), color: '#ef4444' }
+        }
 
-    // 更新项目进度数据（限制6条）
-    if (progressResponse.code === 200 && progressResponse.data) {
-      const records = progressResponse.data.records || []
-      projectProgress.value = records.slice(0, 6).map(item => ({
-        id: item.id,
-        name: item.name || '-',
-        progress: item.progress || 0,
-        expectedDate: formatDate(item.estimatedCompletionTime || item.endTime, 'YYYY-MM-DD')
-      }))
-      logger.info('Project progress loaded successfully', { count: projectProgress.value.length })
+        // 构建所有3个状态的完整数据（缺少数值为0）
+        const declarationCounts = {}
+        declarationStatusResp.data.forEach((item) => {
+          const rawStatus = String(item.status || '')
+          declarationCounts[rawStatus] = item.count
+        })
+
+        declarationStatusSeries.value = [
+          { name: declarationStatusMap['1'].name, value: declarationCounts['1'] || 0, itemStyle: { color: declarationStatusMap['1'].color } },
+          { name: declarationStatusMap['2'].name, value: declarationCounts['2'] || 0, itemStyle: { color: declarationStatusMap['2'].color } },
+          { name: declarationStatusMap['3'].name, value: declarationCounts['3'] || 0, itemStyle: { color: declarationStatusMap['3'].color } }
+        ]
+      }
+
+      const projectStatusResp = await getProjectStatusStats()
+      if (projectStatusResp.code === 200 && Array.isArray(projectStatusResp.data)) {
+        // 项目状态映射：按用户要求显示为 进行中、已完成、已延期、已取消
+        // 支持字符串状态和数字状态（1=进行中，2=已完成，3=已延期，4=已取消）
+        const projectStatusMap = {
+          '1': { name: t('project.statusInProgress'), color: '#3b82f6' },
+          '2': { name: t('project.statusCompleted'), color: '#22c55e' },
+          '3': { name: t('dashboard.delayedProjects'), color: '#f59e0b' },
+          '4': { name: t('project.statusCancelled'), color: '#6b7280' }
+        }
+
+        // 构建所有4个状态的完整数据（缺少数值为0）
+        const projectCounts = {}
+        projectStatusResp.data.forEach((item) => {
+          const rawStatus = String(item.status || '')
+          projectCounts[rawStatus] = item.count
+        })
+
+        projectStatusSeries.value = [
+          { name: projectStatusMap['1'].name, value: projectCounts['1'] || 0, itemStyle: { color: projectStatusMap['1'].color } },
+          { name: projectStatusMap['2'].name, value: projectCounts['2'] || 0, itemStyle: { color: projectStatusMap['2'].color } },
+          { name: projectStatusMap['3'].name, value: projectCounts['3'] || 0, itemStyle: { color: projectStatusMap['3'].color } },
+          { name: projectStatusMap['4'].name, value: projectCounts['4'] || 0, itemStyle: { color: projectStatusMap['4'].color } }
+        ]
+      }
+    } catch (error) {
+      logger.error('Failed to load status distribution data', error)
+    }
+
+    // 4）加载按课题发布部门统计
+    try {
+      const deptResp = await getByDepartmentStats()
+      logger.info('Department API raw response:', deptResp)
+      if (deptResp.code === 200 && Array.isArray(deptResp.data)) {
+        // 定义部门映射（后端返回的中文 -> i18n键）
+        const departmentMap = {
+          '国自然-青年基金': t('dashboard.departments.youthFund'),
+          '国自然-面上基金': t('dashboard.departments.generalFund'),
+          '国自然-地区项目': t('dashboard.departments.regionalProject'),
+          '省市级项目': t('dashboard.departments.provincialProject'),
+          '其他': t('dashboard.departments.other')
+        }
+
+        // 定义部门排序顺序
+        const departmentOrder = [
+          '国自然-青年基金',
+          '国自然-面上基金',
+          '国自然-地区项目',
+          '省市级项目'
+        ]
+
+        // 处理返回数据：映射i18n、排序、其他项放最后
+        const processedData = []
+        let otherCount = 0
+
+        deptResp.data.forEach((item) => {
+          const rawName = item.departmentName
+          const count = item.count
+
+          if (departmentOrder.includes(rawName)) {
+            // 已知部门，按顺序放入
+            processedData.push({
+              name: departmentMap[rawName] || rawName,
+              count: count,
+              order: departmentOrder.indexOf(rawName)
+            })
+          } else {
+            // 未知部门，归入"其他"
+            otherCount += count
+          }
+        })
+
+        // 按固定顺序排序
+        processedData.sort((a, b) => a.order - b.order)
+
+        // 如果有"其他"数据或未分类的数据，添加到最后
+        const existingOther = deptResp.data.find(item => item.departmentName === '其他')
+        if (existingOther) {
+          otherCount += existingOther.count
+        }
+
+        if (otherCount > 0) {
+          processedData.push({
+            name: t('dashboard.departments.other'),
+            count: otherCount,
+            order: 999
+          })
+        }
+
+        // 提取x轴和y轴数据
+        const x = processedData.map(item => item.name)
+        const y = processedData.map(item => item.count)
+
+        departmentChartData.value = { x, y }
+        logger.info('Dashboard department stats loaded:', { rawData: deptResp.data, processed: departmentChartData.value })
+      }
+    } catch (error) {
+      logger.error('Failed to load department stats', error)
+    }
+
+    // 5）加载按项目类型分布 - 暂时注释，后续按需启用
+    // try {
+    //   const typeResp = await getByTypeStats()
+    //   logger.info('Type API raw response:', typeResp)
+    //   if (typeResp.code === 200 && Array.isArray(typeResp.data)) {
+    //     projectTypeSeries.value = typeResp.data.map((item) => ({
+    //       name: item.type,
+    //       value: item.count
+    //     }))
+    //     logger.info('Dashboard type stats loaded:', { rawData: typeResp.data, processed: projectTypeSeries.value })
+    //   }
+    // } catch (error) {
+    //   logger.error('Failed to load project type stats', error)
+    // }
+
+    // 6）加载项目延期预警数据
+    try {
+      const delayWarningResp = await getDelayWarningStats()
+      logger.info('Delay warning API response:', delayWarningResp)
+      if (delayWarningResp.code === 200 && delayWarningResp.data) {
+        delayWarningData.value = {
+          riskLevels: delayWarningResp.data.riskLevels || [],
+          upcomingDeadlines: delayWarningResp.data.upcomingDeadlines || []
+        }
+        logger.info('Dashboard delay warning loaded:', delayWarningData.value)
+      }
+    } catch (error) {
+      logger.error('Failed to load delay warning stats', error)
     }
   } catch (error) {
     logger.error('Dashboard data loading failed', error)
@@ -435,11 +551,74 @@ onMounted(() => {
   margin: 0;
 }
 
+.status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.status-tabs {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.25);
+}
+
+.status-tab {
+  min-width: 90px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.status-tab:hover {
+  color: var(--color-primary);
+}
+
+.status-tab.active {
+  background: var(--color-primary);
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+}
+
 .stats-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 24px;
+
+  // 统计卡片左侧彩色条纹 - 使用 :deep() 穿透到子组件
+  :deep(.dashboard-stat-card) {
+    border-left: 4px solid transparent;
+  }
+
+  :deep(.stat-total),
+  :deep(.stat--primary) {
+    border-left-color: var(--color-primary) !important;
+  }
+
+  :deep(.stat-progress),
+  :deep(.stat--warning) {
+    border-left-color: var(--color-warning) !important;
+  }
+
+  :deep(.stat-pending),
+  :deep(.stat--danger) {
+    border-left-color: var(--color-danger) !important;
+  }
+
+  :deep(.stat-completed),
+  :deep(.stat--success) {
+    border-left-color: var(--color-success) !important;
+  }
 }
 
 .stat-card {
@@ -532,7 +711,7 @@ onMounted(() => {
 
 .stat-total { color: #1e3a8a; }
 .stat-progress { color: #f59e0b; }
-.stat-pending { color: #2563eb; }
+.stat-pending { color: #dc2626; }
 .stat-completed { color: #16a34a; }
 
 .main-content {
@@ -643,7 +822,7 @@ onMounted(() => {
   min-width: 0; // 🔥 关键：允许在 grid 中收缩
   box-sizing: border-box;
   overflow: hidden; // 🔥 防止内容溢出
-  
+
   // 🔥 快捷操作区域需要 padding
   :deep(.base-card__content) {
     padding: var(--gap-lg);
@@ -653,389 +832,23 @@ onMounted(() => {
   }
 }
 
-.progress-card {
+// 延期预警区域
+.bottom-section {
+  width: 100%;
+}
+
+.delay-warning-card {
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  min-width: 0;
   box-sizing: border-box;
-  
-  // 🔥 项目进度区域需要 padding
+
   :deep(.base-card__content) {
     padding: var(--gap-lg);
-  }
-}
-
-
-// Element Plus 表格样式 - 与 DeclarationList.vue 保持一致
-.declaration-table {
-  width: 100%;
-  max-width: 100%; // 🔥 限制最大宽度，防止溢出
-  border-radius: 8px;
-  overflow: hidden; // 🔥 改为 hidden，防止内容溢出
-  border: 1px solid var(--border);
-  box-sizing: border-box; // 🔥 确保盒模型正确
-
-  // 🔥 使用最强的选择器优先级，确保覆盖所有全局样式
-  // 关键：使用 .declaration-table 类名 + 完整的选择器路径 + 多重选择器
-  :deep(.el-table) {
     width: 100%;
     max-width: 100%;
-    
-    // 表头样式 - 使用最高优先级覆盖全局样式
-    .el-table__header-wrapper {
-      width: 100%;
-      
-      .el-table__header {
-        width: 100% !important;
-        
-        th {
-          padding: 14px 16px !important;
-          font-size: 14px !important;
-          font-weight: 600 !important; // 🔥 加粗
-          color: #000000 !important; // 🔥 变黑 - 覆盖所有全局样式
-          background-color: var(--surface) !important;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          border-bottom: 1px solid var(--border) !important;
-        }
-        
-        // 🔥 确保表头单元格内的文字也应用黑色和加粗（使用独立选择器提高优先级）
-        th .cell {
-          font-weight: 600 !important; // 🔥 加粗
-          color: #000000 !important; // 🔥 变黑 - 覆盖所有全局样式
-          font-size: 14px !important;
-          line-height: 1.5 !important;
-        }
-      }
-    }
-    
-    // 🔥 确保表体容器宽度正确
-    .el-table__body-wrapper {
-      width: 100%;
-      max-width: 100%;
-    }
+    box-sizing: border-box;
   }
-  
-  // 🔥 额外的样式规则，使用更直接的选择器确保覆盖
-  :deep(.el-table__header th),
-  :deep(.el-table__header th.cell),
-  :deep(.el-table__header th .cell) {
-    font-weight: 600 !important; // 🔥 加粗
-    color: #000000 !important; // 🔥 变黑
-    font-size: 14px !important;
-  }
-  
-  // 表体样式
-  :deep(.el-table) {
-    .el-table__body {
-      width: 100%;
-      
-      tr {
-        cursor: pointer;
-        transition: background-color 0.2s;
-
-        &:hover {
-          background-color: var(--hover) !important;
-        }
-      }
-
-      td {
-        padding: 12px 16px !important;
-        font-size: 14px;
-        color: var(--text);
-        border-bottom: 1px solid var(--border) !important;
-      }
-    }
-    
-    // 操作列固定右侧
-    .el-table__fixed-right {
-      right: 0 !important;
-      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-      
-      .el-table__fixed-body-wrapper {
-        tr.el-table__row--striped {
-          td {
-            overflow: visible !important;
-            position: relative !important;
-            
-            .cell {
-              overflow: visible !important;
-              position: relative !important;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // 研究课题列允许换行
-  :deep(.el-table__body-wrapper) {
-    .topic-cell {
-      word-break: break-word;
-      white-space: normal !important; // 🔥 研究课题允许换行
-      line-height: 1.5;
-    }
-    
-    .number-cell {
-      white-space: nowrap !important; // 🔥 申报编号不换行
-    }
-  }
-}
-
-.number-cell { 
-  color: var(--text-3); 
-  font-weight: 500; 
-}
-
-.topic-cell { 
-  color: var(--text-1);
-  word-break: break-word;
-  white-space: normal;
-}
-
-.time-cell { 
-  color: var(--text-3); 
-}
-
-// 状态标签样式 - 与 DeclarationList.vue 保持一致
-.status-tag {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.status-submitting {
-  background-color: #fef3c7;
-  color: #f59e0b;
-}
-
-.status-success {
-  background-color: #dcfce7;
-  color: #16a34a;
-}
-
-.status-failed {
-  background-color: #fee2e2;
-  color: #dc2626;
-}
-
-.status-withdrawn {
-  background-color: #e0e7ff;
-  color: #2563eb;
-}
-
-// 操作按钮样式 - 与 DeclarationList.vue 保持一致
-.action-btn {
-  padding: 4px; // 🔥 图标按钮紧凑样式
-  min-width: 32px;
-  height: 28px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: none;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0; // 🔥 图标按钮不需要间距
-  user-select: none;
-  
-  .el-icon {
-    font-size: 16px; // 🔥 图标大小
-  }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    
-    &:hover {
-      background: none;
-      color: inherit;
-    }
-  }
-  
-  &.btn-primary {
-    color: var(--color-primary);
-    border-color: var(--color-primary);
-    
-    &:hover:not(:disabled) {
-      background: var(--color-primary);
-      color: var(--surface);
-    }
-  }
-  
-  &.btn-success {
-    color: #16a34a;
-    border-color: #16a34a;
-    display: inline-flex;
-    align-items: center;
-    
-    &:hover:not(:disabled) {
-      background: #16a34a;
-      color: var(--surface);
-    }
-  }
-  
-  &.btn-info {
-    color: var(--text-3);
-    border-color: var(--text-3);
-    
-    &:hover:not(:disabled) {
-      background: var(--text-3);
-      color: var(--surface);
-    }
-  }
-}
-
-.quick-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.action-button {
-  display: flex;
-  align-items: center;
-  padding: 10px 14px;
-  border-radius: 6px;
-  text-decoration: none;
-  color: #374151;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s;
-  cursor: pointer;
-  border: none;
-  background: none;
-  width: 100%;
-  text-align: left;
-  box-sizing: border-box;
-
-  .action-icon {
-    margin-right: 8px;
-    font-size: 16px;
-  }
-
-  &.primary {
-    background-color: var(--surface);
-    border: 1px solid var(--color-primary);
-    color: var(--color-primary);
-  }
-
-  &.primary:hover {
-    background-color: #e0f2fe;
-    border-color: #1e40af;
-    color: #1e40af;
-  }
-
-  &.secondary {
-    background-color: var(--surface);
-    border: 1px solid var(--color-primary);
-    color: var(--color-primary);
-  }
-
-  &.secondary:hover {
-    background-color: #e0f2fe;
-    border-color: #1e40af;
-    color: #1e40af;
-  }
-
-  &.text {
-    background-color: var(--surface);
-    color: var(--color-primary);
-    border: 1px solid var(--color-primary);
-  }
-
-  &.text:hover {
-    background-color: #e0f2fe;
-    border-color: #1e40af;
-    color: #1e40af;
-  }
-}
-
-.progress-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.progress-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 12px;
-  padding: 12px;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  transition: all 0.2s;
-  gap: 8px;
-  background: var(--hover);
-  border: 1px solid var(--border);
-  width: 100%;
-  box-sizing: border-box;
-
-  &:hover {
-    background-color: var(--hover);
-    border-color: var(--color-primary);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.1);
-  }
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-
-.progress-info {
-  flex: 1;
-  min-width: 0;
-  max-width: 40%;
-}
-
-.progress-name {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text-1);
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.progress-time {
-  font-size: 12px;
-  color: var(--text-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.progress-bar-container {
-  width: 100px;
-  flex-shrink: 0;
-  margin: 0 8px;
-}
-
-.progress-percentage {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-primary);
-  min-width: 30px;
-  text-align: right;
-  flex-shrink: 0;
-}
-
-.loading-skeleton {
-  padding: 16px;
 }
 
 // 响应式设计

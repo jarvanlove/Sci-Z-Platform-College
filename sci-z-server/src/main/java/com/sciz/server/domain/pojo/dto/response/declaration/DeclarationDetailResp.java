@@ -185,5 +185,10 @@ public class DeclarationDetailResp {
          * 时间戳
          */
         private String timestamp;
+
+        /**
+         * 失败原因（仅当 status 为 failed 时有值）
+         */
+        private String errorMessage;
     }
 }

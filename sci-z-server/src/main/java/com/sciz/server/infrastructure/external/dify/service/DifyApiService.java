@@ -210,7 +210,7 @@ public class DifyApiService {
     }
 
     /**
-     * 更新数据集
+     * 更新数据集（PUT 全量更新）
      */
     public ResponseEntity<String> updateDataset(String datasetId, DifyDatasetRequest request, Long userId,
             String resourceId, String keyType) {
@@ -218,6 +218,28 @@ public class DifyApiService {
             return difyApiClient.request("PUT", "/datasets/" + datasetId, request,  resourceId, keyType);
         } catch (HttpClientErrorException e) {
             log.error("Dify API调用失败: {}", e.getMessage());
+            return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
+        }
+    }
+
+    /**
+     * 修改知识库详情（PATCH 部分更新，仅同步名称、描述等指定字段）
+     * 对应 Dify 官方文档：PATCH /datasets/{dataset_id}
+     *
+     * @param datasetId   Dify 知识库 ID（dataset_id）
+     * @param request     请求体（name、description 等，选填）
+     * @param userId      用户 ID（用于审计）
+     * @param resourceId  资源 ID（API Key 对应）
+     * @param keyType     密钥类型（如 dataset）
+     * @return 响应体
+     */
+    public ResponseEntity<String> patchDataset(String datasetId, DifyDatasetPatchRequest request, Long userId,
+            String resourceId, String keyType) {
+        try {
+            return difyApiClient.request("PATCH", "/datasets/" + datasetId, request, resourceId, keyType);
+        } catch (HttpClientErrorException e) {
+            log.error("Dify PATCH 知识库详情失败: datasetId={}, status={}, body={}",
+                    datasetId, e.getStatusCode(), e.getResponseBodyAsString());
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
         }
     }
@@ -363,34 +385,21 @@ public class DifyApiService {
     }
 
     /**
-     * 构建默认配置JSON
-     * 使用配置文件中的文档处理配置
+     * 构建上传文档时的最小 data 配置，仅包含处理规则。
+     * 不传 embedding_model、retrieval_model、indexing_technique 等，以便 Dify 使用该知识库在「知识库设置」中
+     * 已配置的策略（索引模式、Embedding 模型、检索方式、Top K 等），避免服务端全局配置覆盖用户在 Dify 的配置。
+     *
+     * @return 仅含 process_rule 的 JSON 字符串
      */
-    private String buildDefaultConfigJson() {
+    private String buildUploadDataFollowDatasetConfig() {
         Map<String, Object> config = new HashMap<>();
-        // 基础配置
-        config.put("indexing_technique", difyDocumentConfig.getIndexingTechnique());
-        config.put("doc_form", difyDocumentConfig.getDocForm());
-        config.put("doc_language", difyDocumentConfig.getDocLanguage());
-        config.put("embedding_model", difyDocumentConfig.getEmbeddingModel());
-        config.put("embedding_model_provider", difyDocumentConfig.getEmbeddingModelProvider());
-        // 检索模型配置
-        Map<String, Object> retrievalModel = new HashMap<>();
-        retrievalModel.put("search_method", difyDocumentConfig.getRetrievalModel().getSearchMethod());
-        retrievalModel.put("reranking_enable", difyDocumentConfig.getRetrievalModel().getRerankingEnable());
-        retrievalModel.put("top_k", difyDocumentConfig.getRetrievalModel().getTopK());
-        retrievalModel.put("score_threshold_enabled",
-                difyDocumentConfig.getRetrievalModel().getScoreThresholdEnabled());
-        retrievalModel.put("score_threshold", difyDocumentConfig.getRetrievalModel().getScoreThreshold());
-        config.put("retrieval_model", retrievalModel);
-        // 处理规则配置
         Map<String, Object> processRule = new HashMap<>();
         processRule.put("mode", difyDocumentConfig.getProcessRule().getMode());
         config.put("process_rule", processRule);
         try {
             return new ObjectMapper().writeValueAsString(config);
         } catch (Exception e) {
-            throw new RuntimeException("构建默认配置JSON失败", e);
+            throw new RuntimeException("构建上传 data 配置失败", e);
         }
     }
 
@@ -502,9 +511,9 @@ public class DifyApiService {
             // 验证文件
             validateFile(file);
 
-            // 构建表单数据
+            // 构建表单数据：仅传 process_rule，索引/嵌入/检索策略沿用 Dify 知识库设置（图2）
             Map<String, Object> data = new HashMap<>();
-            data.put("data", buildDefaultConfigJson());
+            data.put("data", buildUploadDataFollowDatasetConfig());
 
             log.info("上传单个文件到 Dify API: fileName={}, size={}",
                     file.getOriginalFilename(), file.getSize());
@@ -597,9 +606,9 @@ public class DifyApiService {
                     .map(FileStat::fileName)
                     .toList();
 
-            // 4. 构建表单数据（所有文件共享同一个 data 配置）
+            // 4. 构建表单数据：仅传 process_rule，索引/嵌入/检索策略沿用 Dify 知识库设置
             Map<String, Object> data = new HashMap<>();
-            data.put("data", buildDefaultConfigJson());
+            data.put("data", buildUploadDataFollowDatasetConfig());
 
             // 5. 直接调用 Dify API 批量上传
             log.info("📤 开始批量上传文件到 Dify: datasetId={}, fileCount={}, totalSize={} bytes ({}), userId={}",

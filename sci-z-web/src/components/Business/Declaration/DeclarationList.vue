@@ -178,9 +178,9 @@
         <!-- 操作列 -->
         <template #actions="{ row }">
           <div class="action-buttons">
-            <!-- 更新申报状态按钮（暂时隐藏，由后端根据工作流执行结果自动更新） -->
+            <!-- 更新申报状态按钮：仅当申报书生成状态为「已完成」时显示 -->
             <BaseTooltip
-              v-if="false"
+              v-if="row.workflowStatus === 'completed'"
               :content="$t('declaration.updateStatus') || '更新申报状态'"
               placement="top"
             >
@@ -260,6 +260,19 @@
                 </template>
               </el-dropdown>
             </BaseTooltip>
+            <!-- 申报书编辑上传按钮：有申报书生成状态时显示，上传后覆盖当前申报书 -->
+            <BaseTooltip
+              v-if="canUploadDocument(row)"
+              :content="$t('declaration.uploadDocumentEdit') || '申报书编辑'"
+              placement="top"
+            >
+              <button
+                class="action-btn btn-upload"
+                @click.stop="handleUploadDocument(row)"
+              >
+                <el-icon><Upload /></el-icon>
+              </button>
+            </BaseTooltip>
             <!-- 预览按钮 -->
             <BaseTooltip
               v-if="canPreview(row)"
@@ -278,6 +291,43 @@
       </BaseTable>
     </BaseCard>
 
+    <!-- 申报书编辑：上传本地文件弹窗（与项目里程碑一致：先选文件展示，点击开始上传后调接口并显示进度） -->
+    <el-dialog
+      v-model="showDocumentUploadDialog"
+      :title="$t('knowledge.uploadLocalFile')"
+      width="800px"
+      :close-on-click-modal="false"
+      @close="onDocumentUploadDialogClose"
+    >
+      <!-- 上传进度列表（点击开始上传后显示） -->
+      <FileUploadProgressList
+        v-if="showDocumentUploadProgress && uploadDocumentResults.length > 0"
+        :upload-results="uploadDocumentResults"
+        @close="handleDocumentUploadProgressClose"
+      />
+      <!-- 文件选择区域（未开始上传时显示：拖拽区 + 待上传列表 + 开始上传） -->
+      <template v-else>
+        <FileUpload
+          v-model="declarationPendingFiles"
+          mode="batch"
+          :limit="1"
+          :max-batch-count="1"
+          :multiple="false"
+          accept=".doc,.docx,.pdf"
+          :drag="true"
+          :show-file-list="true"
+          :show-tips="false"
+          :allowed-types="declarationDocumentAllowedTypes"
+          :max-size="200"
+          :upload-tip="$t('project.detail.uploadHint') || '支持拖拽上传，可批量上传多个文件'"
+          @batch-upload="onDeclarationBatchUpload"
+        />
+      </template>
+      <template #footer>
+        <el-button v-if="!showDocumentUploadProgress" @click="closeDocumentUploadDialog">{{ $t('common.cancel') }}</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 文件预览组件 - 已改为新窗口打开，保留组件以防需要 -->
     <!-- <FilePreview
       v-model="showPreviewDialog"
@@ -292,12 +342,16 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Refresh, Document, Edit, View, Download, TopRight } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Document, Edit, View, Download, TopRight, Upload } from '@element-plus/icons-vue'
 import { BaseCard, BaseTable, BaseTooltip, BackButton } from '@/components/Common'
+import { FileUpload } from '@/components/Business/Form'
+import FileUploadProgressList from '@/components/Business/Knowledge/FileUploadProgressList.vue'
+import { validateFileSize, validateFileType } from '@/constants/attachment'
 import { DECLARATION_STATUS_CONFIG } from '@/utils/constants'
 import { 
   getDeclarationList, 
-  updateDeclarationStatus
+  updateDeclarationStatus,
+  uploadDeclarationDocument
 } from '@/api/Declaration'
 import { downloadFile } from '@/api/File'
 import { createLogger } from '@/utils/simpleLogger'
@@ -349,11 +403,10 @@ const editableStatusOptions = computed(() => [
   { label: t('declaration.statusFailed'), value: 'failed' }
 ])
 
-// 状态更新选项（用于操作列按钮的下拉菜单，文字已修改，不包含"申报中"）
+// 状态更新选项（用于操作列按钮的下拉菜单）：申报成功、申报未通过
 const statusUpdateOptions = computed(() => [
-  // 移除"申报中"选项，只保留"申报已提交"和"申报未通过"
-  { label: t('declaration.statusSubmitted') || '申报已提交', value: 'success' }, // 申报成功 → 申报已提交
-  { label: t('declaration.statusRejected') || '申报未通过', value: 'failed' } // 申报失败 → 申报未通过
+  { label: t('declaration.statusSuccess'), value: 'success' },
+  { label: t('declaration.statusRejected') || '申报未通过', value: 'failed' }
 ])
 
 // 获取工作流状态标签（使用后端返回的 workflowStatusDescription，如果没有则使用默认标签）
@@ -423,8 +476,8 @@ const tableColumns = computed(() => [
   },
   {
     prop: 'workflowStatus',
-    label: t('declaration.workflowStatus'),
-    minWidth: 100, // 🔥 优化最小宽度，确保状态文字完整显示
+    label: t('declaration.workflowStatusColumn'),
+    minWidth: 120,
     align: 'center'
   }
 ])
@@ -460,6 +513,109 @@ const canDownload = (record) => {
 // 判断是否可以预览
 const canPreview = (record) => {
   return canDownloadPreview(record)
+}
+
+// 申报书编辑上传：展示时机与下载按钮一致（有申报书时可替换）
+const canUploadDocument = (record) => {
+  return canDownload(record)
+}
+
+// 申报书编辑上传：仅允许 doc / docx / pdf，最大 200MB（调用申报书覆盖接口，保证列表下载/预览可用）
+const declarationDocumentAllowedTypes = ['doc', 'docx', 'pdf']
+
+const showDocumentUploadDialog = ref(false)
+const declarationIdForUpload = ref(null)
+const declarationPendingFiles = ref([])
+const showDocumentUploadProgress = ref(false)
+const uploadDocumentResults = ref([])
+
+const handleUploadDocument = (row) => {
+  declarationIdForUpload.value = row.id
+  declarationPendingFiles.value = []
+  showDocumentUploadProgress.value = false
+  uploadDocumentResults.value = []
+  showDocumentUploadDialog.value = true
+}
+
+// 点击「开始上传」后调用：校验 → 调后端 → 展示进度
+const onDeclarationBatchUpload = async (files) => {
+  const declarationId = declarationIdForUpload.value
+  if (!declarationId || !files || files.length === 0) {
+    ElMessage.warning(t('declaration.uploadDocumentNoFile') || '请先选择文件')
+    return
+  }
+  const file = files[0]
+
+  const maxSizeMB = 200
+  const sizeValidation = validateFileSize(file, maxSizeMB)
+  if (!sizeValidation.passed) {
+    ElMessage.error(`${file.name}: ${sizeValidation.reason}`)
+    return
+  }
+  const typeValidation = validateFileType(file, declarationDocumentAllowedTypes)
+  if (!typeValidation.passed) {
+    ElMessage.error(`${file.name}: ${typeValidation.reason}`)
+    return
+  }
+
+  showDocumentUploadProgress.value = true
+  uploadDocumentResults.value = [{
+    fileName: file.name,
+    success: false,
+    errorMessage: null,
+    attachmentId: null,
+    fileSize: file.size || 0,
+    stage: 1,
+    stageDescription: t('knowledge.stageMinIO') || '正在上传到存储...'
+  }]
+
+  try {
+    const res = await uploadDeclarationDocument(declarationId, file)
+    const ok = res?.code === 200 && res?.data
+    uploadDocumentResults.value = [{
+      fileName: file.name,
+      success: !!ok,
+      errorMessage: ok ? null : (res?.message || t('declaration.uploadDocumentFailed')),
+      attachmentId: res?.data?.id ?? null,
+      fileSize: file.size || 0,
+      stage: ok ? 5 : 0,
+      stageDescription: ok ? (t('knowledge.uploadComplete') || '上传完成') : (res?.message || t('declaration.uploadDocumentFailed'))
+    }]
+    if (ok) {
+      ElMessage.success(t('declaration.uploadDocumentSuccess') || '申报书已更新')
+    }
+  } catch (err) {
+    uploadDocumentResults.value = [{
+      fileName: file.name,
+      success: false,
+      errorMessage: err.response?.data?.message || err.message || (t('declaration.uploadDocumentFailed') || '申报书上传失败'),
+      attachmentId: null,
+      fileSize: file.size || 0,
+      stage: 0,
+      stageDescription: t('knowledge.uploadFailed') || '上传失败'
+    }]
+    if (!err._messageShown) {
+      ElMessage.error(err.response?.data?.message || err.message || t('declaration.uploadDocumentFailed'))
+    }
+  }
+}
+
+const onDocumentUploadDialogClose = () => {
+  declarationIdForUpload.value = null
+  declarationPendingFiles.value = []
+  showDocumentUploadProgress.value = false
+  uploadDocumentResults.value = []
+}
+
+const closeDocumentUploadDialog = () => {
+  showDocumentUploadDialog.value = false
+  onDocumentUploadDialogClose()
+}
+
+const handleDocumentUploadProgressClose = () => {
+  showDocumentUploadDialog.value = false
+  onDocumentUploadDialogClose()
+  loadDeclarations()
 }
 
 // 格式化提交时间 - 格式：yyyy-mm-dd
@@ -1222,6 +1378,16 @@ onMounted(() => {
     
     &:hover:not(:disabled) {
       background: var(--text-3);
+      color: var(--surface);
+    }
+  }
+
+  &.btn-upload {
+    color: #0d9488;
+    border-color: #0d9488;
+
+    &:hover:not(:disabled) {
+      background: #0d9488;
       color: var(--surface);
     }
   }

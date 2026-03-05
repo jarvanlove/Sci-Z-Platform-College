@@ -1,10 +1,8 @@
-<!-- <!--
 /**
  * @description 仪表板统计卡片组件
  * 基于原型图设计的仪表板统计卡片，专门用于仪表板页面
  * 包含项目数量、申报数量、报告数量等统计信息展示
  */
--->
 <template>
   <BaseCard class="dashboard-stat-card" :class="[`stat--${type}`, customClass]">
     <div class="stat-content">
@@ -161,47 +159,35 @@ const formattedValue = computed(() => {
 
   .stat-icon {
     position: absolute;
-    top: var(--gap-lg);
-    right: var(--gap-lg);
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0.1;
-
-    .icon {
-      font-size: 24px;
-    }
+    top: 10px;
+    right: 12px;
+    width: 18px;
+    height: 18px;
+    border-radius: 6px;
+    opacity: 0.2;
 
     &.icon--default {
       background: var(--color-primary);
-      color: var(--color-primary);
     }
 
     &.icon--primary {
       background: var(--color-primary);
-      color: var(--color-primary);
     }
 
     &.icon--success {
       background: var(--color-success);
-      color: var(--color-success);
     }
 
     &.icon--warning {
       background: var(--color-warning);
-      color: var(--color-warning);
     }
 
     &.icon--danger {
       background: var(--color-danger);
-      color: var(--color-danger);
     }
   }
 
-  // 不同类型样式
+  // 不同类型样式 - 左侧彩色条纹
   &.stat--primary {
     border-left: 4px solid var(--color-primary);
   }
@@ -217,5 +203,22 @@ const formattedValue = computed(() => {
   &.stat--danger {
     border-left: 4px solid var(--color-danger);
   }
+
+  // 自定义类名的条纹样式（兼容 Dashboard.vue 传入的 stat-pending 等类名）
+  &.stat-total {
+    border-left: 4px solid var(--color-primary);
+  }
+
+  &.stat-progress {
+    border-left: 4px solid var(--color-warning);
+  }
+
+  &.stat-pending {
+    border-left: 4px solid var(--color-danger);
+  }
+
+  &.stat-completed {
+    border-left: 4px solid var(--color-success);
+  }
 }
-</style> -->
+</style>

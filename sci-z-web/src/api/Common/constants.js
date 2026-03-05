@@ -57,7 +57,8 @@ export const DECLARATION_API = {
   DELETE: (id) => buildApiUrl(`/declaration/${id}`), // 删除申报
   SUBMIT: (id) => buildApiUrl(`/declaration/${id}/submit`), // 提交申报
   RED_HEADER_FILE_UPLOAD: buildApiUrl('/declaration/red-header-file/upload'), // 上传红头文件
-  WORKFLOW_STATUS: (id) => buildApiUrl(`/declaration/${id}/workflow/status`) // 获取工作流状态
+  WORKFLOW_STATUS: (id) => buildApiUrl(`/declaration/${id}/workflow/status`), // 获取工作流状态
+  DOCUMENT_UPLOAD: (id) => buildApiUrl(`/declaration/${id}/document/upload`) // 申报书编辑上传（覆盖）
 }
 
 // ================================
@@ -67,6 +68,7 @@ export const DECLARATION_API = {
 export const PROJECT_API = {
   BASE_PATH: buildApiUrl('/project'),
   LIST: buildApiUrl('/project/list'), // 获取项目列表
+  EXPORT: buildApiUrl('/project/export'), // 导出项目列表 Excel
   DETAIL: (id) => buildApiUrl(`/project/detail/${id}`), // 获取项目详情
   CREATE: buildApiUrl('/project/create'),
   UPDATE: (id) => buildApiUrl(`/project/update/${id}`), // 更新项目
@@ -82,6 +84,33 @@ export const PROJECT_API = {
   MILESTONE_CANCEL_COMPLETE: (milestoneId) => buildApiUrl(`/project/milestone/${milestoneId}/cancel-complete`), // 取消完成里程碑
   CANCEL: (id) => buildApiUrl(`/project/${id}/cancel`), // 取消项目
   REPORT_SELECT: buildApiUrl('/project/report/select') // 获取报告生成可选项目列表
+}
+
+// ================================
+// 4.1 产教研智能体 API 路径
+// ================================
+
+export const INDUSTRY_EDUCATION_API = {
+  BASE_PATH: buildApiUrl('/industry-education'),
+  TEAMS_MATCH: buildApiUrl('/industry-education/teams/match'),
+  TEAM_DETAIL: (id) => buildApiUrl(`/industry-education/teams/${id}`),
+  ASSIGN: buildApiUrl('/industry-education/assign'),
+  DISTRIBUTE: buildApiUrl('/industry-education/distribute'),
+  DISTRIBUTE_ACCEPT: (messageId) => buildApiUrl(`/industry-education/distribute/${messageId}/accept`),
+  DISTRIBUTE_REJECT: (messageId) => buildApiUrl(`/industry-education/distribute/${messageId}/reject`)
+}
+
+// ================================
+// 4.2 站内消息 API 路径
+// ================================
+
+export const MESSAGE_API = {
+  BASE_PATH: buildApiUrl('/messages'),
+  LIST: buildApiUrl('/messages'),
+  DETAIL: (id) => buildApiUrl(`/messages/${id}`),
+  UNREAD_COUNT: buildApiUrl('/messages/unread-count'),
+  MARK_READ: (id) => buildApiUrl(`/messages/${id}/read`),
+  MARK_READ_ALL: buildApiUrl('/messages/read-all')
 }
 
 // ================================
@@ -138,6 +167,20 @@ export const AI_API = {
   WORKFLOW_EXECUTE: buildApiUrl('/ai/workflow/execute'),
   KNOWLEDGE_SYNC: buildApiUrl('/ai/knowledge/sync'),
   WORKFLOW_STATUS: (id) => buildApiUrl(`/ai/workflow/status/${id}`)
+}
+
+// ================================
+// 7.1 仪表板模块 API 路径
+// ================================
+
+export const DASHBOARD_API = {
+  BASE_PATH: buildApiUrl('/dashboard'),
+  TREND: buildApiUrl('/dashboard/trend'),
+  DECLARATION_STATUS: buildApiUrl('/dashboard/declaration-status'),
+  PROJECT_STATUS: buildApiUrl('/dashboard/project-status'),
+  BY_DEPARTMENT: buildApiUrl('/dashboard/by-department'),
+  BY_TYPE: buildApiUrl('/dashboard/by-type'),
+  DELAY_WARNING: buildApiUrl('/dashboard/delay-warning')
 }
 
 // ================================

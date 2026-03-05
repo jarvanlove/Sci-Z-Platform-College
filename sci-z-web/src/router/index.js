@@ -180,6 +180,46 @@ const routes = [
     }
   },
   {
+    path: '/practice/team-project-hub',
+    name: 'PracticeTeamProjectHub',
+    component: () => import('@/views/Practice/TeamProjectHub.vue'),
+    meta: {
+      title: '团队项目管理智能体',
+      requiresAuth: true,
+      layout: 'toc'
+    }
+  },
+  {
+    path: '/practice/project-summary-hub',
+    name: 'PracticeProjectSummaryHub',
+    component: () => import('@/views/Practice/ProjectSummaryHub.vue'),
+    meta: {
+      title: '项目汇总',
+      requiresAuth: true,
+      layout: 'toc'
+    }
+  },
+  {
+    path: '/practice/research-team-hub',
+    name: 'PracticeResearchTeamHub',
+    component: () => import('@/views/Practice/ResearchTeamHub.vue'),
+    meta: {
+      title: '科研团队建设',
+      requiresAuth: true,
+      layout: 'toc'
+    }
+  },
+  {
+    path: '/practice/industry-education',
+    name: 'IndustryEducation',
+    component: () => import('@/views/Practice/IndustryEducation.vue'),
+    meta: { 
+      title: '产教研智能体', 
+      requiresAuth: true,
+      layout: 'toc'
+    }
+  },
+  {
     path: '/literature',
     component: RouterView,
     children: [
@@ -247,6 +287,16 @@ const routes = [
           requiresAuth: true,
           permission: 'menu:user:security',
           layout: 'toc' // 🔥 修复：使用 ToC 布局，在侧边栏右侧显示
+        }
+      },
+      {
+        path: 'messages',
+        name: 'UserMessages',
+        component: () => import('@/views/User/Messages.vue'),
+        meta: {
+          title: '系统消息',
+          requiresAuth: true,
+          layout: 'toc'
         }
       }
     ]

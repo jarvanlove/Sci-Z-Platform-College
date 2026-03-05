@@ -1138,41 +1138,51 @@ const loadKnowledgeBases = async (isLoadMore = false) => {
       pageNo: kbListPagination.value.pageNo,
       pageSize: kbListPagination.value.pageSize,
       keyword: kbListSearchQuery.value || undefined,
-      kbType: activeKbType.value === 'all' ? undefined : activeKbType.value
+      kbType: activeKbType.value === 'all' ? undefined : activeKbType.value,
+      // 点击「个人」「项目」时，将当前登录用户 ID 传给后端，由后端按 ownerId 过滤
+      ownerId: activeKbType.value === 'all' ? undefined : authStore.userInfo?.id
     })
 
     if (response.code === 200 && response.data) {
       // 🔥 修正：使用后端实际返回的字段名 records
       const list = response.data.records || []
-      // 🔥 修正：直接使用后端返回的字段，移除不存在的字段兼容处理
-      const newList = list.map((kb) => ({
-        ...kb,
-        // 后端已直接返回 coverUrl 和 coverFileId，无需兼容处理
-        coverUrl: kb.coverUrl,
-        coverFileId: kb.coverFileId
-      }))
 
+      // 当点击「显示更多」时，如果后端已经没有更多数据（当前页返回 0 条），
+      // 需要显式将 hasMore 置为 false，隐藏「显示更多」按钮，避免用户重复点击
+      if (isLoadMore && list.length === 0) {
+        kbListPagination.value.hasMore = false
+        kbListPagination.value.loading = false
+        return
+      }
+      // 所有 Tab（全部 / 个人 / 项目）统一由后端根据入参 ownerId、kbType 过滤
+      // 前端直接使用后端返回的数据，不再做任何额外处理
       if (isLoadMore) {
         // 追加数据
-        knowledgeBases.value.push(...newList)
+        knowledgeBases.value.push(...list)
       } else {
         // 替换数据
-        knowledgeBases.value = newList
+        knowledgeBases.value = list
       }
 
       // 🔥 修正：使用后端实际返回的分页字段 total
       kbListPagination.value.total = response.data.total || 0
-      // 🔥 修复：正确判断是否还有更多数据
-      // 判断逻辑：已加载数量 < 总数，或者当前页返回的数据量等于pageSize（说明可能还有下一页）
+      // 🔥 修复：「显示更多」按钮显示逻辑
+      // 优先使用后端返回的分页信息 current/pages 判断是否还有下一页；
+      // 若无 pages 信息，再退回到 total / pageSize 的判断。
       const loadedCount = knowledgeBases.value.length
       const currentPageSize = list.length
       const total = kbListPagination.value.total
-      
-      // 如果有总数，直接比较；如果没有总数，根据当前页数据量判断
-      if (total > 0) {
+      const current = response.data.current
+      const pages = response.data.pages
+
+      if (pages && current) {
+        // 有明确的总页数信息时：当前页 < 总页数 才认为有更多
+        kbListPagination.value.hasMore = current < pages
+      } else if (total > 0) {
+        // 有总条数但无总页数：已加载数量 < 总数 才认为有更多
         kbListPagination.value.hasMore = loadedCount < total
       } else {
-        // 如果没有返回总数，根据当前页数据量判断（如果等于pageSize，可能还有更多）
+        // 既没有 total 也没有 pages：仅当当前页条数等于 pageSize 时，可能还有下一页
         kbListPagination.value.hasMore = currentPageSize === kbListPagination.value.pageSize
       }
       
@@ -1875,9 +1885,14 @@ const handleCoverSelect = async (e) => {
   if (!file) return
   if (!file.type.startsWith('image/')) {
     ElMessage.warning(t('knowledge.selectImageFile'))
+    if (e.target) e.target.value = ''
     return
   }
-  await uploadCoverFile(file, false)
+  try {
+    await uploadCoverFile(file, false)
+  } finally {
+    if (e.target) e.target.value = ''
+  }
 }
 
 /**

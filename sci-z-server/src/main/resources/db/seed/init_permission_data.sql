@@ -27,7 +27,9 @@ SELECT 0, 'AI助手',   'menu:ai:chat',          1, i.industry_type, 'ai', 'Moni
 UNION ALL
 SELECT 0, '用户中心', 'menu:user:profile',     1, i.industry_type, 'user', 'User', 60, 1 FROM industries i
 UNION ALL
-SELECT 0, '系统管理', 'menu:system:user',      1, i.industry_type, 'system', 'Setting', 70, 1 FROM industries i;
+SELECT 0, '系统管理', 'menu:system:user',      1, i.industry_type, 'system', 'Setting', 70, 1 FROM industries i
+UNION ALL
+SELECT 0, '产教研智能体', 'menu:practice:industry-education', 1, i.industry_type, '/practice/industry-education', 'School', 52, 1 FROM industries i;
 
 -- 3) 二级菜单
 WITH industries(industry_type) AS (
@@ -98,7 +100,14 @@ UNION ALL
 -- 系统管理-日志管理：清空日志、导出日志
 SELECT (SELECT id FROM sys_permission WHERE permission_code='menu:system:logs' AND industry_type=i.industry_type), '日志-清空按钮', 'button:log:clear', 2, i.industry_type, 1, 1 FROM industries i
 UNION ALL
-SELECT (SELECT id FROM sys_permission WHERE permission_code='menu:system:logs' AND industry_type=i.industry_type), '日志-导出按钮', 'button:log:export', 2, i.industry_type, 2, 1 FROM industries i;
+SELECT (SELECT id FROM sys_permission WHERE permission_code='menu:system:logs' AND industry_type=i.industry_type), '日志-导出按钮', 'button:log:export', 2, i.industry_type, 2, 1 FROM industries i
+UNION ALL
+-- 产教研智能体：匹配团队、查看团队明细、分发项目
+SELECT (SELECT id FROM sys_permission WHERE permission_code='menu:practice:industry-education' AND industry_type=i.industry_type), '产教研-匹配团队', 'button:practice:industry-education:match', 2, i.industry_type, 1, 1 FROM industries i
+UNION ALL
+SELECT (SELECT id FROM sys_permission WHERE permission_code='menu:practice:industry-education' AND industry_type=i.industry_type), '产教研-查看团队明细', 'button:practice:industry-education:detail', 2, i.industry_type, 2, 1 FROM industries i
+UNION ALL
+SELECT (SELECT id FROM sys_permission WHERE permission_code='menu:practice:industry-education' AND industry_type=i.industry_type), '产教研-分发项目', 'button:practice:industry-education:assign', 2, i.industry_type, 3, 1 FROM industries i;
 
 -- 5) 用户（仅默认 education 行业创建示例账户，避免 username 唯一索引冲突）
 -- 注意：employee_id 用于标识用户在行业内的唯一身份（学工号/工号/员工号），与 industry_type 组合唯一

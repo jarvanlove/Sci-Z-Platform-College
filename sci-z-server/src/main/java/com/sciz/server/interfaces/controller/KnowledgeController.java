@@ -32,6 +32,7 @@ import java.util.List;
 public class KnowledgeController {
 
     private final KnowledgeService knowledgeService;
+
     /**
      * 创建知识库
      *

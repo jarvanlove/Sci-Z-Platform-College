@@ -62,10 +62,26 @@
           <el-icon><Refresh /></el-icon>
           {{ $t('common.reset') }}
         </el-button>
+        <!-- 未进入导出模式：点击「导出」显示勾选列 -->
+        <template v-if="!exportModeActive">
+          <el-button type="primary" @click="enterExportMode">
+            <el-icon><Download /></el-icon>
+            {{ $t('project.list.export') }}
+          </el-button>
+        </template>
+        <!-- 导出模式：仅显示确认导出 / 取消按钮 -->
+        <template v-else>
+          <el-button type="primary" :loading="exportLoading" @click="confirmExport">
+            <el-icon><Download /></el-icon>
+            {{ $t('project.list.confirmExport') }}
+          </el-button>
+          <el-button @click="exitExportMode">{{ $t('common.cancel') }}</el-button>
+        </template>
       </div>
 
-      <!-- 项目列表表格 -->
+      <!-- 项目列表表格（仅导出模式下显示勾选列） -->
       <BaseTable
+        ref="projectTableRef"
         :data="projects"
         :columns="tableColumns"
         :loading="loading"
@@ -73,8 +89,10 @@
         :action-width="280"
         action-fixed="right"
         :empty-text="$t('project.list.noData')"
+        :selectable="exportModeActive"
         stripe
         class="project-table"
+        @selection-change="handleSelectionChange"
         @current-change="handleCurrentChange"
         @size-change="handleSizeChange"
       >
@@ -164,10 +182,10 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, DataLine, TopRight, Edit, Close } from '@element-plus/icons-vue'
+import { Search, Refresh, DataLine, TopRight, Edit, Close, Download } from '@element-plus/icons-vue'
 import { BaseCard, BaseTable, BaseDatePicker, ProjectProgressBar, BaseTooltip, BackButton } from '@/components/Common'
 import { PROJECT_STATUS, PROJECT_STATUS_CONFIG } from '@/utils/constants'
-import { getProjectList, cancelProject } from '@/api/Project'
+import { getProjectList, cancelProject, exportProjectList } from '@/api/Project'
 import { createLogger } from '@/utils/simpleLogger'
 
 const router = useRouter()
@@ -176,7 +194,13 @@ const logger = createLogger('ProjectList')
 
 // 响应式数据
 const loading = ref(false)
+const exportLoading = ref(false)
+const projectTableRef = ref(null)
 const projects = ref([])
+/** 是否处于导出模式（为 true 时显示勾选列，用户勾选后点击「确认导出」） */
+const exportModeActive = ref(false)
+/** 表格勾选中的行（仅导出选中项时使用） */
+const selectedProjects = ref([])
 
 // 搜索表单
 const searchForm = reactive({
@@ -313,31 +337,7 @@ const loadProjects = async () => {
     })
 
     // 构建请求参数（根据 API 文档）
-    const params = {
-      pageNo: pagination.current,
-      pageSize: pagination.size
-    }
-    
-    // 可选参数
-    if (searchForm.keyword && searchForm.keyword.trim()) {
-      params.keyword = searchForm.keyword.trim()
-    }
-    
-    // 状态筛选：将前端状态值转换为后端期望的值
-    if (searchForm.status) {
-      params.status = mapStatusToBackend(searchForm.status)
-    }
-    
-    // 🔥 时间范围筛选：将 dateRange 转换为 startTime 和 endTime（LocalDate 格式：YYYY-MM-DD）
-    if (searchForm.dateRange && searchForm.dateRange.length === 2) {
-      params.startTime = searchForm.dateRange[0] // 开始时间：YYYY-MM-DD
-      params.endTime = searchForm.dateRange[1]   // 结束时间：YYYY-MM-DD
-    }
-    
-    // 排序参数：默认按更新时间倒序，便于更新后列表顺序变化
-    params.sortBy = 'updatedTime'
-    params.sortOrder = 'DESC'
-
+    const params = buildListParams()
     const response = await getProjectList(params)
     
     if (response.code === 200 && response.data) {
@@ -401,6 +401,75 @@ watch(
   },
   { deep: true }
 )
+
+// 构建列表/导出共用查询参数
+const buildListParams = () => {
+  const params = {
+    pageNo: pagination.current,
+    pageSize: pagination.size,
+    sortBy: 'updatedTime',
+    sortOrder: 'DESC'
+  }
+  if (searchForm.keyword && searchForm.keyword.trim()) {
+    params.keyword = searchForm.keyword.trim()
+  }
+  if (searchForm.status) {
+    params.status = mapStatusToBackend(searchForm.status)
+  }
+  if (searchForm.dateRange && searchForm.dateRange.length === 2) {
+    params.startTime = searchForm.dateRange[0]
+    params.endTime = searchForm.dateRange[1]
+  }
+  return params
+}
+
+// 表格勾选变化（方案 A：仅导出选中项）
+const handleSelectionChange = (selection) => {
+  selectedProjects.value = selection || []
+}
+
+const clearTableSelection = () => {
+  selectedProjects.value = []
+  const tableComponent = projectTableRef.value
+  const elTable = tableComponent?.tableRef
+  if (elTable && typeof elTable.clearSelection === 'function') {
+    elTable.clearSelection()
+  }
+}
+
+// 点击「导出」进入导出模式，显示勾选列
+const enterExportMode = () => {
+  exportModeActive.value = true
+  clearTableSelection()
+}
+
+// 退出导出模式，隐藏勾选列
+const exitExportMode = () => {
+  exportModeActive.value = false
+  clearTableSelection()
+}
+
+// 确认导出：仅导出勾选的项目
+const confirmExport = async () => {
+  if (!selectedProjects.value.length) {
+    ElMessage.warning(t('project.list.exportSelectFirst'))
+    return
+  }
+  try {
+    exportLoading.value = true
+    const projectIds = selectedProjects.value.map((row) => row.id).filter(Boolean)
+    await exportProjectList({ projectIds })
+    ElMessage.success(t('project.list.exportSuccess'))
+    exitExportMode()
+  } catch (error) {
+    logger.error('Export project list failed', error)
+    if (!error._messageShown) {
+      ElMessage.error(error.message || t('project.list.exportError'))
+    }
+  } finally {
+    exportLoading.value = false
+  }
+}
 
 // 重置搜索
 const handleReset = () => {
@@ -548,6 +617,12 @@ onMounted(() => {
       border-color: var(--border) !important;
     }
   }
+}
+
+.export-mode-hint {
+  margin-right: 8px;
+  color: var(--text-2);
+  font-size: 13px;
 }
 
 // 进度列样式 - 限制进度条宽度，避免百分比文本被遮挡

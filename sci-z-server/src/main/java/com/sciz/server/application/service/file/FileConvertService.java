@@ -24,6 +24,15 @@ public interface FileConvertService {
             String originalFileName);
 
     /**
+     * 将 .doc（Word 97-2003）转为 .docx，用于 Dify 等仅支持 docx 的场景。
+     *
+     * @param docInputStream   .doc 文件输入流
+     * @param originalFileName 原始文件名（含 .doc 扩展名）
+     * @return ConvertResult 转换后的 docx 流与元数据
+     */
+    ConvertResult convertDocToDocx(InputStream docInputStream, String originalFileName);
+
+    /**
      * 检查是否支持转换
      *
      * @param sourceFormat String 源文件格式

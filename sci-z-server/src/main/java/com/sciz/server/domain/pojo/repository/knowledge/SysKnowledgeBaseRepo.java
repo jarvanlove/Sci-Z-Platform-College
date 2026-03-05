@@ -33,6 +33,14 @@ public interface SysKnowledgeBaseRepo {
     SysKnowledgeBase findById(Long id);
 
     /**
+     * 根据ID列表批量查询知识库（用于避免 N+1）
+     *
+     * @param ids 知识库ID列表
+     * @return 知识库实体列表（未找到的 id 不包含在结果中，顺序不保证）
+     */
+    List<SysKnowledgeBase> findByIds(List<Long> ids);
+
+    /**
      * 根据名称查询知识库
      *
      * @param name 知识库名称
@@ -41,12 +49,21 @@ public interface SysKnowledgeBaseRepo {
     SysKnowledgeBase findByName(String name);
 
     /**
-     * 根据Dify知识库ID查询知识库
+     * 按系统主键 id 查询（兼容 PathVariable int 等场景）。
+     * 注意：参数为系统知识库主键 id，非 Dify 的 knowdata_id；按 Dify ID 查询请使用 {@link #findByDifyKnowdataId(String)}。
      *
-     * @param difyKnowdataId Dify知识库ID（字符串类型）
+     * @param id 系统知识库主键 ID（如路径变量）
      * @return 知识库实体
      */
-    SysKnowledgeBase findByDifyKnowdataId(int difyKnowdataId);
+    SysKnowledgeBase findByDifyKnowdataId(int id);
+
+    /**
+     * 根据 Dify 知识库 ID（dify_knowdata_id 字段）查询
+     *
+     * @param difyKnowdataId Dify 返回的知识库 ID 字符串
+     * @return 知识库实体
+     */
+    SysKnowledgeBase findByDifyKnowdataId(String difyKnowdataId);
 
     /**
      * 分页查询知识库列表
@@ -82,8 +99,14 @@ public interface SysKnowledgeBaseRepo {
      * @param asc               是否升序
      * @return 分页结果
      */
-    IPage<SysKnowledgeBase> pageByCondition(Page<SysKnowledgeBase> page, Long userId, List<Long> memberProjectIds,
-                                            String kbType, String keyword, String sortBy, boolean asc);
+    IPage<SysKnowledgeBase> pageByCondition(Page<SysKnowledgeBase> page,
+                                            Long userId,
+                                            List<Long> memberProjectIds,
+                                            String kbType,
+                                            String keyword,
+                                            String sortBy,
+                                            boolean asc,
+                                            Long ownerId);
 
     /**
      * 根据ID删除知识库（软删除）

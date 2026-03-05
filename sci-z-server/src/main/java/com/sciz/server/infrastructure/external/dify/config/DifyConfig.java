@@ -312,12 +312,12 @@ public class DifyConfig {
             private Integer topK;
 
             /**
-             * 重排序模式
+             * 重排序模式：weight 权重融合，reranking_model 使用 Rerank 模型。默认 weight。
              */
             private String rerankingMode;
 
             /**
-             * 重排序模型配置
+             * 重排序模型配置（reranking_mode=reranking_model 时使用）
              */
             private RerankingModel rerankingModel;
 
@@ -325,6 +325,16 @@ public class DifyConfig {
              * 是否启用重排序
              */
             private Boolean rerankingEnable;
+
+            /**
+             * 关键词权重（权重模式），行业常用 0.3，与 vectorWeight 之和建议 1.0
+             */
+            private Double keywordWeight;
+
+            /**
+             * 向量语义权重（权重模式），行业常用 0.7
+             */
+            private Double vectorWeight;
 
             /**
              * 数据集集合

@@ -56,7 +56,9 @@ export default {
     added: '追加済み',
     remove: '削除',
     collapseSidebar: 'サイドバーを折りたたむ',
-    expandSidebar: 'サイドバーを展開'
+    expandSidebar: 'サイドバーを展開',
+    month: '月',
+    quantity: '数量'
   },
   // ページネーション
   pagination: {
@@ -115,7 +117,13 @@ export default {
     systemRole: 'ロール・権限',
     systemConfig: 'システム設定',
     systemLogs: 'ログ管理',
-    apiKey: 'API Key 設定'
+    apiKey: 'API Key 設定',
+    industryEducation: '産教研エージェント'
+  },
+
+  message: {
+    systemMessage: 'システムメッセージ',
+    languageSwitch: '言語切替'
   },
 
   // 認証
@@ -392,7 +400,9 @@ export default {
       avatarPreviewTitle: 'アバタープレビュー',
       previewError: 'アバタープレビューの読み込みに失敗しました。後でもう一度お試しください',
       avatarRememberSave: 'アバターが更新されました。「情報を保存」をクリックして適用してください。',
-      avatarReused: '同じアバターが以前にアップロードされたことが検出されました。直接再利用しました。'
+      avatarReused: '同じアバターが以前にアップロードされたことが検出されました。直接再利用しました。',
+      completeProfilePrompt: 'プロフィールを完成させて、より快適にご利用ください',
+      goToComplete: 'プロフィールを完成'
     },
     security: {
       menu: 'セキュリティ設定',
@@ -455,6 +465,7 @@ export default {
     noTopic: 'なし',
     declarationStatus: '申請ステータス',
     statusSubmitting: '申請中',
+    statusInProgress: '申請進行中',
     statusSuccess: '申請成功',
     statusFailed: '申請失敗',
     keywordPlaceholder: '申請番号/申請者/研究方向を入力してください',
@@ -486,11 +497,17 @@ export default {
     researchDirection: '研究方向',
     researchField: '研究分野',
     statusPending: '審査待ち',
-    statusApproved: '承認済み',
+    statusApproved: '申請成功',
     statusRejected: '申請不承認',
     statusSubmitted: '申請済み',
     updateStatus: '申請ステータスを更新',
+    uploadDocumentEdit: '申込書編集',
+    uploadDocumentTip: 'アップロードすると現在の申込書を上書きします。.doc / .docx / .pdf のみ、1ファイル200MB以内',
+    uploadDocumentSuccess: '申込書を更新しました',
+    uploadDocumentFailed: '申込書のアップロードに失敗しました',
+    uploadDocumentNoFile: '先にファイルを選択してください',
     workflowStatus: '処理ステータス',
+    workflowStatusColumn: '申込書生成状態',
     workflowStatusPending: '待機中',
     workflowStatusPendingDesc: 'ワークフローの開始を待機中',
     workflowStatusRunning: '処理中',
@@ -503,6 +520,8 @@ export default {
     declarationUpdated: '申請が正常に更新されました',
     declarationDeleted: '申請が正常に削除されました',
     workflowNotCompletedHint: '処理ステータスが完了していないため、申請ステータスを変更できません',
+    viewErrorReason: '失敗理由を表示',
+    collapseError: '閉じる',
     listPage: {
       searchPlaceholder: '申請タイトル/番号を入力してください',
       download: 'ダウンロード',
@@ -606,7 +625,9 @@ export default {
     processing: '処理中',
     processingDesc: '申請を処理しています。お待ちください...',
     completed: '処理完了',
-    completedDesc: '申請書が生成されました。リストに移動してダウンロードしてください',
+    completedDesc: '申請書が生成されました。リストに移動して閲覧・ダウンロード',
+    completedDescPrefix: '申請書が生成されました。',
+    completedDescLink: 'リストに移動して閲覧・ダウンロード',
     failed: '処理失敗',
     failedDesc: '申請処理中にエラーが発生しました',
     unknown: '不明なステータス',
@@ -654,7 +675,7 @@ export default {
     list: {
       title: 'プロジェクト管理',
       keywordSearch: 'キーワード検索',
-      keywordPlaceholder: 'プロジェクト名または番号を入力してください',
+      keywordPlaceholder: 'プロジェクト名・番号・責任者を入力してください',
       statusFilter: 'ステータスフィルター',
       statusPlaceholder: 'ステータスを選択してください',
       dateFilter: '日付フィルター',
@@ -668,6 +689,12 @@ export default {
       cancelSuccess: 'プロジェクト"{name}"がキャンセルされました',
       cancelError: 'プロジェクトキャンセル失敗',
       loadError: 'プロジェクトリストの読み込みに失敗しました',
+      export: 'エクスポート',
+      exportModeHint: 'エクスポートするプロジェクトを選択し、「エクスポート確認」をクリックしてください',
+      confirmExport: 'エクスポート確認',
+      exportSelectFirst: 'エクスポートするプロジェクトを選択してください',
+      exportSuccess: 'エクスポート成功',
+      exportError: 'エクスポート失敗',
       columns: {
         number: 'プロジェクト番号',
         name: 'プロジェクト名',
@@ -1068,6 +1095,11 @@ export default {
   dashboard: {
     title: 'ダッシュボード',
     stats: '統計概要',
+    trendTitle: '申請・プロジェクトの推移',
+    declarationStatusDistribution: '申請ステータス分布',
+    projectStatusDistribution: 'プロジェクトステータス分布',
+    byDepartmentTitle: '課題発布部門別件数',
+    byTypeTitle: 'プロジェクト種別別件数',
     recentDeclarations: '最近の申請',
     projectProgress: 'プロジェクト進捗概要',
     quickActions: 'クイックアクション',
@@ -1094,7 +1126,25 @@ export default {
     actionNewDeclaration: '新規申請',
     actionApplyAcceptance: '検収申請',
     actionAcademicSearch: '学術検索',
-    actionKnowledgeSearch: 'ナレッジベース検索'
+    actionKnowledgeSearch: 'ナレッジベース検索',
+    declarationCount: '申請件数',
+    projectCount: 'プロジェクト件数',
+    topicDepartment: '課題発布部門',
+    delayWarningTitle: 'プロジェクト延期警告',
+    riskLevel: {
+      delayed: '延期済み',
+      sevenDays: '7日以内に期限',
+      thirtyDays: '30日以内に期限',
+      normal: '正常'
+    },
+    departments: {
+      youthFund: '国自然-青年基金',
+      generalFund: '国自然-面上基金',
+      regionalProject: '国自然-地区プロジェクト',
+      provincialProject: '省市級プロジェクト',
+      other: 'その他'
+    },
+    projectCountLabel: 'プロジェクト件数'
   },
 
   // AIアシスタント
@@ -1137,6 +1187,7 @@ export default {
       retry: '再試行',
       regenerate: '再生成',
       edit: '編集',
+      scrollToBottom: '一番下へ',
       editMessagePlaceholder: 'メッセージ内容を編集...',
       // 🔥 修复：使用全角 ＠ 符号，避免 Vue I18n 编译错误
       inputPlaceholderWithKb: '＠ナレッジベースを入力するか、直接質問してください',
@@ -1146,10 +1197,13 @@ export default {
         supportUpload: '個人ナレッジベースとローカルファイルのアップロードをサポート',
         maxFiles: 'ファイル数: 最大10個',
         fileTypes: 'ファイルタイプ: pdf、doc、docx、ppt、pptx、xls、xlsx、csv、md、txtをサポート',
-        maxKbFiles: 'ナレッジベースファイル: 最大3個'
+        maxKbFiles: 'ナレッジベースファイル: 最大3個',
+        attachmentTooltipFull: '·個人ナレッジベースとローカルファイルのアップロードをサポート\n·ファイル数: 最大10個\n·ファイルタイプ: pdf、doc、docx、ppt、pptx、xls、xlsx、csv、md、txt\n·ナレッジベースファイル: 最大3個'
       },
       attachmentLocalFile: 'ローカルファイル',
       attachmentKnowledgeFile: 'ナレッジベースファイル',
+      searchTooltipOn: 'オンライン検索を有効にしました',
+      searchTooltipOff: 'オンライン検索を無効にしました',
       aiContentHint: 'AIが生成した内容は参考のみ',
       editTitle: 'タイトルを編集',
       enterNewTitle: '新しい対話タイトルを入力してください',
@@ -1174,13 +1228,13 @@ export default {
           name: 'Qwen3-Max',
           description: '通義千問最新モデル、中国語の理解と生成に優れている'
         },
-        deepseekV31: {
-          name: 'Deepseek-V3.1',
-          description: 'Deepseek V3.1、強力なコードと推論能力'
+        minimax21: {
+          name: 'MiniMax-2.1',
+          description: 'MiniMax M2.1、マルチモーダルとAgent、コード・推論に優れる'
         },
-        deepseekR1: {
-          name: 'Deepseek-R1',
-          description: 'Deepseek R1、強化学習モデル'
+        kimiK25: {
+          name: 'Kimi-k2.5',
+          description: '月の裏側Kimi K2.5、ネイティブ視覚とAgentクラスタ、コード・推論に優れる'
         }
       },
       justNow: 'たった今',
@@ -1251,13 +1305,61 @@ export default {
     pageBadge: 'エージェント',
     pageSubtitle: 'エージェントを選択して効率的な研究協力を始めましょう',
     startUse: '始める',
+    groupProject: 'チームプロジェクト管理エージェント',
+    groupDecision: '研究チーム構築',
+    groupDashboard: 'プロジェクト集約',
     subtitle: '研究プロジェクト管理と実践ツール',
     dashboardDesc: 'プロジェクト概要と統計データを表示',
     projectDesc: '研究プロジェクトの全ライフサイクルを管理し、プロジェクトの進捗を追跡',
     declarationDesc: '研究プロジェクトの申請を作成および管理',
+    industryEducationDesc: '申請課題で研究チームをマッチし、詳細を確認して配分',
     reportDesc: '研究報告書を生成および管理',
     knowledgeDesc: 'ナレッジベースを構築および管理し、ドキュメントのアップロードと検索をサポート',
-    systemDesc: '権限設定、ログ照会、APIキー設定'
+    systemDesc: '権限設定、ログ照会、APIキー設定',
+    industryEducation: {
+      pageTitle: '産教研エージェント',
+      pageSubtitle: '申請課題キーワードを入力し、研究チームをマッチして配分',
+      keywordPlaceholder: '申請課題または研究方向キーワードを入力',
+      matchButton: 'チームをマッチ',
+      emptyHint: '課題を入力して「チームをマッチ」をクリック',
+      noResultHint: '該当チームがありません。他のキーワードをお試しください',
+      teamCard: { leader: '責任者', members: 'メンバー', completed: '完了', participantProjects: '参加プロジェクト数', efficiency: '効率', viewDetail: '詳細', assign: 'このチームに配分' },
+      detail: {
+        title: 'チーム詳細',
+        titleTeamProjectIntro: 'チーム・プロジェクト紹介',
+        leaderIntro: '責任者紹介',
+        members: 'メンバー',
+        projectLeader: 'プロジェクト責任者',
+        projectMembers: 'プロジェクトメンバー',
+        memberIntro: '紹介',
+        projects: 'プロジェクト',
+        viewProjectDetail: 'プロジェクト詳細を見る',
+        backToTeam: 'チーム詳細に戻る',
+        clickProjectToShowDetail: '上記の関連プロジェクトをクリックすると、ここにその詳細が表示されます',
+        efficiency: '効率',
+        nonLeadParticipant: '非責任参加プロジェクト',
+        honors: '栄誉',
+        assign: 'このチームに配分'
+      },
+      projectDetail: {
+        title: 'プロジェクト詳細',
+        status: '状態',
+        efficiencyChart: '効率グラフ',
+        honors: '栄誉',
+        assign: 'このチームに配分'
+      },
+      assign: {
+        title: '研究プロジェクトを配分',
+        projectLeaderLabel: 'プロジェクト責任者（現在のチームから自動取得）',
+        projectLeaderColon: 'プロジェクト責任者：',
+        topicLabel: '研究プロジェクトの説明',
+        topicLabelPlaceholder: '説明を入力（キーワードと同一または調整可）',
+        success: '配分しました',
+        selectDeclaration: '配分する申請を選択',
+        declarationIdPlaceholder: '申請ID'
+      },
+      semanticMatch: '意味マッチ'
+    }
   },
 
   // システム管理

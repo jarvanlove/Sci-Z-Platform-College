@@ -98,9 +98,20 @@ public class DataPermissionUtil implements ApplicationContextAware {
      * @return null 如果是 admin（不过滤），否则返回当前用户ID（需要过滤）
      */
     public static Long getDataPermissionFilter() {
+        // 1. admin：不过滤，返回 null
         if (isAdmin()) {
-            return null; // admin 可以看到所有数据
+            return null;
         }
-        return LoginUserUtil.requireCurrentUserId(); // 普通用户只能看到自己的数据
+
+        // 2. 尝试获取当前用户ID（支持 Web 请求线程、异步线程、定时任务中已设置 AsyncUserContext 的情况）
+        var currentUserIdOpt = LoginUserUtil.getCurrentUserId();
+
+        // 2.1 如果没有用户上下文（如定时任务、系统任务），返回 null，不做数据权限过滤
+        if (currentUserIdOpt.isEmpty()) {
+            return null;
+        }
+
+        // 2.2 普通请求：返回当前用户ID，用于仓储层拼接数据权限条件
+        return currentUserIdOpt.get();
     }
 }

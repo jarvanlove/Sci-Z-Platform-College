@@ -22,28 +22,48 @@
       </div>
     </div>
 
-    <!-- 智能体卡片网格 -->
-    <div class="practice-grid">
-      <div
-        v-for="agent in agentCards"
-        :key="agent.key"
-        class="agent-card"
-        :class="`agent-${agent.key}`"
-        @click="goTo(agent.path)"
-      >
-        <div class="card-glow" />
-        <div class="card-inner">
-          <div class="card-icon-wrap">
-            <div class="icon-bg" />
-            <component :is="agent.icon" class="card-icon" />
+    <!-- 顶部分组卡片 + 智能体卡片：3 个标签 + 原来的卡片布局 -->
+    <div class="practice-accordion-wrap">
+      <!-- 顶部三大分组卡片，作为选项卡切换 -->
+      <div class="group-card-grid">
+        <div
+          v-for="group in agentGroups"
+          :key="group.name"
+          class="group-card"
+          :class="{ active: activeGroup === group.name }"
+          @click="activeGroup = group.name"
+        >
+          <div class="group-card-inner">
+            <div class="group-card-title">
+              {{ $t(group.nameKey) }}
+            </div>
           </div>
-          <div class="card-body">
-            <h3 class="card-title">{{ agent.title }}</h3>
-            <p class="card-desc">{{ agent.desc }}</p>
-            <span class="card-action">
-              <span class="action-text">{{ $t('practice.startUse') }}</span>
-              <el-icon class="action-arrow"><ArrowRight /></el-icon>
-            </span>
+        </div>
+      </div>
+
+      <!-- 下方：当前分组下的智能体卡片，沿用之前的显示方式 -->
+      <div class="practice-grid">
+        <div
+          v-for="agent in currentAgents"
+          :key="agent.key"
+          class="agent-card"
+          :class="`agent-${agent.key}`"
+          @click="goTo(agent.path)"
+        >
+          <div class="card-glow" />
+          <div class="card-inner">
+            <div class="card-icon-wrap">
+              <div class="icon-bg" />
+              <component :is="agent.icon" class="card-icon" />
+            </div>
+            <div class="card-body">
+              <h3 class="card-title">{{ agent.title }}</h3>
+              <p class="card-desc">{{ agent.desc }}</p>
+              <span class="card-action">
+                <span class="action-text">{{ $t('practice.startUse') }}</span>
+                <el-icon class="action-arrow"><ArrowRight /></el-icon>
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -52,7 +72,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -60,13 +80,18 @@ import {
   MagicStick,
   Notebook,
   Odometer,
+  School,
   TrendCharts
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const { t } = useI18n()
 
-const agentCards = computed(() => [
+// 当前激活的分组（选项卡），默认选中项目管理
+const activeGroup = ref('project')
+
+// 所有智能体配置，保持原来的卡片内容
+const allAgents = computed(() => [
   {
     key: 'declaration',
     title: t('menu.declaration'),
@@ -89,6 +114,13 @@ const agentCards = computed(() => [
     icon: Notebook
   },
   {
+    key: 'industry-education',
+    title: t('menu.industryEducation'),
+    desc: t('practice.industryEducationDesc'),
+    path: '/practice/industry-education',
+    icon: School
+  },
+  {
     key: 'dashboard',
     title: t('menu.dashboard'),
     desc: t('practice.dashboardDesc'),
@@ -96,6 +128,35 @@ const agentCards = computed(() => [
     icon: Odometer
   }
 ])
+
+// 分组配置：与之前手风琴分组保持一致
+const agentGroups = computed(() => {
+  const agents = allAgents.value
+  const byKey = (k) => agents.find((a) => a.key === k) || null
+  return [
+    {
+      name: 'project',
+      nameKey: 'practice.groupProject',
+      agents: [byKey('declaration'), byKey('project'), byKey('report')].filter(Boolean)
+    },
+    {
+      name: 'dashboard',
+      nameKey: 'practice.groupDashboard',
+      agents: [byKey('dashboard')].filter(Boolean)
+    },
+    {
+      name: 'decision',
+      nameKey: 'practice.groupDecision',
+      agents: [byKey('industry-education')].filter(Boolean)
+    }
+  ]
+})
+
+// 当前激活分组下的智能体列表
+const currentAgents = computed(() => {
+  const group = agentGroups.value.find((g) => g.name === activeGroup.value)
+  return group ? group.agents : []
+})
 
 const goTo = (path) => {
   router.push(path)
@@ -192,14 +253,112 @@ const goTo = (path) => {
   line-height: 1.5;
 }
 
-// 卡片网格
+// 手风琴容器
+.practice-accordion-wrap {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 48px;
+}
+
+/* 顶部分组卡片布局 */
+.group-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap-lg);
+  margin-bottom: 24px;
+}
+
+.group-card {
+  position: relative;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  &:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+  }
+
+  &.active {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25), var(--shadow-md);
+    background: linear-gradient(
+      135deg,
+      rgba(59, 130, 246, 0.06) 0%,
+      rgba(139, 92, 246, 0.04) 100%
+    );
+  }
+}
+
+.group-card-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: 12px;
+}
+
+.group-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+  text-align: center;
+  width: 100%;
+}
+
+.practice-collapse {
+  border: none;
+  background: transparent;
+
+  :deep(.el-collapse-item__header) {
+    height: 52px;
+    padding: 0 20px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-1);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+
+  :deep(.el-collapse-item__wrap) {
+    border: none;
+    background: transparent;
+    overflow: visible;
+  }
+
+  :deep(.el-collapse-item__content) {
+    padding: 20px 0 20px 0;
+    background: transparent;
+    overflow: visible;
+  }
+
+  :deep(.el-collapse-item__header.is-active) {
+    border-color: rgba(59, 130, 246, 0.4);
+    background: rgba(59, 130, 246, 0.06);
+  }
+}
+
+.collapse-title {
+  letter-spacing: 0.02em;
+}
+
+// 卡片网格（手风琴内）：顶部留足间距，避免悬浮 translateY 时卡片顶部被手风琴标题遮挡
 .practice-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 48px;
+  padding-top: 4px;
+  overflow: visible;
 }
 
 .agent-card {
@@ -310,6 +469,33 @@ const goTo = (path) => {
 }
 .agent-dashboard .card-icon {
   color: #047857;
+}
+
+// 产教研智能体：玫红/rose 主题（与申报同款交互：常规主题 + 悬浮加深），与仪表板绿色区分
+.agent-industry-education .card-glow {
+  background: linear-gradient(135deg, rgba(190, 18, 60, 0.08), transparent);
+}
+.agent-industry-education .card-inner {
+  border-color: rgba(190, 18, 60, 0.2);
+}
+.agent-industry-education:hover .card-inner {
+  border-color: rgba(190, 18, 60, 0.4);
+  box-shadow: 0 12px 40px -12px rgba(190, 18, 60, 0.2);
+}
+.agent-industry-education .icon-bg {
+  background: linear-gradient(135deg, #fce7f3, #fbcfe8);
+}
+.agent-industry-education .card-icon {
+  color: #9d174d;
+}
+// 常规态「开始使用」与其余四张卡片一致（灰底灰字），悬浮时再变为玫红
+.agent-industry-education:hover .card-action {
+  color: #be123c;
+  background: #fce7f3;
+  .action-text,
+  .action-arrow {
+    color: #be123c;
+  }
 }
 
 .card-icon-wrap {
@@ -431,9 +617,12 @@ const goTo = (path) => {
     font-size: 24px;
   }
 
+  .practice-accordion-wrap {
+    padding: 0 24px;
+  }
+
   .practice-grid {
     grid-template-columns: 1fr;
-    padding: 0 24px;
     gap: 16px;
   }
 

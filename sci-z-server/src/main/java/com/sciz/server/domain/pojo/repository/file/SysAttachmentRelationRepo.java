@@ -74,4 +74,21 @@ public interface SysAttachmentRelationRepo {
      * @return SysAttachmentRelation 关联信息（如果不存在则返回null）
      */
     SysAttachmentRelation findByAttachmentId(Long attachmentId, String relationType);
+
+    /**
+     * 根据关联类型和关联ID查询关联记录列表
+     *
+     * @param relationType String 关联类型
+     * @param relationId   Long 关联对象ID
+     * @return List<SysAttachmentRelation> 关联记录列表（按创建时间倒序）
+     */
+    List<SysAttachmentRelation> findRelations(String relationType, Long relationId);
+
+    /**
+     * 根据主键更新关联记录
+     *
+     * @param entity SysAttachmentRelation 关联实体（需包含id）
+     * @return boolean 是否更新成功
+     */
+    boolean updateById(SysAttachmentRelation entity);
 }

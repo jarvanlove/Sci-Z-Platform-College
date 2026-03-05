@@ -33,6 +33,10 @@
     <aliyun.dysmsapi.version>2.1.0</aliyun.dysmsapi.version>
     <poi.version>5.2.5</poi.version>
     <pdfbox.version>2.0.29</pdfbox.version>
+    <!-- 阿里云 Tea 系列 -->
+    <tea.openapi.version>0.2.9</tea.openapi.version>
+    <tea.util.version>0.2.19</tea.util.version>
+    <tea.version>1.1.14</tea.version>
   </properties>
 
   <dependencies>
@@ -47,21 +51,21 @@
     <dependency>
       <groupId>com.aliyun</groupId>
       <artifactId>tea-openapi</artifactId>
-      <version>0.2.9</version>
+      <version>${tea.openapi.version}</version>
     </dependency>
 
     <!-- Tea工具包 -->
     <dependency>
       <groupId>com.aliyun</groupId>
       <artifactId>tea-util</artifactId>
-      <version>0.2.19</version>
+      <version>${tea.util.version}</version>
     </dependency>
 
     <!-- Tea核心库 -->
     <dependency>
       <groupId>com.aliyun</groupId>
       <artifactId>tea</artifactId>
-      <version>1.1.14</version>
+      <version>${tea.version}</version>
     </dependency>
 
     <!-- Spring Boot 基础 -->
@@ -81,6 +85,10 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-aop</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-websocket</artifactId>
     </dependency>
 
     <!-- 日志（logback 由 spring-boot 提供） -->
@@ -197,10 +205,16 @@
     </dependency>
 
     <!-- 文档格式转换：Apache POI + PDFBox -->
-    <!-- Apache POI：处理 Word 文档（docx） -->
+    <!-- Apache POI：处理 Word 文档（docx + 旧版 doc） -->
     <dependency>
       <groupId>org.apache.poi</groupId>
       <artifactId>poi-ooxml</artifactId>
+      <version>${poi.version}</version>
+    </dependency>
+    <!-- POI Scratchpad：读取 .doc（HWPF），用于知识库 .doc 转 .docx 后上传 Dify -->
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-scratchpad</artifactId>
       <version>${poi.version}</version>
     </dependency>
     <!-- Apache PDFBox：处理 PDF 文档 -->

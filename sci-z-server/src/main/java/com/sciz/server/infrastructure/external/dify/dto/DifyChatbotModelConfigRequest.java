@@ -175,23 +175,36 @@ public class DifyChatbotModelConfigRequest {
             request.setModel(defaultModel);
         }
 
-        // 数据集配置
+        // 数据集配置（默认权重模式 weight；此前默认 reranking_model）
         if (config.getDatasetConfigs() != null) {
             DifyConfig.Chatbot.DatasetConfigs dc = config.getDatasetConfigs();
             DatasetConfigs datasetConfigs = new DatasetConfigs();
             datasetConfigs.setRetrievalModel(dc.getRetrievalModel() != null ? dc.getRetrievalModel() : "multiple");
-            datasetConfigs.setTopK(dc.getTopK() != null ? dc.getTopK() : 4);
-            datasetConfigs.setRerankingMode(dc.getRerankingMode() != null ? dc.getRerankingMode() : "reranking_model");
-            datasetConfigs.setRerankingEnable(dc.getRerankingEnable() != null ? dc.getRerankingEnable() : false);
+            datasetConfigs.setTopK(dc.getTopK() != null ? dc.getTopK() : 6);
+            String rerankingMode = dc.getRerankingMode() != null ? dc.getRerankingMode() : "weight";
+            datasetConfigs.setRerankingMode(rerankingMode);
+            datasetConfigs.setRerankingEnable(dc.getRerankingEnable() != null ? dc.getRerankingEnable() : true);
 
-            // 重排序模型配置
-            if (config.getRerankingModel() != null) {
-                datasetConfigs.setRerankingModel(new DatasetConfigs.RerankingModel(
-                        config.getRerankingModel().getRerankingProviderName() != null ? config.getRerankingModel().getRerankingProviderName() : "langgenius/tongyi/tongyi",
-                        config.getRerankingModel().getRerankingModelName() != null ? config.getRerankingModel().getRerankingModelName() : "gte-rerank"
-                ));
+            if ("weight".equals(rerankingMode)) {
+                DatasetConfigs.DatasetWeights w = DatasetConfigs.DatasetWeights.defaultConfig();
+                if (dc.getKeywordWeight() != null && w.getKeywordSetting() != null) {
+                    w.getKeywordSetting().setKeywordWeight(dc.getKeywordWeight());
+                }
+                if (dc.getVectorWeight() != null && w.getVectorSetting() != null) {
+                    w.getVectorSetting().setVectorWeight(dc.getVectorWeight());
+                }
+                datasetConfigs.setWeights(w);
+                datasetConfigs.setRerankingModel(null);
             } else {
-                datasetConfigs.setRerankingModel(DatasetConfigs.RerankingModel.defaultConfig());
+                datasetConfigs.setWeights(null);
+                if (config.getRerankingModel() != null) {
+                    datasetConfigs.setRerankingModel(new DatasetConfigs.RerankingModel(
+                            config.getRerankingModel().getRerankingProviderName() != null ? config.getRerankingModel().getRerankingProviderName() : "langgenius/tongyi/tongyi",
+                            config.getRerankingModel().getRerankingModelName() != null ? config.getRerankingModel().getRerankingModelName() : "gte-rerank"
+                    ));
+                } else {
+                    datasetConfigs.setRerankingModel(DatasetConfigs.RerankingModel.defaultConfig());
+                }
             }
 
             // 数据集集合配置
@@ -455,6 +468,10 @@ public class DifyChatbotModelConfigRequest {
         @JsonProperty("reranking_enable")
         private Boolean rerankingEnable;
 
+        /** 权重模式（reranking_mode=weight 时）：关键词/语义权重，行业常用 0.3/0.7 */
+        @JsonProperty("weights")
+        private DatasetWeights weights;
+
         @JsonProperty("datasets")
         private DatasetCollection datasets;
 
@@ -466,24 +483,72 @@ public class DifyChatbotModelConfigRequest {
                                String rerankingMode,
                                RerankingModel rerankingModel,
                                Boolean rerankingEnable,
+                               DatasetWeights weights,
                                DatasetCollection datasets) {
             this.retrievalModel = retrievalModel;
             this.topK = topK;
             this.rerankingMode = rerankingMode;
             this.rerankingModel = rerankingModel;
             this.rerankingEnable = rerankingEnable;
+            this.weights = weights;
             this.datasets = datasets;
         }
 
+        /** 默认使用权重模式（此前为 reranking_model + RerankingModel.defaultConfig()） */
         public static DatasetConfigs defaultConfig() {
             return new DatasetConfigs(
                     "multiple",
-                    4,
-                    "reranking_model",
-                    RerankingModel.defaultConfig(),
-                    false,
+                    6,
+                    "weight",
+                    null,
+                    true,
+                    DatasetWeights.defaultConfig(),
                     DatasetCollection.defaultConfig()
             );
+        }
+
+        @Data
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public static class DatasetWeights {
+            @JsonProperty("weight_type")
+            private String weightType;
+            @JsonProperty("keyword_setting")
+            private KeywordSetting keywordSetting;
+            @JsonProperty("vector_setting")
+            private VectorSetting vectorSetting;
+
+            public DatasetWeights() {
+            }
+
+            public static DatasetWeights defaultConfig() {
+                DatasetWeights w = new DatasetWeights();
+                w.setWeightType("customized");
+                KeywordSetting ks = new KeywordSetting();
+                ks.setKeywordWeight(0.3);
+                w.setKeywordSetting(ks);
+                VectorSetting vs = new VectorSetting();
+                vs.setVectorWeight(0.7);
+                w.setVectorSetting(vs);
+                return w;
+            }
+        }
+
+        @Data
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public static class KeywordSetting {
+            @JsonProperty("keyword_weight")
+            private Double keywordWeight;
+        }
+
+        @Data
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public static class VectorSetting {
+            @JsonProperty("vector_weight")
+            private Double vectorWeight;
+            @JsonProperty("embedding_model_name")
+            private String embeddingModelName;
+            @JsonProperty("embedding_provider_name")
+            private String embeddingProviderName;
         }
 
         @Data

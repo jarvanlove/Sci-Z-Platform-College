@@ -8,6 +8,7 @@ import com.sciz.server.domain.pojo.dto.request.file.FileUploadReq;
 import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationDetailResp;
 import com.sciz.server.domain.pojo.dto.response.declaration.DeclarationListResp;
 import com.sciz.server.domain.pojo.dto.response.declaration.RedHeaderFileParseResp;
+import com.sciz.server.domain.pojo.dto.response.file.FileInfoResp;
 import com.sciz.server.infrastructure.shared.exception.BusinessException;
 import com.sciz.server.infrastructure.shared.result.PageResult;
 import com.sciz.server.infrastructure.shared.result.Result;
@@ -17,6 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 申报控制器
@@ -113,5 +115,18 @@ public class DeclarationController {
         }
         declarationService.updateStatus(req);
         return Result.success();
+    }
+
+    /**
+     * 上传/覆盖申报书文档
+     * 每次上传覆盖该申报当前关联的申报书附件，下载时获取最新文件。
+     */
+    @Operation(summary = "申报书编辑上传", description = "上传申报书文件，覆盖原申报书附件；下载时获取当前上传的文件")
+    @PostMapping("/{id}/document/upload")
+    public Result<FileInfoResp> uploadDeclarationDocument(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        FileInfoResp resp = declarationService.uploadDeclarationDocument(id, file);
+        return Result.success(resp);
     }
 }

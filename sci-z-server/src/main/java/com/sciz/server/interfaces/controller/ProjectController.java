@@ -22,7 +22,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * 项目控制器
@@ -59,11 +65,29 @@ public class ProjectController {
      * @param req ProjectListQueryReq 查询请求
      * @return Result<PageResult<ProjectListResp>> 分页结果
      */
-    @Operation(summary = "分页查询项目列表", description = "根据关键字、状态分页查询项目列表，支持按项目编号、项目名称搜索")
+    @Operation(summary = "分页查询项目列表", description = "根据关键字、状态分页查询项目列表，支持按项目编号、项目名称、项目负责人搜索")
     @PostMapping("/list")
     public Result<PageResult<ProjectListResp>> pageProject(@Valid @RequestBody ProjectListQueryReq req) {
         var pageResult = projectService.page(req);
         return Result.success(pageResult);
+    }
+
+    /**
+     * 导出项目列表为 Excel（与列表查询条件一致，表头：项目编号、项目名称、项目负责人、项目状态、进度、开始时间、预计完成时间、项目预算）
+     *
+     * @param req 与列表一致的查询条件
+     * @return Excel 文件流
+     */
+    @Operation(summary = "导出项目列表", description = "按当前查询条件导出项目列表为 Excel，最多 10000 条")
+    @PostMapping("/export")
+    public ResponseEntity<byte[]> exportProjectList(@Valid @RequestBody ProjectListQueryReq req) {
+        byte[] body = projectService.exportList(req);
+        // 文件名：纯时间戳 年月日时分秒.xlsx，仅用 filename 避免部分环境对 filename* 解析异常
+        String filename = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + ".xlsx";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
+        return ResponseEntity.ok().headers(headers).body(body);
     }
 
     /**

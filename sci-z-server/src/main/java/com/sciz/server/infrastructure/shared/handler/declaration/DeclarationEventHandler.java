@@ -259,9 +259,10 @@ public class DeclarationEventHandler {
     /**
      * 处理申报成功事件
      * <p>
-     * 当申报状态更新为"申报成功"时，异步创建项目和知识库
+     * 旧行为：当申报状态更新为「申报成功」时，自动创建项目和知识库，并在工作流中记录「项目创建」步骤。
+     * 新需求：项目创建改为用户自主选择，不再在申报成功事件中自动创建项目/知识库，也不再写入「项目创建」工作流步骤。
      * <p>
-     * 注意：使用事务确保原子性，如果任何步骤失败，整个流程回滚
+     * 现行为：仅记录申报成功的操作日志，保留研究课题的校验逻辑。
      *
      * @param event 申报成功事件
      */
@@ -281,30 +282,24 @@ public class DeclarationEventHandler {
             log.info(String.format("处理申报成功事件: declarationId=%s, researchTopic=%s, applicantId=%s",
                     event.getDeclarationId(), event.getResearchTopic(), event.getApplicantId()));
 
-            // 1. 验证研究课题是否存在
+            // 1. 验证研究课题是否存在（即便不自动创建项目，研究课题仍为必填业务字段）
             var researchTopic = event.getResearchTopic();
             if (researchTopic == null || researchTopic.trim().isEmpty()) {
-                log.error(String.format("研究课题为空，无法创建项目和知识库: declarationId=%s", event.getDeclarationId()));
+                log.error(String.format("研究课题为空，无法完成申报成功流程: declarationId=%s", event.getDeclarationId()));
                 recordFailureLog(operation, event.getDeclarationId(), "研究课题不能为空", startTime, event);
                 throw BusinessException.of(ResultCode.BAD_REQUEST, "研究课题不能为空");
             }
 
-            // 2. 创建项目（内部会记录操作日志，现在可以正常使用 LoginUserUtil）
-            var projectId = createProject(event, researchTopic);
-
-            // 3. 创建知识库（内部会记录操作日志，现在可以正常使用 LoginUserUtil）
-            createKnowledgeBase(event, researchTopic, projectId);
-
-            // 4. 记录整体流程操作日志（成功）
+            // 2. 记录整体流程操作日志（成功）——不再自动创建项目和知识库
             var endTime = DateUtil.now();
             var executionTime = (int) DateUtil.millisBetween(startTime, endTime);
-            var detail = String.format("%s：申报编号 %s（ID: %s），已创建项目和知识库",
+            var detail = String.format("%s：申报编号 %s（ID: %s），状态已更新为申报成功（未自动创建项目和知识库）",
                     operationType.getDescription(), event.getDeclarationNumber(), event.getDeclarationId());
             // 现在可以正常使用 LoginUserUtil，它会从 AsyncUserContext 获取用户信息
             operationLogRecorderUtil.recordSuccess(operation, detail, executionTime);
 
-            log.info(String.format("申报成功事件处理完成: declarationId=%s, projectId=%s",
-                    event.getDeclarationId(), projectId));
+            log.info(String.format("申报成功事件处理完成（未自动创建项目/知识库）: declarationId=%s, researchTopic=%s",
+                    event.getDeclarationId(), researchTopic));
 
         } catch (Exception e) {
             log.error(String.format("处理申报成功事件失败: declarationId=%s, err=%s",

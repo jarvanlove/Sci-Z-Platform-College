@@ -25,45 +25,45 @@ public class DocumentUploadRequest {
     private MultipartFile file;
     
     /**
-     * 索引技术
+     * 索引技术：high_quality 语义索引，利于召回与准确率
      */
     @Builder.Default
     private String indexingTechnique = "high_quality";
-    
+
     /**
      * 文档形式
      */
     @Builder.Default
     private String docForm = "text_model";
-    
+
     /**
      * 文档语言
      */
     @Builder.Default
     private String docLanguage = "Chinese";
-    
+
     /**
-     * 嵌入模型
+     * 嵌入模型：通义 text-embedding-v4
      */
     @Builder.Default
-    private String embeddingModel = "text-embedding-v3";
-    
+    private String embeddingModel = "text-embedding-v4";
+
     /**
      * 嵌入模型提供商
      */
     @Builder.Default
     private String embeddingModelProvider = "tongyi";
-    
+
     /**
-     * 检索模型
+     * 检索模型（未传时按行业默认：混合检索 + 权重融合 + Top K 6）
      */
     private RetrievalModel retrievalModel;
-    
+
     /**
      * 处理规则
      */
     private ProcessRule processRule;
-    
+
     /**
      * 检索模型内部类
      */
@@ -73,34 +73,47 @@ public class DocumentUploadRequest {
     @AllArgsConstructor
     public static class RetrievalModel {
         /**
-         * 搜索方法
+         * 搜索方法：hybrid_search 向量+全文，提升召回
          */
         @Builder.Default
         private String searchMethod = "hybrid_search";
-        
+
         /**
-         * 是否启用重排序
+         * 重排序模式：weight 权重融合，reranking_model 使用 Rerank 模型。默认 weight。
          */
         @Builder.Default
-        private Boolean rerankingEnable = false;
-        
+        private String rerankingMode = "weight";
+
         /**
-         * 返回结果数量
+         * 是否启用重排序（合并/排序步骤）
          */
         @Builder.Default
-        private Integer topK = 3;
-        
+        private Boolean rerankingEnable = true;
+
         /**
-         * 是否启用分数阈值
+         * 返回结果数量：6 为常用平衡值
+         */
+        @Builder.Default
+        private Integer topK = 6;
+
+        /**
+         * 是否启用分数阈值：默认关闭，避免漏召
          */
         @Builder.Default
         private Boolean scoreThresholdEnabled = false;
-        
+
         /**
-         * 分数阈值
+         * 分数阈值（启用时），常用 0.5
          */
         @Builder.Default
         private Double scoreThreshold = 0.5;
+
+        /** 关键词权重（权重模式），行业常用 0.3 */
+        @Builder.Default
+        private Double keywordWeight = 0.3;
+        /** 向量语义权重（权重模式），行业常用 0.7 */
+        @Builder.Default
+        private Double vectorWeight = 0.7;
     }
     
     /**

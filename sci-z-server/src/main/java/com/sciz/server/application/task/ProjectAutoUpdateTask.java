@@ -46,8 +46,8 @@ public class ProjectAutoUpdateTask {
         log.info("开始定时任务：自动更新项目进度和状态");
 
         try {
-            // 1. 查询所有需要更新的项目（排除已取消和已删除的项目）
-            var projects = projectRepo.findAllActiveProjects();
+            // 1. 查询所有需要更新的项目（排除已取消和已删除的项目，定时任务用专用方法不走数据权限）
+            var projects = projectRepo.findAllActiveProjectsForTask();
 
             if (projects.isEmpty()) {
                 log.info("没有需要更新的项目");

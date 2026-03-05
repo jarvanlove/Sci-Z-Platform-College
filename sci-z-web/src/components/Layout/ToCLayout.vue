@@ -21,19 +21,25 @@
       <slot>
         <router-view />
       </slot>
+
+      <!-- 未完善个人信息时显示悬浮飘窗，点击跳转至个人信息页 -->
+      <ProfileCompleteFloatingPrompt :visible="showProfileCompletePrompt" />
     </main>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, provide } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/store/modules/auth'
 import { useLoginModal } from '@/composables/useLoginModal'
+import { isProfileIncomplete } from '@/utils/profile'
 import ToCSidebar from './ToCSidebar.vue'
+import { ProfileCompleteFloatingPrompt } from '@/components/Business/User'
 
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const sidebarRef = ref(null)
@@ -44,6 +50,13 @@ const showTopRightLogin = computed(() => {
   // 只在侧边栏折叠且用户未登录时显示
   const isCollapsed = sidebarRef.value?.isCollapsed ?? false
   return isCollapsed && !authStore.isLoggedIn
+})
+
+// 未完善个人信息时显示悬浮飘窗（realName 以「用户_」开头或必填项未填）；当前已在个人信息页则不显示
+const showProfileCompletePrompt = computed(() => {
+  if (!authStore.isLoggedIn || !authStore.userInfo) return false
+  if (route.path === '/user/profile') return false
+  return isProfileIncomplete(authStore.userInfo)
 })
 
 // 显示登录弹窗

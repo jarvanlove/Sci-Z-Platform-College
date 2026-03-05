@@ -207,11 +207,11 @@
             @visible-change="handleDropdownVisibleChange"
           >
             <div class="user-info">
-              <el-avatar :size="32" :src="avatarUrl">
+              <el-avatar :size="26" :src="avatarUrl">
                 {{ userInfo?.username?.charAt(0)?.toUpperCase() || 'U' }}
               </el-avatar>
               <div class="user-details" v-show="!isCollapsed">
-                <div class="username" :title="userInfo?.username || 'User'">{{ displayUsername }}</div>
+                <div class="username">{{ displayUsername }}</div>
               </div>
               <el-icon class="dropdown-icon" v-show="!isCollapsed">
                 <ArrowUp v-if="isDropdownOpen" />
@@ -232,42 +232,71 @@
                 <el-icon><Reading /></el-icon>
                 {{ $t('manual.title') }}
               </el-dropdown-item>
-              <!-- 系统设置（嵌套下拉菜单） -->
-              <el-dropdown 
-                v-if="isAdmin" 
-                divided
-                trigger="hover"
-                placement="right-start"
-                @command="handleSystemCommand"
-                popper-class="system-submenu-popper"
-              >
-                <template #default>
-                  <div class="system-menu-trigger">
-                    <el-icon><Setting /></el-icon>
-                    <span class="system-menu-text">{{ $t('menu.system') }}</span>
-                  </div>
-                </template>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="user">
-                      <el-icon><User /></el-icon>
-                      {{ $t('menu.systemUser') }}
-                    </el-dropdown-item>
-                    <el-dropdown-item command="role">
-                      <el-icon><Key /></el-icon>
-                      {{ $t('menu.systemRole') }}
-                    </el-dropdown-item>
-                    <el-dropdown-item command="logs">
-                      <el-icon><Document /></el-icon>
-                      {{ $t('menu.systemLogs') }}
-                    </el-dropdown-item>
-                    <el-dropdown-item command="apikey">
-                      <el-icon><Key /></el-icon>
-                      {{ $t('menu.apiKey') }}
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <!-- 语言切换（与系统设置一致：悬浮显示子菜单） -->
+              <div class="user-dropdown-row">
+                <el-dropdown
+                  trigger="hover"
+                  placement="right-start"
+                  @command="handleLanguageCommand"
+                  popper-class="system-submenu-popper"
+                >
+                  <template #default>
+                    <div class="system-menu-trigger">
+                      <el-icon><Monitor /></el-icon>
+                      <span class="system-menu-text">{{ $t('message.languageSwitch') }}</span>
+                    </div>
+                  </template>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item
+                        v-for="locale in supportedLocales"
+                        :key="locale.code"
+                        :command="locale.code"
+                        :class="{ 'is-active': currentLocale === locale.code }"
+                      >
+                        <span class="locale-flag">{{ locale.flag }}</span>
+                        <span class="locale-name">{{ locale.name }}</span>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </div>
+              <!-- 系统设置（嵌套下拉菜单，在语言切换下面） -->
+              <div v-if="isAdmin" class="user-dropdown-row user-dropdown-row-divided">
+                <el-dropdown
+                  trigger="hover"
+                  placement="right-start"
+                  @command="handleSystemCommand"
+                  popper-class="system-submenu-popper"
+                >
+                  <template #default>
+                    <div class="system-menu-trigger">
+                      <el-icon><Setting /></el-icon>
+                      <span class="system-menu-text">{{ $t('menu.system') }}</span>
+                    </div>
+                  </template>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="user">
+                        <el-icon><User /></el-icon>
+                        {{ $t('menu.systemUser') }}
+                      </el-dropdown-item>
+                      <el-dropdown-item command="role">
+                        <el-icon><Key /></el-icon>
+                        {{ $t('menu.systemRole') }}
+                      </el-dropdown-item>
+                      <el-dropdown-item command="logs">
+                        <el-icon><Document /></el-icon>
+                        {{ $t('menu.systemLogs') }}
+                      </el-dropdown-item>
+                      <el-dropdown-item command="apikey">
+                        <el-icon><Key /></el-icon>
+                        {{ $t('menu.apiKey') }}
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </div>
               <el-dropdown-item command="theme">
                 <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
                 {{ $t('theme.switchTheme') }}
@@ -279,9 +308,10 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <!-- 🔥 修改：i18n切换按钮放在用户信息右边，使用紧凑模式 -->
-        <div v-show="!isCollapsed" class="language-switcher-inline">
-          <LanguageSwitcher :compact="true" />
+        <!-- 系统消息在用户信息右侧，点击进入消息页；未读数红色角标 -->
+        <div v-show="!isCollapsed" class="messages-trigger-inline messages-trigger-wrap" @click="goToMessages">
+          <el-icon :size="18"><Bell /></el-icon>
+          <span v-if="messageUnreadCount > 0" class="messages-badge">{{ messageUnreadCount >= 100 ? '99+' : messageUnreadCount }}</span>
         </div>
         </div>
       </div>
@@ -306,7 +336,7 @@ import { useAppStore } from '@/store/modules/app'
 import { ElMessage } from 'element-plus'
 import { useLoginModal } from '@/composables/useLoginModal'
 import { BaseScrollbar } from '@/components/Common'
-import LanguageSwitcher from '@/components/Common/LanguageSwitcher.vue'
+import { supportedLocales, setLocale, getCurrentLocale } from '@/locales'
 import {
   Plus,
   ChatDotRound,
@@ -332,7 +362,9 @@ import {
   Reading,
   Sunny,
   Moon,
-  Document
+  Document,
+  Bell,
+  Monitor
 } from '@element-plus/icons-vue'
 import {
   pageAiConversations,
@@ -341,6 +373,7 @@ import {
   deleteAiConversation,
   updateAiConversationPinnedStatus
 } from '@/api/AI/ai'
+import { getUnreadCount } from '@/api/Message/message'
 import { ElMessageBox } from 'element-plus'
 import { formatPhoneDisplay, validateEmail, validatePhone } from '@/utils/validate'
 
@@ -350,6 +383,9 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 const { openLoginModal } = useLoginModal()
+
+// 当前语言（用于语言切换子菜单高亮）
+const currentLocale = computed(() => getCurrentLocale())
 
 // 🔥 修复：不再使用 provide/inject（因为 ToCSidebar 和 AIChat 是兄弟组件）
 // 改用事件系统进行通信
@@ -534,6 +570,11 @@ const handleDropdownVisibleChange = (visible) => {
 }
 
 // 处理系统设置二级菜单命令
+// 语言切换子菜单：选择后切换语言
+const handleLanguageCommand = (localeCode) => {
+  setLocale(localeCode)
+}
+
 const handleSystemCommand = (command) => {
   isDropdownOpen.value = false
   // 🔥 修复：清除历史对话的选中状态
@@ -847,6 +888,29 @@ const handleUserCommand = (command) => {
   }
 }
 
+// 未读消息数（侧栏消息图标角标）
+const messageUnreadCount = ref(0)
+async function fetchMessageUnreadCount() {
+  if (!authStore.isLoggedIn) {
+    messageUnreadCount.value = 0
+    return
+  }
+  try {
+    const res = await getUnreadCount()
+    messageUnreadCount.value = Number(res?.data ?? res ?? 0) || 0
+  } catch {
+    messageUnreadCount.value = 0
+  }
+}
+
+// 跳转系统消息页（与 I18n 互换后，系统消息在侧栏外侧独立按钮）
+const goToMessages = () => {
+  currentChatId.value = null
+  sessionStorage.removeItem('currentConversationId')
+  storedConversationId.value = null
+  router.push('/user/messages')
+}
+
 // 显示登录弹窗
 const goToLogin = () => {
   // 🔥 修复：更新路由并打开登录弹窗（与 ToCLayout.vue 保持一致）
@@ -993,6 +1057,15 @@ watch(() => appStore.theme, (newTheme) => {
   }
 }, { immediate: true })
 
+// 路由变化时刷新未读消息数（例如从消息页返回后角标更新）
+watch(() => route.path, () => {
+  if (authStore.isLoggedIn) fetchMessageUnreadCount()
+})
+
+function onMessagesUnreadCountChanged() {
+  if (authStore.isLoggedIn) fetchMessageUnreadCount()
+}
+
 // 组件挂载时加载对话历史
 onMounted(() => {
   // 🔥 修复：确保主题在组件挂载时正确应用
@@ -1005,7 +1078,9 @@ onMounted(() => {
     html.classList.remove('dark')
     html.setAttribute('data-theme', 'light')
   }
-  
+  if (authStore.isLoggedIn) {
+    fetchMessageUnreadCount()
+  }
   // 🔥 修复：onMounted 中的加载由 watch 的 immediate: true 处理，避免重复调用
   // watch 会在组件挂载时立即执行，所以这里不需要再次调用
   // 如果 watch 的 immediate 没有触发（理论上不会发生），这里作为备用
@@ -1033,12 +1108,14 @@ onMounted(() => {
   // 🔥 修复：在组件挂载时添加事件监听器
   window.addEventListener('chatCreated', handleChatCreated)
   window.addEventListener('chatCleared', handleChatCleared)
+  window.addEventListener('messagesUnreadCountChanged', onMessagesUnreadCountChanged)
 })
 
 // 组件卸载时移除事件监听器
 onUnmounted(() => {
   window.removeEventListener('chatCreated', handleChatCreated)
   window.removeEventListener('chatCleared', handleChatCleared)
+  window.removeEventListener('messagesUnreadCountChanged', onMessagesUnreadCountChanged)
 })
 </script>
 
@@ -1500,9 +1577,9 @@ onUnmounted(() => {
 .user-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-radius: 50px !important;
   transition: background 0.2s ease;
   flex: 1;
@@ -1512,12 +1589,58 @@ onUnmounted(() => {
 
   .toc-sidebar.is-collapsed & {
     justify-content: center;
-    padding: 8px;
+    padding: 6px;
   }
 
   &:hover {
     background-color: var(--hover);
   }
+}
+
+/* 系统消息：仅图标、与个人信息同主题（圆角+背景+hover），向右留出间距，尺寸与底部区域一致 */
+.messages-trigger-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  margin-left: 14px;
+  border-radius: 50px !important;
+  cursor: pointer;
+  color: var(--text-2, #374151);
+  background-color: var(--hover-light);
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+
+  .el-icon {
+    font-size: 18px;
+  }
+
+  &:hover {
+    background-color: var(--hover);
+  }
+}
+
+/* 消息图标容器：用于未读数角标定位 */
+.messages-trigger-wrap {
+  position: relative;
+}
+
+/* 未读消息数红色角标：超过 100 显示 99+ */
+.messages-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: #f56c6c;
+  border-radius: 10px;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .language-switcher-inline {
@@ -1638,6 +1761,24 @@ onUnmounted(() => {
   color: var(--text);
 }
 
+/* 用户下拉中嵌套项（语言切换、系统设置）各占一行，系统设置在语言切换下面 */
+.user-dropdown-row {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+
+  .el-dropdown {
+    display: block;
+    width: 100%;
+  }
+}
+
+.user-dropdown-row-divided {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 2px;
+}
+
 // 系统设置嵌套下拉菜单样式（与其他菜单项对齐）
 .system-menu-trigger {
   display: flex;
@@ -1679,20 +1820,41 @@ onUnmounted(() => {
   }
 }
 
-// 系统设置二级菜单的 popper 样式（稍微紧凑一点）
+// 系统设置/语言切换二级菜单 popper 样式（与主菜单一致的浅色主题）
 :deep(.system-submenu-popper) {
   margin-left: 4px !important;
-  
+
   .el-dropdown-menu {
     padding: 2px 0 !important;
     margin: 0 !important;
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
   }
-  
+
   .el-dropdown-menu__item {
     height: 44px !important;
     line-height: 44px !important;
     margin: 1px 6px !important;
     padding: 0 16px !important;
+
+    .locale-flag {
+      margin-right: 8px;
+      font-size: 16px;
+    }
+
+    .locale-name {
+      font-size: 14px;
+    }
+
+    &:hover {
+      background-color: var(--hover) !important;
+    }
+
+    &.is-active {
+      color: var(--color-primary) !important;
+      background-color: var(--hover) !important;
+    }
   }
 }
 
@@ -1901,6 +2063,25 @@ onUnmounted(() => {
   background: #1e40af !important;
   border-color: #1e40af !important;
   color: white !important;
+}
+</style>
+
+<!-- 语言切换、系统设置 悬浮子菜单：浅色主题（popper 挂载到 body 需独立样式块） -->
+<style lang="scss">
+.system-submenu-popper .el-dropdown-menu {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+}
+.system-submenu-popper .el-dropdown-menu__item {
+  color: inherit;
+}
+.system-submenu-popper .el-dropdown-menu__item:hover {
+  background-color: var(--hover) !important;
+}
+.system-submenu-popper .el-dropdown-menu__item.is-active {
+  color: var(--color-primary) !important;
+  background-color: var(--hover) !important;
 }
 </style>
 

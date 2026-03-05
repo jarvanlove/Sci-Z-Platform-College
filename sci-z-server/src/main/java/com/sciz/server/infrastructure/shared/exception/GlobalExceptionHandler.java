@@ -17,6 +17,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
@@ -282,6 +283,20 @@ public class GlobalExceptionHandler {
         log.warn(String.format("请求路径不存在: %s", e.getMessage()));
 
         String message = "请求路径 '" + e.getRequestURL() + "' 不存在";
+        Result<Void> result = Result.fail(ResultCode.NOT_FOUND.getCode(), message);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(result);
+    }
+
+    /**
+     * 处理无静态资源异常（Spring 6.1+，无控制器匹配时可能抛出）
+     *
+     * @param e NoResourceFoundException
+     * @return 404 错误响应
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Result<Void>> handleNoResourceFoundException(NoResourceFoundException e) {
+        log.warn("无匹配处理器或静态资源: {}", e.getResourcePath());
+        String message = "请求路径 '" + e.getResourcePath() + "' 不存在";
         Result<Void> result = Result.fail(ResultCode.NOT_FOUND.getCode(), message);
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(result);
     }

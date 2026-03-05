@@ -52,6 +52,20 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
     }
 
     @Override
+    public List<SysKnowledgeBase> findByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<Long> distinctIds = ids.stream().filter(id -> id != null).distinct().toList();
+        if (distinctIds.isEmpty()) {
+            return List.of();
+        }
+        return mapper.selectList(new LambdaQueryWrapper<SysKnowledgeBase>()
+                .in(SysKnowledgeBase::getId, distinctIds)
+                .eq(SysKnowledgeBase::getIsDeleted, DeleteStatus.NOT_DELETED.getCode()));
+    }
+
+    @Override
     public SysKnowledgeBase findByName(String name) {
         return new LambdaQueryChainWrapper<>(mapper)
                 .eq(SysKnowledgeBase::getName, name)
@@ -60,9 +74,17 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
     }
 
     @Override
-    public SysKnowledgeBase findByDifyKnowdataId(int difyKnowdataId) {
+    public SysKnowledgeBase findByDifyKnowdataId(int id) {
+        return findById(Long.valueOf(id));
+    }
+
+    @Override
+    public SysKnowledgeBase findByDifyKnowdataId(String difyKnowdataId) {
+        if (difyKnowdataId == null || difyKnowdataId.isEmpty()) {
+            return null;
+        }
         return new LambdaQueryChainWrapper<>(mapper)
-                .eq(SysKnowledgeBase::getId, difyKnowdataId)
+                .eq(SysKnowledgeBase::getDifyKnowdataId, difyKnowdataId)
                 .eq(SysKnowledgeBase::getIsDeleted, DeleteStatus.NOT_DELETED.getCode())
                 .one();
     }
@@ -134,20 +156,49 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
     }
 
     @Override
-    public IPage<SysKnowledgeBase> pageByCondition(Page<SysKnowledgeBase> page, Long userId,
-                                                     List<Long> memberProjectIds, String kbType, String keyword,
-                                                     String sortBy, boolean asc) {
+    public IPage<SysKnowledgeBase> pageByCondition(Page<SysKnowledgeBase> page,
+                                                   Long userId,
+                                                   List<Long> memberProjectIds,
+                                                   String kbType,
+                                                   String keyword,
+                                                   String sortBy,
+                                                   boolean asc,
+                                                   Long ownerId) {
         LambdaQueryWrapper<SysKnowledgeBase> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(SysKnowledgeBase::getIsDeleted, DeleteStatus.NOT_DELETED.getCode());
 
-        // 可见性：管理员不限；普通用户 = 本人创建的 OR 项目成员可见的项目知识库 OR 他人公开的个人知识库（personal + is_shared=1）
-        if (!DataPermissionUtil.isAdmin() && userId != null) {
+        // 可见性控制逻辑：
+        // 1. 如果显式传入了 ownerId（点击「个人」Tab 时），强制按 ownerId 过滤（不管是不是管理员）
+        // 2. 否则，普通用户按可见性规则过滤；管理员可以查看所有数据
+        Long selfId = ownerId != null ? ownerId : userId;
+
+        if (ownerId != null) {
+            // 场景1：点击「个人」Tab，强制只查询该 ownerId 的知识库
+            if (KnowledgeStatus.PERSONAL.getCode().equals(kbType)) {
+                queryWrapper.eq(SysKnowledgeBase::getOwnerId, ownerId);
+            }
+            // 场景2：点击「项目」Tab，查询该用户参与的项目知识库
+            else if (KnowledgeStatus.PROJECT.getCode().equals(kbType)) {
+                if (CollectionUtils.isEmpty(memberProjectIds)) {
+                    // 空集合时用不可能匹配的 id，避免 MyBatis-Plus 生成无效的 project_id IN () 导致 PostgreSQL 语法错误
+                    queryWrapper.in(SysKnowledgeBase::getProjectId, List.of(-1L));
+                } else {
+                    queryWrapper.isNotNull(SysKnowledgeBase::getProjectId)
+                            .in(SysKnowledgeBase::getProjectId, memberProjectIds);
+                }
+            }
+            // 场景3：其他情况（如全部），走普通可见性逻辑
+        }
+
+        // 普通用户可见性控制（点击「全部」Tab 时或未传 ownerId 时）
+        if (!DataPermissionUtil.isAdmin() && userId != null && ownerId == null) {
+            // 普通用户未指定 ownerId 时，只能查看自己创建或可见的知识库
             if (CollectionUtils.isEmpty(memberProjectIds)) {
-                queryWrapper.and(w -> w.eq(SysKnowledgeBase::getOwnerId, userId)
+                queryWrapper.and(w -> w.eq(SysKnowledgeBase::getOwnerId, selfId)
                         .or(i -> i.eq(SysKnowledgeBase::getKbType, KnowledgeStatus.PERSONAL.getCode())
                                 .eq(SysKnowledgeBase::getIsShared, 1)));
             } else {
-                queryWrapper.and(w -> w.eq(SysKnowledgeBase::getOwnerId, userId)
+                queryWrapper.and(w -> w.eq(SysKnowledgeBase::getOwnerId, selfId)
                         .or(i -> i.isNotNull(SysKnowledgeBase::getProjectId)
                                 .in(SysKnowledgeBase::getProjectId, memberProjectIds))
                         .or(j -> j.eq(SysKnowledgeBase::getKbType, KnowledgeStatus.PERSONAL.getCode())
@@ -155,7 +206,7 @@ public class SysKnowledgeBaseRepoImpl implements SysKnowledgeBaseRepo {
             }
         }
 
-        // 类型筛选
+        // 类型筛选（个人/项目 Tab 时只查对应类型）
         if (KnowledgeStatus.isValid(kbType)) {
             queryWrapper.eq(SysKnowledgeBase::getKbType, kbType);
         }

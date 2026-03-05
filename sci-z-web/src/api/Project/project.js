@@ -11,7 +11,7 @@ import { PROJECT_API, HTTP_METHODS } from '../Common/constants'
  * @param {Object} params - 查询参数
  * @param {number} params.pageNo - 页码（从1开始）
  * @param {number} params.pageSize - 每页数量
- * @param {string} [params.keyword] - 关键词搜索（可选）
+ * @param {string} [params.keyword] - 关键词搜索（可选，支持项目名称/编号/负责人）
  * @param {string} [params.status] - 状态筛选（可选，如 "1"）
  * @param {string} [params.startTime] - 项目开始时间（可选，LocalDate 格式：YYYY-MM-DD，查询开始时间 >= startTime 的项目）
  * @param {string} [params.endTime] - 项目结束时间（可选，LocalDate 格式：YYYY-MM-DD，查询结束时间 <= endTime 的项目）
@@ -25,6 +25,63 @@ export const getProjectList = (params) => {
     method: HTTP_METHODS.POST,
     data: params
   })
+}
+
+/**
+ * 导出项目列表为 Excel（表头：项目编号、项目名称、项目负责人、项目状态、进度、开始时间、预计完成时间、项目预算）
+ * @param {Object} params - 若传 projectIds 则只导出指定 ID 的项目；否则可按 keyword/status/startTime/endTime 等查询参数导出（当前未使用）
+ * @param {number[]} [params.projectIds] - 要导出的项目 ID 列表（方案 A：仅导出选中项）
+ * @returns {Promise<void>} 触发浏览器下载，无返回值
+ */
+export const exportProjectList = async (params) => {
+  const res = await request({
+    url: PROJECT_API.EXPORT,
+    method: HTTP_METHODS.POST,
+    data: params,
+    responseType: 'blob'
+  })
+  const blob = res.data
+  const contentType = res.headers['content-type'] || ''
+  if (contentType.includes('application/json')) {
+    const text = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = reject
+      reader.readAsText(blob)
+    })
+    const json = JSON.parse(text)
+    throw new Error(json.message || '导出失败')
+  }
+  const disposition = res.headers['content-disposition']
+  let filename = '项目列表.xlsx'
+  if (disposition) {
+    // 优先使用 filename="..." 得到纯时间戳名；避免 filename* 在部分环境下被错误展示
+    const quoted = /filename="([^"]+)"/i.exec(disposition)
+    if (quoted && quoted[1]) {
+      filename = quoted[1].trim()
+    } else {
+      const star = /filename\*=(?:UTF-8'')?([^;\s]+)/i.exec(disposition)
+      if (star && star[1]) {
+        try {
+          filename = decodeURIComponent(star[1].trim())
+        } catch (_) {
+          filename = star[1].trim()
+        }
+      }
+    }
+    if (!filename || filename.includes('=') || /UTF-8/i.test(filename)) {
+      const ts = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14) + '.xlsx'
+      filename = ts || '项目列表.xlsx'
+    }
+  }
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
 }
 
 /**

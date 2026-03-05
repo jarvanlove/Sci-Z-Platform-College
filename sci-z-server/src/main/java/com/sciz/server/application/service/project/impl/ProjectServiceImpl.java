@@ -79,7 +79,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.math.BigDecimal;
+
+import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 /**
  * 项目应用服务实现类
@@ -221,11 +228,16 @@ public class ProjectServiceImpl implements ProjectService {
             log.debug(String.format("时间范围筛选找到 %d 个符合条件的申报ID", declarationIds.size()));
         }
 
-        // 2. 查询项目列表（如果提供了时间范围，只查询符合条件的申报关联的项目）
+        // 2. 若有关键字，查询负责人姓名匹配的申报ID（用于 keyword 支持“项目负责人”筛选）
+        List<Long> declarationIdsByLeader = null;
+        if (req.keyword() != null && !req.keyword().isBlank()) {
+            declarationIdsByLeader = declarationRepo.findIdsByProjectLeaderLike(req.keyword());
+        }
+        // 3. 查询项目列表（时间范围用 declarationIds；关键字含编号/名称/负责人）
         IPage<Project> projectPage = projectRepo.page(
-                page, req.keyword(), req.status(), sortBy, asc, declarationIds);
+                page, req.keyword(), req.status(), sortBy, asc, declarationIds, declarationIdsByLeader);
 
-        // 3. 批量查询申报信息（获取开始时间、预计完成时间和项目负责人）
+        // 4. 批量查询申报信息（获取开始时间、预计完成时间和项目负责人）
         var projectDeclarationIds = projectPage.getRecords().stream()
                 .map(Project::getDeclarationId)
                 .filter(id -> id != null)
@@ -237,7 +249,7 @@ public class ProjectServiceImpl implements ProjectService {
         Long currentUserId = LoginUserUtil.getCurrentUser().map(u -> u.userId()).orElse(null);
         boolean isAdmin = DataPermissionUtil.isAdmin();
 
-        // 4. 转换为响应对象，直接使用项目主表的进度值，并设置状态描述和时间信息
+        // 5. 转换为响应对象，直接使用项目主表的进度值，并设置状态描述和时间信息
         var records = projectPage.getRecords().stream()
                 .map(project -> {
                     var baseResp = projectConverter.toListResp(project);
@@ -2499,5 +2511,106 @@ public class ProjectServiceImpl implements ProjectService {
                             project.getDifyKnowledgeId());
                 })
                 .toList();
+    }
+
+    /** 导出 Excel 单次最大行数，避免内存与超时 */
+    private static final int EXPORT_MAX_ROWS = 10_000;
+
+    private static final String[] EXPORT_HEADERS = {
+            "项目编号", "项目名称", "项目负责人", "项目状态", "进度", "开始时间", "预计完成时间", "项目预算"
+    };
+
+    @Override
+    public byte[] exportList(ProjectListQueryReq req) {
+        List<ProjectListResp> records;
+        if (req.projectIds() != null && !req.projectIds().isEmpty()) {
+            // 方案 A：仅导出选中的项目（按 ID 列表，带数据权限）
+            List<Project> projectList = projectRepo.findByIds(req.projectIds());
+            if (projectList.isEmpty()) {
+                records = List.of();
+            } else {
+                var declarationIds = projectList.stream()
+                        .map(Project::getDeclarationId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList();
+                var declarationMap = declarationRepo.findByIds(declarationIds);
+                records = projectList.stream()
+                        .map(project -> {
+                            var baseResp = projectConverter.toListResp(project);
+                            var progress = project.getProgress() != null ? project.getProgress() : 0;
+                            var statusDescription = getProjectStatusDescription(project.getStatus());
+                            var declaration = declarationMap.get(project.getDeclarationId());
+                            var startTime = declaration != null ? declaration.getProjectStartTime() : null;
+                            var estimatedCompletionTime = declaration != null ? declaration.getProjectEndTime() : null;
+                            var projectLeader = declaration != null ? declaration.getProjectLeader() : null;
+                            return new ProjectListResp(
+                                    baseResp.id(), baseResp.number(), baseResp.name(), baseResp.description(),
+                                    baseResp.declarationId(), baseResp.budget(), progress, baseResp.status(),
+                                    statusDescription, startTime, estimatedCompletionTime, projectLeader,
+                                    baseResp.difyKnowledgeId(), baseResp.createdTime(), baseResp.updatedTime(), false);
+                        })
+                        .toList();
+            }
+        } else {
+            var exportReq = new ProjectListQueryReq(
+                    1,
+                    EXPORT_MAX_ROWS,
+                    req.sortBy(),
+                    req.sortOrder(),
+                    req.keyword(),
+                    req.status(),
+                    req.startTime(),
+                    req.endTime());
+            PageResult<ProjectListResp> result = page(exportReq);
+            records = result.getRecords();
+            if (records == null) {
+                records = List.of();
+            }
+        }
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            XSSFSheet sheet = workbook.createSheet("项目列表");
+            XSSFRow headerRow = sheet.createRow(0);
+            for (int i = 0; i < EXPORT_HEADERS.length; i++) {
+                XSSFCell cell = headerRow.createCell(i);
+                cell.setCellValue(EXPORT_HEADERS[i]);
+            }
+            int rowIndex = 1;
+            for (ProjectListResp r : records) {
+                XSSFRow row = sheet.createRow(rowIndex++);
+                setCellValue(row, 0, r.number());
+                setCellValue(row, 1, r.name());
+                setCellValue(row, 2, r.projectLeader());
+                setCellValue(row, 3, r.statusDescription());
+                setCellValue(row, 4, r.progress() != null ? r.progress().intValue() : null);
+                setCellValue(row, 5, r.startTime());
+                setCellValue(row, 6, r.estimatedCompletionTime());
+                setCellValue(row, 7, r.budget());
+            }
+            try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                workbook.write(out);
+                return out.toByteArray();
+            }
+        } catch (Exception e) {
+            log.error(String.format("项目列表导出Excel失败: err=%s", e.getMessage()), e);
+            throw BusinessException.of(ResultCode.SERVER_ERROR, "导出失败: %s", e.getMessage());
+        }
+    }
+
+    private static void setCellValue(XSSFRow row, int columnIndex, Object value) {
+        XSSFCell cell = row.createCell(columnIndex);
+        if (value == null) {
+            cell.setCellValue("");
+            return;
+        }
+        if (value instanceof Integer) {
+            cell.setCellValue((Integer) value);
+        } else if (value instanceof BigDecimal) {
+            cell.setCellValue(((BigDecimal) value).doubleValue());
+        } else if (value instanceof java.time.LocalDate) {
+            cell.setCellValue(((java.time.LocalDate) value).toString());
+        } else {
+            cell.setCellValue(value.toString());
+        }
     }
 }

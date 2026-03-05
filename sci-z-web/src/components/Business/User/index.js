@@ -8,3 +8,6 @@ export { default as UserProfile } from './UserProfile.vue'
 
 // 安全设置组件
 export { default as UserSecurity } from './UserSecurity.vue'
+
+// 完善个人信息悬浮提示
+export { default as ProfileCompleteFloatingPrompt } from './ProfileCompleteFloatingPrompt.vue'

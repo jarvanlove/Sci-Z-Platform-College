@@ -33,6 +33,9 @@ dist/
 # Cursor 本地配置（不提交，每人可自定义）
 .cursorignore
 
+# 本地 Git 同步脚本（含流程/凭据相关，不提交）
+scripts/gitlab-toc-wjw-sync.ps1
+
 # IDE
 .vscode/
 *.suo

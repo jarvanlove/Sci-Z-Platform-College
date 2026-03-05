@@ -31,14 +31,14 @@
                   class="attachment-item"
                   :class="{ 'knowledge-file': attachment.type === 'knowledge' }"
                 >
-                  <span class="attachment-icon">{{ getFileIcon(attachment.type) }}</span>
+                  <FileTypeIcon :fileName="attachment.name" size="small" class="attachment-file-icon" />
                   <div class="attachment-info">
                     <div class="attachment-name">{{ attachment.name }}</div>
                     <div v-if="attachment.type === 'knowledge'" class="attachment-source">
                       来自：{{ attachment.knowledgeName }}
                     </div>
+                    <div class="attachment-size">{{ attachment.size }}</div>
                   </div>
-                  <div class="attachment-size">{{ attachment.size }}</div>
                   <div
                     class="attachment-remove"
                     @click="removeAttachment(index)"
@@ -155,51 +155,36 @@
                 </div>
 
                 <div class="kb-right-controls">
-                  <!-- 联网搜索开关 -->
-                  <el-tooltip
+                  <!-- 联网搜索开关（使用 open_connect/close_connect 图片） -->
+                  <BaseTooltip
+                    :content="enableSearch ? t('ai.chat.searchTooltipOn') : t('ai.chat.searchTooltipOff')"
                     placement="top"
-                    effect="light"
                     :show-after="300"
-                    :hide-after="0"
-                    trigger="hover"
                   >
-                    <template #content>
-                      <div class="attachment-tooltip-content">
-                        {{ enableSearch ? '已开启联网搜索' : '已关闭联网搜索' }}
-                      </div>
-                    </template>
                     <button
                       class="kb-enable-search-btn"
                       :class="{ active: enableSearch }"
                       @click.stop="toggleEnableSearch"
                     >
                       <img
-                        :src="enableSearch ? iconSearchOn : iconSearchOff"
-                        alt="联网搜索"
-                        class="search-icon"
+                        :src="enableSearch ? connectImgOpen : connectImgClose"
+                        alt=""
+                        class="kb-enable-search-btn-img"
                       />
                     </button>
-                  </el-tooltip>
+                  </BaseTooltip>
 
-                  <!-- 附件按钮（和历史对话一样的下拉菜单形式和悬浮主题） -->
-                  <el-tooltip
+                  <!-- 附件按钮（与联网 logo 大小相近的附件图标） -->
+                  <BaseTooltip
+                    :content="t('ai.chat.attachmentTooltip.attachmentTooltipFull')"
                     placement="top"
-                    effect="light"
                     :show-after="300"
-                    :hide-after="0"
                     :disabled="showAttachmentDropdown"
-                    trigger="hover"
+                    popper-class="attachment-tooltip"
                   >
-                    <template #content>
-                      <div class="attachment-tooltip-content">
-                        <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.supportUpload') }}</div>
-                        <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.maxFiles') }}</div>
-                        <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.fileTypes') }}</div>
-                        <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.maxKbFiles') }}</div>
-                      </div>
-                    </template>
                     <el-dropdown
                       trigger="click"
+                      popper-class="attachment-dropdown base-tooltip-theme"
                       @command="handleAttachmentCommand"
                       @visible-change="handleAttachmentDropdownVisible"
                       placement="top-end"
@@ -207,7 +192,7 @@
                       <button
                         class="kb-attachment-btn"
                       >
-                        <el-icon><Paperclip /></el-icon>
+                        <el-icon class="kb-attachment-icon"><Paperclip /></el-icon>
                       </button>
                       <template #dropdown>
                         <el-dropdown-menu>
@@ -216,13 +201,13 @@
                             <span style="margin-left: 8px">{{ $t('ai.chat.attachmentLocalFile') }}</span>
                           </el-dropdown-item>
                           <el-dropdown-item command="knowledge">
-                            <el-icon><Document /></el-icon>
+                            <el-icon><Reading /></el-icon>
                             <span style="margin-left: 8px">{{ $t('ai.chat.attachmentKnowledgeFile') }}</span>
                           </el-dropdown-item>
                         </el-dropdown-menu>
                       </template>
                     </el-dropdown>
-                  </el-tooltip>
+                  </BaseTooltip>
 
                   <!-- 隐藏的文件输入 -->
                   <input
@@ -364,25 +349,27 @@
                     
                     <div class="kb-message-meta">
                       <div class="kb-message-actions">
-                        <!-- AI消息的复制和重试按钮 -->
+                        <!-- AI消息的复制和重试按钮：仅图标，悬浮 BaseTooltip 显示文字 -->
                         <template v-if="msg.type === 'ai'">
-                          <button
-                            class="kb-copy-btn"
-                            @click="copyKbMessage(msg.content)"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 4px;">
-                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
-                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2" fill="none"/>
-                            </svg>
-                            <span>{{ $t('ai.chat.copy') }}</span>
-                          </button>
-                          <button
-                            class="kb-retry-btn"
-                            @click="retryKbMessage(msg)"
-                          >
-                            <el-icon><Refresh /></el-icon>
-                            <span>{{ $t('ai.chat.regenerate') }}</span>
-                          </button>
+                          <BaseTooltip :content="$t('ai.chat.copy')" placement="top" >
+                            <button
+                              class="kb-copy-btn kb-msg-action-icon-only"
+                              @click="copyKbMessage(msg.content)"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2" fill="none"/>
+                              </svg>
+                            </button>
+                          </BaseTooltip>
+                          <BaseTooltip :content="$t('ai.chat.regenerate')" placement="top" >
+                            <button
+                              class="kb-retry-btn kb-msg-action-icon-only"
+                              @click="retryKbMessage(msg)"
+                            >
+                              <el-icon><Refresh /></el-icon>
+                            </button>
+                          </BaseTooltip>
                         </template>
 
                         <!-- 用户消息的编辑和复制按钮 -->
@@ -426,14 +413,14 @@
                 class="attachment-item"
                 :class="{ 'knowledge-file': attachment.type === 'knowledge' }"
               >
-                <span class="attachment-icon">{{ getFileIcon(attachment.type) }}</span>
+                <FileTypeIcon :fileName="attachment.name" size="small" class="attachment-file-icon" />
                 <div class="attachment-info">
                   <div class="attachment-name">{{ attachment.name }}</div>
                   <div v-if="attachment.type === 'knowledge'" class="attachment-source">
                     来自：{{ attachment.knowledgeName }}
                   </div>
+                  <div class="attachment-size">{{ attachment.size }}</div>
                 </div>
-                <div class="attachment-size">{{ attachment.size }}</div>
                 <div
                   class="attachment-remove"
                   @click="removeAttachment(index)"
@@ -550,51 +537,36 @@
               </div>
 
               <div class="kb-right-controls">
-                <!-- 联网搜索开关 -->
-                <el-tooltip
+                <!-- 联网搜索开关（使用 open_connect/close_connect 图片） -->
+                <BaseTooltip
+                  :content="enableSearch ? t('ai.chat.searchTooltipOn') : t('ai.chat.searchTooltipOff')"
                   placement="top"
-                  effect="light"
                   :show-after="300"
-                  :hide-after="0"
-                  trigger="hover"
                 >
-                  <template #content>
-                    <div class="attachment-tooltip-content">
-                      {{ enableSearch ? '已开启联网搜索' : '已关闭联网搜索' }}
-                    </div>
-                  </template>
                   <button
                     class="kb-enable-search-btn"
                     :class="{ active: enableSearch }"
                     @click.stop="toggleEnableSearch"
                   >
                     <img
-                      :src="enableSearch ? iconSearchOn : iconSearchOff"
-                      alt="联网搜索"
-                      class="search-icon"
+                      :src="enableSearch ? connectImgOpen : connectImgClose"
+                      alt=""
+                      class="kb-enable-search-btn-img"
                     />
                   </button>
-                </el-tooltip>
+                </BaseTooltip>
 
-                <!-- 附件按钮 -->
-                <el-tooltip
+                <!-- 附件按钮（与联网 logo 大小相近的附件图标） -->
+                <BaseTooltip
+                  :content="t('ai.chat.attachmentTooltip.attachmentTooltipFull')"
                   placement="top"
-                  effect="light"
                   :show-after="300"
-                  :hide-after="0"
                   :disabled="showAttachmentDropdown"
-                  trigger="hover"
+                  popper-class="attachment-tooltip"
                 >
-                  <template #content>
-                    <div class="attachment-tooltip-content">
-                      <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.supportUpload') }}</div>
-                      <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.maxFiles') }}</div>
-                      <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.fileTypes') }}</div>
-                      <div class="tooltip-item">• {{ $t('ai.chat.attachmentTooltip.maxKbFiles') }}</div>
-                    </div>
-                  </template>
                   <el-dropdown
                     trigger="click"
+                    popper-class="attachment-dropdown base-tooltip-theme"
                     @command="handleAttachmentCommand"
                     @visible-change="handleAttachmentDropdownVisible"
                     placement="top-end"
@@ -602,7 +574,7 @@
                     <button
                       class="kb-attachment-btn"
                     >
-                      <el-icon><Paperclip /></el-icon>
+                      <el-icon class="kb-attachment-icon"><Paperclip /></el-icon>
                     </button>
                     <template #dropdown>
                       <el-dropdown-menu>
@@ -611,13 +583,13 @@
                           <span style="margin-left: 8px">{{ $t('ai.chat.attachmentLocalFile') }}</span>
                         </el-dropdown-item>
                         <el-dropdown-item command="knowledge">
-                          <el-icon><Document /></el-icon>
+                          <el-icon><Reading /></el-icon>
                           <span style="margin-left: 8px">{{ $t('ai.chat.attachmentKnowledgeFile') }}</span>
                         </el-dropdown-item>
                       </el-dropdown-menu>
                     </template>
                   </el-dropdown>
-                </el-tooltip>
+                </BaseTooltip>
 
                 <!-- 隐藏的文件输入 -->
                 <input
@@ -652,15 +624,19 @@
             </div>
           </div>
           <div class="input-footer">{{ $t('ai.chat.aiContentHint') }}</div>
-          <!-- 🔥 修复：滚动到底部按钮 - 在输入框区域右下角（还原到原始位置） -->
-          <button
+          <!-- 🔥 修复：滚动到底部按钮 - BaseTooltip 浅色主题 -->
+          <BaseTooltip
             v-if="showScrollToBottom"
-            class="scroll-to-bottom-btn-input"
-            @click="scrollKbToBottom"
-            :title="$t('ai.chat.scrollToBottom') || '滚动到底部'"
+            :content="$t('ai.chat.scrollToBottom')"
+            placement="top"
           >
-            <el-icon><ArrowDown /></el-icon>
-          </button>
+            <button
+              class="scroll-to-bottom-btn-input"
+              @click="scrollKbToBottom"
+            >
+              <el-icon><ArrowDown /></el-icon>
+            </button>
+          </BaseTooltip>
         </div>
     </div>
 
@@ -824,13 +800,16 @@ import {
   Close,
   ArrowDown,
   ArrowUp,
-  Paperclip,
   Folder,
   Check,
   InfoFilled,
   Search,
-  Collection
+  Collection,
+  Paperclip,
+  Reading
 } from '@element-plus/icons-vue'
+import connectImgOpen from '@/assets/images/open_connect.png'
+import connectImgClose from '@/assets/images/close_connect.png'
 import {
   getKnowledgeList,
   getKnowledgeListPage,
@@ -862,8 +841,7 @@ import {
 import { createLogger } from '@/utils/simpleLogger'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import iconSearchOn from '@/assets/images/open_connect.png'
-import iconSearchOff from '@/assets/images/close_connect.png'
+import { BaseTooltip, FileTypeIcon } from '@/components/Common'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -1033,14 +1011,14 @@ const modelOptions = computed(() => [
     description: t('ai.chat.models.qwen3Max.description')
   },
   {
-    value: 'deepseek-v3.1',
-    name: t('ai.chat.models.deepseekV31.name'),
-    description: t('ai.chat.models.deepseekV31.description')
+    value: 'minimax-2.1',
+    name: t('ai.chat.models.minimax21.name'),
+    description: t('ai.chat.models.minimax21.description')
   },
   {
-    value: 'deepseek-r1',
-    name: t('ai.chat.models.deepseekR1.name'),
-    description: t('ai.chat.models.deepseekR1.description')
+    value: 'kimi-k2.5',
+    name: t('ai.chat.models.kimiK25.name'),
+    description: t('ai.chat.models.kimiK25.description')
   }
 ])
 
@@ -2269,6 +2247,10 @@ const sendKbMessage = async () => {
         // 更新会话ID（Dify返回的会话ID）
         if (data.conversationId) {
           currentConversationId.value = data.conversationId
+          // conversation-memory：持久化 Dify 会话 ID 到 ai_conversation，以便多轮对话时 convertToDifyConversationId 能查找到
+          if (currentChat.value?.id) {
+            updateAiConversation({ id: String(currentChat.value.id), difyConversationId: data.conversationId }).catch(e => logger.warn('持久化 Dify 会话ID 失败', e))
+          }
         }
         
         // 🔥 修复：获取当前对话ID（优先使用 currentChat 的ID，如果没有则使用 Dify 返回的ID）
@@ -2751,6 +2733,9 @@ const retryKbMessage = async (msg) => {
         
         if (data.conversationId) {
           currentConversationId.value = data.conversationId
+          if (currentChat.value?.id) {
+            updateAiConversation({ id: String(currentChat.value.id), difyConversationId: data.conversationId }).catch(e => logger.warn('持久化 Dify 会话ID 失败', e))
+          }
         }
         
         // 保存AI消息到后端
@@ -3130,6 +3115,9 @@ const confirmEditUserMessage = async (msg) => {
         
         if (data.conversationId) {
           currentConversationId.value = data.conversationId
+          if (currentChat.value?.id) {
+            updateAiConversation({ id: String(currentChat.value.id), difyConversationId: data.conversationId }).catch(e => logger.warn('持久化 Dify 会话ID 失败', e))
+          }
         }
         
         const finalConversationId = conversationId || data.conversationId
@@ -3931,27 +3919,6 @@ const formatFileSize = (bytes) => {
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-const getFileIcon = (fileType) => {
-  // 知识库文件使用特殊图标
-  if (fileType === 'knowledge') {
-    return '📚'
-  }
-  
-  const iconMap = {
-    '.pdf': '📕',
-    '.doc': '📘',
-    '.docx': '📘',
-    '.ppt': '📗',
-    '.pptx': '📗',
-    '.xls': '📊',
-    '.xlsx': '📊',
-    '.csv': '📋',
-    '.md': '📝',
-    '.txt': '📄'
-  }
-  return iconMap[fileType] || '📄'
 }
 
 const removeAttachment = (index) => {
@@ -5005,8 +4972,9 @@ onUnmounted(() => {
   background: var(--hover);
   border: 1px solid var(--border);
   border-radius: 6px;
-  color: var(--text-3);
+  color: var(--text);
   font-size: 12px;
+  font-weight: 400;
   cursor: pointer;
   transition: all 0.2s ease;
 
@@ -5018,6 +4986,35 @@ onUnmounted(() => {
 
   &:active {
     background: var(--border-hover);
+  }
+
+  // AI 消息的仅图标按钮：默认无背景，悬浮时灰色背景；统一尺寸
+  &.kb-msg-action-icon-only {
+    padding: 0;
+    gap: 0;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    justify-content: center;
+    background: transparent;
+    border-color: transparent;
+
+    &:hover {
+      background: var(--hover);
+      border-color: var(--border);
+    }
+
+    &:active {
+      background: var(--border);
+    }
+
+    svg,
+    .el-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
   }
 }
 
@@ -5299,8 +5296,7 @@ onUnmounted(() => {
   }
 }
 
-.attachment-icon {
-  font-size: 16px;
+.attachment-file-icon {
   flex-shrink: 0;
 }
 
@@ -5310,6 +5306,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* 本地上传：名称上、大小下；知识库文件：名称上、来自XXX 中、大小下 */
 }
 
 .attachment-name {
@@ -5320,14 +5317,13 @@ onUnmounted(() => {
 }
 
 .attachment-source {
-  color: var(--color-primary-lighter);
-  font-size: 10px;
+  color: var(--text-2);
+  font-size: 11px;
 }
 
 .attachment-size {
   color: var(--text-3);
   font-size: 11px;
-  flex-shrink: 0;
 }
 
 .attachment-remove {
@@ -5550,13 +5546,13 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-// 联网搜索按钮
+// 联网搜索按钮（与附件按钮统一：同尺寸、同圆角、同背景，图标偏深）
 .kb-enable-search-btn {
   width: 32px;
   height: 32px;
   border: none;
-  background: #ffffff;
-  color: var(--text-3);
+  background: var(--hover-light);
+  color: var(--text);
   border-radius: 6px;
   cursor: pointer;
   display: flex;
@@ -5566,42 +5562,39 @@ onUnmounted(() => {
   flex-shrink: 0;
 
   &:hover {
-    background: #ffffff;
+    background: var(--hover);
     color: var(--text);
   }
 
   &:active {
-    background: #ffffff;
+    background: var(--border);
   }
 
   &.active {
-    background: #ffffff;
-    color: var(--surface);
+    background: var(--hover-light);
+    color: var(--text);
 
     &:hover {
-      background: #ffffff;
+      background: var(--hover);
       opacity: 0.9;
     }
   }
 
-  .el-icon {
-    font-size: 16px;
-  }
-
-  .search-icon {
+  .kb-enable-search-btn-img {
     width: 18px;
     height: 18px;
+    object-fit: contain;
     display: block;
   }
 }
 
-// 附件按钮
+// 附件按钮（与联网按钮统一风格：同尺寸、同圆角、同背景、图标同色深）
 .kb-attachment-btn {
   width: 32px;
   height: 32px;
   border: none;
   background: var(--hover-light);
-  color: var(--text-3);
+  color: var(--text);
   border-radius: 6px;
   cursor: pointer;
   display: flex;
@@ -5623,6 +5616,10 @@ onUnmounted(() => {
     background: var(--hover-light);
     color: var(--border-hover);
     cursor: not-allowed;
+  }
+
+  .kb-attachment-icon {
+    font-size: 18px;
   }
 
   .attachment-icon-svg {
@@ -6049,7 +6046,7 @@ onUnmounted(() => {
   }
 }
 
-// 覆盖 Element Plus tooltip 样式，设置白色背景
+// 覆盖 Element Plus tooltip 样式，设置白色背景（BaseTooltip 主题）
 // 注意：tooltip 会被挂载到 body，需要使用深度选择器
 :deep(.el-tooltip__popper) {
   background: var(--surface) !important;
@@ -6061,6 +6058,7 @@ onUnmounted(() => {
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
   }
+
 }
 
 .attachment-tooltip-content {
@@ -6088,6 +6086,41 @@ onUnmounted(() => {
 
   .kb-message-bubble {
     max-width: 85%;
+  }
+}
+</style>
+
+<!-- 附件 tooltip 换行：作用在 popper 及内容节点，覆盖 Element 默认 nowrap，保证 i18n 中 \n 生效 -->
+<style lang="scss">
+[role="tooltip"].attachment-tooltip,
+.el-tooltip__popper.attachment-tooltip,
+[role="tooltip"].attachment-tooltip .el-tooltip__popper__content,
+.el-tooltip__popper.attachment-tooltip .el-tooltip__popper__content {
+  white-space: pre-line !important;
+  max-width: 320px !important;
+}
+.el-tooltip__popper.attachment-tooltip .el-tooltip__popper__content {
+  line-height: 1.6;
+}
+</style>
+
+<!-- 附件下拉：BaseTooltip 主题（白底、边框），需覆盖 .el-dropdown__popper 的默认样式 -->
+<style lang="scss">
+.el-dropdown__popper.attachment-dropdown.base-tooltip-theme,
+.el-popper.attachment-dropdown.base-tooltip-theme {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+
+  .el-dropdown-menu {
+    background: transparent !important;
+    border: none !important;
+    padding: 4px 0 !important;
+  }
+
+  .el-dropdown-menu__item {
+    color: var(--text) !important;
+    font-size: 14px;
   }
 }
 </style>

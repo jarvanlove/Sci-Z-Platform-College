@@ -460,8 +460,8 @@ onMounted(() => {
 }
 
 .timeline-dot.success {
-  background: #16a34a; // 绿色，与进度条 success 颜色一致
-  box-shadow: 0 0 0 1px #16a34a;
+  background: #1b5e20; // 墨绿色
+  box-shadow: 0 0 0 1px #1b5e20;
 }
 
 .timeline-dot.warning {
@@ -485,8 +485,8 @@ onMounted(() => {
     }
     
     &.success {
-      background: #22c55e; // 暗色主题下的绿色
-      box-shadow: 0 0 0 1px #22c55e;
+      background: #1b5e20; // 暗色主题下沿用墨绿色
+      box-shadow: 0 0 0 1px #1b5e20;
     }
     
     &.warning {

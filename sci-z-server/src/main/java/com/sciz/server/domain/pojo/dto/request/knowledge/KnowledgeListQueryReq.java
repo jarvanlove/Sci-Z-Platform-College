@@ -13,6 +13,7 @@ import org.springframework.util.StringUtils;
  * @param sortOrder String 排序方式，支持 ASC 或 DESC，默认 DESC
  * @param keyword   String 搜索关键字（知识库名称/描述），非必传
  * @param kbType    String 知识库类型筛选：personal=个人知识库，project=项目知识库，不传=全部
+ * @param ownerId   Long   创建人ID（可选，主要用于前端在「个人/项目」Tab 时显式传入当前登录用户ID）
  *
  * @author JiaWen.Wu
  * @className KnowledgeListQueryReq
@@ -24,7 +25,8 @@ public record KnowledgeListQueryReq(
         String sortBy,
         String sortOrder,
         String keyword,
-        String kbType) {
+        String kbType,
+        Long ownerId) {
 
     public KnowledgeListQueryReq {
         var base = BaseQueryReq.of(pageNo, pageSize, sortBy, sortOrder);
@@ -34,6 +36,7 @@ public record KnowledgeListQueryReq(
         sortOrder = base.sortOrder();
         keyword = StringUtils.hasText(keyword) ? keyword.trim() : null;
         kbType = StringUtils.hasText(kbType) ? kbType.trim().toLowerCase() : null;
+        // ownerId 直接沿用入参（允许为 null），不在这里做任何转换
     }
 
     /**

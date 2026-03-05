@@ -56,7 +56,9 @@ export default {
     added: '추가됨',
     remove: '제거',
     collapseSidebar: '사이드바 접기',
-    expandSidebar: '사이드바 펼치기'
+    expandSidebar: '사이드바 펼치기',
+    month: '월',
+    quantity: '수량'
   },
   // 페이지네이션
   pagination: {
@@ -115,7 +117,13 @@ export default {
     systemRole: '역할 및 권한',
     systemConfig: '시스템 설정',
     systemLogs: '로그 관리',
-    apiKey: 'API Key 설정'
+    apiKey: 'API Key 설정',
+    industryEducation: '산학연 에이전트'
+  },
+
+  message: {
+    systemMessage: '시스템 메시지',
+    languageSwitch: '언어 전환'
   },
 
   // 인증
@@ -395,7 +403,9 @@ export default {
       avatarPreviewTitle: '아바타 미리보기',
       previewError: '아바타 미리보기 로드에 실패했습니다. 나중에 다시 시도하세요',
       avatarRememberSave: '아바타가 업데이트되었습니다. "정보 저장"을 클릭하여 적용하세요.',
-      avatarReused: '동일한 아바타가 이전에 업로드된 것으로 감지되어 직접 재사용되었습니다.'
+      avatarReused: '동일한 아바타가 이전에 업로드된 것으로 감지되어 직접 재사용되었습니다.',
+      completeProfilePrompt: '원활한 이용을 위해 프로필을 완성해 주세요',
+      goToComplete: '프로필 완성'
     },
     security: {
       menu: '보안 설정',
@@ -458,6 +468,7 @@ export default {
     noTopic: '없음',
     declarationStatus: '신청 상태',
     statusSubmitting: '신청 중',
+    statusInProgress: '신청 진행 중',
     statusSuccess: '신청 성공',
     statusFailed: '신청 실패',
     keywordPlaceholder: '신청 번호/신청자/연구 방향을 입력하세요',
@@ -489,11 +500,17 @@ export default {
     researchDirection: '연구 방향',
     researchField: '연구 분야',
     statusPending: '검토 대기',
-    statusApproved: '승인됨',
+    statusApproved: '신청 성공',
     statusRejected: '신청 미통과',
     statusSubmitted: '신청 제출됨',
     updateStatus: '신청 상태 업데이트',
+    uploadDocumentEdit: '신청서 편집',
+    uploadDocumentTip: '업로드하면 현재 신청서를 덮어씁니다. .doc / .docx / .pdf만, 파일당 200MB 이하',
+    uploadDocumentSuccess: '신청서가 업데이트되었습니다',
+    uploadDocumentFailed: '신청서 업로드 실패',
+    uploadDocumentNoFile: '먼저 파일을 선택해 주세요',
     workflowStatus: '처리 상태',
+    workflowStatusColumn: '신청서 생성 상태',
     workflowStatusPending: '대기 중',
     workflowStatusPendingDesc: '워크플로우 시작 대기',
     workflowStatusRunning: '처리 중',
@@ -506,6 +523,8 @@ export default {
     declarationUpdated: '신청이 성공적으로 업데이트되었습니다',
     declarationDeleted: '신청이 성공적으로 삭제되었습니다',
     workflowNotCompletedHint: '처리 상태가 완료되지 않아 신청 상태를 수정할 수 없습니다',
+    viewErrorReason: '실패 사유 보기',
+    collapseError: '접기',
     listPage: {
       searchPlaceholder: '신청 제목/번호를 입력하세요',
       download: '다운로드',
@@ -609,7 +628,9 @@ export default {
     processing: '처리 중',
     processingDesc: '신청을 처리하고 있습니다. 잠시만 기다려주세요...',
     completed: '처리 완료',
-    completedDesc: '신청서가 생성되었습니다. 목록으로 이동하여 다운로드하세요',
+    completedDesc: '신청서가 생성되었습니다. 목록에서 보기 및 다운로드',
+    completedDescPrefix: '신청서가 생성되었습니다. ',
+    completedDescLink: '목록에서 보기 및 다운로드',
     failed: '처리 실패',
     failedDesc: '신청 처리 중 오류가 발생했습니다',
     unknown: '알 수 없는 상태',
@@ -657,7 +678,7 @@ export default {
     list: {
       title: '프로젝트 관리',
       keywordSearch: '키워드 검색',
-      keywordPlaceholder: '프로젝트명 또는 번호를 입력하세요',
+      keywordPlaceholder: '프로젝트명, 번호 또는 책임자를 입력하세요',
       statusFilter: '상태 필터',
       statusPlaceholder: '상태를 선택하세요',
       dateFilter: '날짜 필터',
@@ -671,6 +692,12 @@ export default {
       cancelSuccess: '프로젝트 "{name}"이(가) 취소되었습니다',
       cancelError: '프로젝트 취소 실패',
       loadError: '프로젝트 목록 로드에 실패했습니다',
+      export: '내보내기',
+      exportModeHint: '내보낼 프로젝트를 선택한 후 「내보내기 확인」을 클릭하세요',
+      confirmExport: '내보내기 확인',
+      exportSelectFirst: '내보낼 프로젝트를 먼저 선택하세요',
+      exportSuccess: '내보내기 성공',
+      exportError: '내보내기 실패',
       columns: {
         number: '프로젝트 번호',
         name: '프로젝트명',
@@ -911,6 +938,11 @@ export default {
   dashboard: {
     title: '대시보드',
     stats: '통계 개요',
+    trendTitle: '신청 · 프로젝트 추세',
+    declarationStatusDistribution: '신청 상태 분포',
+    projectStatusDistribution: '프로젝트 상태 분포',
+    byDepartmentTitle: '과제 발부 부서별 건수',
+    byTypeTitle: '프로젝트 유형별 분포',
     recentDeclarations: '최근 신청',
     projectProgress: '프로젝트 진행률 개요',
     quickActions: '빠른 액세스',
@@ -937,7 +969,25 @@ export default {
     actionNewDeclaration: '새 신청',
     actionApplyAcceptance: '검수 신청',
     actionAcademicSearch: '학술 검색',
-    actionKnowledgeSearch: '지식베이스 검색'
+    actionKnowledgeSearch: '지식베이스 검색',
+    declarationCount: '신청 수',
+    projectCount: '프로젝트 수',
+    topicDepartment: '과제 발부 부서',
+    delayWarningTitle: '프로젝트 지연 경고',
+    riskLevel: {
+      delayed: '지연됨',
+      sevenDays: '7일 이내 만료',
+      thirtyDays: '30일 이내 만료',
+      normal: '정상'
+    },
+    departments: {
+      youthFund: '국자연-청년기금',
+      generalFund: '국자연-일반기금',
+      regionalProject: '국자연-지역프로젝트',
+      provincialProject: '성시급프로젝트',
+      other: '기타'
+    },
+    projectCountLabel: '프로젝트 수'
   },
 
   // 지식베이스
@@ -1141,6 +1191,7 @@ export default {
       retry: '다시 시도',
       regenerate: '재생성',
       edit: '편집',
+      scrollToBottom: '맨 아래로',
       editMessagePlaceholder: '메시지 내용 편집...',
       // 🔥 修复：使用全角 ＠ 符号，避免 Vue I18n 编译错误
       inputPlaceholderWithKb: '＠지식베이스를 입력하거나 직접 질문하세요',
@@ -1150,10 +1201,13 @@ export default {
         supportUpload: '개인 지식베이스 및 로컬 파일 업로드 지원',
         maxFiles: '파일 수: 최대 10개',
         fileTypes: '파일 유형: pdf, doc, docx, ppt, pptx, xls, xlsx, csv, md, txt 지원',
-        maxKbFiles: '지식베이스 파일: 최대 3개'
+        maxKbFiles: '지식베이스 파일: 최대 3개',
+        attachmentTooltipFull: '·개인 지식베이스 및 로컬 파일 업로드 지원\n·파일 수: 최대 10개\n·파일 유형: pdf, doc, docx, ppt, pptx, xls, xlsx, csv, md, txt\n·지식베이스 파일: 최대 3개'
       },
       attachmentLocalFile: '로컬 파일',
       attachmentKnowledgeFile: '지식베이스 파일',
+      searchTooltipOn: '온라인 검색이 켜져 있습니다',
+      searchTooltipOff: '온라인 검색이 꺼져 있습니다',
       aiContentHint: 'AI가 생성한 내용은 참고용입니다',
       editTitle: '제목 편집',
       enterNewTitle: '새 대화 제목을 입력하세요',
@@ -1178,13 +1232,13 @@ export default {
           name: 'Qwen3-Max',
           description: '통의천문 최신 모델, 중국어 이해 및 생성에 뛰어남'
         },
-        deepseekV31: {
-          name: 'Deepseek-V3.1',
-          description: 'Deepseek V3.1, 강력한 코드 및 추론 능력'
+        minimax21: {
+          name: 'MiniMax-2.1',
+          description: 'MiniMax M2.1, 멀티모달·에이전트·코드 및 추론에 강함'
         },
-        deepseekR1: {
-          name: 'Deepseek-R1',
-          description: 'Deepseek R1, 강화 학습 모델'
+        kimiK25: {
+          name: 'Kimi-k2.5',
+          description: '문샷 Kimi K2.5, 네이티브 비전·에이전트 클러스터·코드 및 추론'
         }
       },
       justNow: '방금',
@@ -1255,13 +1309,61 @@ export default {
     pageBadge: '에이전트',
     pageSubtitle: '에이전트를 선택하여 효율적인 연구 협업을 시작하세요',
     startUse: '시작하기',
+    groupProject: '팀 프로젝트 관리 에이전트',
+    groupDecision: '연구 팀 구축',
+    groupDashboard: '프로젝트 통합',
     subtitle: '연구 프로젝트 관리 및 실천 도구',
     dashboardDesc: '프로젝트 개요 및 통계 데이터 보기',
     projectDesc: '연구 프로젝트의 전체 생명주기 관리, 프로젝트 진행 상황 추적',
     declarationDesc: '연구 프로젝트 신청 생성 및 관리',
+    industryEducationDesc: '신청 과제로 연구팀 매칭, 상세 조회 및 배정',
     reportDesc: '연구 보고서 생성 및 관리',
     knowledgeDesc: '지식베이스 구축 및 관리, 문서 업로드 및 검색 지원',
-    systemDesc: '권한 설정, 로그 조회, API 키 설정'
+    systemDesc: '권한 설정, 로그 조회, API 키 설정',
+    industryEducation: {
+      pageTitle: '산학연 에이전트',
+      pageSubtitle: '신청 과제 키워드 입력 후 연구팀 매칭 및 배정',
+      keywordPlaceholder: '신청 과제 또는 연구 방향 키워드 입력',
+      matchButton: '팀 매칭',
+      emptyHint: '과제를 입력하고 「팀 매칭」을 클릭하세요',
+      noResultHint: '매칭 팀이 없습니다. 다른 키워드를 시도해 보세요',
+      teamCard: { leader: '책임자', members: '멤버', completed: '완료', participantProjects: '참여 프로젝트 수', efficiency: '효율', viewDetail: '상세', assign: '이 팀에 배정' },
+      detail: {
+        title: '팀 상세',
+        titleTeamProjectIntro: '팀·프로젝트 소개',
+        leaderIntro: '책임자 소개',
+        members: '멤버',
+        projectLeader: '프로젝트 책임자',
+        projectMembers: '프로젝트 멤버',
+        memberIntro: '소개',
+        projects: '프로젝트',
+        viewProjectDetail: '프로젝트 상세 보기',
+        backToTeam: '팀 상세로 돌아가기',
+        clickProjectToShowDetail: '위 연결 프로젝트를 클릭하면 해당 프로젝트 상세가 여기에 표시됩니다',
+        efficiency: '효율',
+        nonLeadParticipant: '비책임 참여 프로젝트',
+        honors: '영예',
+        assign: '이 팀에 배정'
+      },
+      projectDetail: {
+        title: '프로젝트 상세',
+        status: '상태',
+        efficiencyChart: '효율 차트',
+        honors: '영예',
+        assign: '이 팀에 배정'
+      },
+      assign: {
+        title: '연구 프로젝트 배포',
+        projectLeaderLabel: '프로젝트 책임자(현재 팀에서 자동 획득)',
+        projectLeaderColon: '프로젝트 책임자: ',
+        topicLabel: '연구 프로젝트 설명',
+        topicLabelPlaceholder: '설명 입력 (키워드와 동일하거나 수정)',
+        success: '배포 완료',
+        selectDeclaration: '배정할 신청 선택',
+        declarationIdPlaceholder: '신청 ID'
+      },
+      semanticMatch: '의미 매칭'
+    }
   },
 
   // 시스템 관리

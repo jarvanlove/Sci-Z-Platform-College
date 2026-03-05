@@ -121,6 +121,25 @@ export const updateDeclarationStatus = (params) => {
 }
 
 /**
+ * 申报书编辑上传（覆盖当前申报书附件，下载时获取最新文件）
+ * @param {number} declarationId - 申报ID
+ * @param {File} file - 申报书文件
+ * @returns {Promise} 新附件信息
+ */
+export const uploadDeclarationDocument = (declarationId, file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request({
+    url: DECLARATION_API.DOCUMENT_UPLOAD(declarationId),
+    method: HTTP_METHODS.POST,
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+/**
  * 下载申报文档
  * @param {Object} params - 下载参数
  * @param {number} params.id - 申报ID

@@ -65,5 +65,15 @@ public class KnowledgeCreateReq {
      * 密钥类型
      */
     private String keyType;
+
+    /**
+     * 封面图片文件 ID（创建前通过上传接口获得）
+     */
+    private Long coverFileId;
+
+    /**
+     * 封面图片 URL（创建前通过上传接口获得，用于回显与持久化）
+     */
+    private String coverUrl;
 }
 
